@@ -1,0 +1,7 @@
+(executable
+ (public_name MLSL)
+ (name main)
+ (modes exe js)
+ (preprocessor_deps (file ./shader.frag))
+ (preprocess (pps js_of_ocaml-ppx ppx_blob))
+ (libraries MLSL js_of_ocaml))

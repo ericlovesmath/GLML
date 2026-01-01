@@ -1,0 +1,24 @@
+(lang dune 3.20)
+
+(name MLSL)
+
+(generate_opam_files true)
+
+(source
+ (github ericlovesmath/MLSL))
+
+(authors "Eric Lee <me@ericchanlee.com>")
+
+(maintainers "Eric Lee <me@ericchanlee.com>")
+
+(license MIT)
+
+(documentation https://github.com/ericlovesmath/MLSL)
+
+(package
+ (name MLSL)
+ (synopsis "Functional DSL targetting GLSL")
+ (description "Functional DSL targetting GLSL")
+ (depends ocaml)
+ (tags
+  ("graphics" "shader" "DSL" "GLSL" "MLSL" "compiler")))
