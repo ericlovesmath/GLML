@@ -7,12 +7,14 @@ const vs_source = `#version 300 es
     gl_Position = vec4(x, y, 0, 1);
   }`;
 
-const response = await fetch("shader.frag");
-const fs_source = await response.text();
-
 let gl, program;
 let mouseX = 0;
 let mouseY = 0;
+
+// FPS Capping variables
+let lastTime = 0;
+const fpsLimit = 120;
+const interval = 1000 / fpsLimit;
 
 function compileAndLinkGLSL() {
   const compile = (source, type) => {
@@ -25,7 +27,7 @@ function compileAndLinkGLSL() {
   };
 
   let vs = compile(vs_source, gl.VERTEX_SHADER);
-  let fs = compile(fs_source, gl.FRAGMENT_SHADER);
+  let fs = compile(mlsl.shader, gl.FRAGMENT_SHADER);
 
   program = gl.createProgram();
   gl.attachShader(program, vs);
@@ -35,17 +37,25 @@ function compileAndLinkGLSL() {
     throw Error(gl.getProgramInfoLog(program));
 }
 
-function render() {
-  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-  gl.useProgram(program);
-  gl.uniform2f(
-    gl.getUniformLocation(program, "u_resolution"),
-    gl.canvas.width,
-    gl.canvas.height,
-  );
-  gl.uniform2f(gl.getUniformLocation(program, "u_mouse"), mouseX, mouseY);
-  gl.drawArrays(gl.TRIANGLES, 0, 3);
+function render(currentTime) {
   requestAnimationFrame(render);
+
+  const delta = currentTime - lastTime;
+
+  if (delta >= interval) {
+    lastTime = currentTime - (delta % interval);
+
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    gl.useProgram(program);
+    gl.uniform2f(
+      gl.getUniformLocation(program, "u_resolution"),
+      gl.canvas.width,
+      gl.canvas.height,
+    );
+    gl.uniform2f(gl.getUniformLocation(program, "u_mouse"), mouseX, mouseY);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    requestAnimationFrame(render);
+  }
 }
 
 function main() {
@@ -77,7 +87,10 @@ function main() {
 
   compileAndLinkGLSL();
   resize();
-  requestAnimationFrame(render);
+  requestAnimationFrame((time) => {
+    lastTime = time;
+    render(time);
+  });
 }
 
 main();
