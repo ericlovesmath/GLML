@@ -1,8 +1,8 @@
 open Js_of_ocaml
 
 let () =
-  Js.export "mlsl"
+  Js.export "glml"
     (object%js
-       val description = "MLSL Language Compiler"
+       val description = "GLML Language Compiler"
        val shader = [%blob "./shader.frag"]
     end)

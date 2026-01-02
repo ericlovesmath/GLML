@@ -1,5 +1,5 @@
 {
-  description = "MLSL";
+  description = "GLML Compiler and Playground";
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };

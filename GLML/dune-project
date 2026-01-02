@@ -1,11 +1,11 @@
 (lang dune 3.20)
 
-(name MLSL)
+(name GLML)
 
 (generate_opam_files true)
 
 (source
- (github ericlovesmath/MLSL))
+ (github ericlovesmath/GLML))
 
 (authors "Eric Lee <me@ericchanlee.com>")
 
@@ -13,12 +13,11 @@
 
 (license MIT)
 
-(documentation https://github.com/ericlovesmath/MLSL)
+(documentation https://github.com/ericlovesmath/GLML)
 
 (package
- (name MLSL)
+ (name GLML)
  (synopsis "Functional DSL targetting GLSL")
  (description "Functional DSL targetting GLSL")
  (depends ocaml)
- (tags
-  ("graphics" "shader" "DSL" "GLSL" "MLSL" "compiler")))
+ (tags ("graphics" "shader" "DSL" "GLSL" "GLML" "compiler" "playground")))

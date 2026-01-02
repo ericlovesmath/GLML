@@ -27,7 +27,7 @@ function compileAndLinkGLSL() {
   };
 
   let vs = compile(vs_source, gl.VERTEX_SHADER);
-  let fs = compile(mlsl.shader, gl.FRAGMENT_SHADER);
+  let fs = compile(glml.shader, gl.FRAGMENT_SHADER);
 
   program = gl.createProgram();
   gl.attachShader(program, vs);

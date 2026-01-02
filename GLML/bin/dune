@@ -1,7 +1,7 @@
 (executable
- (public_name MLSL)
+ (public_name GLML)
  (name main)
  (modes exe js)
  (preprocessor_deps (file ./shader.frag))
  (preprocess (pps js_of_ocaml-ppx ppx_blob ppx_string))
- (libraries MLSL js_of_ocaml))
+ (libraries GLML js_of_ocaml))
