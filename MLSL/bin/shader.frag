@@ -4,6 +4,7 @@ precision highp float;
 
 uniform vec2 u_resolution;
 uniform vec2 u_mouse;
+uniform float u_time;
 
 out vec4 fragColor;
 
@@ -66,7 +67,8 @@ void main() {
     vec2 uv = (2.0 * gl_FragCoord.xy - u_resolution.xy) / min(u_resolution.y, u_resolution.x);
     vec2 mouseUV = uv - (2.0 * u_mouse.xy - u_resolution.xy) / min(u_resolution.y, u_resolution.x);
 
-    vec3 ro = vec3(0, 0, -7); // ray origin
+    // Raymarching Logic
+    vec3 ro = vec3(0, 0, -10); // ray origin
     vec3 rd = normalize(vec3(uv, 1)); // ray direction
     vec3 col = vec3(0);
 
@@ -79,9 +81,10 @@ void main() {
 
     for (int i = 0; i < 80; i++) {
         vec3 p = ro + rd * t;
-        p.xy *= rot2D(-1.7);
-        p.yz *= rot2D(-1.7);
-        p -= vec3(0, 0, 0);
+
+        // Rotating Camera
+        p.xy *= rot2D(u_time / 1000.);
+        p.yz *= rot2D(u_time / 1000.);
 
         float d = sMin(sdTorus(p, vec2(1., 0.5)), sdBoxFrame(p, vec3(2, 2, 3), 0.5), 0.1);
         t += d;
@@ -97,6 +100,8 @@ void main() {
     col += 0.2 * (1.0 / (mouseDist * 10.0));
 
     fragColor = vec4(col, 1.0);
+
+    // SDF visualization for 2D object below, from ShaderToy
 
     // Calculate distance to triangle + circle combo
     // float d = sMin(sdTriangle(uv, 0.5), sdCircle(uv - mouseUV, 0.3), 0.1);

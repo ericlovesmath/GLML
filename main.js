@@ -53,6 +53,7 @@ function render(currentTime) {
       gl.canvas.height,
     );
     gl.uniform2f(gl.getUniformLocation(program, "u_mouse"), mouseX, mouseY);
+    gl.uniform1f(gl.getUniformLocation(program, "u_time"), currentTime);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     requestAnimationFrame(render);
   }

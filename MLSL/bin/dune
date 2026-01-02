@@ -3,5 +3,5 @@
  (name main)
  (modes exe js)
  (preprocessor_deps (file ./shader.frag))
- (preprocess (pps js_of_ocaml-ppx ppx_blob))
+ (preprocess (pps js_of_ocaml-ppx ppx_blob ppx_string))
  (libraries MLSL js_of_ocaml))
