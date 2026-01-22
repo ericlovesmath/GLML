@@ -19,5 +19,5 @@
  (name GLML)
  (synopsis "Functional DSL targetting GLSL")
  (description "Functional DSL targetting GLSL")
- (depends ocaml)
+ (depends ocaml js_of_ocaml js_of_ocaml-ppx core ppx_blob ppx_jane)
  (tags ("graphics" "shader" "DSL" "GLSL" "GLML" "compiler" "playground")))
