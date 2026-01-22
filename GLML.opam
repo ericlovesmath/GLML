@@ -12,6 +12,11 @@ bug-reports: "https://github.com/ericlovesmath/GLML/issues"
 depends: [
   "dune" {>= "3.17"}
   "ocaml"
+  "js_of_ocaml"
+  "js_of_ocaml-ppx"
+  "core"
+  "ppx_blob"
+  "ppx_jane"
   "odoc" {with-doc}
 ]
 build: [
