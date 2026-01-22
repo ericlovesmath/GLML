@@ -10,7 +10,7 @@ homepage: "https://github.com/ericlovesmath/GLML"
 doc: "https://github.com/ericlovesmath/GLML"
 bug-reports: "https://github.com/ericlovesmath/GLML/issues"
 depends: [
-  "dune" {>= "3.20"}
+  "dune" {>= "3.17"}
   "ocaml"
   "odoc" {with-doc}
 ]
@@ -29,4 +29,3 @@ build: [
   ]
 ]
 dev-repo: "git+https://github.com/ericlovesmath/GLML.git"
-x-maintenance-intent: ["(latest)"]
