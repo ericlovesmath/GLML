@@ -3,4 +3,4 @@
  (name main)
  (modes exe js)
  (preprocess (pps js_of_ocaml-ppx ppx_string ppx_jane))
- (libraries GLML js_of_ocaml core))
+ (libraries glml_compiler js_of_ocaml core))
