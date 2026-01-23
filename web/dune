@@ -1,0 +1,13 @@
+(executable
+ (modes js)
+ (name main)
+ (libraries
+   js_of_ocaml
+   bonsai_web
+   bonsai_web_components.web_ui_codemirror
+   bonsai_web_components.web_ui_form
+   bonsai_web_components.codemirror_ocaml_with_janestreet_extensions
+   bonsai_web_components.codemirror_themes
+   core)
+ (preprocess
+  (pps bonsai.ppx_bonsai ppx_jane ppx_html)))
