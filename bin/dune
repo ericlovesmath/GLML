@@ -2,6 +2,5 @@
  (public_name GLML)
  (name main)
  (modes exe js)
- (preprocessor_deps (file ./shader.frag))
- (preprocess (pps js_of_ocaml-ppx ppx_blob ppx_string))
- (libraries GLML js_of_ocaml base))
+ (preprocess (pps js_of_ocaml-ppx ppx_string ppx_jane))
+ (libraries GLML js_of_ocaml core))
