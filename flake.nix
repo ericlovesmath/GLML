@@ -10,12 +10,9 @@
       url = "github:janestreet/opam-repository";
       flake = false;
     };
-
-    jail-nix.url = "sourcehut:~alexdavid/jail.nix";
-    llm-agents.url = "github:numtide/llm-agents.nix";
   };
 
-  outputs = { self, flake-utils, opam-nix, janestreet-repo, nixpkgs, jail-nix, llm-agents }@inputs:
+  outputs = { self, flake-utils, opam-nix, janestreet-repo, nixpkgs }@inputs:
     let
       # Uses <package>.opam to solve dependencies from
       package = "GLML";
@@ -56,39 +53,6 @@
         # Expose OCaml packages defined in [devOpamPackagesQuery] to devshell
         devOpamPackages = builtins.attrValues (pkgs.lib.getAttrs (builtins.attrNames devOpamPackagesQuery) scope');
         main = scope'.${package};
-
-        # Expose OCaml packages from opam derivation to opencode, except our package itself
-        opamPackages = builtins.filter pkgs.lib.isDerivation (builtins.attrValues (removeAttrs scope' [ package ]));
-        ocamlPath = pkgs.lib.makeSearchPath "lib/ocaml/${scope'.ocaml-base-compiler.version}/site-lib" opamPackages;
-
-        opencode-pkg = llm-agents.packages.${system}.opencode;
-        jail = jail-nix.lib.init pkgs;
-
-        # Sandboxing for Opencode using bubblewrap
-        makeJailedOpencode = { extraPkgs ? [] } :
-          jail "jailed-opencode" opencode-pkg (with jail.combinators; [
-            network
-            time-zone
-            no-new-session
-
-            # Automatically grants access to your project source
-            mount-cwd
-
-            # Persistent config/cache for the agent
-            (readwrite (noescape "~/.config/opencode"))
-            (readwrite (noescape "~/.local/share/opencode"))
-            (readonly "/nix/store")
-
-            (set-env "OCAMLPATH" ocamlPath)
-
-            # Inject OCaml tools and common utilities that opencode can use
-            (add-pkg-deps (with pkgs; extraPkgs ++ opamPackages ++ [
-                bashInteractive curl wget jq which
-                ripgrep gnugrep gawkInteractive ps findutils
-                diffutils binutils gcc
-            ]))
-          ]);
-
       in
       {
         legacyPackages = scope';
@@ -101,16 +65,6 @@
             packages = [
               devOpamPackages
               pkgs.glsl_analyzer
-            ];
-          };
-
-          # Shell with jailed opencode agent, nix develop ".#opencode"
-          opencode = pkgs.mkShell {
-            inputsFrom = [ main ];
-            packages = [
-              devOpamPackages
-              pkgs.glsl_analyzer
-              (makeJailedOpencode {})
             ];
           };
         };
