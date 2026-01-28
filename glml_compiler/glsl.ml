@@ -133,7 +133,7 @@ type qualifier =
   | Uniform
   | Out
   | Const
-[@@deriving sexp, string ~capitalize:"lowercase"]
+[@@deriving sexp, string ~capitalize:"lower sentence case"]
 
 type stmt =
   | Decl of qualifier option * ty_lit * string * t
