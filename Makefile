@@ -7,6 +7,7 @@ clean:
 	dune clean
 
 build:
+    # Use dune exec GLML -- <args> to run cli
 	dune build _build/default/bin/main.exe
 
 web:
