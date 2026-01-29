@@ -3,4 +3,4 @@
  (name main)
  (modes exe)
  (preprocess (pps ppx_string ppx_jane))
- (libraries glml_compiler core))
+ (libraries glml_compiler async core))
