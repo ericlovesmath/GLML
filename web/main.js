@@ -10,15 +10,11 @@ const vs_source = `#version 300 es
   }`;
 
 // FPS Capping variables
-
-//Provides: lastTime
-let lastTime = 0;
-//Provides: fpsLimit
 const fpsLimit = 120;
-//Provides: interval
 const interval = 1000 / fpsLimit;
 
 //Provides: compileAndLinkGLSL
+//Requires: vs_source, render
 function compileAndLinkGLSL(shader) {
   let gl = window.gl;
   const compile = (source, type) => {
@@ -31,8 +27,6 @@ function compileAndLinkGLSL(shader) {
   };
 
   let vs = compile(vs_source, gl.VERTEX_SHADER);
-  console.log("hello!");
-  console.log(shader);
 
   let fs;
   try {
@@ -50,7 +44,8 @@ function compileAndLinkGLSL(shader) {
     throw Error(gl.getProgramInfoLog(window.program));
 }
 
-window.render = function (currentTime) {
+//Provides: render
+function render(currentTime) {
   let gl = window.gl;
   requestAnimationFrame(render);
 
@@ -77,19 +72,18 @@ window.render = function (currentTime) {
   }
 };
 
-//Provides: main
-function main() {
+//Provides: init
+//Requires: vs_source, compileAndLinkGLSL, render
+function init() {
   window.gl = null;
   window.program;
   window.mouseX = 0;
   window.mouseY = 0;
   window.lastTime = 0;
 
-  console.log("hello from main!");
   const canvas = document.getElementById("gl-canvas");
   const container = canvas.parentElement;
   window.gl = canvas.getContext("webgl2");
-  console.log(window.gl);
 
   // Find the smallest dimension to maintain a square, resize canvas
   const resize = () => {
@@ -117,6 +111,6 @@ function main() {
   resize();
   requestAnimationFrame((time) => {
     window.lastTime = time;
-    window.render(time);
+    render(time);
   });
 }

@@ -6,10 +6,8 @@ open Virtual_dom
 module Form = Bonsai_web_ui_form.With_automatic_view
 module Codemirror = Bonsai_web_ui_codemirror
 
-external init_canvas : unit -> unit = "main"
+external init_canvas : unit -> unit = "init"
 external compile_and_link : string -> unit = "compileAndLinkGLSL"
-
-let example_shader = Glml_compiler.Glsl.compile_source Shader.example_source
 
 let () =
   Inline_css.Private.append
@@ -153,16 +151,7 @@ let y =
 end
 
 module Scheme_syntax_highlighting = struct
-  let doc =
-    {|;; Building a list of squares from 0 to 9:
-;; Note: loop is simply an arbitrary symbol used as a label. Any symbol will do.
-
-(define (list-of-squares n)
-  (let loop ((i n) (res '()))
-    (if (< i 0)
-        res
-        (loop (- i 1) (cons (* i i) res)))))|}
-  ;;
+  let doc = Shader.example_source
 
   let codemirror_editor ~name =
     Codemirror.of_initial_state
@@ -183,19 +172,19 @@ end
 
 module Which_editor = struct
   type t =
+    | Scheme
     | Ocaml
     | Ocaml_dynamic_prime
     | Ocaml_with_vim_keybindings
     | Ocaml_with_emacs_keybindings
-    | Scheme
   [@@deriving enumerate, sexp, equal, compare]
 
   let to_string = function
+    | Scheme -> "Scheme syntax highlighting"
     | Ocaml -> "OCaml syntax highlighting"
     | Ocaml_dynamic_prime -> "OCaml syntax highlighting with_dynamic_extensions'"
     | Ocaml_with_vim_keybindings -> "OCaml syntax highlighting with vim keybindings"
     | Ocaml_with_emacs_keybindings -> "OCaml syntax highlighting with emacs keybindings"
-    | Scheme -> "Scheme syntax highlighting"
   ;;
 end
 
@@ -276,7 +265,15 @@ let component graph =
     let%arr codemirror = codemirror in
     Codemirror.view codemirror
   in
-  let%arr codemirror_view = codemirror_view in
+  let codemirror_text =
+    let%arr codemirror = codemirror in
+    Codemirror.text codemirror
+  in
+  let () =
+    Bonsai.Edge.lifecycle ~on_activate:(return (Ui_effect.of_thunk init_canvas)) graph
+  in
+  let%arr codemirror_view = codemirror_view
+  and codemirror_text = codemirror_text in
   let open Vdom.Node in
   let open Vdom.Attr in
   div
@@ -287,12 +284,11 @@ let component graph =
         ; div
             ~attrs:[ class_ "controls" ]
             [ button
-                ~attrs:[ on_click (fun _ -> Ui_effect.of_thunk init_canvas) ]
-                [ text "Initialize GLSL" ]
-            ; button
                 ~attrs:
                   [ on_click (fun _ ->
-                      Ui_effect.of_thunk (fun _ -> compile_and_link example_shader))
+                      Ui_effect.of_thunk (fun _ ->
+                        compile_and_link
+                          (Glml_compiler.Glsl.compile_source codemirror_text)))
                   ]
                 [ text "Compile and Link" ]
             ]
