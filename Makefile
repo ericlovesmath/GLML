@@ -16,7 +16,6 @@ web:
 
 serve: web
 	@echo "========================================================="
-	@echo "  Shader: http://localhost:8000/web/glml.html"
 	@echo "  Codemirror: http://localhost:8000/web/codemirror.html"
 	@echo "========================================================="
 	python3 -m http.server

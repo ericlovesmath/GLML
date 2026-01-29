@@ -6,18 +6,60 @@ open Virtual_dom
 module Form = Bonsai_web_ui_form.With_automatic_view
 module Codemirror = Bonsai_web_ui_codemirror
 
-(* Make the codemirror editor take up most of the view *)
+external init_canvas : unit -> unit = "main"
+external compile_and_link : string -> unit = "compileAndLinkGLSL"
+
+let example_shader = Glml_compiler.Glsl.compile_source Shader.example_source
+
 let () =
   Inline_css.Private.append
     {|
-  .cm-editor {
-    height: 80vh;
+  body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
   }
 
-  label {
-    font-weight: normal;
+  .main-container {
+    display: flex;
+    flex-direction: row;
+    width: 100vw;
+    height: 100vh;
   }
-|}
+
+  .sidebar {
+    flex: 0 0 600px;
+    height: 100vh;
+    background-color: #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #ccc;
+    overflow-y: auto;
+  }
+
+  .editor-container {
+    flex: 1;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Make CodeMirror fill the editor-container */
+  .cm-editor {
+    height: 100% !important;
+  }
+
+  #gl-canvas {
+    width: 600px;
+    height: 600px;
+    background-color: black;
+    display: block;
+  }
+
+  .controls {
+    padding: 10px;
+  }
+  |}
 ;;
 
 module Ocaml_syntax_highlighting = struct
@@ -173,7 +215,7 @@ let component graph =
     let%arr language_picker = language_picker in
     Form.value language_picker |> Or_error.ok_exn
   in
-  let%sub theme_picker, codemirror =
+  let%sub _theme_picker, codemirror =
     (* Note: [Codemirror.with_dynamic_extensions] is generally preferred to [match%sub]ing
        and choosing a codemirror editor instance. For the purposes of this demo, the code
        is optimized for showing off the ease with which people can create different
@@ -234,23 +276,28 @@ let component graph =
     let%arr codemirror = codemirror in
     Codemirror.view codemirror
   in
-  let codemirror_text =
-    let%arr codemirror = codemirror in
-    Codemirror.text codemirror
-  in
-  let%arr codemirror_view = codemirror_view
-  and codemirror_text = codemirror_text
-  and language_picker = language_picker
-  and theme_picker = theme_picker in
-  Vdom.Node.div
-    [ Vdom.Node.text "Choose your editor extension:"
-    ; Vdom.Node.text codemirror_text
-    ; Vdom.Node.div
-        ~attrs:[ Vdom.Attr.style (Css_gen.flex_container ~direction:`Row ()) ]
-        [ Form.view_as_vdom language_picker
-        ; Option.value_map ~default:Vdom.Node.none ~f:Form.view_as_vdom theme_picker
+  let%arr codemirror_view = codemirror_view in
+  let open Vdom.Node in
+  let open Vdom.Attr in
+  div
+    ~attrs:[ class_ "main-container" ]
+    [ div
+        ~attrs:[ class_ "sidebar" ]
+        [ div ~attrs:[ id "canvas-container" ] [ canvas ~attrs:[ id "gl-canvas" ] [] ]
+        ; div
+            ~attrs:[ class_ "controls" ]
+            [ button
+                ~attrs:[ on_click (fun _ -> Ui_effect.of_thunk init_canvas) ]
+                [ text "Initialize GLSL" ]
+            ; button
+                ~attrs:
+                  [ on_click (fun _ ->
+                      Ui_effect.of_thunk (fun _ -> compile_and_link example_shader))
+                  ]
+                [ text "Compile and Link" ]
+            ]
         ]
-    ; codemirror_view
+    ; div ~attrs:[ class_ "editor-container" ] [ codemirror_view ]
     ]
 ;;
 
