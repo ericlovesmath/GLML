@@ -8,6 +8,8 @@
    bonsai_web_components.web_ui_form
    bonsai_web_components.codemirror_ocaml_with_janestreet_extensions
    bonsai_web_components.codemirror_themes
-   core)
+   core
+   glml_compiler)
+ (js_of_ocaml (javascript_files main.js))
  (preprocess
   (pps bonsai.ppx_bonsai ppx_jane ppx_html)))
