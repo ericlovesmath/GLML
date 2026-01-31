@@ -1,13 +1,14 @@
-open! Core
-open! Bonsai_web
+open Core
+open Bonsai_web
 open Bonsai.Let_syntax
 open Codemirror
+open Js_of_ocaml
 open Virtual_dom
 module Form = Bonsai_web_ui_form.With_automatic_view
 module Codemirror = Bonsai_web_ui_codemirror
 
 external init_canvas : unit -> unit = "init"
-external compile_and_link : string -> unit = "compileAndLinkGLSL"
+external compile_and_link : string -> Js.js_string Js.t Js.opt = "compileAndLinkGLSL"
 
 let () =
   Inline_css.Private.append
@@ -56,6 +57,18 @@ let () =
 
   .controls {
     padding: 10px;
+  }
+
+  .error-message {
+    color: #ff4444;
+    background-color: #ffe8e8;
+    border: 1px solid #ffcccc;
+    padding: 10px;
+    margin: 10px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 12px;
   }
   |}
 ;;
@@ -269,11 +282,16 @@ let component graph =
     let%arr codemirror = codemirror in
     Codemirror.text codemirror
   in
+  let error, set_error =
+    Bonsai.state_opt graph ~equal:String.equal ~sexp_of_model:String.sexp_of_t
+  in
   let () =
     Bonsai.Edge.lifecycle ~on_activate:(return (Ui_effect.of_thunk init_canvas)) graph
   in
   let%arr codemirror_view = codemirror_view
-  and codemirror_text = codemirror_text in
+  and codemirror_text = codemirror_text
+  and error = error
+  and set_error = set_error in
   let open Vdom.Node in
   let open Vdom.Attr in
   div
@@ -286,10 +304,22 @@ let component graph =
             [ button
                 ~attrs:
                   [ on_click (fun _ ->
-                      Ui_effect.of_thunk (fun _ ->
-                        compile_and_link (Glml_compiler.compile_source codemirror_text)))
+                      match
+                        Or_error.try_with (fun () ->
+                          Glml_compiler.compile_source codemirror_text)
+                      with
+                      | Error err -> set_error (Some (Error.to_string_hum err))
+                      | Ok glsl ->
+                        glsl
+                        |> compile_and_link
+                        |> Js.Opt.to_option
+                        |> Option.map ~f:Js.to_string
+                        |> set_error)
                   ]
                 [ text "Compile and Link" ]
+            ; (match error with
+               | None -> none
+               | Some err -> div ~attrs:[ class_ "error-message" ] [ text err ])
             ]
         ]
     ; div ~attrs:[ class_ "editor-container" ] [ codemirror_view ]

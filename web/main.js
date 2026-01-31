@@ -30,28 +30,32 @@ function compileAndLinkGLSL(shader) {
     let s = gl.createShader(type);
     gl.shaderSource(s, source);
     gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
-      throw Error(gl.getShaderInfoLog(s));
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      return gl.getShaderInfoLog(s);
+    }
     return s;
   };
 
   let vs = compile(vs_source, gl.VERTEX_SHADER);
+  if (typeof vs === "string") return vs;
 
-  let fs;
-  try {
-    fs = compile(shader, gl.FRAGMENT_SHADER);
-  } catch (error) {
-    console.error("GLSL Error!", error);
+  let fs = compile(shader, gl.FRAGMENT_SHADER);
+  if (typeof fs === "string") {
     state.program = null;
-    return null;
+    return fs;
   }
 
   state.program = gl.createProgram();
   gl.attachShader(state.program, vs);
   gl.attachShader(state.program, fs);
   gl.linkProgram(state.program);
-  if (!gl.getProgramParameter(state.program, gl.LINK_STATUS))
-    throw Error(gl.getProgramInfoLog(state.program));
+  if (!gl.getProgramParameter(state.program, gl.LINK_STATUS)) {
+    const log = gl.getProgramInfoLog(state.program);
+    state.program = null;
+    return log;
+  }
+
+  return null;
 }
 
 // Provides: render
