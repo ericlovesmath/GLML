@@ -1,6 +1,6 @@
 # GLML (OpenGL Meta Language)
 
-GLML is an early stage functional domain-specific language for writing fragment shaders, targeting GLSL. It allows you to write shaders using an ML-style syntax with the benefits of a strong type system and functional abstractions.
+GLML is an early stage functional domain-specific language for writing fragment shaders, targeting GLSL. It allows you to write shaders using an ML-style language with [size-dependent types](https://futhark-lang.org/publications/fhpnc23.pdf).
 
 ## Build
 
@@ -15,7 +15,7 @@ opam switch create . 5.2.0 --repositories=default,janestreet=git+https://github.
 opam install . --deps-only
 ```
 
-## Usag
+## Usage
 
 - **CLI**: `dune exec GLML -- compile <file>`
 - **Web**: `make serve` and visit `http://localhost:8000/web/index.html`
