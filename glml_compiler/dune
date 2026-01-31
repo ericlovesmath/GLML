@@ -1,4 +1,5 @@
 (library
  (name glml_compiler)
+ (modules glsl stlc uniquify anf typecheck translate glml_compiler)
  (libraries core)
  (preprocess (pps ppx_jane)))
