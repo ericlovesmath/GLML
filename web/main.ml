@@ -287,8 +287,7 @@ let component graph =
                 ~attrs:
                   [ on_click (fun _ ->
                       Ui_effect.of_thunk (fun _ ->
-                        compile_and_link
-                          (Glml_compiler.Glsl.compile_source codemirror_text)))
+                        compile_and_link (Glml_compiler.compile_source codemirror_text)))
                   ]
                 [ text "Compile and Link" ]
             ]
