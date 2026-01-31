@@ -16,7 +16,7 @@ web:
 
 serve: web
 	@echo "========================================================="
-	@echo "  Codemirror: http://localhost:8000/web/codemirror.html"
+	@echo "  Playground: http://localhost:8000/web/index.html"
 	@echo "========================================================="
 	python3 -m http.server
 
