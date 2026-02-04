@@ -2,6 +2,8 @@
 
 GLML is an early stage functional domain-specific language for writing fragment shaders, targeting GLSL. It allows you to write shaders using an ML-style language with [size-dependent types](https://futhark-lang.org/publications/fhpnc23.pdf).
 
+See [INFORMATION.md](INFORMATION.md) for a working roadmap and referenced resources
+
 ## Build
 
 If Nix is installed, `nix develop` provides the necessary libraries. If not, note that the web playground uses some dependencies from [Jane Street's opam repository](https://github.com/janestreet/opam-repository) for [bonsai](https://github.com/janestreet/bonsai/issues). The compiler itself does not depend on bonsai and can be compiled without Jane Street's opam repository.
