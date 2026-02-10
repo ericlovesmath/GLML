@@ -17,16 +17,54 @@ let compile_stlc (t : Stlc.t) : string Or_error.t =
   return (Glsl.to_shader glsl)
 ;;
 
-(* TODO: Potentially ephemeral tests, does not pass *)
 let%expect_test "simple tests for compile_stlc" =
   let test s =
-    s
-    |> Stlc.of_string
-    |> compile_stlc
-    |> Or_error.sexp_of_t String.sexp_of_t
-    |> Sexp.to_string_hum
-    |> print_endline
+    match compile_stlc (Stlc.of_string s) with
+    | Error err -> print_s (Error.sexp_of_t err)
+    | Ok glsl -> print_endline glsl
   in
-  test "((fun x : float -> (+ x 1.0)) 10.0)";
-  [%expect "hi"]
+  test "(let x = 2.0 in (+ (* 12.0 x) 10.0))";
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        float x_0 = 2.;
+        float anf_1 = (12. * x_0);
+        return (anf_1 + 10.);
+    }
+    |}];
+  test "(if (&& #t #f) (let x = 2.0 in (* x 1.0)) 2.0)";
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        bool anf_1 = (true && false);
+        if (anf_1) {
+            float x_0 = 2.;
+            return (x_0 * 1.);
+        } else {
+            return 2.;
+        }
+    }
+    |}];
+  test "(let x = (if #f 0 1) in (* x 2))";
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        float x_0 = 0.;
+        if (false) {
+            x_0 = 0.;
+        } else {
+            x_0 = 1.;
+        }
+        return (x_0 * 2.);
+    }
+    |}]
 ;;
