@@ -146,6 +146,10 @@ type stmt =
   | Break
 [@@deriving sexp_of]
 
+let indent s =
+  s |> String.split_lines |> List.map ~f:(String.append "    ") |> String.concat ~sep:"\n"
+;;
+
 let rec string_of_stmt = function
   | Decl (qual, ty, name, t) ->
     let t = string_of_term t in
@@ -185,13 +189,11 @@ let rec string_of_stmt = function
     let body = string_of_stmt body in
     [%string "for (%{init} %{cond}; %{iter}) %{body}"]
   | Block stmts ->
-    let body =
-      stmts
-      |> List.map ~f:string_of_stmt
-      |> List.map ~f:(fun s -> "    " ^ s)
-      |> String.concat ~sep:"\n"
-    in
-    [%string "{\n%{body}\n}"]
+    stmts
+    |> List.map ~f:string_of_stmt
+    |> List.map ~f:indent
+    |> String.concat ~sep:"\n"
+    |> fun body -> [%string "{\n%{body}\n}"]
   | Break -> "break;"
 ;;
 
@@ -269,7 +271,7 @@ let to_shader (Program decls : t) : string =
       let body =
         body
         |> List.map ~f:string_of_stmt
-        |> List.map ~f:(String.append "    ")
+        |> List.map ~f:indent
         |> String.concat ~sep:"\n"
       in
       [%string "%{ret_type} %{name}(%{params}) {\n%{body}\n}"]
