@@ -1,5 +1,6 @@
 (library
  (name glml_compiler)
- (modules glsl stlc uniquify anf typecheck translate glml_compiler)
+ (modules glsl stlc uniquify typecheck translate glml_compiler)
  (libraries core)
- (preprocess (pps ppx_jane)))
+ (preprocess (pps ppx_jane))
+ (inline_tests))
