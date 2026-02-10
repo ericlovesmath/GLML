@@ -12,6 +12,7 @@ let compile_stlc (t : Stlc.t) : string Or_error.t =
   let open Or_error.Let_syntax in
   let t = Uniquify.uniquify t in
   let%bind ctx = Typecheck.typecheck t in
+  let ctx, t = Anf.normalize ctx t in
   let%bind glsl = Translate.translate ctx t in
   return (Glsl.to_shader glsl)
 ;;
