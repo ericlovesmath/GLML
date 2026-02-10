@@ -1,3 +1,80 @@
 open Core
+open Stlc
 
-let typecheck (_ : Stlc.t) : Glsl.ty String.Map.t Or_error.t = failwith "TODO typecheck"
+let rec update (map : ty String.Map.t) (t : t) : (ty String.Map.t * ty) Or_error.t =
+  let open Or_error.Let_syntax in
+  match t with
+  | Var v ->
+    (match Map.find map v with
+     | Some ty -> Ok (map, ty)
+     | None ->
+       error_s
+         [%message
+           "typecheck: var not found in type map" (v : string) (map : ty String.Map.t)])
+  | Float _ -> Ok (map, TyFloat)
+  | Int _ -> Ok (map, TyInt)
+  | Bool _ -> Ok (map, TyBool)
+  | Vec3 (x, y, z) ->
+    (* Pure functions with all unique variable names, so passing maps
+       like this should be fine to collect them *)
+    let%bind map, ty_x = update map x in
+    let%bind map, ty_y = update map y in
+    let%bind map, ty_z = update map z in
+    (match ty_x, ty_y, ty_z with
+     | TyFloat, TyFloat, TyFloat -> Ok (map, TyVec3)
+     | _ ->
+       error_s
+         [%message
+           "typecheck: vec3 does not contain floats" (ty_x : ty) (ty_y : ty) (ty_z : ty)])
+  | Lam (v, ty_v, t) ->
+    let map = Map.set map ~key:v ~data:ty_v in
+    let%bind map, ty_t = update map t in
+    Ok (map, TyArrow (ty_v, ty_t))
+  | App (f, x) ->
+    (* Pure functions with all unique variable names, so passing maps
+       like this should be fine to collect them *)
+    let%bind map, ty_f = update map f in
+    let%bind map, ty_x = update map x in
+    (match ty_f with
+     | TyArrow (l, r) when equal_ty ty_x l -> Ok (map, r)
+     | _ -> error_s [%message "typecheck: invalid app" (ty_f : ty) (ty_x : ty)])
+  | Let (v, bind, body) ->
+    let%bind map, ty_v = update map bind in
+    let map = Map.set map ~key:v ~data:ty_v in
+    update map body
+  | If (c, t, e) ->
+    (* Pure functions with all unique variable names, so passing maps
+       like this should be fine to collect them *)
+    let%bind map, ty_c = update map c in
+    let%bind map, ty_t = update map t in
+    let%bind map, ty_e = update map e in
+    if not (equal_ty ty_c TyBool)
+    then error_s [%message "typecheck: if cond is not bool" (ty_c : ty)]
+    else if not (equal_ty ty_t ty_e)
+    then error_s [%message "typecheck: if/else differs" (ty_t : ty) (ty_e : ty)]
+    else Ok (map, ty_t)
+  | Bop (op, l, r) ->
+    (* Pure functions with all unique variable names, so passing maps
+       like this should be fine to collect them *)
+    let%bind map, ty_l = update map l in
+    let%bind map, ty_r = update map r in
+    (match op, ty_l, ty_r with
+     | (Add | Sub | Mul | Div | Mod), TyFloat, TyFloat -> Ok (map, TyFloat)
+     | (Add | Sub | Mul | Div | Mod), TyInt, TyInt -> Ok (map, TyInt)
+     | (Add | Sub | Mul | Div | Mod), _, _ ->
+       error_s [%message "typecheck: bop expected int/float" (ty_l : ty) (ty_r : ty)]
+     | Eq, TyFloat, TyFloat | Eq, TyInt, TyInt | Eq, TyBool, TyBool | Eq, TyVec3, TyVec3
+       -> Ok (map, TyBool)
+     | Eq, _, _ -> error_s [%message "typecheck: unsupport eq" (ty_l : ty) (ty_r : ty)]
+     | (Lt | Gt | Leq | Geq), TyFloat, TyFloat | (Lt | Gt | Leq | Geq), TyInt, TyInt ->
+       Ok (map, TyBool)
+     | (Lt | Gt | Leq | Geq), _, _ ->
+       error_s [%message "typecheck: bop expected int/float" (ty_l : ty) (ty_r : ty)]
+     | (And | Or), TyBool, TyBool -> Ok (map, TyBool)
+     | (And | Or), _, _ ->
+       error_s [%message "typecheck: and/or expected bools" (ty_l : ty) (ty_r : ty)])
+;;
+
+let typecheck (t : t) : ty String.Map.t Or_error.t =
+  Or_error.map ~f:fst (update String.Map.empty t)
+;;
