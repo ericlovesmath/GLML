@@ -58,13 +58,13 @@ let%expect_test "simple tests for compile_stlc" =
     precision highp float;
     out vec4 fragColor;
     void main() {
-        float x_0 = 0.;
+        int x_0 = 0;
         if (false) {
-            x_0 = 0.;
+            x_0 = 0;
         } else {
-            x_0 = 1.;
+            x_0 = 1;
         }
-        return (x_0 * 2.);
+        return (x_0 * 2);
     }
     |}]
 ;;
