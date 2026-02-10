@@ -1,25 +1,17 @@
 open Core
 
-let counter = ref 0
-
-let fresh name =
-  let id = !counter in
-  counter := id + 1;
-  Printf.sprintf "%s.%d" name id
-;;
-
 let rec aux (ctx : string String.Map.t) (t : Stlc.t) : Stlc.t =
   match t with
   | Float _ | Int _ | Bool _ -> t
   | Var v -> Var (Option.value (Map.find ctx v) ~default:v)
   | Lam (v, ty, body) ->
-    let v' = fresh v in
+    let v' = Utils.fresh v in
     let ctx = Map.set ctx ~key:v ~data:v' in
     Lam (v', ty, aux ctx body)
   | App (f, x) -> App (aux ctx f, aux ctx x)
   | Let (v, bind, body) ->
     let bind = aux ctx bind in
-    let v' = fresh v in
+    let v' = Utils.fresh v in
     let ctx = Map.set ctx ~key:v ~data:v' in
     let body = aux ctx body in
     Let (v', bind, body)
@@ -29,6 +21,6 @@ let rec aux (ctx : string String.Map.t) (t : Stlc.t) : Stlc.t =
 ;;
 
 let uniquify e =
-  counter := 0;
+  Utils.reset ();
   aux String.Map.empty e
 ;;
