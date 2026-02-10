@@ -7,7 +7,7 @@ type ty =
   | TyBool
   | TyVec3
   | TyArrow of ty * ty
-[@@deriving sexp_of]
+[@@deriving sexp_of, equal]
 
 type t =
   | Var of string
