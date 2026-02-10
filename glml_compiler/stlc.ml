@@ -34,8 +34,8 @@ let rec ty_of_sexp = function
 let is_ident = String.for_all ~f:Char.is_alpha
 
 let rec t_of_sexp = function
-  | Atom f when Option.is_some (Float.of_string_opt f) -> Float (Float.of_string f)
   | Atom i when Option.is_some (Int.of_string_opt i) -> Int (Int.of_string i)
+  | Atom f when Option.is_some (Float.of_string_opt f) -> Float (Float.of_string f)
   | Atom "#t" -> Bool true
   | Atom "#f" -> Bool false
   | Atom v when is_ident v -> Var v
