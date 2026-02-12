@@ -1,13 +1,13 @@
 .PHONY: clean build web serve test
 
-# Default command if you just type 'make'
-all: clean build
+all: build web
 
 clean:
 	dune clean
 
 build:
     # Use dune exec GLML -- <args> to run cli
+    # Alternatively use ./_build/default/bin/main.exe
 	dune build _build/default/bin/main.exe
 
 web:

@@ -41,7 +41,7 @@ type qualifier =
 
 type stmt =
   | Decl of qualifier option * ty * string * term
-  | Assign of term * term
+  | Set of term * term
   | Return of term option
   | Expr of term
   | IfStmt of term * stmt * stmt option
