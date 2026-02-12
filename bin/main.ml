@@ -1,6 +1,5 @@
 open Core
-
-let compile _ = "TODO: hook up compiler"
+module Glml = Glml_compiler
 
 let compile_command =
   Command.basic
@@ -11,9 +10,27 @@ let compile_command =
      let%map_open input_file = anon ("filename" %: string)
      and output_file =
        flag "-o" (optional string) ~doc:"FILE output file path (default: stdout)"
-     in
+     and passes = flag "-p" (listed string) ~doc:"PASSES name of pass to dump or 'all'" in
      fun () ->
-       let result = compile input_file in
+       let dump_to_stdout pass sexp =
+         Printf.printf
+           "=== %s ===\n%s\n\n"
+           (Glml.Passes.to_string pass)
+           (Sexp.to_string_hum sexp)
+       in
+       let dump =
+         let passes =
+           if List.mem passes "all" ~equal:String.equal
+           then Glml.Passes.all
+           else List.map ~f:Glml.Passes.of_string passes
+         in
+         passes
+         |> List.map ~f:(fun pass -> pass, dump_to_stdout pass)
+         |> Glml.Passes.Map.of_alist_exn
+       in
+       let result =
+         input_file |> In_channel.read_all |> Glml.compile_stlc ~dump |> Or_error.ok_exn
+       in
        match output_file with
        | Some path -> Out_channel.write_all path ~data:result
        | None -> print_endline result)
@@ -22,8 +39,11 @@ let compile_command =
 let list_passes_command =
   Command.basic
     ~summary:"List all available passes"
-    (let open Command.Let_syntax in
-     return (fun () -> print_endline "TODO: list passes here"))
+    (Command.Param.return (fun () ->
+       Glml.Passes.all
+       |> List.map ~f:Glml.Passes.to_string
+       |> String.concat ~sep:", "
+       |> print_endline))
 ;;
 
 let main_command =

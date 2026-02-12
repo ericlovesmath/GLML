@@ -25,7 +25,7 @@ module Passes = struct
       | Typecheck
       | Anf
       | Translate
-    [@@deriving compare, sexp]
+    [@@deriving compare, sexp, enumerate, string ~capitalize:"lower sentence case"]
   end
 
   include T
