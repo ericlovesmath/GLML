@@ -10,22 +10,31 @@ let compile_command =
      let%map_open input_file = anon ("filename" %: string)
      and output_file =
        flag "-o" (optional string) ~doc:"FILE output file path (default: stdout)"
-     and passes = flag "-p" (listed string) ~doc:"PASSES name of pass to dump or 'all'" in
+     and dump_passes =
+       flag "-p" (listed string) ~doc:"PASSES name of pass to dump or 'all'"
+     and dump_dir =
+       flag "-d" (optional string) ~doc:"DIR directory to dump pass files into"
+     in
      fun () ->
-       let dump_to_stdout pass sexp =
-         Printf.printf
-           "=== %s ===\n%s\n\n"
-           (Glml.Passes.to_string pass)
-           (Sexp.to_string_hum sexp)
+       let handler pass sexp =
+         let pass = Glml.Passes.to_string pass in
+         let data = Sexp.to_string_hum sexp in
+         match dump_dir with
+         | None -> Printf.printf "=== %s ===\n%s\n\n" pass data
+         | Some dir ->
+           if not (Sys_unix.is_directory_exn dir) then Core_unix.mkdir_p dir;
+           let filename = sprintf "%s/%s.sexp" dir pass in
+           Printf.printf "Dumping %s\n" filename;
+           Out_channel.write_all filename ~data
        in
        let dump =
          let passes =
-           if List.mem passes "all" ~equal:String.equal
+           if List.mem dump_passes "all" ~equal:String.equal
            then Glml.Passes.all
-           else List.map ~f:Glml.Passes.of_string passes
+           else List.map ~f:Glml.Passes.of_string dump_passes
          in
          passes
-         |> List.map ~f:(fun pass -> pass, dump_to_stdout pass)
+         |> List.map ~f:(fun pass -> pass, handler pass)
          |> Glml.Passes.Map.of_alist_exn
        in
        let result =
