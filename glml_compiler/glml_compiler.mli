@@ -1,5 +1,6 @@
 open Core
 
+(** Passes in compiler available to be dumped *)
 module Passes : sig
   type t =
     | Stlc
@@ -7,8 +8,6 @@ module Passes : sig
     | Typecheck
     | Anf
     | Translate
-    | Glsl
-  [@@deriving compare, sexp_of]
 
   include Comparable.S with type t := t
 end

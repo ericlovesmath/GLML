@@ -1,6 +1,23 @@
 open Core
 
+(** Passes in compiler available to be dumped, using GADT witnesses to have
+    generic [sexp_of_pass] function with [trace] *)
 module Passes = struct
+  type _ pass =
+    | Stlc : Stlc.t pass
+    | Uniquify : Stlc.t pass
+    | Typecheck : Stlc.ty String.Map.t pass
+    | Anf : (Stlc.ty String.Map.t * Anf.t) pass
+    | Translate : Glsl.t pass
+
+  let sexp_of_pass : type a. a pass -> a -> Sexp.t = function
+    | Stlc -> Stlc.sexp_of_t
+    | Uniquify -> Stlc.sexp_of_t
+    | Typecheck -> [%sexp_of: Stlc.ty String.Map.t]
+    | Anf -> [%sexp_of: Stlc.ty String.Map.t * Anf.t]
+    | Translate -> Glsl.sexp_of_t
+  ;;
+
   module T = struct
     type t =
       | Stlc
@@ -8,12 +25,19 @@ module Passes = struct
       | Typecheck
       | Anf
       | Translate
-      | Glsl
     [@@deriving compare, sexp]
   end
 
   include T
   include Comparable.Make (T)
+
+  let of_pass : type a. a pass -> t = function
+    | Stlc -> Stlc
+    | Uniquify -> Uniquify
+    | Typecheck -> Typecheck
+    | Anf -> Anf
+    | Translate -> Translate
+  ;;
 end
 
 let compile_source src = Glsl.to_shader (Glsl.of_string src)
@@ -21,22 +45,23 @@ let compile_source src = Glsl.to_shader (Glsl.of_string src)
 let compile_stlc ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : string)
   : string Or_error.t
   =
-  let trace pass sexp =
-    match Map.find dump pass with
-    | Some handler -> handler sexp
-    | None -> ()
+  let trace : type a. a Passes.pass -> a -> unit =
+    fun pass value ->
+    Passes.of_pass pass
+    |> Map.find dump
+    |> Option.iter ~f:(fun f -> f (Passes.sexp_of_pass pass value))
   in
   let open Or_error.Let_syntax in
   let%bind t = Stlc.of_string s in
-  trace Stlc (Stlc.sexp_of_t t);
+  trace Stlc t;
   let t = Uniquify.uniquify t in
-  trace Uniquify (Stlc.sexp_of_t t);
+  trace Uniquify t;
   let%bind ctx = Typecheck.typecheck t in
-  trace Typecheck [%message (ctx : Stlc.ty String.Map.t)];
+  trace Typecheck ctx;
   let ctx, t = Anf.normalize ctx t in
-  trace Anf [%message (t : Anf.t) (ctx : Stlc.ty String.Map.t)];
+  trace Anf (ctx, t);
   let%bind glsl = Translate.translate ctx t in
-  trace Translate (Glsl.sexp_of_t glsl);
+  trace Translate glsl;
   return (Glsl.to_shader glsl)
 ;;
 
