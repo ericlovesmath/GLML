@@ -8,6 +8,7 @@ module Passes : sig
     | Typecheck
     | Anf
     | Translate
+  [@@deriving sexp_of, enumerate, string]
 
   include Comparable.S with type t := t
 end
