@@ -3,6 +3,6 @@ let () =
     "glml"
     (object%js
        val description = "GLML Language Compiler"
-       val shader = Glml_compiler.compile_source Shader.example_source
+       val shader = Glml_compiler.compile_source
     end)
 ;;

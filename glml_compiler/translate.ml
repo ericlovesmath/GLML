@@ -44,23 +44,23 @@ let placeholder_value_for_ty (ty : ty) : term =
   | TyVoid -> failwith "translate: if statement shouldn't return void"
 ;;
 
-let rec translate_assign (map : Stlc.ty String.Map.t) (var : string) (anf : Anf.t)
+let rec translate_set (map : Stlc.ty String.Map.t) (var : string) (anf : Anf.t)
   : stmt list
   =
   match anf with
   | Let (v, bind, body) ->
     let ty = to_glsl_ty (Map.find_exn map v) in
     let stmt = Decl (None, ty, v, to_glsl_term bind) in
-    stmt :: translate_assign map var body
+    stmt :: translate_set map var body
   | Return t ->
     (match t with
      | If (c, t, e) ->
        [ IfStmt
            ( to_glsl_atom c
-           , Block (translate_assign map var t)
-           , Some (Block (translate_assign map var e)) )
+           , Block (translate_set map var t)
+           , Some (Block (translate_set map var e)) )
        ]
-     | _ -> [ Assign (Var var, to_glsl_term t) ])
+     | _ -> [ Set (Var var, to_glsl_term t) ])
 ;;
 
 let rec translate_block (map : Stlc.ty String.Map.t) (anf : Anf.t) : stmt list =
@@ -73,8 +73,8 @@ let rec translate_block (map : Stlc.ty String.Map.t) (anf : Anf.t) : stmt list =
        let if_stmt =
          IfStmt
            ( to_glsl_atom c
-           , Block (translate_assign map v t)
-           , Some (Block (translate_assign map v e)) )
+           , Block (translate_set map v t)
+           , Some (Block (translate_set map v e)) )
        in
        decl :: if_stmt :: translate_block map body
      | _ ->

@@ -137,7 +137,7 @@ type qualifier =
 
 type stmt =
   | Decl of qualifier option * ty * string * term
-  | Assign of term * term
+  | Set of term * term
   | Return of term option
   | Expr of term
   | IfStmt of term * stmt * stmt option
@@ -159,7 +159,7 @@ let rec string_of_stmt = function
      | Some q ->
        let q = string_of_qualifier q in
        [%string "%{q} %{ty} %{name} = %{t};"])
-  | Assign (lhs, rhs) ->
+  | Set (lhs, rhs) ->
     let lhs = string_of_term lhs in
     let rhs = string_of_term rhs in
     [%string "%{lhs} = %{rhs};"]
@@ -199,11 +199,11 @@ let rec string_of_stmt = function
 
 let rec stmt_of_sexp (s : Sexp.t) : stmt =
   match s with
-  | List [ Atom "assign"; Atom qual; Atom ty; Atom name; val_expr ] ->
+  | List [ Atom "set"; Atom qual; Atom ty; Atom name; val_expr ] ->
     Decl (Some (qualifier_of_string qual), ty_of_string ty, name, term_of_sexp val_expr)
-  | List [ Atom "assign"; Atom ty_or_var; Atom name_or_expr; val_expr ] ->
+  | List [ Atom "set"; Atom ty_or_var; Atom name_or_expr; val_expr ] ->
     Decl (None, ty_of_string ty_or_var, name_or_expr, term_of_sexp val_expr)
-  | List [ Atom "assign"; lhs; rhs ] -> Assign (term_of_sexp lhs, term_of_sexp rhs)
+  | List [ Atom "set"; lhs; rhs ] -> Set (term_of_sexp lhs, term_of_sexp rhs)
   | List [ Atom "return"; val_expr ] -> Return (Some (term_of_sexp val_expr))
   | List [ Atom "return" ] -> Return None
   | List [ Atom "if"; cond; then_stmt ] ->
