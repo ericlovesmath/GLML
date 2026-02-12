@@ -1,25 +1,48 @@
 open Core
-module Glsl = Glsl
-module Stlc = Stlc
-module Uniquify = Uniquify
-module Typecheck = Typecheck
-module Translate = Translate
+
+module Passes = struct
+  module T = struct
+    type t =
+      | Stlc
+      | Uniquify
+      | Typecheck
+      | Anf
+      | Translate
+      | Glsl
+    [@@deriving compare, sexp]
+  end
+
+  include T
+  include Comparable.Make (T)
+end
 
 let compile_source src = Glsl.to_shader (Glsl.of_string src)
 
-(* TODO: Move this to compile_source *)
-let compile_stlc (t : Stlc.t) : string Or_error.t =
+let compile_stlc ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : string)
+  : string Or_error.t
+  =
+  let trace pass sexp =
+    match Map.find dump pass with
+    | Some handler -> handler sexp
+    | None -> ()
+  in
   let open Or_error.Let_syntax in
+  let%bind t = Stlc.of_string s in
+  trace Stlc (Stlc.sexp_of_t t);
   let t = Uniquify.uniquify t in
+  trace Uniquify (Stlc.sexp_of_t t);
   let%bind ctx = Typecheck.typecheck t in
+  trace Typecheck [%message (ctx : Stlc.ty String.Map.t)];
   let ctx, t = Anf.normalize ctx t in
+  trace Anf [%message (t : Anf.t) (ctx : Stlc.ty String.Map.t)];
   let%bind glsl = Translate.translate ctx t in
+  trace Translate (Glsl.sexp_of_t glsl);
   return (Glsl.to_shader glsl)
 ;;
 
 let%expect_test "simple tests for compile_stlc" =
   let test s =
-    match compile_stlc (Stlc.of_string s) with
+    match compile_stlc s with
     | Error err -> print_s (Error.sexp_of_t err)
     | Ok glsl -> print_endline glsl
   in

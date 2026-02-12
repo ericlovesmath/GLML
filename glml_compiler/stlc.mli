@@ -1,3 +1,5 @@
+open Core
+
 type ty =
   | TyFloat
   | TyInt
@@ -21,4 +23,4 @@ type t =
 
 (** Reads string sexp for simple STLC representation, intended to be temporary
     until a real parser will be written. Failiable. *)
-val of_string : string -> t
+val of_string : string -> t Or_error.t

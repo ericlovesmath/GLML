@@ -63,4 +63,4 @@ let rec t_of_sexp = function
 
 (** Reads string sexp for simple STLC representation, intended to be temporary
     until a real parser will be written *)
-let of_string s = t_of_sexp (Sexp.of_string s)
+let of_string s = Or_error.try_with (fun () -> t_of_sexp (Sexp.of_string s))
