@@ -12,16 +12,18 @@ type term =
   | Bop of Glsl.binary_op * atom * atom
   | Vec3 of atom * atom * atom
   | App of atom * atom
-  | If of atom * t * t
-  | Lam of string * Stlc.ty * t
+  | If of atom * anf * anf
+  | Lam of string * Stlc.ty * anf
 [@@deriving sexp_of]
 
 (** A-normal form representation of the STLC *)
-and t =
-  | Let of string * term * t
+and anf =
+  | Let of string * term * anf
   | Return of term
 [@@deriving sexp_of]
 
+type t = Program of Stlc.ty String.Map.t * anf list [@@deriving sexp_of]
+
 (** Converts [t] to A-normal form, updating the [type map] to account for
     the new created variables. Variables are named in the form [anf_num]. *)
-val normalize : Stlc.ty String.Map.t -> Stlc.t -> Stlc.ty String.Map.t * t
+val to_anf : Typecheck.t -> t

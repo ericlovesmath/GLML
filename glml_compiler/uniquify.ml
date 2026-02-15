@@ -1,6 +1,7 @@
 open Core
+open Stlc
 
-let rec aux (ctx : string String.Map.t) (t : Stlc.t) : Stlc.t =
+let rec aux (ctx : string String.Map.t) (t : term) : term =
   match t with
   | Float _ | Int _ | Bool _ -> t
   | Var v -> Var (Option.value (Map.find ctx v) ~default:v)
@@ -20,7 +21,4 @@ let rec aux (ctx : string String.Map.t) (t : Stlc.t) : Stlc.t =
   | Bop (op, t, t') -> Bop (op, aux ctx t, aux ctx t')
 ;;
 
-let uniquify e =
-  Utils.reset ();
-  aux String.Map.empty e
-;;
+let uniquify (Program terms) = Program (List.map ~f:(aux String.Map.empty) terms)

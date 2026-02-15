@@ -13,14 +13,16 @@ type term =
   | Bop of Glsl.binary_op * atom * atom
   | Vec3 of atom * atom * atom
   | App of atom * atom
-  | If of atom * t * t
-  | Lam of string * Stlc.ty * t
+  | If of atom * anf * anf
+  | Lam of string * Stlc.ty * anf
 [@@deriving sexp_of]
 
-and t =
-  | Let of string * term * t
+and anf =
+  | Let of string * term * anf
   | Return of term
 [@@deriving sexp_of]
+
+type t = Program of Stlc.ty String.Map.t * anf list [@@deriving sexp_of]
 
 let type_of_atom ctx = function
   | Var v -> Map.find_exn ctx v
@@ -58,7 +60,7 @@ and type_of ctx = function
 ;;
 
 (* TODO: Refactor to use some kind of State monad + let* for implicit CPS *)
-let rec normalize (map : ty String.Map.t) (expr : Stlc.t) : ty String.Map.t * t =
+let rec normalize (map : ty String.Map.t) (expr : Stlc.term) : ty String.Map.t * anf =
   match expr with
   | Var v -> map, Return (Atom (Var v))
   | Float f -> map, Return (Atom (Float f))
@@ -92,7 +94,7 @@ let rec normalize (map : ty String.Map.t) (expr : Stlc.t) : ty String.Map.t * t 
       let map, e_anf = normalize map e in
       map, Return (If (c, t_anf, e_anf)))
 
-and atomize (map : ty String.Map.t) (expr : Stlc.t) k : ty String.Map.t * t =
+and atomize (map : ty String.Map.t) (expr : Stlc.term) k : ty String.Map.t * anf =
   match expr with
   | Var v -> k map (Var v)
   | Float f -> k map (Float f)
@@ -109,4 +111,9 @@ and atomize (map : ty String.Map.t) (expr : Stlc.t) k : ty String.Map.t * t =
       | Return t -> Let (v, t, rem)
     in
     map, make_let anf_block
+;;
+
+let to_anf (Program (map, terms) : Typecheck.t) : t =
+  let map, anfs = List.fold_map terms ~init:map ~f:normalize in
+  Program (map, anfs)
 ;;

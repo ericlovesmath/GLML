@@ -6,15 +6,15 @@ module Passes = struct
   type _ pass =
     | Stlc : Stlc.t pass
     | Uniquify : Stlc.t pass
-    | Typecheck : Stlc.ty String.Map.t pass
-    | Anf : (Stlc.ty String.Map.t * Anf.t) pass
+    | Typecheck : Typecheck.t pass
+    | Anf : Anf.t pass
     | Translate : Glsl.t pass
 
   let sexp_of_pass : type a. a pass -> a -> Sexp.t = function
     | Stlc -> Stlc.sexp_of_t
     | Uniquify -> Stlc.sexp_of_t
-    | Typecheck -> [%sexp_of: Stlc.ty String.Map.t]
-    | Anf -> [%sexp_of: Stlc.ty String.Map.t * Anf.t]
+    | Typecheck -> Typecheck.sexp_of_t
+    | Anf -> Anf.sexp_of_t
     | Translate -> Glsl.sexp_of_t
   ;;
 
@@ -52,15 +52,16 @@ let compile_stlc ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s :
     |> Option.iter ~f:(fun f -> f (Passes.sexp_of_pass pass value))
   in
   let open Or_error.Let_syntax in
+  Utils.reset ();
   let%bind t = Stlc.of_string s in
   trace Stlc t;
   let t = Uniquify.uniquify t in
   trace Uniquify t;
-  let%bind ctx = Typecheck.typecheck t in
-  trace Typecheck ctx;
-  let ctx, t = Anf.normalize ctx t in
-  trace Anf (ctx, t);
-  let%bind glsl = Translate.translate ctx t in
+  let%bind t = Typecheck.typecheck t in
+  trace Typecheck t;
+  let t = Anf.to_anf t in
+  trace Anf t;
+  let%bind glsl = Translate.translate t in
   trace Translate glsl;
   return (Glsl.to_shader glsl)
 ;;
@@ -71,7 +72,7 @@ let%expect_test "simple tests for compile_stlc" =
     | Error err -> print_s (Error.sexp_of_t err)
     | Ok glsl -> print_endline glsl
   in
-  test "(let x = 2.0 in (+ (* 12.0 x) 10.0))";
+  test "((let x = 2.0 in (+ (* 12.0 x) 10.0)))";
   [%expect
     {|
     #version 300 es
@@ -83,7 +84,7 @@ let%expect_test "simple tests for compile_stlc" =
         return (anf_1 + 10.);
     }
     |}];
-  test "(if (&& #t #f) (let x = 2.0 in (* x 1.0)) 2.0)";
+  test "((if (&& #t #f) (let x = 2.0 in (* x 1.0)) 2.0))";
   [%expect
     {|
     #version 300 es
@@ -99,7 +100,7 @@ let%expect_test "simple tests for compile_stlc" =
         }
     }
     |}];
-  test "(let x = (if #f 0 1) in (* x 2))";
+  test "((let x = (if #f 0 1) in (* x 2)))";
   [%expect
     {|
     #version 300 es
