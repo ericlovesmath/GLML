@@ -44,7 +44,7 @@ let placeholder_value_for_ty (ty : ty) : term =
   | TyVoid -> failwith "translate: if statement shouldn't return void"
 ;;
 
-let rec translate_set (map : Stlc.ty String.Map.t) (var : string) (anf : Anf.t)
+let rec translate_set (map : Stlc.ty String.Map.t) (var : string) (anf : Anf.anf)
   : stmt list
   =
   match anf with
@@ -63,7 +63,7 @@ let rec translate_set (map : Stlc.ty String.Map.t) (var : string) (anf : Anf.t)
      | _ -> [ Set (Var var, to_glsl_term t) ])
 ;;
 
-let rec translate_block (map : Stlc.ty String.Map.t) (anf : Anf.t) : stmt list =
+let rec translate_block (map : Stlc.ty String.Map.t) (anf : Anf.anf) : stmt list =
   match anf with
   | Let (v, term, body) ->
     (match term with
@@ -92,7 +92,7 @@ let rec translate_block (map : Stlc.ty String.Map.t) (anf : Anf.t) : stmt list =
      | _ -> [ Return (Some (to_glsl_term t)) ])
 ;;
 
-let translate (map : Stlc.ty String.Map.t) (t : Anf.t) : t Or_error.t =
+let translate (Program (map, terms) : Anf.t) : t Or_error.t =
   Ok
     (Program
        [ Global (Out, TyVec 4, "fragColor")
@@ -101,7 +101,11 @@ let translate (map : Stlc.ty String.Map.t) (t : Anf.t) : t Or_error.t =
            ; desc = None
            ; params = []
            ; ret_type = TyVoid
-           ; body = translate_block map t
+           ; body =
+               translate_block
+                 map
+                 (* TODO: Clearly do not just want to do that *)
+                 (List.hd_exn terms)
            }
        ])
 ;;

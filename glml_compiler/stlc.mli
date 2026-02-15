@@ -8,18 +8,20 @@ type ty =
   | TyArrow of ty * ty
 [@@deriving sexp_of, equal]
 
-type t =
+type term =
   | Var of string
   | Float of float
   | Int of int
   | Bool of bool
-  | Vec3 of t * t * t
-  | Lam of string * ty * t
-  | App of t * t
-  | Let of string * t * t
-  | If of t * t * t
-  | Bop of Glsl.binary_op * t * t
+  | Vec3 of term * term * term
+  | Lam of string * ty * term
+  | App of term * term
+  | Let of string * term * term
+  | If of term * term * term
+  | Bop of Glsl.binary_op * term * term
 [@@deriving sexp_of]
+
+type t = Program of term list [@@deriving sexp_of]
 
 (** Reads string sexp for simple STLC representation, intended to be temporary
     until a real parser will be written. Failiable. *)

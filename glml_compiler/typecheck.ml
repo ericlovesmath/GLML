@@ -1,7 +1,9 @@
 open Core
 open Stlc
 
-let rec update (map : ty String.Map.t) (t : t) : (ty String.Map.t * ty) Or_error.t =
+type t = Program of Stlc.ty String.Map.t * term list [@@deriving sexp_of]
+
+let rec update (map : ty String.Map.t) (t : term) : (ty String.Map.t * ty) Or_error.t =
   let open Or_error.Let_syntax in
   match t with
   | Var v ->
@@ -75,6 +77,11 @@ let rec update (map : ty String.Map.t) (t : t) : (ty String.Map.t * ty) Or_error
        error_s [%message "typecheck: and/or expected bools" (ty_l : ty) (ty_r : ty)])
 ;;
 
-let typecheck (t : t) : ty String.Map.t Or_error.t =
-  Or_error.map ~f:fst (update String.Map.empty t)
+let typecheck (Program terms : Stlc.t) : t Or_error.t =
+  let open Or_error.Let_syntax in
+  let%map map =
+    List.fold_result terms ~init:String.Map.empty ~f:(fun map t ->
+      update map t |> Or_error.map ~f:fst)
+  in
+  Program (map, terms)
 ;;
