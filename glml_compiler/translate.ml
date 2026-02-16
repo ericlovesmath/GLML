@@ -93,49 +93,30 @@ let rec translate_block (map : Stlc.ty String.Map.t) (anf : Anf.anf) : stmt list
 ;;
 
 let translate (Program (map, tops) : Anf.t) : t =
-  let globals, main_stmts =
-    List.fold tops ~init:([], []) ~f:(fun (globals, main_stmts) top ->
+  let globals =
+    List.map tops ~f:(fun top ->
       match top with
       | Define ("main", Return (Lam (_, _, body))) ->
         let stmts = translate_block map body in
-        let stmts =
+        let body =
           List.map stmts ~f:(function
             | Return (Some t) -> Set (Var "fragColor", t)
             | s -> s)
         in
-        globals, main_stmts @ stmts
+        Function { name = "main"; desc = None; params = []; ret_type = TyVoid; body }
       | Define (name, Return (Lam (arg, arg_ty, body))) ->
-        let ret_ty =
+        let ret_type =
           match Map.find_exn map name with
           | TyArrow (_, r) -> to_glsl_ty r
           | _ -> failwith "translate: expected arrow type for function"
         in
-        let func_body = translate_block map body in
-        let func =
-          Function
-            { name
-            ; desc = None
-            ; params = [ to_glsl_ty arg_ty, arg ]
-            ; ret_type = ret_ty
-            ; body = func_body
-            }
-        in
-        func :: globals, main_stmts
+        let params = [ to_glsl_ty arg_ty, arg ] in
+        let body = translate_block map body in
+        Function { name; desc = None; params; ret_type; body }
       | Define (_, Return _) ->
-        raise_s
-          [%message "translate: expected to return lam form at toplevel" (top : Anf.top)]
+        raise_s [%message "translate: expected lam form at toplevel" (top : Anf.top)]
       | Define (_, Let _) ->
         raise_s [%message "translate: expected return toplevel" (top : Anf.top)])
   in
-  Program
-    ([ Global (Out, TyVec 3, "fragColor") ]
-     @ List.rev globals
-     @ [ Function
-           { name = "main"
-           ; desc = None
-           ; params = []
-           ; ret_type = TyVoid
-           ; body = main_stmts
-           }
-       ])
+  Program ([ Global (Out, TyVec 3, "fragColor") ] @ globals)
 ;;
