@@ -38,7 +38,7 @@ let rec ty_of_sexp = function
   | sexp -> raise_s [%message "ty_of_sexp: unexpected format" (sexp : Sexp.t)]
 ;;
 
-let is_ident = String.for_all ~f:Char.is_alpha
+let is_ident = String.for_all ~f:(fun c -> Char.is_alphanum c || Char.equal c '_')
 
 let rec term_of_sexp = function
   | Atom i when Option.is_some (Int.of_string_opt i) -> Int (Int.of_string i)
@@ -51,6 +51,8 @@ let rec term_of_sexp = function
     Lam (v, ty_of_sexp ty, term_of_sexp t)
   | List [ Atom "let"; Atom v; Atom "="; bind; Atom "in"; body ] when is_ident v ->
     Let (v, term_of_sexp bind, term_of_sexp body)
+  | List (Atom "let" :: Atom v :: Atom "=" :: bind :: Atom "in" :: tl) when is_ident v ->
+    Let (v, term_of_sexp bind, term_of_sexp (List tl))
   | List [ Atom "if"; c; t; e ] -> If (term_of_sexp c, term_of_sexp t, term_of_sexp e)
   | List [ Atom "+"; t; t' ] -> Bop (Add, term_of_sexp t, term_of_sexp t')
   | List [ Atom "-"; t; t' ] -> Bop (Sub, term_of_sexp t, term_of_sexp t')
@@ -71,8 +73,18 @@ let rec term_of_sexp = function
 let top_of_sexp = function
   | List [ Atom "let"; Atom v; Atom "="; bind ] when is_ident v ->
     Define (v, term_of_sexp bind)
-  | List [ Atom "extern"; ty; Atom v ] when is_ident v ->
-    Extern (ty_of_sexp ty, v)
+  | List (Atom "let" :: Atom v :: Atom "=" :: tl) when is_ident v ->
+    Define (v, term_of_sexp (List tl))
+  | List (Atom "let" :: Atom v :: tl) when is_ident v ->
+    let rec build = function
+      | [ Atom "="; term ] -> term_of_sexp term
+      | Atom "=" :: tl -> term_of_sexp (List tl)
+      | List [ Atom v; Atom ":"; ty ] :: tl when is_ident v ->
+        Lam (v, ty_of_sexp ty, build tl)
+      | _ -> raise_s [%message "top_of_sexp: unexpected let tail" (tl : Sexp.t list)]
+    in
+    Define (v, build tl)
+  | List [ Atom "extern"; ty; Atom v ] when is_ident v -> Extern (ty_of_sexp ty, v)
   | sexp -> raise_s [%message "top_of_sexp: unexpected format" (sexp : Sexp.t)]
 ;;
 

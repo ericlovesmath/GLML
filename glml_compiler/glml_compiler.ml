@@ -156,4 +156,24 @@ let%expect_test "simple tests for compile_stlc" =
         fragColor = vec3(anf_3, 0., 0.);
     }
     |}];
+  test
+    {|
+    ((extern float n)
+     (let f (x : float) = (+ x n))
+     (let main (u : float) = (vec3 (f 10.0) 0.0 0.0)))
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec3 fragColor;
+    uniform float n;
+    float f_1(float x_0) {
+        return (x_0 + n);
+    }
+    void main() {
+        float anf_3 = f_1(10.);
+        fragColor = vec3(anf_3, 0., 0.);
+    }
+    |}]
 ;;
