@@ -1,7 +1,7 @@
 open Core
 open Stlc
 
-type t = Program of Stlc.ty String.Map.t * term list [@@deriving sexp_of]
+type t = Program of ty String.Map.t * top list [@@deriving sexp_of]
 
 let rec update (map : ty String.Map.t) (t : term) : (ty String.Map.t * ty) Or_error.t =
   let open Or_error.Let_syntax in
@@ -79,9 +79,13 @@ let rec update (map : ty String.Map.t) (t : term) : (ty String.Map.t * ty) Or_er
 
 let typecheck (Program terms : Stlc.t) : t Or_error.t =
   let open Or_error.Let_syntax in
-  let%map map =
-    List.fold_result terms ~init:String.Map.empty ~f:(fun map t ->
-      update map t |> Or_error.map ~f:fst)
+  let%map map, _ =
+    List.fold_result terms ~init:(String.Map.empty, []) ~f:(fun (map, acc) t ->
+      match t with
+      | Define (v, bind) ->
+        let%bind map, ty = update map bind in
+        let map = Map.set map ~key:v ~data:ty in
+        Ok (map, Define (v, bind) :: acc))
   in
   Program (map, terms)
 ;;

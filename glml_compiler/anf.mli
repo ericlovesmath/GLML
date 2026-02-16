@@ -22,7 +22,8 @@ and anf =
   | Return of term
 [@@deriving sexp_of]
 
-type t = Program of Stlc.ty String.Map.t * anf list [@@deriving sexp_of]
+type top = Define of string * anf [@@deriving sexp_of]
+type t = Program of Stlc.ty String.Map.t * top list [@@deriving sexp_of]
 
 (** Converts [t] to A-normal form, updating the [type map] to account for
     the new created variables. Variables are named in the form [anf_num]. *)

@@ -22,7 +22,8 @@ type term =
   | Bop of Glsl.binary_op * term * term
 [@@deriving sexp_of]
 
-type t = Program of term list [@@deriving sexp_of]
+type top = Define of string * term [@@deriving sexp_of]
+type t = Program of top list [@@deriving sexp_of]
 
 let rec ty_of_sexp = function
   | Atom "float" -> TyFloat
@@ -60,10 +61,16 @@ let rec term_of_sexp = function
   | List [ Atom "&&"; t; t' ] -> Bop (And, term_of_sexp t, term_of_sexp t')
   | List [ Atom "||"; t; t' ] -> Bop (Or, term_of_sexp t, term_of_sexp t')
   | List [ f; x ] -> App (term_of_sexp f, term_of_sexp x)
-  | sexp -> raise_s [%message "[t_of_sexp] unexpected format" (sexp : Sexp.t)]
+  | sexp -> raise_s [%message "t_of_sexp: unexpected format" (sexp : Sexp.t)]
 ;;
 
-let t_of_sexp s = Program (List.t_of_sexp term_of_sexp (Sexp.of_string s))
+let top_of_sexp = function
+  | List [ Atom "let"; Atom v; Atom "="; bind ] when is_ident v ->
+    Define (v, term_of_sexp bind)
+  | sexp -> raise_s [%message "top_of_sexp: unexpected format" (sexp : Sexp.t)]
+;;
+
+let t_of_sexp s = Program (List.t_of_sexp top_of_sexp (Sexp.of_string s))
 
 (** Reads string sexp for simple STLC representation, intended to be temporary
     until a real parser will be written *)

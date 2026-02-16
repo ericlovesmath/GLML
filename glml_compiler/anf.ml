@@ -22,7 +22,8 @@ and anf =
   | Return of term
 [@@deriving sexp_of]
 
-type t = Program of Stlc.ty String.Map.t * anf list [@@deriving sexp_of]
+type top = Define of string * anf [@@deriving sexp_of]
+type t = Program of Stlc.ty String.Map.t * top list [@@deriving sexp_of]
 
 let type_of_atom ctx = function
   | Var v -> Map.find_exn ctx v
@@ -68,7 +69,7 @@ let rec normalize (map : ty String.Map.t) (expr : Stlc.term) : ty String.Map.t *
   | Bool b -> map, Return (Atom (Bool b))
   | Lam (v, ty_v, t) ->
     let map = Map.set map ~key:v ~data:ty_v in
-    let _, t = normalize map t in
+    let map, t = normalize map t in
     map, Return (Lam (v, ty_v, t))
   | Let (v, bind, body) ->
     let map, bind_anf = normalize map bind in
@@ -113,7 +114,16 @@ and atomize (map : ty String.Map.t) (expr : Stlc.term) k : ty String.Map.t * anf
     map, make_let anf_block
 ;;
 
+let normalize_top (map : ty String.Map.t) (t : Stlc.top) : ty String.Map.t * top =
+  match t with
+  | Define (v, bind) ->
+    let map, bind_anf = normalize map bind in
+    let ty_v = type_of map bind_anf in
+    let map = Map.set map ~key:v ~data:ty_v in
+    map, Define (v, bind_anf)
+;;
+
 let to_anf (Program (map, terms) : Typecheck.t) : t =
-  let map, anfs = List.fold_map terms ~init:map ~f:normalize in
+  let map, anfs = List.fold_map terms ~init:map ~f:normalize_top in
   Program (map, anfs)
 ;;

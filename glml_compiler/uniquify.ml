@@ -21,4 +21,16 @@ let rec aux (ctx : string String.Map.t) (t : term) : term =
   | Bop (op, t, t') -> Bop (op, aux ctx t, aux ctx t')
 ;;
 
-let uniquify (Program terms) = Program (List.map ~f:(aux String.Map.empty) terms)
+let uniquify_top (ctx : string String.Map.t) (t : top) : string String.Map.t * top =
+  match t with
+  | Define (v, bind) ->
+    let bind = aux ctx bind in
+    let v' = Utils.fresh v in
+    let ctx = Map.set ctx ~key:v ~data:v' in
+    ctx, Define (v', bind)
+;;
+
+let uniquify (Program terms) =
+  let _, terms = List.fold_map terms ~init:String.Map.empty ~f:uniquify_top in
+  Program terms
+;;

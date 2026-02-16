@@ -40,6 +40,7 @@ module Passes = struct
   ;;
 end
 
+(* TODO: remove this? *)
 let compile_source src = Glsl.to_shader (Glsl.of_string src)
 
 let compile_stlc ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : string)
@@ -61,7 +62,7 @@ let compile_stlc ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s :
   trace Typecheck t;
   let t = Anf.to_anf t in
   trace Anf t;
-  let%bind glsl = Translate.translate t in
+  let glsl = Translate.translate t in
   trace Translate glsl;
   return (Glsl.to_shader glsl)
 ;;
@@ -72,48 +73,67 @@ let%expect_test "simple tests for compile_stlc" =
     | Error err -> print_s (Error.sexp_of_t err)
     | Ok glsl -> print_endline glsl
   in
-  test "((let x = 2.0 in (+ (* 12.0 x) 10.0)))";
+  let wrap_main s = [%string "((let main = (fun u : float -> %{s})))"] in
+  test (wrap_main "(let x = 2.0 in (+ (* 12.0 x) 10.0))");
   [%expect
     {|
     #version 300 es
     precision highp float;
-    out vec4 fragColor;
+    out vec3 fragColor;
     void main() {
-        float x_0 = 2.;
-        float anf_1 = (12. * x_0);
-        return (anf_1 + 10.);
+        float x_1 = 2.;
+        float anf_2 = (12. * x_1);
+        fragColor = (anf_2 + 10.);
     }
     |}];
-  test "((if (&& #t #f) (let x = 2.0 in (* x 1.0)) 2.0))";
+  test (wrap_main "(if (&& #t #f) (let x = 2.0 in (* x 1.0)) 2.0)");
   [%expect
     {|
     #version 300 es
     precision highp float;
-    out vec4 fragColor;
+    out vec3 fragColor;
     void main() {
-        bool anf_1 = (true && false);
-        if (anf_1) {
-            float x_0 = 2.;
-            return (x_0 * 1.);
+        bool anf_2 = (true && false);
+        if (anf_2) {
+            float x_1 = 2.;
+            return (x_1 * 1.);
         } else {
             return 2.;
         }
     }
     |}];
-  test "((let x = (if #f 0 1) in (* x 2)))";
+  test (wrap_main "(let x = (if #f 0 1) in (* x 2))");
   [%expect
     {|
     #version 300 es
     precision highp float;
-    out vec4 fragColor;
+    out vec3 fragColor;
     void main() {
-        int x_0 = 0;
+        int x_1 = 0;
         if (false) {
-            x_0 = 0;
+            x_1 = 0;
         } else {
-            x_0 = 1;
+            x_1 = 1;
         }
-        return (x_0 * 2);
+        fragColor = (x_1 * 2);
+    }
+    |}];
+  test
+    {|
+    ((let f = (fun x : float -> (+ x 1.0)))
+     (let main = (fun u : float -> (vec3 (f 10.0) 0.0 0.0))))
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec3 fragColor;
+    float f_1(float x_0) {
+        return (x_0 + 1.);
+    }
+    void main() {
+        float anf_3 = f_1(10.);
+        fragColor = vec3(anf_3, 0., 0.);
     }
     |}]
 ;;
