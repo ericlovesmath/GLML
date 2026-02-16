@@ -85,7 +85,10 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
       | Define (v, bind) ->
         let%bind map, ty = update map bind in
         let map = Map.set map ~key:v ~data:ty in
-        Ok (map, Define (v, bind) :: acc))
+        Ok (map, Define (v, bind) :: acc)
+      | Extern (ty, v) ->
+        let map = Map.set map ~key:v ~data:ty in
+        Ok (map, Extern (ty, v) :: acc))
   in
   Program (map, terms)
 ;;

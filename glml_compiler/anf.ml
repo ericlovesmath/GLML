@@ -22,7 +22,11 @@ and anf =
   | Return of term
 [@@deriving sexp_of]
 
-type top = Define of string * anf [@@deriving sexp_of]
+type top =
+  | Define of string * anf
+  | Extern of ty * string
+[@@deriving sexp_of]
+
 type t = Program of Stlc.ty String.Map.t * top list [@@deriving sexp_of]
 
 let type_of_atom ctx = function
@@ -121,6 +125,7 @@ let normalize_top (map : ty String.Map.t) (t : Stlc.top) : ty String.Map.t * top
     let ty_v = type_of map bind_anf in
     let map = Map.set map ~key:v ~data:ty_v in
     map, Define (v, bind_anf)
+  | Extern (ty, v) -> map, Extern (ty, v)
 ;;
 
 let to_anf (Program (map, terms) : Typecheck.t) : t =

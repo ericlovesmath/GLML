@@ -22,7 +22,11 @@ and anf =
   | Return of term
 [@@deriving sexp_of]
 
-type top = Define of string * anf [@@deriving sexp_of]
+type top =
+  | Define of string * anf
+  | Extern of Stlc.ty * string
+[@@deriving sexp_of]
+
 type t = Program of Stlc.ty String.Map.t * top list [@@deriving sexp_of]
 
 (** Converts [t] to A-normal form, updating the [type map] to account for

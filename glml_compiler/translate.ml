@@ -97,6 +97,7 @@ let translate (Program (map, tops) : Anf.t) : t =
     List.map tops ~f:(fun top ->
       match top with
       | Define ("main", Return (Lam (_, _, body))) ->
+        (* TODO: Validate typechecking special case for main *)
         let stmts = translate_block map body in
         let body =
           List.map stmts ~f:(function
@@ -116,7 +117,8 @@ let translate (Program (map, tops) : Anf.t) : t =
       | Define (_, Return _) ->
         raise_s [%message "translate: expected lam form at toplevel" (top : Anf.top)]
       | Define (_, Let _) ->
-        raise_s [%message "translate: expected return toplevel" (top : Anf.top)])
+        raise_s [%message "translate: expected return toplevel" (top : Anf.top)]
+      | Extern (ty, v) -> Global (Uniform, to_glsl_ty ty, v))
   in
   Program ([ Global (Out, TyVec 3, "fragColor") ] @ globals)
 ;;
