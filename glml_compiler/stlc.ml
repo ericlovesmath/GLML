@@ -22,7 +22,11 @@ type term =
   | Bop of Glsl.binary_op * term * term
 [@@deriving sexp_of]
 
-type top = Define of string * term [@@deriving sexp_of]
+type top =
+  | Define of string * term
+  | Extern of ty * string
+[@@deriving sexp_of]
+
 type t = Program of top list [@@deriving sexp_of]
 
 let rec ty_of_sexp = function
@@ -67,6 +71,8 @@ let rec term_of_sexp = function
 let top_of_sexp = function
   | List [ Atom "let"; Atom v; Atom "="; bind ] when is_ident v ->
     Define (v, term_of_sexp bind)
+  | List [ Atom "extern"; ty; Atom v ] when is_ident v ->
+    Extern (ty_of_sexp ty, v)
   | sexp -> raise_s [%message "top_of_sexp: unexpected format" (sexp : Sexp.t)]
 ;;
 

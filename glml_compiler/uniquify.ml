@@ -28,6 +28,7 @@ let uniquify_top (ctx : string String.Map.t) (t : top) : string String.Map.t * t
     let v' = Utils.fresh v in
     let ctx = Map.set ctx ~key:v ~data:v' in
     ctx, Define (v', bind)
+  | Extern _ -> ctx, t
 ;;
 
 let uniquify (Program terms) =
