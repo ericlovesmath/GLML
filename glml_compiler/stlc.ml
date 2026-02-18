@@ -5,7 +5,8 @@ type ty =
   | TyFloat
   | TyInt
   | TyBool
-  | TyVec3
+  | TyUnit
+  | TyVec of int
   | TyArrow of ty * ty
 [@@deriving sexp_of, equal]
 
@@ -14,7 +15,8 @@ type term =
   | Float of float
   | Int of int
   | Bool of bool
-  | Vec3 of term * term * term
+  | Unit
+  | Vec of int * term list
   | Lam of string * ty * term
   | App of term * term
   | Let of string * term * term
@@ -33,7 +35,10 @@ let rec ty_of_sexp = function
   | Atom "float" -> TyFloat
   | Atom "int" -> TyInt
   | Atom "bool" -> TyBool
-  | Atom "vec3" -> TyVec3
+  | Atom "unit" -> TyUnit
+  | Atom s when String.is_prefix s ~prefix:"vec" ->
+    let n = String.drop_prefix s 3 |> Int.of_string in
+    TyVec n
   | List [ ty; Atom "->"; ty' ] -> TyArrow (ty_of_sexp ty, ty_of_sexp ty')
   | sexp -> raise_s [%message "ty_of_sexp: unexpected format" (sexp : Sexp.t)]
 ;;
@@ -45,8 +50,11 @@ let rec term_of_sexp = function
   | Atom f when Option.is_some (Float.of_string_opt f) -> Float (Float.of_string f)
   | Atom "#t" -> Bool true
   | Atom "#f" -> Bool false
+  | Atom "#u" -> Unit
   | Atom v when is_ident v -> Var v
-  | List [ Atom "vec3"; x; y; z ] -> Vec3 (term_of_sexp x, term_of_sexp y, term_of_sexp z)
+  | List (Atom s :: args) when String.is_prefix s ~prefix:"vec" ->
+    let n = String.drop_prefix s 3 |> Int.of_string in
+    Vec (n, List.map args ~f:term_of_sexp)
   | List [ Atom "fun"; Atom v; Atom ":"; ty; Atom "->"; t ] when is_ident v ->
     Lam (v, ty_of_sexp ty, term_of_sexp t)
   | List [ Atom "let"; Atom v; Atom "="; bind; Atom "in"; body ] when is_ident v ->

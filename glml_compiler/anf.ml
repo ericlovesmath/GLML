@@ -6,12 +6,13 @@ type atom =
   | Float of float
   | Int of int
   | Bool of bool
+  | Unit
 [@@deriving sexp_of]
 
 type term =
   | Atom of atom
   | Bop of Glsl.binary_op * atom * atom
-  | Vec3 of atom * atom * atom
+  | Vec of int * atom list
   | App of atom * atom
   | If of atom * anf * anf
   | Lam of string * Stlc.ty * anf
@@ -34,6 +35,7 @@ let type_of_atom ctx = function
   | Float _ -> TyFloat
   | Int _ -> TyInt
   | Bool _ -> TyBool
+  | Unit -> TyUnit
 ;;
 
 let rec type_of_term ctx = function
@@ -44,9 +46,12 @@ let rec type_of_term ctx = function
     (match op, ty_l, ty_r with
      | (Add | Sub | Mul | Div | Mod), TyFloat, TyFloat -> TyFloat
      | (Add | Sub | Mul | Div | Mod), TyInt, TyInt -> TyInt
+     | (Add | Sub), TyVec n, TyVec _ -> TyVec n
+     | (Mul | Div), TyVec n, TyFloat | (Mul | Div), TyFloat, TyVec n -> TyVec n
+     | Mul, TyVec n, TyVec _ -> TyVec n
      | (Add | Sub | Mul | Div | Mod), _, _ -> failwith "get_term_ty: invalid bop"
      | (Lt | Gt | Leq | Geq | Eq | And | Or), _, _ -> TyBool)
-  | Vec3 _ -> TyVec3
+  | Vec (n, _) -> TyVec n
   | App (f, _) ->
     (match type_of_atom ctx f with
      | TyArrow (_, r) -> r
@@ -71,6 +76,7 @@ let rec normalize (map : ty String.Map.t) (expr : Stlc.term) : ty String.Map.t *
   | Float f -> map, Return (Atom (Float f))
   | Int i -> map, Return (Atom (Int i))
   | Bool b -> map, Return (Atom (Bool b))
+  | Unit -> map, Return (Atom Unit)
   | Lam (v, ty_v, t) ->
     let map = Map.set map ~key:v ~data:ty_v in
     let map, t = normalize map t in
@@ -89,10 +95,7 @@ let rec normalize (map : ty String.Map.t) (expr : Stlc.term) : ty String.Map.t *
     atomize map f (fun map f -> atomize map x (fun map x -> map, Return (App (f, x))))
   | Bop (op, l, r) ->
     atomize map l (fun map l -> atomize map r (fun map r -> map, Return (Bop (op, l, r))))
-  | Vec3 (x, y, z) ->
-    atomize map x (fun map x ->
-      atomize map y (fun map y ->
-        atomize map z (fun map z -> map, Return (Vec3 (x, y, z)))))
+  | Vec (n, ts) -> atomize_list map ts (fun map ts -> map, Return (Vec (n, ts)))
   | If (c, t, e) ->
     atomize map c (fun map c ->
       let map, t_anf = normalize map t in
@@ -105,6 +108,7 @@ and atomize (map : ty String.Map.t) (expr : Stlc.term) k : ty String.Map.t * anf
   | Float f -> k map (Float f)
   | Int i -> k map (Int i)
   | Bool b -> k map (Bool b)
+  | Unit -> k map Unit
   | _ ->
     let map, anf_block = normalize map expr in
     let ty = type_of map anf_block in
@@ -116,6 +120,12 @@ and atomize (map : ty String.Map.t) (expr : Stlc.term) k : ty String.Map.t * anf
       | Return t -> Let (v, t, rem)
     in
     map, make_let anf_block
+
+and atomize_list map ts k =
+  match ts with
+  | [] -> k map []
+  | t :: ts ->
+    atomize map t (fun map t -> atomize_list map ts (fun map ts -> k map (t :: ts)))
 ;;
 
 let normalize_top (map : ty String.Map.t) (t : Stlc.top) : ty String.Map.t * top =

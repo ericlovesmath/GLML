@@ -6,7 +6,8 @@ let to_glsl_ty (ty : Stlc.ty) : ty =
   | TyFloat -> TyFloat
   | TyInt -> TyInt
   | TyBool -> TyBool
-  | TyVec3 -> TyVec 3
+  | TyVec n -> TyVec n
+  | TyUnit -> failwith "translate: no unit should be left"
   | TyArrow _ -> failwith "translate: arrow types should not be translated"
 ;;
 
@@ -16,13 +17,16 @@ let to_glsl_atom (a : Anf.atom) : term =
   | Float f -> Float f
   | Int i -> Int i
   | Bool b -> Bool b
+  | Unit -> Int 0
 ;;
 
 let to_glsl_term (t : Anf.term) : term =
   match t with
   | Atom a -> to_glsl_atom a
   | Bop (op, l, r) -> Bop (op, to_glsl_atom l, to_glsl_atom r)
-  | Vec3 (x, y, z) -> App ("vec3", [ to_glsl_atom x; to_glsl_atom y; to_glsl_atom z ])
+  | Vec (n, ts) ->
+    let args = List.map ts ~f:to_glsl_atom in
+    App ([%string "vec%{n#Int}"], args)
   | App (f, x) ->
     (match f with
      | Var v -> App (v, [ to_glsl_atom x ])
@@ -38,10 +42,9 @@ let placeholder_value_for_ty (ty : ty) : term =
   | TyFloat -> Float 0.0
   | TyInt -> Int 0
   | TyBool -> Bool false
-  | TyVec 3 -> App ("vec3", [ Float 0.0 ])
-  | TyVec _ -> failwith "translate: non vec3 is unsupported"
+  | TyVec n -> App ([%string "vec%{n#Int}"], [ Float 0.0 ])
   | TyMat _ -> failwith "translate: mat is unsupported"
-  | TyVoid -> failwith "translate: if statement shouldn't return void"
+  | TyVoid -> failwith "translate: void is unsupported"
 ;;
 
 let rec translate_set (map : Stlc.ty String.Map.t) (var : string) (anf : Anf.anf)
@@ -92,6 +95,28 @@ let rec translate_block (map : Stlc.ty String.Map.t) (anf : Anf.anf) : stmt list
      | _ -> [ Return (Some (to_glsl_term t)) ])
 ;;
 
+let rec replace_returns_with_set (var : string) (stmts : stmt list) : stmt list =
+  List.concat_map stmts ~f:(fun stmt ->
+    match stmt with
+    | Return (Some t) -> [ Set (Var var, t); Return None ]
+    | Return None -> [ stmt ]
+    | IfStmt (c, t, e) ->
+      let t =
+        match t with
+        | Block ss -> Block (replace_returns_with_set var ss)
+        | s -> Block (replace_returns_with_set var [ s ])
+      in
+      let e =
+        Option.map e ~f:(fun e ->
+          match e with
+          | Block ss -> Block (replace_returns_with_set var ss)
+          | s -> Block (replace_returns_with_set var [ s ]))
+      in
+      [ IfStmt (c, t, e) ]
+    | Block ss -> [ Block (replace_returns_with_set var ss) ]
+    | _ -> [ stmt ])
+;;
+
 let translate (Program (map, tops) : Anf.t) : t =
   let globals =
     List.map tops ~f:(fun top ->
@@ -99,11 +124,7 @@ let translate (Program (map, tops) : Anf.t) : t =
       | Define ("main", Return (Lam (_, _, body))) ->
         (* TODO: Validate typechecking special case for main *)
         let stmts = translate_block map body in
-        let body =
-          List.map stmts ~f:(function
-            | Return (Some t) -> Set (Var "fragColor", t)
-            | s -> s)
-        in
+        let body = replace_returns_with_set "fragColor" stmts in
         Function { name = "main"; desc = None; params = []; ret_type = TyVoid; body }
       | Define (name, Return (Lam (arg, arg_ty, body))) ->
         let ret_type =

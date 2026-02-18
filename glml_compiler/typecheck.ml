@@ -16,18 +16,19 @@ let rec update (map : ty String.Map.t) (t : term) : (ty String.Map.t * ty) Or_er
   | Float _ -> Ok (map, TyFloat)
   | Int _ -> Ok (map, TyInt)
   | Bool _ -> Ok (map, TyBool)
-  | Vec3 (x, y, z) ->
-    (* Pure functions with all unique variable names, so passing maps
-       like this should be fine to collect them *)
-    let%bind map, ty_x = update map x in
-    let%bind map, ty_y = update map y in
-    let%bind map, ty_z = update map z in
-    (match ty_x, ty_y, ty_z with
-     | TyFloat, TyFloat, TyFloat -> Ok (map, TyVec3)
-     | _ ->
-       error_s
-         [%message
-           "typecheck: vec3 does not contain floats" (ty_x : ty) (ty_y : ty) (ty_z : ty)])
+  | Unit -> Ok (map, TyUnit)
+  | Vec (n, ts) ->
+    let%bind map, tys =
+      List.fold_result ts ~init:(map, []) ~f:(fun (map, acc) t ->
+        let%bind map, ty = update map t in
+        match ty with
+        | TyFloat -> Ok (map, ty :: acc)
+        | _ -> error_s [%message "typecheck: vec expected all floats" (ts : term list)])
+    in
+    let size = List.length tys in
+    if size = n
+    then Ok (map, TyVec n)
+    else error_s [%message "typecheck: vec size mismatch" (n : int) (size : int)]
   | Lam (v, ty_v, t) ->
     let map = Map.set map ~key:v ~data:ty_v in
     let%bind map, ty_t = update map t in
@@ -63,10 +64,14 @@ let rec update (map : ty String.Map.t) (t : term) : (ty String.Map.t * ty) Or_er
     (match op, ty_l, ty_r with
      | (Add | Sub | Mul | Div | Mod), TyFloat, TyFloat -> Ok (map, TyFloat)
      | (Add | Sub | Mul | Div | Mod), TyInt, TyInt -> Ok (map, TyInt)
+     | (Add | Sub | Mul | Div | Mod), TyVec n, TyVec n' when n = n' -> Ok (map, TyVec n)
+     | (Mul | Div), TyVec n, TyFloat | (Mul | Div), TyFloat, TyVec n -> Ok (map, TyVec n)
      | (Add | Sub | Mul | Div | Mod), _, _ ->
        error_s [%message "typecheck: bop expected int/float" (ty_l : ty) (ty_r : ty)]
-     | Eq, TyFloat, TyFloat | Eq, TyInt, TyInt | Eq, TyBool, TyBool | Eq, TyVec3, TyVec3
-       -> Ok (map, TyBool)
+     | Eq, TyFloat, TyFloat
+     | Eq, TyInt, TyInt
+     | Eq, TyBool, TyBool
+     | Eq, TyVec _, TyVec _
      | Eq, _, _ -> error_s [%message "typecheck: unsupport eq" (ty_l : ty) (ty_r : ty)]
      | (Lt | Gt | Leq | Geq), TyFloat, TyFloat | (Lt | Gt | Leq | Geq), TyInt, TyInt ->
        Ok (map, TyBool)

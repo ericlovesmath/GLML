@@ -67,14 +67,16 @@ let compile_stlc ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s :
   return (Glsl.to_shader glsl)
 ;;
 
+let test s =
+  match compile_stlc s with
+  | Error err -> print_s (Error.sexp_of_t err)
+  | Ok glsl -> print_endline glsl
+;;
+
+let wrap_main s = [%string "((let main = (fun u : unit -> %{s})))"]
+
 let%expect_test "simple tests for compile_stlc" =
-  let test s =
-    match compile_stlc s with
-    | Error err -> print_s (Error.sexp_of_t err)
-    | Ok glsl -> print_endline glsl
-  in
-  let wrap_main s = [%string "((let main = (fun u : float -> %{s})))"] in
-  test (wrap_main "(let x = 2.0 in (+ (* 12.0 x) 10.0))");
+  test (wrap_main "(let x = 2.0 in (vec3 (+ (* 12.0 x) 10.0) 0.0 0.0))");
   [%expect
     {|
     #version 300 es
@@ -83,45 +85,32 @@ let%expect_test "simple tests for compile_stlc" =
     void main() {
         float x_1 = 2.;
         float anf_2 = (12. * x_1);
-        fragColor = (anf_2 + 10.);
+        float anf_3 = (anf_2 + 10.);
+        fragColor = vec3(anf_3, 0., 0.);
+        return;
     }
     |}];
-  test (wrap_main "(if (&& #t #f) (let x = 2.0 in (* x 1.0)) 2.0)");
+  test (wrap_main "(if (&& #t #f) (vec3 1.0 0.0 0.0) (vec3 0.0 0.0 0.0))");
   [%expect
     {|
     #version 300 es
     precision highp float;
     out vec3 fragColor;
     void main() {
-        bool anf_2 = (true && false);
-        if (anf_2) {
-            float x_1 = 2.;
-            return (x_1 * 1.);
+        bool anf_1 = (true && false);
+        if (anf_1) {
+            fragColor = vec3(1., 0., 0.);
+            return;
         } else {
-            return 2.;
+            fragColor = vec3(0., 0., 0.);
+            return;
         }
-    }
-    |}];
-  test (wrap_main "(let x = (if #f 0 1) in (* x 2))");
-  [%expect
-    {|
-    #version 300 es
-    precision highp float;
-    out vec3 fragColor;
-    void main() {
-        int x_1 = 0;
-        if (false) {
-            x_1 = 0;
-        } else {
-            x_1 = 1;
-        }
-        fragColor = (x_1 * 2);
     }
     |}];
   test
     {|
     ((let f = (fun x : float -> (+ x 1.0)))
-     (let main = (fun u : float -> (vec3 (f 10.0) 0.0 0.0))))
+     (let main = (fun u : unit -> (vec3 (f 10.0) 0.0 0.0))))
     |};
   [%expect
     {|
@@ -134,13 +123,14 @@ let%expect_test "simple tests for compile_stlc" =
     void main() {
         float anf_3 = f_1(10.);
         fragColor = vec3(anf_3, 0., 0.);
+        return;
     }
     |}];
   test
     {|
     ((extern float n)
      (let f = (fun x : float -> (+ x n)))
-     (let main = (fun u : float -> (vec3 (f 10.0) 0.0 0.0))))
+     (let main = (fun u : unit -> (vec3 (f 10.0) 0.0 0.0))))
     |};
   [%expect
     {|
@@ -154,13 +144,14 @@ let%expect_test "simple tests for compile_stlc" =
     void main() {
         float anf_3 = f_1(10.);
         fragColor = vec3(anf_3, 0., 0.);
+        return;
     }
     |}];
   test
     {|
     ((extern float n)
      (let f (x : float) = (+ x n))
-     (let main (u : float) = (vec3 (f 10.0) 0.0 0.0)))
+     (let main (u : unit) = (vec3 (f 10.0) 0.0 0.0)))
     |};
   [%expect
     {|
@@ -174,6 +165,27 @@ let%expect_test "simple tests for compile_stlc" =
     void main() {
         float anf_3 = f_1(10.);
         fragColor = vec3(anf_3, 0., 0.);
+        return;
+    }
+    |}]
+;;
+
+let%expect_test "generic vectors and matrices" =
+  test
+    {|
+    ((let main (u : unit) =
+     let v = (vec2 1.0 2.0) in
+     vec3 1.0 0.0 0.0))
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec3 fragColor;
+    void main() {
+        vec2 v_1 = vec2(1., 2.);
+        fragColor = vec3(1., 0., 0.);
+        return;
     }
     |}]
 ;;
