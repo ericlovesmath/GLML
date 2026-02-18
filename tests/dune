@@ -1,0 +1,5 @@
+(library
+ (name tests)
+ (libraries core glml_compiler)
+ (preprocess (pps ppx_jane))
+ (inline_tests))

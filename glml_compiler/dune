@@ -4,5 +4,4 @@
    utils glml_compiler
    stlc uniquify typecheck anf translate glsl)
  (libraries core)
- (preprocess (pps ppx_jane))
- (inline_tests))
+ (preprocess (pps ppx_jane)))
