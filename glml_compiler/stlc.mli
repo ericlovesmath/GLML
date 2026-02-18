@@ -4,7 +4,8 @@ type ty =
   | TyFloat
   | TyInt
   | TyBool
-  | TyVec3
+  | TyUnit
+  | TyVec of int
   | TyArrow of ty * ty
 [@@deriving sexp_of, equal]
 
@@ -13,7 +14,8 @@ type term =
   | Float of float
   | Int of int
   | Bool of bool
-  | Vec3 of term * term * term
+  | Unit
+  | Vec of int * term list
   | Lam of string * ty * term
   | App of term * term
   | Let of string * term * term

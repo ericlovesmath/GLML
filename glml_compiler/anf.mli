@@ -5,12 +5,13 @@ type atom =
   | Float of float
   | Int of int
   | Bool of bool
+  | Unit
 [@@deriving sexp_of]
 
 type term =
   | Atom of atom
   | Bop of Glsl.binary_op * atom * atom
-  | Vec3 of atom * atom * atom
+  | Vec of int * atom list
   | App of atom * atom
   | If of atom * anf * anf
   | Lam of string * Stlc.ty * anf
