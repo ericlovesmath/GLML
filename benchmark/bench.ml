@@ -1,4 +1,3 @@
-open Core
 open Glml_compiler
 
 (* module%bench [@name "Test Group"] _ = struct end *)
