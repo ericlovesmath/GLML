@@ -7,10 +7,10 @@ let test s =
   | Ok glsl -> print_endline glsl
 ;;
 
-let wrap_main s = [%string "((let main = (fun u : unit -> %{s})))"]
+let test_term s = test [%string "((let main = (fun u : unit -> %{s})))"]
 
 let%expect_test "simple tests for compile_stlc" =
-  test (wrap_main "(let x = 2.0 in (vec3 (+ (* 12.0 x) 10.0) 0.0 0.0))");
+  test_term "(let x = 2.0 in (vec3 (+ (* 12.0 x) 10.0) 0.0 0.0))";
   [%expect
     {|
     #version 300 es
@@ -24,7 +24,7 @@ let%expect_test "simple tests for compile_stlc" =
         return;
     }
     |}];
-  test (wrap_main "(if (&& #t #f) (vec3 1.0 0.0 0.0) (vec3 0.0 0.0 0.0))");
+  test_term "(if (&& #t #f) (vec3 1.0 0.0 0.0) (vec3 0.0 0.0 0.0))";
   [%expect
     {|
     #version 300 es
@@ -125,5 +125,49 @@ let%expect_test "generic vectors and matrices" =
         fragColor = vec3(1., 0., 0.);
         return;
     }
+    |}]
+;;
+
+let%expect_test "indexing" =
+  test_term "(let v = (vec3 1.0 2.0 3.0) in (vec3 (. v 0) 0.0 0.0))";
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec3 fragColor;
+    void main() {
+        vec3 v_1 = vec3(1., 2., 3.);
+        float anf_2 = v_1[0];
+        fragColor = vec3(anf_2, 0., 0.);
+        return;
+    }
+    |}];
+  test_term
+    {|
+    (let m = (mat3 1.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 1.0) in
+    (let c = (. m 0) in
+    vec3 (. c 0) (. c 1) (. c 2)))
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec3 fragColor;
+    void main() {
+        mat3 m_1 = mat3(1., 0., 0., 0., 1., 0., 0., 0., 1.);
+        vec3 c_2 = m_1[0];
+        float anf_3 = c_2[0];
+        float anf_4 = c_2[1];
+        float anf_5 = c_2[2];
+        fragColor = vec3(anf_3, anf_4, anf_5);
+        return;
+    }
+    |}];
+  test_term "(. (vec3 0.0 0.0 0.0) 4)";
+  test_term "(. (vec3 0.0 0.0 0.0) -1)";
+  [%expect
+    {|
+    ("typecheck: vec index out of bounds" (n 3) (i 4))
+    ("typecheck: vec index out of bounds" (n 3) (i -1))
     |}]
 ;;

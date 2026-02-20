@@ -31,6 +31,7 @@ type term =
   | If of term * term * term
   | App of string * term list
   | Swizzle of term * string
+  | Index of term * int
 [@@deriving sexp_of]
 
 type qualifier =

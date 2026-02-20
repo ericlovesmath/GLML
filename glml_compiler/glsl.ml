@@ -73,6 +73,7 @@ type term =
   | If of term * term * term
   | App of string * term list
   | Swizzle of term * string
+  | Index of term * int
 [@@deriving sexp_of]
 
 let rec string_of_term = function
@@ -96,6 +97,9 @@ let rec string_of_term = function
   | Swizzle (t, s) ->
     let t = string_of_term t in
     [%string "%{t}.%{s}"]
+  | Index (t, i) ->
+    let t = string_of_term t in
+    [%string "%{t}[%{i#Int}]"]
 ;;
 
 let rec term_of_sexp (s : Sexp.t) : term =
@@ -125,6 +129,10 @@ let rec term_of_sexp (s : Sexp.t) : term =
      | "||", [ a; b ] -> Bop (Or, term_of_sexp a, term_of_sexp b)
      | "if", [ c; t; e ] -> If (term_of_sexp c, term_of_sexp t, term_of_sexp e)
      | ".", [ t; Atom s ] -> Swizzle (term_of_sexp t, s)
+     | "[]", [ t; i ] ->
+       (match i with
+        | Atom i -> Index (term_of_sexp t, Int.of_string i)
+        | _ -> failwith "term_of_sexp: invalid index")
      | f, args -> App (f, List.map args ~f:term_of_sexp))
   | List _ -> failwith "Invalid expression structure"
 ;;
