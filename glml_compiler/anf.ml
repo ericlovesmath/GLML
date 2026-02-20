@@ -13,6 +13,7 @@ type term =
   | Atom of atom
   | Bop of Glsl.binary_op * atom * atom
   | Vec of int * atom list
+  | Mat of int * int * atom list
   | App of atom * atom
   | If of atom * anf * anf
   | Lam of string * Stlc.ty * anf
@@ -49,9 +50,15 @@ let rec type_of_term ctx = function
      | (Add | Sub), TyVec n, TyVec _ -> TyVec n
      | (Mul | Div), TyVec n, TyFloat | (Mul | Div), TyFloat, TyVec n -> TyVec n
      | Mul, TyVec n, TyVec _ -> TyVec n
+     | (Add | Sub | Mul | Div | Mod), TyMat (x, y), TyMat (x', y') when x = x' && y = y'
+       -> TyMat (x, y)
+     | (Mul | Div), TyMat (x, y), TyFloat | (Mul | Div), TyFloat, TyMat (x, y) ->
+       TyMat (x, y)
+     | (Mul | Div), TyMat (x, y), TyVec n when y = n -> TyVec x
      | (Add | Sub | Mul | Div | Mod), _, _ -> failwith "get_term_ty: invalid bop"
      | (Lt | Gt | Leq | Geq | Eq | And | Or), _, _ -> TyBool)
   | Vec (n, _) -> TyVec n
+  | Mat (x, y, _) -> TyMat (x, y)
   | App (f, _) ->
     (match type_of_atom ctx f with
      | TyArrow (_, r) -> r
@@ -96,6 +103,7 @@ let rec normalize (map : ty String.Map.t) (expr : Stlc.term) : ty String.Map.t *
   | Bop (op, l, r) ->
     atomize map l (fun map l -> atomize map r (fun map r -> map, Return (Bop (op, l, r))))
   | Vec (n, ts) -> atomize_list map ts (fun map ts -> map, Return (Vec (n, ts)))
+  | Mat (x, y, ts) -> atomize_list map ts (fun map ts -> map, Return (Mat (x, y, ts)))
   | If (c, t, e) ->
     atomize map c (fun map c ->
       let map, t_anf = normalize map t in

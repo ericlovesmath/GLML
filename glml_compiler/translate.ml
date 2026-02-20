@@ -7,6 +7,7 @@ let to_glsl_ty (ty : Stlc.ty) : ty =
   | TyInt -> TyInt
   | TyBool -> TyBool
   | TyVec n -> TyVec n
+  | TyMat (x, y) -> TyMat (x, y)
   | TyUnit -> failwith "translate: no unit should be left"
   | TyArrow _ -> failwith "translate: arrow types should not be translated"
 ;;
@@ -27,6 +28,12 @@ let to_glsl_term (t : Anf.term) : term =
   | Vec (n, ts) ->
     let args = List.map ts ~f:to_glsl_atom in
     App ([%string "vec%{n#Int}"], args)
+  | Mat (x, y, ts) ->
+    let args = List.map ts ~f:to_glsl_atom in
+    let ty =
+      if x = y then [%string "mat%{x#Int}"] else [%string "mat%{x#Int}x%{y#Int}"]
+    in
+    App (ty, args)
   | App (f, x) ->
     (match f with
      | Var v -> App (v, [ to_glsl_atom x ])
@@ -43,7 +50,11 @@ let placeholder_value_for_ty (ty : ty) : term =
   | TyInt -> Int 0
   | TyBool -> Bool false
   | TyVec n -> App ([%string "vec%{n#Int}"], [ Float 0.0 ])
-  | TyMat _ -> failwith "translate: mat is unsupported"
+  | TyMat (x, y) ->
+    let ty =
+      if x = y then [%string "mat%{x#Int}"] else [%string "mat%{x#Int}x%{y#Int}"]
+    in
+    App (type_name, [ Float 0.0 ])
   | TyVoid -> failwith "translate: void is unsupported"
 ;;
 

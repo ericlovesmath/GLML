@@ -7,6 +7,7 @@ type ty =
   | TyBool
   | TyUnit
   | TyVec of int
+  | TyMat of int * int
   | TyArrow of ty * ty
 [@@deriving sexp_of, equal]
 
@@ -17,6 +18,7 @@ type term =
   | Bool of bool
   | Unit
   | Vec of int * term list
+  | Mat of int * int * term list
   | Lam of string * ty * term
   | App of term * term
   | Let of string * term * term
@@ -39,6 +41,14 @@ let rec ty_of_sexp = function
   | Atom s when String.is_prefix s ~prefix:"vec" ->
     let n = String.drop_prefix s 3 |> Int.of_string in
     TyVec n
+  | Atom s when String.is_prefix s ~prefix:"mat" ->
+    let d = String.drop_prefix s 3 in
+    (match String.split d ~on:'x' with
+     | [ n ] ->
+       let n = Int.of_string n in
+       TyMat (n, n)
+     | [ x; y ] -> TyMat (Int.of_string x, Int.of_string y)
+     | _ -> raise_s [%message "ty_of_sexp: invalid mat" (s : string)])
   | List [ ty; Atom "->"; ty' ] -> TyArrow (ty_of_sexp ty, ty_of_sexp ty')
   | sexp -> raise_s [%message "ty_of_sexp: unexpected format" (sexp : Sexp.t)]
 ;;
@@ -55,6 +65,14 @@ let rec term_of_sexp = function
   | List (Atom s :: args) when String.is_prefix s ~prefix:"vec" ->
     let n = String.drop_prefix s 3 |> Int.of_string in
     Vec (n, List.map args ~f:term_of_sexp)
+  | List (Atom s :: args) when String.is_prefix s ~prefix:"mat" ->
+    let d = String.drop_prefix s 3 in
+    (match String.split d ~on:'x' with
+     | [ n ] ->
+       let n = Int.of_string n in
+       Mat (n, n, List.map args ~f:term_of_sexp)
+     | [ x; y ] -> Mat (Int.of_string x, Int.of_string y, List.map args ~f:term_of_sexp)
+     | _ -> raise_s [%message "term_of_sexp: invalid mat" (s : string)])
   | List [ Atom "fun"; Atom v; Atom ":"; ty; Atom "->"; t ] when is_ident v ->
     Lam (v, ty_of_sexp ty, term_of_sexp t)
   | List [ Atom "let"; Atom v; Atom "="; bind; Atom "in"; body ] when is_ident v ->
