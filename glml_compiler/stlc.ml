@@ -24,6 +24,7 @@ type term =
   | Let of string * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
+  | Index of term * int
 [@@deriving sexp_of]
 
 type top =
@@ -92,6 +93,7 @@ let rec term_of_sexp = function
   | List [ Atom ">="; t; t' ] -> Bop (Geq, term_of_sexp t, term_of_sexp t')
   | List [ Atom "&&"; t; t' ] -> Bop (And, term_of_sexp t, term_of_sexp t')
   | List [ Atom "||"; t; t' ] -> Bop (Or, term_of_sexp t, term_of_sexp t')
+  | List [ Atom "."; t; Atom i ] -> Index (term_of_sexp t, Int.of_string i)
   | List [ f; x ] -> App (term_of_sexp f, term_of_sexp x)
   | sexp -> raise_s [%message "t_of_sexp: unexpected format" (sexp : Sexp.t)]
 ;;

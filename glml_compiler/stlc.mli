@@ -23,6 +23,7 @@ type term =
   | Let of string * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
+  | Index of term * int
 [@@deriving sexp_of]
 
 type top =

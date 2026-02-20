@@ -99,6 +99,18 @@ let rec update (map : ty String.Map.t) (t : term) : (ty String.Map.t * ty) Or_er
      | (And | Or), TyBool, TyBool -> Ok (map, TyBool)
      | (And | Or), _, _ ->
        error_s [%message "typecheck: and/or expected bools" (ty_l : ty) (ty_r : ty)])
+  | Index (t, i) ->
+    let%bind map, ty = update map t in
+    (match ty with
+     | TyVec n ->
+       if 0 <= i && i < n
+       then Ok (map, TyFloat)
+       else error_s [%message "typecheck: vec index out of bounds" (n : int) (i : int)]
+     | TyMat (x, y) ->
+       if 0 <= i && i < x
+       then Ok (map, TyVec y)
+       else error_s [%message "typecheck: mat index out of bounds" (x : int) (i : int)]
+     | _ -> error_s [%message "typecheck: expected vec or mat" (ty : ty)])
 ;;
 
 let typecheck (Program terms : Stlc.t) : t Or_error.t =

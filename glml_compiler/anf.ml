@@ -14,6 +14,7 @@ type term =
   | Bop of Glsl.binary_op * atom * atom
   | Vec of int * atom list
   | Mat of int * int * atom list
+  | Index of atom * int
   | App of atom * atom
   | If of atom * anf * anf
   | Lam of string * Stlc.ty * anf
@@ -59,6 +60,11 @@ let rec type_of_term ctx = function
      | (Lt | Gt | Leq | Geq | Eq | And | Or), _, _ -> TyBool)
   | Vec (n, _) -> TyVec n
   | Mat (x, y, _) -> TyMat (x, y)
+  | Index (t, _) ->
+    (match type_of_atom ctx t with
+     | TyVec _ -> TyFloat
+     | TyMat (_, y) -> TyVec y
+     | _ -> failwith "get_term_ty: invalid index")
   | App (f, _) ->
     (match type_of_atom ctx f with
      | TyArrow (_, r) -> r
@@ -104,6 +110,7 @@ let rec normalize (map : ty String.Map.t) (expr : Stlc.term) : ty String.Map.t *
     atomize map l (fun map l -> atomize map r (fun map r -> map, Return (Bop (op, l, r))))
   | Vec (n, ts) -> atomize_list map ts (fun map ts -> map, Return (Vec (n, ts)))
   | Mat (x, y, ts) -> atomize_list map ts (fun map ts -> map, Return (Mat (x, y, ts)))
+  | Index (t, i) -> atomize map t (fun map t -> map, Return (Index (t, i)))
   | If (c, t, e) ->
     atomize map c (fun map c ->
       let map, t_anf = normalize map t in

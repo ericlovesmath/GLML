@@ -34,6 +34,7 @@ let to_glsl_term (t : Anf.term) : term =
       if x = y then [%string "mat%{x#Int}"] else [%string "mat%{x#Int}x%{y#Int}"]
     in
     App (ty, args)
+  | Index (t, i) -> Index (to_glsl_atom t, i)
   | App (f, x) ->
     (match f with
      | Var v -> App (v, [ to_glsl_atom x ])
@@ -54,7 +55,7 @@ let placeholder_value_for_ty (ty : ty) : term =
     let ty =
       if x = y then [%string "mat%{x#Int}"] else [%string "mat%{x#Int}x%{y#Int}"]
     in
-    App (type_name, [ Float 0.0 ])
+    App (ty, [ Float 0.0 ])
   | TyVoid -> failwith "translate: void is unsupported"
 ;;
 
