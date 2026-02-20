@@ -17,6 +17,7 @@ depends: [
   "bonsai"
   "bonsai_web_components"
   "core"
+  "core_bench"
   "ppx_jane"
   "odoc" {with-doc}
 ]

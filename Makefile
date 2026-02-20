@@ -1,11 +1,11 @@
-.PHONY: clean build web serve test
+.PHONY: clean bin web serve test benchmark
 
-all: build web
+all: bin web
 
 clean:
 	dune clean
 
-build:
+bin:
     # Use dune exec GLML -- <args> to run cli
     # Alternatively use ./_build/default/bin/main.exe
 	dune build _build/default/bin/main.exe
@@ -22,3 +22,6 @@ serve: web
 
 test:
 	dune runtest
+
+benchmark:
+	cd benchmark; ./runner.sh
