@@ -49,6 +49,36 @@ type binary_op =
   | Or
 [@@deriving sexp_of]
 
+type builtin =
+  | Sin
+  | Cos
+  | Tan
+  | Asin
+  | Acos
+  | Atan
+  | Pow
+  | Exp
+  | Log
+  | Exp2
+  | Log2
+  | Sqrt
+  | Abs
+  | Sign
+  | Floor
+  | Ceil
+  | Min
+  | Max
+  | Clamp
+  | Mix
+  | Length
+  | Distance
+  | Dot
+  | Cross
+  | Normalize
+[@@deriving sexp_of, string ~capitalize:"lower sentence case"]
+
+let builtin_of_string_opt s = Option.try_with (fun () -> builtin_of_string s)
+
 let string_of_binary_op = function
   | Add -> "+"
   | Sub -> "-"
@@ -72,6 +102,7 @@ type term =
   | Bop of binary_op * term * term
   | If of term * term * term
   | App of string * term list
+  | Builtin of builtin * term list
   | Swizzle of term * string
   | Index of term * int
 [@@deriving sexp_of]
@@ -94,6 +125,10 @@ let rec string_of_term = function
   | App (f, args) ->
     let args = args |> List.map ~f:string_of_term |> String.concat ~sep:", " in
     [%string "%{f}(%{args})"]
+  | Builtin (b, args) ->
+    let b = string_of_builtin b in
+    let args = args |> List.map ~f:string_of_term |> String.concat ~sep:", " in
+    [%string "%{b}(%{args})"]
   | Swizzle (t, s) ->
     let t = string_of_term t in
     [%string "%{t}.%{s}"]

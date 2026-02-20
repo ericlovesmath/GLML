@@ -171,3 +171,40 @@ let%expect_test "indexing" =
     ("typecheck: vec index out of bounds" (n 3) (i -1))
     |}]
 ;;
+
+let%expect_test "builtins" =
+  test_term "(let v = (vec3 1.0 2.0 3.0) in (vec3 (sin 1.0) (dot v v) (length v)))";
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec3 fragColor;
+    void main() {
+        vec3 v_1 = vec3(1., 2., 3.);
+        float anf_2 = sin(1.);
+        float anf_3 = dot(v_1, v_1);
+        float anf_4 = length(v_1);
+        fragColor = vec3(anf_2, anf_3, anf_4);
+        return;
+    }
+    |}];
+  test_term "(cross (vec3 1.0 2.0 3.0) (vec3 0.0 2.0 5.0))";
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec3 fragColor;
+    void main() {
+        vec3 anf_1 = vec3(1., 2., 3.);
+        vec3 anf_2 = vec3(0., 2., 5.);
+        fragColor = cross(anf_1, anf_2);
+        return;
+    }
+    |}];
+  test_term "(cross (vec2 1.0 1.0) (vec2 0.0 0.0))";
+  [%expect
+    {|
+    ("typecheck: invalid geometric call" (name Cross)
+     (tys ((TyVec 2) (TyVec 2))))
+    |}]
+;;

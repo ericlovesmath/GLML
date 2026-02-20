@@ -15,6 +15,7 @@ type term =
   | Vec of int * atom list
   | Mat of int * int * atom list
   | Index of atom * int
+  | Builtin of Glsl.builtin * atom list
   | App of atom * atom
   | If of atom * anf * anf
   | Lam of string * Stlc.ty * anf
@@ -65,6 +66,47 @@ let rec type_of_term ctx = function
      | TyVec _ -> TyFloat
      | TyMat (_, y) -> TyVec y
      | _ -> failwith "get_term_ty: invalid index")
+  | Builtin (name, args) ->
+    let tys = List.map args ~f:(type_of_atom ctx) in
+    let check_unary_math () =
+      match tys with
+      | [ TyFloat ] -> TyFloat
+      | [ TyVec n ] -> TyVec n
+      | _ -> failwith "get_term_ty: builtin unary math error"
+    in
+    let check_binary_math () =
+      match tys with
+      | [ TyFloat; TyFloat ] -> TyFloat
+      | [ TyVec n; TyVec n' ] when n = n' -> TyVec n
+      | [ TyVec n; TyFloat ] | [ TyFloat; TyVec n ] -> TyVec n
+      | _ -> failwith "get_term_ty: builtin binary math error"
+    in
+    let check_geometric () =
+      match name, tys with
+      | (Length | Distance | Dot), _ -> TyFloat
+      | Cross, [ TyVec 3; TyVec 3 ] -> TyVec 3
+      | Normalize, [ TyVec n ] -> TyVec n
+      | Normalize, [ TyFloat ] -> TyFloat
+      | _ -> failwith "get_term_ty: builtin geometric error"
+    in
+    let check_common () =
+      match name, tys with
+      | (Abs | Sign | Floor | Ceil), _ -> check_unary_math ()
+      | (Min | Max), _ -> check_binary_math ()
+      | Clamp, [ TyFloat; TyFloat; TyFloat ] -> TyFloat
+      | Clamp, [ TyVec n; TyFloat; TyFloat ] -> TyVec n
+      | Clamp, [ TyVec n; TyVec _; TyVec _ ] -> TyVec n
+      | Mix, [ TyFloat; TyFloat; TyFloat ] -> TyFloat
+      | Mix, [ TyVec n; TyVec _; TyFloat ] -> TyVec n
+      | Mix, [ TyVec n; TyVec _; TyVec _ ] -> TyVec n
+      | _ -> failwith "get_term_ty: builtin common error"
+    in
+    (match name with
+     | Sin | Cos | Tan | Asin | Acos | Atan | Exp | Log | Exp2 | Log2 | Sqrt ->
+       check_unary_math ()
+     | Pow -> check_binary_math ()
+     | Length | Distance | Dot | Cross | Normalize -> check_geometric ()
+     | Abs | Sign | Floor | Ceil | Min | Max | Clamp | Mix -> check_common ())
   | App (f, _) ->
     (match type_of_atom ctx f with
      | TyArrow (_, r) -> r
@@ -111,6 +153,8 @@ let rec normalize (map : ty String.Map.t) (expr : Stlc.term) : ty String.Map.t *
   | Vec (n, ts) -> atomize_list map ts (fun map ts -> map, Return (Vec (n, ts)))
   | Mat (x, y, ts) -> atomize_list map ts (fun map ts -> map, Return (Mat (x, y, ts)))
   | Index (t, i) -> atomize map t (fun map t -> map, Return (Index (t, i)))
+  | Builtin (f, args) ->
+    atomize_list map args (fun map args -> map, Return (Builtin (f, args)))
   | If (c, t, e) ->
     atomize map c (fun map c ->
       let map, t_anf = normalize map t in

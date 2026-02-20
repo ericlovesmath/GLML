@@ -22,6 +22,36 @@ type binary_op =
   | Or
 [@@deriving sexp_of]
 
+type builtin =
+  | Sin
+  | Cos
+  | Tan
+  | Asin
+  | Acos
+  | Atan
+  | Pow
+  | Exp
+  | Log
+  | Exp2
+  | Log2
+  | Sqrt
+  | Abs
+  | Sign
+  | Floor
+  | Ceil
+  | Min
+  | Max
+  | Clamp
+  | Mix
+  | Length
+  | Distance
+  | Dot
+  | Cross
+  | Normalize
+[@@deriving sexp_of, string]
+
+val builtin_of_string_opt : string -> builtin option
+
 type term =
   | Float of float
   | Int of int
@@ -30,6 +60,7 @@ type term =
   | Bop of binary_op * term * term
   | If of term * term * term
   | App of string * term list
+  | Builtin of builtin * term list
   | Swizzle of term * string
   | Index of term * int
 [@@deriving sexp_of]

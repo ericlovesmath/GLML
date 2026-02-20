@@ -35,6 +35,7 @@ let to_glsl_term (t : Anf.term) : term =
     in
     App (ty, args)
   | Index (t, i) -> Index (to_glsl_atom t, i)
+  | Builtin (f, args) -> Builtin (f, List.map args ~f:to_glsl_atom)
   | App (f, x) ->
     (match f with
      | Var v -> App (v, [ to_glsl_atom x ])

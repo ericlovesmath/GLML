@@ -25,6 +25,7 @@ type term =
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
+  | Builtin of Glsl.builtin * term list
 [@@deriving sexp_of]
 
 type top =
@@ -94,7 +95,13 @@ let rec term_of_sexp = function
   | List [ Atom "&&"; t; t' ] -> Bop (And, term_of_sexp t, term_of_sexp t')
   | List [ Atom "||"; t; t' ] -> Bop (Or, term_of_sexp t, term_of_sexp t')
   | List [ Atom "."; t; Atom i ] -> Index (term_of_sexp t, Int.of_string i)
-  | List [ f; x ] -> App (term_of_sexp f, term_of_sexp x)
+  | List (Atom f :: args) ->
+    (match Glsl.builtin_of_string_opt f with
+     | Some b -> Builtin (b, List.map args ~f:term_of_sexp)
+     | None ->
+       (match args with
+        | [ x ] -> App (term_of_sexp (Atom f), term_of_sexp x)
+        | _ -> raise_s [%message "t_of_sexp: unexpected list format" (f : string)]))
   | sexp -> raise_s [%message "t_of_sexp: unexpected format" (sexp : Sexp.t)]
 ;;
 

@@ -24,6 +24,7 @@ type term =
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
+  | Builtin of Glsl.builtin * term list
 [@@deriving sexp_of]
 
 type top =

@@ -111,6 +111,69 @@ let rec update (map : ty String.Map.t) (t : term) : (ty String.Map.t * ty) Or_er
        then Ok (map, TyVec y)
        else error_s [%message "typecheck: mat index out of bounds" (x : int) (i : int)]
      | _ -> error_s [%message "typecheck: expected vec or mat" (ty : ty)])
+  | Builtin (name, args) ->
+    let%bind map, tys =
+      List.fold_result args ~init:(map, []) ~f:(fun (map, acc) t ->
+        let%bind map, ty = update map t in
+        Ok (map, ty :: acc))
+    in
+    let tys = List.rev tys in
+    let check_unary_math () =
+      match tys with
+      | [ TyFloat ] -> Ok (map, TyFloat)
+      | [ TyVec n ] -> Ok (map, TyVec n)
+      | _ ->
+        error_s
+          [%message
+            "typecheck: expected float or vec" (name : Glsl.builtin) (tys : ty list)]
+    in
+    let check_binary_math () =
+      match tys with
+      | [ TyFloat; TyFloat ] -> Ok (map, TyFloat)
+      | [ TyVec n; TyVec n' ] when n = n' -> Ok (map, TyVec n)
+      | [ TyVec n; TyFloat ] | [ TyFloat; TyVec n ] -> Ok (map, TyVec n)
+      | _ ->
+        error_s
+          [%message
+            "typecheck: expected floats or vecs" (name : Glsl.builtin) (tys : ty list)]
+    in
+    let check_geometric () =
+      match name, tys with
+      | Length, [ TyVec _ ] | Length, [ TyFloat ] -> Ok (map, TyFloat)
+      | Distance, [ TyVec n; TyVec n' ] when n = n' -> Ok (map, TyFloat)
+      | Distance, [ TyFloat; TyFloat ] -> Ok (map, TyFloat)
+      | Dot, [ TyVec n; TyVec n' ] when n = n' -> Ok (map, TyFloat)
+      | Dot, [ TyFloat; TyFloat ] -> Ok (map, TyFloat)
+      | Cross, [ TyVec 3; TyVec 3 ] -> Ok (map, TyVec 3)
+      | Normalize, [ TyVec n ] -> Ok (map, TyVec n)
+      | Normalize, [ TyFloat ] -> Ok (map, TyFloat)
+      | _ ->
+        error_s
+          [%message
+            "typecheck: invalid geometric call" (name : Glsl.builtin) (tys : ty list)]
+    in
+    let check_common () =
+      match name, tys with
+      | (Abs | Sign | Floor | Ceil), _ -> check_unary_math ()
+      | (Min | Max), _ -> check_binary_math ()
+      | Clamp, [ TyFloat; TyFloat; TyFloat ] -> Ok (map, TyFloat)
+      | Clamp, [ TyVec n; TyFloat; TyFloat ] -> Ok (map, TyVec n)
+      | Clamp, [ TyVec n; TyVec n'; TyVec n'' ] when n = n' && n' = n'' ->
+        Ok (map, TyVec n)
+      | Mix, [ TyFloat; TyFloat; TyFloat ] -> Ok (map, TyFloat)
+      | Mix, [ TyVec n; TyVec n'; TyFloat ] when n = n' -> Ok (map, TyVec n)
+      | Mix, [ TyVec n; TyVec n'; TyVec n'' ] when n = n' && n' = n'' -> Ok (map, TyVec n)
+      | _ ->
+        error_s
+          [%message
+            "typecheck: invalid common call" (name : Glsl.builtin) (tys : ty list)]
+    in
+    (match name with
+     | Sin | Cos | Tan | Asin | Acos | Atan | Exp | Log | Exp2 | Log2 | Sqrt ->
+       check_unary_math ()
+     | Pow -> check_binary_math ()
+     | Length | Distance | Dot | Cross | Normalize -> check_geometric ()
+     | Abs | Sign | Floor | Ceil | Min | Max | Clamp | Mix -> check_common ())
 ;;
 
 let typecheck (Program terms : Stlc.t) : t Or_error.t =

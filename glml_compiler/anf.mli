@@ -14,6 +14,7 @@ type term =
   | Vec of int * atom list
   | Mat of int * int * atom list
   | Index of atom * int
+  | Builtin of Glsl.builtin * atom list
   | App of atom * atom
   | If of atom * anf * anf
   | Lam of string * Stlc.ty * anf

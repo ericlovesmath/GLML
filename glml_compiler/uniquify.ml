@@ -21,6 +21,7 @@ let rec aux (ctx : string String.Map.t) (t : term) : term =
   | Mat (x, y, ts) -> Mat (x, y, List.map ts ~f:(aux ctx))
   | Bop (op, t, t') -> Bop (op, aux ctx t, aux ctx t')
   | Index (t, i) -> Index (aux ctx t, i)
+  | Builtin (f, args) -> Builtin (f, List.map args ~f:(aux ctx))
 ;;
 
 let uniquify_top (ctx : string String.Map.t) (t : top) : string String.Map.t * top =
