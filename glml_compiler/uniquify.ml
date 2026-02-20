@@ -18,6 +18,7 @@ let rec aux (ctx : string String.Map.t) (t : term) : term =
     Let (v', bind, body)
   | If (c, t, f) -> If (aux ctx c, aux ctx t, aux ctx f)
   | Vec (n, ts) -> Vec (n, List.map ts ~f:(aux ctx))
+  | Mat (x, y, ts) -> Mat (x, y, List.map ts ~f:(aux ctx))
   | Bop (op, t, t') -> Bop (op, aux ctx t, aux ctx t')
 ;;
 

@@ -6,6 +6,7 @@ type ty =
   | TyBool
   | TyUnit
   | TyVec of int
+  | TyMat of int * int
   | TyArrow of ty * ty
 [@@deriving sexp_of, equal]
 
@@ -16,6 +17,7 @@ type term =
   | Bool of bool
   | Unit
   | Vec of int * term list
+  | Mat of int * int * term list
   | Lam of string * ty * term
   | App of term * term
   | Let of string * term * term

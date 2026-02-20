@@ -108,6 +108,8 @@ let%expect_test "generic vectors and matrices" =
   test
     {|
     ((let main (u : unit) =
+     let m = (mat3 1.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 1.0) in
+     let m2 = (mat3x2 1.0 2.0 3.0 4.0 5.0 6.0) in
      let v = (vec2 1.0 2.0) in
      vec3 1.0 0.0 0.0))
     |};
@@ -117,7 +119,9 @@ let%expect_test "generic vectors and matrices" =
     precision highp float;
     out vec3 fragColor;
     void main() {
-        vec2 v_1 = vec2(1., 2.);
+        mat3 m_1 = mat3(1., 0., 0., 0., 1., 0., 0., 0., 1.);
+        mat3x2 m2_2 = mat3x2(1., 2., 3., 4., 5., 6.);
+        vec2 v_3 = vec2(1., 2.);
         fragColor = vec3(1., 0., 0.);
         return;
     }

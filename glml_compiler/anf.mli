@@ -12,6 +12,7 @@ type term =
   | Atom of atom
   | Bop of Glsl.binary_op * atom * atom
   | Vec of int * atom list
+  | Mat of int * int * atom list
   | App of atom * atom
   | If of atom * anf * anf
   | Lam of string * Stlc.ty * anf
