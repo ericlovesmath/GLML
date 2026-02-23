@@ -164,7 +164,7 @@ let y =
 end
 
 module Scheme_syntax_highlighting = struct
-  let doc = Shader.example_source
+  let doc = Shader.example_glml
 
   let codemirror_editor ~name =
     Codemirror.of_initial_state
@@ -305,8 +305,8 @@ let component graph =
                 ~attrs:
                   [ on_click (fun _ ->
                       match
-                        Or_error.try_with (fun () ->
-                          Glml_compiler.compile_source codemirror_text)
+                        Or_error.try_with_join (fun () ->
+                          Glml_compiler.compile_stlc codemirror_text)
                       with
                       | Error err -> set_error (Some (Error.to_string_hum err))
                       | Ok glsl ->

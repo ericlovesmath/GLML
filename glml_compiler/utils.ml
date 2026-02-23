@@ -1,6 +1,6 @@
 open Core
 
-let no_mangle = [ "main" ]
+let no_mangle = [ "main"; "gl_FragCoord" ]
 let counter = ref 0
 
 let fresh name =

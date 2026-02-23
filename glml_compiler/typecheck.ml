@@ -176,10 +176,12 @@ let rec update (map : ty String.Map.t) (t : term) : (ty String.Map.t * ty) Or_er
      | Abs | Sign | Floor | Ceil | Min | Max | Clamp | Mix -> check_common ())
 ;;
 
+let init_tymap = String.Map.of_alist_exn [ "gl_FragCoord", TyVec 3 ]
+
 let typecheck (Program terms : Stlc.t) : t Or_error.t =
   let open Or_error.Let_syntax in
   let%map map, _ =
-    List.fold_result terms ~init:(String.Map.empty, []) ~f:(fun (map, acc) t ->
+    List.fold_result terms ~init:(init_tymap, []) ~f:(fun (map, acc) t ->
       match t with
       | Define (v, bind) ->
         let%bind map, ty = update map bind in

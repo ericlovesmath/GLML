@@ -154,5 +154,5 @@ let translate (Program (map, tops) : Anf.t) : t =
         raise_s [%message "translate: expected return toplevel" (top : Anf.top)]
       | Extern (ty, v) -> Global (Uniform, to_glsl_ty ty, v))
   in
-  Program ([ Global (Out, TyVec 3, "fragColor") ] @ globals)
+  Program ([ Global (Out, TyVec 4, "fragColor") ] @ globals)
 ;;
