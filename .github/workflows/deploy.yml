@@ -1,0 +1,26 @@
+name: Deploy Web Playground
+on: [push]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v25
+        with:
+          flake_external_api: true
+
+      - name: build website
+        run: nix develop --command make web
+
+      - name: install vercel
+        run: npm install --global vercel
+
+      - name: Vercel Build and Deploy
+        run: |
+          npm install -g vercel
+          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+          vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
