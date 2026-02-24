@@ -143,7 +143,7 @@ let translate (Program (map, tops) : Anf.t) : t =
         let () =
           match ty, ret_ty with
           | TyVec 2, TyVec 3 -> ()
-          | _ -> failwith "translate: main should be type vec2 -> vec4"
+          | _ -> failwith "translate: main should be type vec2 -> vec3"
         in
         let stmts = translate_block map body in
         let body = replace_returns_with_set "fragColor" stmts in
