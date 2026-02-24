@@ -4,19 +4,19 @@ on: [push]
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v25
-        with:
-          flake_external_api: true
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - uses: DeterminateSystems/flake-checker-action@main
 
-      - name: build website
+      - name: Build Website
         run: nix develop --command make web
-
-      - name: install vercel
-        run: npm install --global vercel
 
       - name: Vercel Build and Deploy
         run: |
