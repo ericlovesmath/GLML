@@ -27,8 +27,9 @@ let () =
   }
 
   .sidebar {
-    flex: 0 0 600px;
-    height: 100vh;
+    flex: 0 0 50%;
+    max-width: 600px;
+    height: 100%;
     background-color: #f0f0f0;
     display: flex;
     flex-direction: column;
@@ -36,11 +37,21 @@ let () =
     overflow-y: auto;
   }
 
+  #canvas-container {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #000;
+  }
+
   .editor-container {
     flex: 1;
-    height: 100vh;
+    height: 100%;
     display: flex;
     flex-direction: column;
+    min-width: 0;
   }
 
   /* Make CodeMirror fill the editor-container */
@@ -49,10 +60,21 @@ let () =
   }
 
   #gl-canvas {
-    width: 600px;
-    height: 600px;
-    background-color: black;
     display: block;
+  }
+
+  @media (max-width: 800px) {
+    .main-container {
+      flex-direction: column;
+    }
+    .sidebar {
+      flex: none;
+      width: 100%;
+      max-width: none;
+      height: auto;
+      border-right: none;
+      border-bottom: 1px solid #ccc;
+    }
   }
 
   .controls {
@@ -285,13 +307,31 @@ let component graph =
   let error, set_error =
     Bonsai.state_opt graph ~equal:String.equal ~sexp_of_model:String.sexp_of_t
   in
+  let compile_effect =
+    let%arr codemirror_text = codemirror_text
+    and set_error = set_error in
+    Ui_effect.bind (Ui_effect.return ()) ~f:(fun () ->
+      match
+        Or_error.try_with_join (fun () -> Glml_compiler.compile_stlc codemirror_text)
+      with
+      | Error err -> set_error (Some (Error.to_string_hum err))
+      | Ok glsl ->
+        glsl
+        |> compile_and_link
+        |> Js.Opt.to_option
+        |> Option.map ~f:Js.to_string
+        |> set_error)
+  in
   let () =
-    Bonsai.Edge.lifecycle ~on_activate:(return (Ui_effect.of_thunk init_canvas)) graph
+    let on_activate =
+      let%arr compile_effect = compile_effect in
+      Ui_effect.bind (Ui_effect.of_thunk init_canvas) ~f:(fun () -> compile_effect)
+    in
+    Bonsai.Edge.lifecycle ~on_activate graph
   in
   let%arr codemirror_view = codemirror_view
-  and codemirror_text = codemirror_text
-  and error = error
-  and set_error = set_error in
+  and compile_effect = compile_effect
+  and error = error in
   let open Vdom.Node in
   let open Vdom.Attr in
   div
@@ -301,22 +341,7 @@ let component graph =
         [ div ~attrs:[ id "canvas-container" ] [ canvas ~attrs:[ id "gl-canvas" ] [] ]
         ; div
             ~attrs:[ class_ "controls" ]
-            [ button
-                ~attrs:
-                  [ on_click (fun _ ->
-                      match
-                        Or_error.try_with_join (fun () ->
-                          Glml_compiler.compile_stlc codemirror_text)
-                      with
-                      | Error err -> set_error (Some (Error.to_string_hum err))
-                      | Ok glsl ->
-                        glsl
-                        |> compile_and_link
-                        |> Js.Opt.to_option
-                        |> Option.map ~f:Js.to_string
-                        |> set_error)
-                  ]
-                [ text "Compile and Link" ]
+            [ button ~attrs:[ on_click (fun _ -> compile_effect) ] [ text "Compile" ]
             ; (match error with
                | None -> none
                | Some err -> div ~attrs:[ class_ "error-message" ] [ text err ])
