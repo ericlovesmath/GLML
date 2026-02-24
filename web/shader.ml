@@ -1,6 +1,5 @@
 let example_glml =
-  {|
-((extern vec2 u_resolution)
+  {|((extern vec2 u_resolution)
  (extern vec2 u_mouse)
  (extern float u_time)
 
@@ -11,8 +10,8 @@ let example_glml =
    (let mouseUV = (/ (- (* 2.0 u_mouse) u_resolution) (. u_resolution 1)) in
    (let radius = (+ 0.2 (* 0.1 (sin (/ u_time 500.)))) in
    (if (< (distance uv mouseUV) radius)
-      (vec3 0. 0. 0.)
-      (vec3 1. 1. 1.)))))))))
+      (vec3 0. 0. 0.5)
+      (vec3 0.5 0.5 1.)))))))))
   |}
 ;;
 
