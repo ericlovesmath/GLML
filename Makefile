@@ -14,11 +14,11 @@ bin:
 web:
 	dune build _build/default/jsoo/main.bc.js
 	dune build _build/default/web/main.bc.js
-
-serve: web
 	mkdir -p dist
 	cp web/index.html dist
 	cp -f _build/default/web/main.bc.js dist
+
+serve: web
 	@echo "========================================"
 	@echo "  Playground: http://localhost:8000"
 	@echo "========================================"

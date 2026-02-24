@@ -13,11 +13,16 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@main
 
-      - name: Magic Nix Cache
-        uses: DeterminateSystems/magic-nix-cache-action@main
-
       - name: Check Nix Flake
         uses: DeterminateSystems/flake-checker-action@main
+
+      - name: Cache Nix Store
+        uses: nix-community/cache-nix-action@v7
+        with:
+          # Use a key based on the OS and the hash of your flake files
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.nix', 'flake.lock', '**/*.opam', 'dune-project') }}
+          # Fallback to the most recent cache if an exact match isn't found
+          restore-prefixes-first-match: nix-${{ runner.os }}-
 
       - name: Build Website
         run: nix develop --command make web
