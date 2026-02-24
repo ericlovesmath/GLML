@@ -4,15 +4,15 @@ let example_glml =
  (extern vec2 u_mouse)
  (extern float u_time)
 
- (let main (gl_FragCoord : vec4) =
-   (let top = (- (* 2.0 (vec2 (. gl_FragCoord 0) (. gl_FragCoord 1))) u_resolution) in
-   (let bot = (min (. u_resolution 0) (. u_resolution 0)) in
+ (let main (coord : vec2) =
+   (let top = (- (* 2.0 coord) u_resolution) in
+   (let bot = (min (. u_resolution 0) (. u_resolution 1)) in
    (let uv = (/ top bot) in
    (let mouseUV = (/ (- (* 2.0 u_mouse) u_resolution) (. u_resolution 1)) in
    (let radius = (+ 0.2 (* 0.1 (sin (/ u_time 500.)))) in
    (if (< (distance uv mouseUV) radius)
-      (vec4 0. 0. 0. 1.)
-      (vec4 1. 1. 1. 1.)))))))))
+      (vec3 0. 0. 0.)
+      (vec3 1. 1. 1.)))))))))
   |}
 ;;
 

@@ -5,7 +5,6 @@ type atom =
   | Float of float
   | Int of int
   | Bool of bool
-  | Unit
 [@@deriving sexp_of]
 
 type term =

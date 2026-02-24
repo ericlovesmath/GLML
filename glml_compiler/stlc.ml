@@ -5,7 +5,6 @@ type ty =
   | TyFloat
   | TyInt
   | TyBool
-  | TyUnit
   | TyVec of int
   | TyMat of int * int
   | TyArrow of ty * ty
@@ -16,7 +15,6 @@ type term =
   | Float of float
   | Int of int
   | Bool of bool
-  | Unit
   | Vec of int * term list
   | Mat of int * int * term list
   | Lam of string * ty * term
@@ -39,7 +37,6 @@ let rec ty_of_sexp = function
   | Atom "float" -> TyFloat
   | Atom "int" -> TyInt
   | Atom "bool" -> TyBool
-  | Atom "unit" -> TyUnit
   | Atom s when String.is_prefix s ~prefix:"vec" ->
     let n = String.drop_prefix s 3 |> Int.of_string in
     TyVec n
@@ -62,7 +59,6 @@ let rec term_of_sexp = function
   | Atom f when Option.is_some (Float.of_string_opt f) -> Float (Float.of_string f)
   | Atom "#t" -> Bool true
   | Atom "#f" -> Bool false
-  | Atom "#u" -> Unit
   | Atom v when is_ident v -> Var v
   | List (Atom s :: args) when String.is_prefix s ~prefix:"vec" ->
     let n = String.drop_prefix s 3 |> Int.of_string in

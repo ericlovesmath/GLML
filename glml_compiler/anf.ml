@@ -6,7 +6,6 @@ type atom =
   | Float of float
   | Int of int
   | Bool of bool
-  | Unit
 [@@deriving sexp_of]
 
 type term =
@@ -38,7 +37,6 @@ let type_of_atom ctx = function
   | Float _ -> TyFloat
   | Int _ -> TyInt
   | Bool _ -> TyBool
-  | Unit -> TyUnit
 ;;
 
 let rec type_of_term ctx = function
@@ -131,7 +129,6 @@ let rec normalize (map : ty String.Map.t) (expr : Stlc.term) : ty String.Map.t *
   | Float f -> map, Return (Atom (Float f))
   | Int i -> map, Return (Atom (Int i))
   | Bool b -> map, Return (Atom (Bool b))
-  | Unit -> map, Return (Atom Unit)
   | Lam (v, ty_v, t) ->
     let map = Map.set map ~key:v ~data:ty_v in
     let map, t = normalize map t in
@@ -167,7 +164,6 @@ and atomize (map : ty String.Map.t) (expr : Stlc.term) k : ty String.Map.t * anf
   | Float f -> k map (Float f)
   | Int i -> k map (Int i)
   | Bool b -> k map (Bool b)
-  | Unit -> k map Unit
   | _ ->
     let map, anf_block = normalize map expr in
     let ty = type_of map anf_block in

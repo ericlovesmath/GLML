@@ -8,7 +8,6 @@ let to_glsl_ty (ty : Stlc.ty) : ty =
   | TyBool -> TyBool
   | TyVec n -> TyVec n
   | TyMat (x, y) -> TyMat (x, y)
-  | TyUnit -> failwith "translate: no unit should be left"
   | TyArrow _ -> failwith "translate: arrow types should not be translated"
 ;;
 
@@ -18,7 +17,6 @@ let to_glsl_atom (a : Anf.atom) : term =
   | Float f -> Float f
   | Int i -> Int i
   | Bool b -> Bool b
-  | Unit -> Int 0
 ;;
 
 let to_glsl_term (t : Anf.term) : term =
@@ -134,10 +132,24 @@ let translate (Program (map, tops) : Anf.t) : t =
   let globals =
     List.map tops ~f:(fun top ->
       match top with
-      | Define ("main", Return (Lam (_, _, body))) ->
-        (* TODO: Validate typechecking special case for main *)
+      (* main is a function from vec2 coord to a vec4 color, but in GLSL these are global
+         variables. This is where the transformation occurs. *)
+      | Define ("main", Return (Lam (coord_var, ty, body))) ->
+        let ret_ty =
+          match Map.find_exn map "main" with
+          | TyArrow (_, r) -> to_glsl_ty r
+          | _ -> failwith "translate: expected arrow type for function"
+        in
+        let () =
+          match ty, ret_ty with
+          | TyVec 2, TyVec 3 -> ()
+          | _ -> failwith "translate: main should be type vec2 -> vec4"
+        in
         let stmts = translate_block map body in
         let body = replace_returns_with_set "fragColor" stmts in
+        let body =
+          Decl (None, TyVec 2, coord_var, Swizzle (Var "gl_FragCoord", "xy")) :: body
+        in
         Function { name = "main"; desc = None; params = []; ret_type = TyVoid; body }
       | Define (name, Return (Lam (arg, arg_ty, body))) ->
         let ret_type =
@@ -154,5 +166,5 @@ let translate (Program (map, tops) : Anf.t) : t =
         raise_s [%message "translate: expected return toplevel" (top : Anf.top)]
       | Extern (ty, v) -> Global (Uniform, to_glsl_ty ty, v))
   in
-  Program ([ Global (Out, TyVec 4, "fragColor") ] @ globals)
+  Program ([ Global (Out, TyVec 3, "fragColor") ] @ globals)
 ;;

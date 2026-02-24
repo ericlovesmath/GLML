@@ -3,7 +3,7 @@ open Stlc
 
 let rec aux (ctx : string String.Map.t) (t : term) : term =
   match t with
-  | Float _ | Int _ | Bool _ | Unit -> t
+  | Float _ | Int _ | Bool _ -> t
   | Var v -> Var (Option.value (Map.find ctx v) ~default:v)
   | Lam (v, ty, body) ->
     let v' = Utils.fresh v in
