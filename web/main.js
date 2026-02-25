@@ -2,8 +2,6 @@
 const state = {
   gl: null,
   program: null,
-  vao: null,
-  dummyBuffer: null,
   mouseX: 0,
   mouseY: 0,
   lastTime: 0,
@@ -79,8 +77,6 @@ function render(currentTime) {
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     gl.useProgram(state.program);
 
-    gl.bindVertexArray(state.vao);
-
     gl.uniform2f(
       gl.getUniformLocation(state.program, "u_resolution"),
       gl.canvas.width,
@@ -93,8 +89,6 @@ function render(currentTime) {
     );
     gl.uniform1f(gl.getUniformLocation(state.program, "u_time"), currentTime);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-    gl.bindVertexArray(null);
   }
 }
 
@@ -106,24 +100,20 @@ function init() {
   state.gl = canvas.getContext("webgl2");
 
   // NOTE: This is to fix the following issue on MacOS
+  //
   // > WebGL warning: drawArraysInstanced: Drawing without vertex attrib 0 array
   // > enabled forces the browser to do expensive emulation work when running on
   // > desktop OpenGL platforms, for example on Mac. It is preferable to always
   // > draw with vertex attrib 0 array enabled, by using bindAttribLocation to
   // > bind some always-used attribute to location 0.
+  //
+  // We create a dummy buffer and attach it
   const gl = state.gl;
-  state.vao = gl.createVertexArray();
-  gl.bindVertexArray(state.vao);
-
-  state.dummyBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, state.dummyBuffer);
-
-  // 3 vertices -> 3 floats is enough (one dummy float per vertex)
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 0]), gl.STATIC_DRAW);
+  const dummyBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, dummyBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0]), gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0);
   gl.vertexAttribPointer(0, 1, gl.FLOAT, false, 0, 0);
-  gl.bindVertexArray(null);
-  gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
   // Find the smallest dimension to maintain a square, resize canvas
   const resizeObserver = new window.ResizeObserver((entries) => {
