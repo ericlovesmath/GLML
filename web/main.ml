@@ -12,13 +12,25 @@ external compile_and_link : string -> Js.js_string Js.t Js.opt = "compileAndLink
 
 type syntax =
   | SexpLike
-  | OCamlLike
+  | OCamlLike [@warning "-37"]
 
 (* Temporary, until my syntax actually moves away from Sexps *)
 let chosen_syntax = SexpLike
 
+module Example = struct
+  type t =
+    | MouseCircle
+    | PastelRainbow
+  [@@deriving sexp, compare, equal, enumerate, to_string]
+
+  let to_glml = function
+    | MouseCircle -> Shader.circle_at_mouse
+    | PastelRainbow -> Shader.pastel_rainbow
+  ;;
+end
+
 module Codemirror_editor = struct
-  let doc = Shader.example_glml
+  let doc = Shader.circle_at_mouse
 
   let component language =
     let name, language_stream_parser =
@@ -47,34 +59,52 @@ let component graph =
   let error, set_error =
     Bonsai.state_opt graph ~equal:String.equal ~sexp_of_model:String.sexp_of_t
   in
-  let%sub codemirror = Codemirror_editor.component chosen_syntax graph in
   let compile_effect =
-    let%arr codemirror = codemirror
-    and set_error = set_error in
-    Ui_effect.bind (Ui_effect.return ()) ~f:(fun () ->
-      match
-        Or_error.try_with_join (fun () ->
-          Glml_compiler.compile_stlc (Codemirror.text codemirror))
-      with
-      | Error err -> set_error (Some (Error.to_string_hum err))
-      | Ok glsl ->
-        glsl
-        |> compile_and_link
-        |> Js.Opt.to_option
-        |> Option.map ~f:Js.to_string
-        |> set_error)
+    let%arr set_error = set_error in
+    fun glml ->
+      Ui_effect.bind (Ui_effect.return ()) ~f:(fun () ->
+        match Or_error.try_with_join (fun () -> Glml_compiler.compile_stlc glml) with
+        | Error err -> set_error (Some (Error.to_string_hum err))
+        | Ok glsl ->
+          glsl
+          |> compile_and_link
+          |> Js.Opt.to_option
+          |> Option.map ~f:Js.to_string
+          |> set_error)
+  in
+  let%sub codemirror = Codemirror_editor.component chosen_syntax graph in
+  let%sub example_form =
+    Form.Elements.Dropdown.enumerable (module Example) ~to_string:Example.to_string graph
+  in
+  let () =
+    Form.Dynamic.on_change
+      ~equal:[%compare.equal: Example.t]
+      ~f:
+        (let%arr codemirror = codemirror
+         and compile_effect = compile_effect in
+         fun example ->
+           let text = Example.to_glml example in
+           Ui_effect.Many
+             [ Codemirror.set_lines codemirror (String.split_lines text)
+             ; compile_effect text
+             ])
+      example_form
+      graph
   in
   let () =
     (* Load sample shader on start *)
     let on_activate =
-      let%arr compile_effect = compile_effect in
-      Ui_effect.bind (Ui_effect.of_thunk init_canvas) ~f:(Fn.const compile_effect)
+      let%arr codemirror = codemirror
+      and compile_effect = compile_effect in
+      Ui_effect.bind (Ui_effect.of_thunk init_canvas) ~f:(fun () ->
+        compile_effect (Codemirror.text codemirror))
     in
     Bonsai.Edge.lifecycle ~on_activate graph
   in
   let%arr codemirror = codemirror
   and compile_effect = compile_effect
-  and error = error in
+  and error = error
+  and example_form = example_form in
   let open Vdom.Node in
   let open Vdom.Attr in
   div
@@ -84,7 +114,10 @@ let component graph =
         [ div ~attrs:[ id "canvas-container" ] [ canvas ~attrs:[ id "gl-canvas" ] [] ]
         ; div
             ~attrs:[ class_ "controls" ]
-            [ button ~attrs:[ on_click (fun _ -> compile_effect) ] [ text "Compile" ]
+            [ Form.view_as_vdom example_form
+            ; button
+                ~attrs:[ on_click (fun _ -> compile_effect (Codemirror.text codemirror)) ]
+                [ text "Compile" ]
             ; (match error with
                | None -> none
                | Some err -> div ~attrs:[ class_ "error-message" ] [ text err ])
