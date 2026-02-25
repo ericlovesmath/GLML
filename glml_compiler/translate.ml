@@ -106,25 +106,37 @@ let rec translate_block (map : Stlc.ty String.Map.t) (anf : Anf.anf) : stmt list
      | _ -> [ Return (Some (to_glsl_term t)) ])
 ;;
 
-let rec replace_returns_with_set (var : string) (stmts : stmt list) : stmt list =
+let rec fix_main_return (stmts : stmt list) : stmt list =
   List.concat_map stmts ~f:(fun stmt ->
     match stmt with
-    | Return (Some t) -> [ Set (Var var, t); Return None ]
+    | Return (Some t) ->
+      (* NOTE: On high precision, not clamping causes issues on old drivers like MacOS *)
+      [ Decl (None, TyVec 3, "tmp_ret", t)
+      ; Set
+          ( Var "fragColor"
+          , App
+              ( "clamp"
+              , [ App ("vec4", [ Swizzle (Var "tmp_ret", "xyz"); Float 1.0 ])
+                ; Float 0.0
+                ; Float 1.0
+                ] ) )
+      ; Return None
+      ]
     | Return None -> [ stmt ]
     | IfStmt (c, t, e) ->
       let t =
         match t with
-        | Block ss -> Block (replace_returns_with_set var ss)
-        | s -> Block (replace_returns_with_set var [ s ])
+        | Block ss -> Block (fix_main_return ss)
+        | s -> Block (fix_main_return [ s ])
       in
       let e =
         Option.map e ~f:(fun e ->
           match e with
-          | Block ss -> Block (replace_returns_with_set var ss)
-          | s -> Block (replace_returns_with_set var [ s ]))
+          | Block ss -> Block (fix_main_return ss)
+          | s -> Block (fix_main_return [ s ]))
       in
       [ IfStmt (c, t, e) ]
-    | Block ss -> [ Block (replace_returns_with_set var ss) ]
+    | Block ss -> [ Block (fix_main_return ss) ]
     | _ -> [ stmt ])
 ;;
 
@@ -132,8 +144,9 @@ let translate (Program (map, tops) : Anf.t) : t =
   let globals =
     List.map tops ~f:(fun top ->
       match top with
-      (* main is a function from vec2 coord to a vec4 color, but in GLSL these are global
-         variables. This is where the transformation occurs. *)
+      (* main is a function from vec2 coord to setting a vec3 color, but in GLSL these are global
+         variables that are read and written to, with different types.
+         This is where the transformation occurs. *)
       | Define ("main", Return (Lam (coord_var, ty, body))) ->
         let ret_ty =
           match Map.find_exn map "main" with
@@ -146,7 +159,7 @@ let translate (Program (map, tops) : Anf.t) : t =
           | _ -> failwith "translate: main should be type vec2 -> vec3"
         in
         let stmts = translate_block map body in
-        let body = replace_returns_with_set "fragColor" stmts in
+        let body = fix_main_return stmts in
         let body =
           Decl (None, TyVec 2, coord_var, Swizzle (Var "gl_FragCoord", "xy")) :: body
         in
@@ -166,5 +179,5 @@ let translate (Program (map, tops) : Anf.t) : t =
         raise_s [%message "translate: expected return toplevel" (top : Anf.top)]
       | Extern (ty, v) -> Global (Uniform, to_glsl_ty ty, v))
   in
-  Program ([ Global (Out, TyVec 3, "fragColor") ] @ globals)
+  Program ([ Global (Out, TyVec 4, "fragColor") ] @ globals)
 ;;
