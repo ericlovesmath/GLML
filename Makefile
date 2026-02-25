@@ -18,6 +18,7 @@ web:
 	dune build --profile release _build/default/web/main.bc.js
 	mkdir -p dist
 	cp web/index.html dist
+	cp web/style.css dist
 	cp -f _build/default/web/main.bc.js dist
 
 serve: web
