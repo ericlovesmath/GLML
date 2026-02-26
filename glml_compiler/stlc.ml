@@ -123,4 +123,4 @@ let t_of_sexp s = Program (List.t_of_sexp top_of_sexp (Sexp.of_string s))
 
 (** Reads string sexp for simple STLC representation, intended to be temporary
     until a real parser will be written *)
-let of_string s = Or_error.try_with (fun () -> t_of_sexp s)
+let of_string s = Or_error.try_with (fun () -> t_of_sexp ("(" ^ s ^ ")"))

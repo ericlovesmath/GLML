@@ -7,7 +7,7 @@ let test s =
   | Ok glsl -> print_endline glsl
 ;;
 
-let test_term s = test [%string "((let main = (fun u : vec2 -> %{s})))"]
+let test_term s = test [%string "(let main = (fun u : vec2 -> %{s}))"]
 
 let%expect_test "simple tests for compile_stlc" =
   test_term "(let x = 2.0 in (vec3 (+ (* 12.0 x) 10.0) 0.0 0.0))";
@@ -15,13 +15,14 @@ let%expect_test "simple tests for compile_stlc" =
     {|
     #version 300 es
     precision highp float;
-    out vec3 fragColor;
+    out vec4 fragColor;
     void main() {
         vec2 u_0 = gl_FragCoord.xy;
         float x_1 = 2.;
         float anf_2 = (12. * x_1);
         float anf_3 = (anf_2 + 10.);
-        fragColor = vec3(anf_3, 0., 0.);
+        vec3 tmp_ret = vec3(anf_3, 0., 0.);
+        fragColor = clamp(vec4(tmp_ret.xyz, 1.), 0., 1.);
         return;
     }
     |}];
@@ -30,50 +31,53 @@ let%expect_test "simple tests for compile_stlc" =
     {|
     #version 300 es
     precision highp float;
-    out vec3 fragColor;
+    out vec4 fragColor;
     void main() {
         vec2 u_0 = gl_FragCoord.xy;
         bool anf_1 = (true && false);
         if (anf_1) {
-            fragColor = vec3(1., 0., 0.);
+            vec3 tmp_ret = vec3(1., 0., 0.);
+            fragColor = clamp(vec4(tmp_ret.xyz, 1.), 0., 1.);
             return;
         } else {
-            fragColor = vec3(0., 0., 0.);
+            vec3 tmp_ret = vec3(0., 0., 0.);
+            fragColor = clamp(vec4(tmp_ret.xyz, 1.), 0., 1.);
             return;
         }
     }
     |}];
   test
     {|
-    ((let f = (fun x : float -> (+ x 1.0)))
-     (let main = (fun u : vec2 -> (vec3 (f 10.0) 0.0 0.0))))
+    (let f = (fun x : float -> (+ x 1.0)))
+    (let main = (fun u : vec2 -> (vec3 (f 10.0) 0.0 0.0)))
     |};
   [%expect
     {|
     #version 300 es
     precision highp float;
-    out vec3 fragColor;
+    out vec4 fragColor;
     float f_1(float x_0) {
         return (x_0 + 1.);
     }
     void main() {
         vec2 u_2 = gl_FragCoord.xy;
         float anf_3 = f_1(10.);
-        fragColor = vec3(anf_3, 0., 0.);
+        vec3 tmp_ret = vec3(anf_3, 0., 0.);
+        fragColor = clamp(vec4(tmp_ret.xyz, 1.), 0., 1.);
         return;
     }
     |}];
   test
     {|
-    ((extern float n)
-     (let f = (fun x : float -> (+ x n)))
-     (let main = (fun u : vec2 -> (vec3 (f 10.0) 0.0 0.0))))
+    (extern float n)
+    (let f = (fun x : float -> (+ x n)))
+    (let main = (fun u : vec2 -> (vec3 (f 10.0) 0.0 0.0)))
     |};
   [%expect
     {|
     #version 300 es
     precision highp float;
-    out vec3 fragColor;
+    out vec4 fragColor;
     uniform float n;
     float f_1(float x_0) {
         return (x_0 + n);
@@ -81,21 +85,22 @@ let%expect_test "simple tests for compile_stlc" =
     void main() {
         vec2 u_2 = gl_FragCoord.xy;
         float anf_3 = f_1(10.);
-        fragColor = vec3(anf_3, 0., 0.);
+        vec3 tmp_ret = vec3(anf_3, 0., 0.);
+        fragColor = clamp(vec4(tmp_ret.xyz, 1.), 0., 1.);
         return;
     }
     |}];
   test
     {|
-    ((extern float n)
-     (let f (x : float) = (+ x n))
-     (let main (u : vec2) = (vec3 (f 10.0) 0.0 0.0)))
+    (extern float n)
+    (let f (x : float) = (+ x n))
+    (let main (u : vec2) = (vec3 (f 10.0) 0.0 0.0))
     |};
   [%expect
     {|
     #version 300 es
     precision highp float;
-    out vec3 fragColor;
+    out vec4 fragColor;
     uniform float n;
     float f_1(float x_0) {
         return (x_0 + n);
@@ -103,7 +108,8 @@ let%expect_test "simple tests for compile_stlc" =
     void main() {
         vec2 u_2 = gl_FragCoord.xy;
         float anf_3 = f_1(10.);
-        fragColor = vec3(anf_3, 0., 0.);
+        vec3 tmp_ret = vec3(anf_3, 0., 0.);
+        fragColor = clamp(vec4(tmp_ret.xyz, 1.), 0., 1.);
         return;
     }
     |}]
@@ -112,23 +118,24 @@ let%expect_test "simple tests for compile_stlc" =
 let%expect_test "generic vectors and matrices" =
   test
     {|
-    ((let main (u : vec2) =
-     let m = (mat3 1.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 1.0) in
-     let m2 = (mat3x2 1.0 2.0 3.0 4.0 5.0 6.0) in
-     let v = (vec2 1.0 2.0) in
-     vec3 1.0 0.0 0.0))
+    (let main (u : vec2) =
+       let m = (mat3 1.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 1.0) in
+       let m2 = (mat3x2 1.0 2.0 3.0 4.0 5.0 6.0) in
+       let v = (vec2 1.0 2.0) in
+       vec3 1.0 0.0 0.0)
     |};
   [%expect
     {|
     #version 300 es
     precision highp float;
-    out vec3 fragColor;
+    out vec4 fragColor;
     void main() {
         vec2 u_0 = gl_FragCoord.xy;
         mat3 m_1 = mat3(1., 0., 0., 0., 1., 0., 0., 0., 1.);
         mat3x2 m2_2 = mat3x2(1., 2., 3., 4., 5., 6.);
         vec2 v_3 = vec2(1., 2.);
-        fragColor = vec3(1., 0., 0.);
+        vec3 tmp_ret = vec3(1., 0., 0.);
+        fragColor = clamp(vec4(tmp_ret.xyz, 1.), 0., 1.);
         return;
     }
     |}]
@@ -140,12 +147,13 @@ let%expect_test "indexing" =
     {|
     #version 300 es
     precision highp float;
-    out vec3 fragColor;
+    out vec4 fragColor;
     void main() {
         vec2 u_0 = gl_FragCoord.xy;
         vec3 v_1 = vec3(1., 2., 3.);
         float anf_2 = v_1[0];
-        fragColor = vec3(anf_2, 0., 0.);
+        vec3 tmp_ret = vec3(anf_2, 0., 0.);
+        fragColor = clamp(vec4(tmp_ret.xyz, 1.), 0., 1.);
         return;
     }
     |}];
@@ -159,7 +167,7 @@ let%expect_test "indexing" =
     {|
     #version 300 es
     precision highp float;
-    out vec3 fragColor;
+    out vec4 fragColor;
     void main() {
         vec2 u_0 = gl_FragCoord.xy;
         mat3 m_1 = mat3(1., 0., 0., 0., 1., 0., 0., 0., 1.);
@@ -167,7 +175,8 @@ let%expect_test "indexing" =
         float anf_3 = c_2[0];
         float anf_4 = c_2[1];
         float anf_5 = c_2[2];
-        fragColor = vec3(anf_3, anf_4, anf_5);
+        vec3 tmp_ret = vec3(anf_3, anf_4, anf_5);
+        fragColor = clamp(vec4(tmp_ret.xyz, 1.), 0., 1.);
         return;
     }
     |}];
@@ -186,14 +195,15 @@ let%expect_test "builtins" =
     {|
     #version 300 es
     precision highp float;
-    out vec3 fragColor;
+    out vec4 fragColor;
     void main() {
         vec2 u_0 = gl_FragCoord.xy;
         vec3 v_1 = vec3(1., 2., 3.);
         float anf_2 = sin(1.);
         float anf_3 = dot(v_1, v_1);
         float anf_4 = length(v_1);
-        fragColor = vec3(anf_2, anf_3, anf_4);
+        vec3 tmp_ret = vec3(anf_2, anf_3, anf_4);
+        fragColor = clamp(vec4(tmp_ret.xyz, 1.), 0., 1.);
         return;
     }
     |}];
@@ -202,12 +212,13 @@ let%expect_test "builtins" =
     {|
     #version 300 es
     precision highp float;
-    out vec3 fragColor;
+    out vec4 fragColor;
     void main() {
         vec2 u_0 = gl_FragCoord.xy;
         vec3 anf_1 = vec3(1., 2., 3.);
         vec3 anf_2 = vec3(0., 2., 5.);
-        fragColor = cross(anf_1, anf_2);
+        vec3 tmp_ret = cross(anf_1, anf_2);
+        fragColor = clamp(vec4(tmp_ret.xyz, 1.), 0., 1.);
         return;
     }
     |}];

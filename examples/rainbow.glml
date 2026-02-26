@@ -1,4 +1,4 @@
-((extern vec2 u_resolution)
+(extern vec2 u_resolution)
 (extern vec2 u_mouse)
 (extern float u_time)
 
@@ -15,4 +15,4 @@
   (let g = (+ 0.7 (* 0.3 (sin (+ wave 2.0)))) in
   (let b = (+ 0.7 (* 0.3 (sin (+ wave 4.0)))) in
 
-  (vec3 r g b))))))))
+  (vec3 r g b)))))))
