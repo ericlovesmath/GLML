@@ -12,4 +12,5 @@
    glml_compiler)
  (js_of_ocaml (javascript_files main.js))
  (preprocess
-  (pps bonsai.ppx_bonsai ppx_jane ppx_html)))
+  (pps bonsai.ppx_bonsai ppx_jane ppx_html ppx_blob))
+ (preprocessor_deps (source_tree ../examples)))

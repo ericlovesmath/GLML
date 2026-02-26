@@ -19,19 +19,17 @@ let chosen_syntax = SexpLike
 
 module Example = struct
   type t =
-    | MouseCircle
-    | PastelRainbow
-  [@@deriving sexp, compare, equal, enumerate, to_string]
+    | Mouse_circle
+    | Pastel_rainbow
+  [@@deriving sexp, compare, equal, enumerate, to_string ~capitalize:"Title Case"]
 
   let to_glml = function
-    | MouseCircle -> Shader.circle_at_mouse
-    | PastelRainbow -> Shader.pastel_rainbow
+    | Mouse_circle -> [%blob "../examples/mouse_circle.glml"]
+    | Pastel_rainbow -> [%blob "../examples/rainbow.glml"]
   ;;
 end
 
 module Codemirror_editor = struct
-  let doc = Shader.circle_at_mouse
-
   let component language =
     let name, language_stream_parser =
       match language with
@@ -42,7 +40,6 @@ module Codemirror_editor = struct
       ~name
       (State.Editor_state.create
          (State.Editor_state_config.create
-            ~doc
             ~extensions:
               [ Basic_setup.basic_setup
               ; Codemirror_themes.get Codemirror_themes.Material_dark
