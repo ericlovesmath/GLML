@@ -1,5 +1,12 @@
 .PHONY: clean bin js web serve test benchmark
 
+PROFILE := dev
+ifdef RELEASE
+	PROFILE := release
+endif
+
+DUNE_FLAGS := --profile $(PROFILE)
+
 all: bin js web
 
 clean:
@@ -9,22 +16,19 @@ clean:
 bin:
     # Use dune exec GLML -- <args> to run cli
     # Alternatively use ./_build/default/bin/main.exe
-	dune build _build/default/bin/main.exe
+	dune build $(DUNE_FLAGS) _build/default/bin/main.exe
 
 js:
-	dune build _build/default/jsoo/main.bc.js
+	dune build $(DUNE_FLAGS) _build/default/jsoo/main.bc.js
 
 web:
-	dune build --profile release _build/default/web/main.bc.js
+	dune build $(DUNE_FLAGS) _build/default/web/main.bc.js
 	mkdir -p dist
 	cp web/index.html dist
 	cp web/style.css dist
 	cp -f _build/default/web/main.bc.js dist
 
 serve: web
-	@echo "========================================"
-	@echo "  Playground: http://localhost:8000"
-	@echo "========================================"
 	cd dist; python3 -m http.server
 
 test:
