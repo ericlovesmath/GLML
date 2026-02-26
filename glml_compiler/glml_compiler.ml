@@ -9,6 +9,7 @@ module Passes = struct
     | Typecheck : Typecheck.t pass
     | Anf : Anf.t pass
     | Translate : Glsl.t pass
+    | Patch_main : Glsl.t pass
 
   let sexp_of_pass : type a. a pass -> a -> Sexp.t = function
     | Stlc -> Stlc.sexp_of_t
@@ -16,6 +17,7 @@ module Passes = struct
     | Typecheck -> Typecheck.sexp_of_t
     | Anf -> Anf.sexp_of_t
     | Translate -> Glsl.sexp_of_t
+    | Patch_main -> Glsl.sexp_of_t
   ;;
 
   module T = struct
@@ -25,6 +27,7 @@ module Passes = struct
       | Typecheck
       | Anf
       | Translate
+      | Patch_main
     [@@deriving compare, sexp, enumerate, string ~capitalize:"lower sentence case"]
   end
 
@@ -37,6 +40,7 @@ module Passes = struct
     | Typecheck -> Typecheck
     | Anf -> Anf
     | Translate -> Translate
+    | Patch_main -> Patch_main
   ;;
 end
 
@@ -64,5 +68,7 @@ let compile_stlc ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s :
   trace Anf t;
   let glsl = Translate.translate t in
   trace Translate glsl;
+  let glsl = Patch_main.patch glsl in
+  trace Patch_main glsl;
   return (Glsl.to_shader glsl)
 ;;
