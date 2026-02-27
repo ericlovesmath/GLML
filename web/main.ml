@@ -60,7 +60,7 @@ let component graph =
     let%arr set_error = set_error in
     fun glml ->
       Ui_effect.bind (Ui_effect.return ()) ~f:(fun () ->
-        match Or_error.try_with_join (fun () -> Glml_compiler.compile_stlc glml) with
+        match Or_error.try_with_join (fun () -> Glml_compiler.compile glml) with
         | Error err -> set_error (Some (Error.to_string_hum err))
         | Ok glsl ->
           glsl

@@ -2,7 +2,7 @@ open Core
 open Glml_compiler
 
 let test s =
-  match compile_stlc s with
+  match compile s with
   | Error err -> print_s (Error.sexp_of_t err)
   | Ok glsl -> print_endline glsl
 ;;
