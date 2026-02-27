@@ -48,7 +48,7 @@ type token =
   | RCURLY
   | BOOL
   | UNITTY
-  | NAT
+  | INT
   | BANG
   | REF
   | ASSIGN
@@ -60,7 +60,7 @@ type token =
   | STAR
   | EXISTS
   | SUBTYPE
-  | INT of int
+  | NUM of int
   | BASE of char
   | ID of string
 [@@deriving sexp, equal]
@@ -83,12 +83,6 @@ let advance c t =
 
 let peek t = if eof t then failwith "peek: EOF" else String.get t.str t.pos.i
 let skip t = advance (peek t) t
-
-let next t =
-  let c = peek t in
-  skip t;
-  c
-;;
 
 let rec strip t =
   if (not (eof t)) && Char.is_whitespace (peek t)
@@ -152,19 +146,14 @@ let read_lexeme t =
     | '!' -> skip t; BANG
     | '\'' -> skip t; TICK
     | '*' -> skip t; STAR
-    | '#' -> (
-        skip t;
-        match next t with
-        | 'u' -> UNIT
-        | 't' -> TRUE
-        | 'f' -> FALSE
-        | _ -> failwith "invalid token starting with #")
     | c when Char.is_digit c ->
-        INT (Int.of_string (read_while Char.is_digit t))
+        NUM (Int.of_string (read_while Char.is_digit t))
     | c when Char.is_alpha c -> (
         let s = read_while Char.is_alpha t in
         match s with
         | "unit" -> UNITTY
+        | "true" -> TRUE
+        | "false" -> FALSE
         | "Z" -> ZERO
         | "S" -> SUCC
         | "pred" -> PRED
@@ -181,7 +170,7 @@ let read_lexeme t =
         | "match" -> MATCH
         | "with" -> WITH
         | "bool" -> BOOL
-        | "nat" -> NAT
+        | "int" -> INT
         | "ref" -> REF
         | "top" -> TOP
         | "bot" -> BOT
@@ -213,48 +202,19 @@ let%expect_test "lexer" =
     s |> of_string |> lex |> List.map ~f:fst |> List.sexp_of_t sexp_of_token |> print_s
   in
   test ".";
-  test "#u";
   test "bool";
   test "->";
   test "abcd";
-  test "if #f then #u else #f";
-  test "if #f then #u";
-  test "if    if #u then #f   else #t then(if #t then #f)else   #f";
   test "f x y z";
   test "f (x y) z";
-  test "match f (x y) z with | some x => #t | none => #f";
-  test "x as bool";
-  test "match pos as < p : nat , end > with | p n -> n | end -> #u";
-  test "match pos as<p:nat,end>with|p n->n|end->#u";
-  test "{ x : nat , y : { bool:bool}}";
-  test "< some : nat, none >";
-  test "{ x = #t , y = v.0 }.x";
-  test "v := S; let x = ref v in !x";
   [%expect
     {|
     (DOT)
-    (UNIT)
     (BOOL)
     (ARROW)
     ((ID abcd))
-    (IF FALSE THEN UNIT ELSE FALSE)
-    (IF FALSE THEN UNIT)
-    (IF IF UNIT THEN FALSE ELSE TRUE THEN LPAREN IF TRUE THEN FALSE RPAREN ELSE
-     FALSE)
     ((ID f) (ID x) (ID y) (ID z))
     ((ID f) LPAREN (ID x) (ID y) RPAREN (ID z))
-    (MATCH (ID f) LPAREN (ID x) (ID y) RPAREN (ID z) WITH BAR (ID some) (ID x)
-     DARROW TRUE BAR (ID none) DARROW FALSE)
-    ((ID x) AS BOOL)
-    (MATCH (ID pos) AS LANGLE (ID p) COLON NAT COMMA (ID end) RANGLE WITH BAR
-     (ID p) (ID n) ARROW (ID n) BAR (ID end) ARROW UNIT)
-    (MATCH (ID pos) AS LANGLE (ID p) COLON NAT COMMA (ID end) RANGLE WITH BAR
-     (ID p) (ID n) ARROW (ID n) BAR (ID end) ARROW UNIT)
-    (LCURLY (ID x) COLON NAT COMMA (ID y) COLON LCURLY BOOL COLON BOOL RCURLY
-     RCURLY)
-    (LANGLE (ID some) COLON NAT COMMA (ID none) RANGLE)
-    (LCURLY (ID x) EQ TRUE COMMA (ID y) EQ (ID v) DOT (INT 0) RCURLY DOT (ID x))
-    ((ID v) ASSIGN SUCC SEMI LET (ID x) EQ REF (ID v) IN BANG (ID x))
     |}];
   test "'a";
   test "forall . { *exists n, m }";

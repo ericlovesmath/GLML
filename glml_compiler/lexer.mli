@@ -39,7 +39,7 @@ type token =
   | RCURLY
   | BOOL
   | UNITTY
-  | NAT
+  | INT
   | BANG
   | REF
   | ASSIGN
@@ -51,7 +51,7 @@ type token =
   | STAR
   | EXISTS
   | SUBTYPE
-  | INT of int
+  | NUM of int
   | BASE of char
   | ID of string
 [@@deriving sexp, equal]

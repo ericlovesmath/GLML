@@ -1,5 +1,2 @@
-(** Parser for Stlc.ty *)
-val ty_p : Stlc.ty Chomp.t
-
-(** Parser for Stlc.t *)
-val t_p : Stlc.t Chomp.t
+(** Parser for Stlc.term *)
+val term_p : Stlc.term Chomp.t
