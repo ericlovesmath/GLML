@@ -1,6 +1,9 @@
 open Core
 open Sexplib.Sexp
 
+(* TODO: Improve Lexer in general *)
+(* TODO: Report location on fail *)
+
 type pos =
   { i : int
   ; line : int
@@ -38,6 +41,7 @@ type token =
   | RCURLY
   | BOOL
   | INT
+  | FLOAT
   | TICK
   | NUM of int
   | ID of string
@@ -120,6 +124,7 @@ let read_lexeme t =
         | "with" -> WITH
         | "bool" -> BOOL
         | "int" -> INT
+        | "float" -> FLOAT
         | _ -> ID s)
     | _ ->
         let s = read_while (fun c -> not Char.(is_alpha c || equal '#' c || is_whitespace c || equal '.' c)) t in
@@ -131,6 +136,7 @@ let read_lexeme t =
     (token, pos)
   [@@ocamlformat "disable"]
 
+(* TODO: Have real non-failable behavior instead of [Or_error.try_with] *)
 let lex t =
   Or_error.try_with (fun () ->
     let rec aux acc = if eof t then List.rev acc else aux (read_lexeme t :: acc) in
@@ -147,21 +153,22 @@ let%expect_test "lexer" =
     |> Or_error.sexp_of_t (List.sexp_of_t sexp_of_token)
     |> print_s
   in
-  test ".";
-  test "bool";
-  test "->";
-  test "abcd";
-  test "f x y z";
-  test "f (x y) z";
-  test "'a";
+  test "true false = -> ( ) . < >";
+  test "{ } ; : , if then else let";
+  test "in fun | match with { }";
+  test "bool int float ' 10 stringy";
   [%expect
     {|
-    (Ok (DOT))
-    (Ok (BOOL))
-    (Ok (ARROW))
-    (Ok ((ID abcd)))
-    (Ok ((ID f) (ID x) (ID y) (ID z)))
-    (Ok ((ID f) LPAREN (ID x) (ID y) RPAREN (ID z)))
-    (Ok (TICK (ID a)))
+    (Ok (TRUE FALSE EQ ARROW LPAREN RPAREN DOT LANGLE RANGLE))
+    (Ok (LCURLY RCURLY SEMI COLON COMMA IF THEN ELSE LET))
+    (Ok (IN FUN BAR MATCH WITH LCURLY RCURLY))
+    (Ok (BOOL INT FLOAT TICK (NUM 10) (ID stringy)))
+    |}];
+  test "let{x:int}=match|a->fun-> (f<x>)";
+  [%expect
+    {|
+    (Ok
+     (LET LCURLY (ID x) COLON INT RCURLY EQ MATCH BAR (ID a) ARROW FUN ARROW
+      LPAREN (ID f) LANGLE (ID x) RANGLE RPAREN))
     |}]
 ;;

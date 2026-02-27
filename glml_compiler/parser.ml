@@ -21,6 +21,8 @@ let between brace_type p =
   tok l *> p <* tok r
 ;;
 
+(* TODO: vec/mat ty parsers *)
+
 let rec ty_p =
   fun st ->
   let ty_p = ty_arrow_p <|> ty_atom_p in
@@ -32,6 +34,7 @@ and ty_singles_p =
   satisfy_map (function
     | BOOL -> Some TyBool
     | INT -> Some TyInt
+    | FLOAT -> Some TyFloat
     | _ -> None)
 
 and ty_arrow_p =
@@ -43,6 +46,7 @@ and ty_arrow_p =
     st
 ;;
 
+(* TODO: Exhausive Ty Tests *)
 let%expect_test "ty parse tests" =
   let test s =
     s
@@ -71,6 +75,8 @@ let%expect_test "ty parse tests" =
     |}]
 ;;
 
+(* TODO: Float/Int/Vec/Mat/Bop/Index/Builtin Parsers *)
+
 let rec term_p =
   fun st ->
   (let%bind t = t_atom_p <|> between `Paren term_p in
@@ -90,7 +96,7 @@ and t_atom_p =
     match%bind peek with
     | LET -> t_let_p
     | IF -> t_if_p
-    | FUN -> t_abs_p
+    | FUN -> t_lam_p
     | _ -> fail "commit: not a fixed prefix"
   in
   (t_singles_p <|> t_commit_prefix_p) st
@@ -115,7 +121,7 @@ and t_app_p t =
   let%bind ts = many (t_atom_p <|> between `Paren term_p) in
   return (List.fold_left ~f:(fun f x -> App (f, x)) ~init:t ts)
 
-and t_abs_p =
+and t_lam_p =
   fun st ->
   (let%bind id = tok FUN *> ident_p in
    let%bind ty = tok COLON *> ty_p in
@@ -124,6 +130,8 @@ and t_abs_p =
     st
 ;;
 
+(* TODO: Pretty print [Stlc.term] for nicer output / testing *)
+(* TODO: Exhausive Term Tests *)
 let%expect_test "term parse tests" =
   let test s =
     s
@@ -151,3 +159,5 @@ let%expect_test "term parse tests" =
   test "fun x : bool -> x";
   [%expect {| (Ok (Lam x TyBool (Var x))) |}]
 ;;
+
+(* TODO: Parser + Tests for [Stlc.t] *)

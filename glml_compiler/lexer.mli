@@ -31,6 +31,7 @@ type token =
   | RCURLY
   | BOOL
   | INT
+  | FLOAT
   | TICK
   | NUM of int
   | ID of string
