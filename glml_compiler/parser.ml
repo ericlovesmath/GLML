@@ -19,12 +19,15 @@ let num_p =
   <??> "num"
 ;;
 
+let commas p = sep_by1 (tok COMMA) p
+
 let between brace_type p =
   let l, r =
     match brace_type with
     | `Paren -> LPAREN, RPAREN
     | `Curly -> LCURLY, RCURLY
     | `Angle -> LANGLE, RANGLE
+    | `Bracket -> LBRACKET, RBRACKET
   in
   tok l *> p <* tok r <??> "between"
 ;;
@@ -112,7 +115,17 @@ let%expect_test "ty parse tests" =
     |}]
 ;;
 
-(* TODO: Float/Int/Vec/Mat/Bop/Index/Builtin Parsers *)
+let term_number_p =
+  let%bind sign = tok SUB *> return (-1) <|> tok ADD *> return 1 <|> return 1 in
+  let%bind n = num_p in
+  (let%bind m = tok DOT *> (num_p <|> return 0) in
+   let unsigned_float = Float.of_string [%string "%{n#Int}.%{m#Int}"] in
+   let float = Float.of_int sign *. unsigned_float in
+   return (Float float) <??> "term_float")
+  <|> (return (Int (sign * n)) <??> "term_int")
+;;
+
+(* TODO: Bop/Index/Builtin Parsers *)
 
 let rec term_let_p =
   fun st ->
@@ -152,6 +165,28 @@ and term_lam_p =
    <??> "term_lam")
     st
 
+and term_mat_p =
+  fun st ->
+  ((let%bind terms = between `Angle (commas (between `Angle (commas term_p))) in
+    let n = List.length terms in
+    let m = List.length (List.hd_exn terms) in
+    if List.for_all terms ~f:(fun ts -> List.length ts = m)
+    then return (Mat (n, m, List.concat terms))
+    else fail "matrix contains rows of unequal size")
+   <??> "term_mat")
+    st
+
+and term_vec_p =
+  fun st ->
+  (let%bind terms = between `Angle (commas term_p) in
+   return (Vec (List.length terms, terms)) <??> "term_index")
+    st
+
+and term_index_p term =
+  let%bind indices = many1 (between `Bracket num_p) in
+  return (List.fold_left indices ~init:term ~f:(fun acc i -> Index (acc, i)))
+  <??> "term_index"
+
 and term_atom_p =
   fun st ->
   let term_singles_p =
@@ -162,12 +197,20 @@ and term_atom_p =
       | _ -> None)
     <??> "term_single"
   in
-  (term_singles_p <|> term_let_p <|> term_if_p <|> term_lam_p <??> "term_atom") st
+  (term_singles_p
+   <|> term_number_p
+   <|> term_let_p
+   <|> term_if_p
+   <|> term_lam_p
+   <|> term_mat_p
+   <|> term_vec_p
+   <??> "term_atom")
+    st
 
 and term_p =
   fun st ->
   (let%bind t = term_atom_p <|> between `Paren term_p in
-   term_app_p t <|> return t <??> "term")
+   term_index_p t <|> term_app_p t <|> return t <??> "term")
     st
 ;;
 
@@ -183,6 +226,35 @@ let%expect_test "term parse tests" =
     |> Or_error.sexp_of_t sexp_of_term
     |> print_s
   in
+  test "variable_name";
+  test "-13.4";
+  test "33";
+  test "false";
+  test "<1, 2, 3>";
+  test "<<1, 2>, <3, 4>, <5, 6>>";
+  test "fun (x : bool) -> x";
+  test "f x";
+  test "let bind = true in bind";
+  test "if true then x else y";
+  test "TODObop";
+  test "v[0]";
+  test "TODObuiltin";
+  [%expect
+    {|
+    (Ok (Var variable_name))
+    (Ok (Float -13.4))
+    (Ok (Int 33))
+    (Ok (Bool false))
+    (Ok (Vec 3 ((Int 1) (Int 2) (Int 3))))
+    (Ok (Mat 3 2 ((Int 1) (Int 2) (Int 3) (Int 4) (Int 5) (Int 6))))
+    (Ok (Lam x TyBool (Var x)))
+    (Ok (App (Var f) (Var x)))
+    (Ok (Let bind (Bool true) (Var bind)))
+    (Ok (If (Bool true) (Var x) (Var y)))
+    (Ok (Var TODObop))
+    (Ok (Index (Var v) 0))
+    (Ok (Var TODObuiltin))
+    |}];
   test "false";
   test "if false then false else false";
   [%expect

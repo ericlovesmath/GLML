@@ -123,7 +123,7 @@ let read_lexeme t =
     | c when Char.is_digit c ->
         NUMERIC (Int.of_string (read_while Char.is_digit t))
     | c when Char.is_alpha c -> (
-        let s = read_while Char.is_alpha t in
+        let s = read_while (fun c -> Char.is_alpha c || Char.equal '_' c) t in
         match s with
         | "true" -> TRUE
         | "false" -> FALSE
@@ -167,14 +167,14 @@ let%expect_test "lexer" =
   test "true false = -> ( ) . < >";
   test "{ } ; : , if then else let";
   test "in fun | match with { }";
-  test "bool int float ' 10 stringy";
+  test "bool int float ' 10 string_var";
   test "+ - / *";
   [%expect
     {|
     (Ok (TRUE FALSE EQ ARROW LPAREN RPAREN DOT LANGLE RANGLE))
     (Ok (LCURLY RCURLY SEMI COLON COMMA IF THEN ELSE LET))
     (Ok (IN FUN BAR MATCH WITH LCURLY RCURLY))
-    (Ok (BOOL INT FLOAT TICK (NUMERIC 10) (ID stringy)))
+    (Ok (BOOL INT FLOAT TICK (NUMERIC 10) (ID string_var)))
     (Ok (ADD SUB DIV MUL))
     |}];
   test "let{x:int}=match|a->fun->(f<x>*2)";
