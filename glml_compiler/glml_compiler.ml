@@ -50,10 +50,7 @@ module Passes = struct
   ;;
 end
 
-(* TODO: remove this? *)
-let compile_source src = Glsl.to_shader (Glsl.of_string src)
-
-let compile_stlc ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : string)
+let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : string)
   : string Or_error.t
   =
   let trace : type a. a Passes.pass -> a -> unit =
