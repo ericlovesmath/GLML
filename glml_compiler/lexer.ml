@@ -43,6 +43,12 @@ type token =
   | INT
   | FLOAT
   | TICK
+  | VEC
+  | MAT
+  | ADD
+  | SUB
+  | DIV
+  | MUL
   | NUM of int
   | ID of string
 [@@deriving sexp, equal]
@@ -107,6 +113,13 @@ let read_lexeme t =
     | '.' -> skip t; DOT
     | '|' -> skip t; BAR
     | '\'' -> skip t; TICK
+    | '+' -> skip t; ADD
+    | '-' -> skip t;
+        (match peek t with
+        | '>' -> skip t; ARROW
+        | _ -> SUB)
+    | '/' -> skip t; DIV
+    | '*' -> skip t; MUL
     | c when Char.is_digit c ->
         NUM (Int.of_string (read_while Char.is_digit t))
     | c when Char.is_alpha c -> (
@@ -125,6 +138,8 @@ let read_lexeme t =
         | "bool" -> BOOL
         | "int" -> INT
         | "float" -> FLOAT
+        | "vec" -> VEC
+        | "mat" -> MAT
         | _ -> ID s)
     | _ ->
         let s = read_while (fun c -> not Char.(is_alpha c || equal '#' c || is_whitespace c || equal '.' c)) t in
@@ -157,18 +172,23 @@ let%expect_test "lexer" =
   test "{ } ; : , if then else let";
   test "in fun | match with { }";
   test "bool int float ' 10 stringy";
+  test "+ - / *";
   [%expect
     {|
     (Ok (TRUE FALSE EQ ARROW LPAREN RPAREN DOT LANGLE RANGLE))
     (Ok (LCURLY RCURLY SEMI COLON COMMA IF THEN ELSE LET))
     (Ok (IN FUN BAR MATCH WITH LCURLY RCURLY))
     (Ok (BOOL INT FLOAT TICK (NUM 10) (ID stringy)))
+    (Ok (ADD SUB DIV MUL))
     |}];
-  test "let{x:int}=match|a->fun-> (f<x>)";
+  test "let{x:int}=match|a->fun->(f<x>*2)";
   [%expect
     {|
     (Ok
      (LET LCURLY (ID x) COLON INT RCURLY EQ MATCH BAR (ID a) ARROW FUN ARROW
-      LPAREN (ID f) LANGLE (ID x) RANGLE RPAREN))
-    |}]
+      LPAREN (ID f) LANGLE (ID x) RANGLE MUL (NUM 2) RPAREN))
+    |}];
+  test "vec2 mat2x3";
+  [%expect
+    {| (Ok (VEC (NUM 2) MAT (NUM 2) (ID x) (NUM 3))) |}];
 ;;

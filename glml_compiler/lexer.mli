@@ -33,6 +33,12 @@ type token =
   | INT
   | FLOAT
   | TICK
+  | VEC
+  | MAT
+  | ADD
+  | SUB
+  | DIV
+  | MUL
   | NUM of int
   | ID of string
 [@@deriving sexp, equal]
