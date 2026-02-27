@@ -1,16 +1,11 @@
+open Core
+
 type t
 type pos [@@deriving sexp_of]
 
 type token =
-  | UNIT
   | TRUE
   | FALSE
-  | ZERO
-  | PRED
-  | SUCC
-  | ISZERO
-  | FIX
-  | LETREC
   | EQ
   | ARROW
   | LPAREN
@@ -22,7 +17,6 @@ type token =
   | RBRACKET
   | SEMI
   | COLON
-  | DCOLON
   | COMMA
   | IF
   | THEN
@@ -30,32 +24,18 @@ type token =
   | LET
   | IN
   | FUN
-  | AS
   | BAR
-  | DARROW
   | MATCH
   | WITH
   | LCURLY
   | RCURLY
   | BOOL
-  | UNITTY
   | INT
-  | BANG
-  | REF
-  | ASSIGN
-  | TOP
-  | BOT
-  | REC
   | TICK
-  | FORALL
-  | STAR
-  | EXISTS
-  | SUBTYPE
   | NUM of int
-  | BASE of char
   | ID of string
 [@@deriving sexp, equal]
 
 val of_string : string -> t
-val lex : t -> (token * pos) list
+val lex : t -> (token * pos) list Or_error.t
 val initial_pos : pos

@@ -26,7 +26,7 @@ let rec ty_p =
   let ty_p = ty_arrow_p <|> ty_atom_p in
   (ty_p <|> between `Paren ty_p) st
 
-and ty_atom_p = fun st -> (ty_singles_p <|> ty_ref_p) st
+and ty_atom_p = fun st -> ty_singles_p st
 
 and ty_singles_p =
   satisfy_map (function
@@ -41,15 +41,15 @@ and ty_arrow_p =
    let%bind r = ty_p in
    return (TyArrow (l, r)))
     st
-
-and ty_ref_p = fun st -> (tok REF *> ty_p) st
+;;
 
 let%expect_test "ty parse tests" =
   let test s =
     s
     |> Lexer.of_string
     |> Lexer.lex
-    |> run ty_p
+    |> Or_error.map ~f:(run ty_p)
+    |> Or_error.join
     |> Or_error.sexp_of_t sexp_of_ty
     |> print_s
   in
@@ -59,7 +59,7 @@ let%expect_test "ty parse tests" =
   [%expect
     {|
     (Ok TyBool)
-    (Error ((chomp_error "satisfy_fail on token LPAREN at 1:2") (contexts ())))
+    (Error ((chomp_error satisfy_map_fail) (contexts ())))
     (Ok (TyArrow TyInt TyBool))
     |}];
   test "";
@@ -67,7 +67,7 @@ let%expect_test "ty parse tests" =
   [%expect
     {|
     (Error ((chomp_error satisfy_eof) (contexts ())))
-    (Error ((chomp_error "satisfy_fail on token RPAREN at 1:2") (contexts ())))
+    (Error ((chomp_error satisfy_map_fail) (contexts ())))
     |}]
 ;;
 
@@ -129,7 +129,8 @@ let%expect_test "term parse tests" =
     s
     |> Lexer.of_string
     |> Lexer.lex
-    |> run term_p
+    |> Or_error.map ~f:(run term_p)
+    |> Or_error.join
     |> Or_error.sexp_of_t sexp_of_term
     |> print_s
   in

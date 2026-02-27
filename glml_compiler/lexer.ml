@@ -11,15 +11,8 @@ let sexp_of_pos { i = _; line; col } = Atom [%string "%{line#Int}:%{col#Int}"]
 let initial_pos = { i = 0; line = 0; col = 0 }
 
 type token =
-  | UNIT
   | TRUE
   | FALSE
-  | ZERO
-  | PRED
-  | SUCC
-  | ISZERO
-  | FIX
-  | LETREC
   | EQ
   | ARROW
   | LPAREN
@@ -31,7 +24,6 @@ type token =
   | RBRACKET
   | SEMI
   | COLON
-  | DCOLON
   | COMMA
   | IF
   | THEN
@@ -39,29 +31,15 @@ type token =
   | LET
   | IN
   | FUN
-  | AS
   | BAR
-  | DARROW
   | MATCH
   | WITH
   | LCURLY
   | RCURLY
   | BOOL
-  | UNITTY
   | INT
-  | BANG
-  | REF
-  | ASSIGN
-  | TOP
-  | BOT
-  | REC
   | TICK
-  | FORALL
-  | STAR
-  | EXISTS
-  | SUBTYPE
   | NUM of int
-  | BASE of char
   | ID of string
 [@@deriving sexp, equal]
 
@@ -111,31 +89,12 @@ let read_lexeme t =
   let token =
     match peek t with
     | '(' -> skip t; LPAREN
-    | '=' -> (
-        skip t;
-        match peek t with
-        | '>' ->
-            skip t;
-            DARROW
-        | _ -> EQ)
-    | ':' -> (
-        skip t;
-        match peek t with
-        | ':' ->
-            skip t;
-            DCOLON
-        | '=' ->
-            skip t;
-            ASSIGN
-        | _ -> COLON)
+    | '=' -> skip t; EQ
+    | ':' -> skip t; COLON
     | ')' -> skip t; RPAREN
     | '{' -> skip t; LCURLY
     | '}' -> skip t; RCURLY
-    | '<' -> (
-        skip t;
-        match peek t with
-        | ':' -> skip t; SUBTYPE
-        | _ -> LANGLE)
+    | '<' -> skip t; LANGLE
     | '>' -> skip t; RANGLE
     | '[' -> skip t; LBRACKET
     | ']' -> skip t; RBRACKET
@@ -143,44 +102,25 @@ let read_lexeme t =
     | ',' -> skip t; COMMA
     | '.' -> skip t; DOT
     | '|' -> skip t; BAR
-    | '!' -> skip t; BANG
     | '\'' -> skip t; TICK
-    | '*' -> skip t; STAR
     | c when Char.is_digit c ->
         NUM (Int.of_string (read_while Char.is_digit t))
     | c when Char.is_alpha c -> (
         let s = read_while Char.is_alpha t in
         match s with
-        | "unit" -> UNITTY
         | "true" -> TRUE
         | "false" -> FALSE
-        | "Z" -> ZERO
-        | "S" -> SUCC
-        | "pred" -> PRED
-        | "iszero" -> ISZERO
-        | "fix" -> FIX
         | "let" -> LET
-        | "letrec" -> LETREC
         | "in" -> IN
         | "if" -> IF
         | "then" -> THEN
         | "else" -> ELSE
         | "fun" -> FUN
-        | "as" -> AS
         | "match" -> MATCH
         | "with" -> WITH
         | "bool" -> BOOL
         | "int" -> INT
-        | "ref" -> REF
-        | "top" -> TOP
-        | "bot" -> BOT
-        | "rec" -> REC
-        | "forall" -> FORALL
-        | "exists" -> EXISTS
-        | _ ->
-            if String.length s = 1 && Char.(is_uppercase (of_string s))
-            then BASE (Char.of_string s)
-            else ID s)
+        | _ -> ID s)
     | _ ->
         let s = read_while (fun c -> not Char.(is_alpha c || equal '#' c || is_whitespace c || equal '.' c)) t in
         match s with
@@ -192,14 +132,20 @@ let read_lexeme t =
   [@@ocamlformat "disable"]
 
 let lex t =
-  let rec aux acc = if eof t then List.rev acc else aux (read_lexeme t :: acc) in
-  strip t;
-  aux []
+  Or_error.try_with (fun () ->
+    let rec aux acc = if eof t then List.rev acc else aux (read_lexeme t :: acc) in
+    strip t;
+    aux [])
 ;;
 
 let%expect_test "lexer" =
   let test s =
-    s |> of_string |> lex |> List.map ~f:fst |> List.sexp_of_t sexp_of_token |> print_s
+    s
+    |> of_string
+    |> lex
+    |> Or_error.map ~f:(List.map ~f:fst)
+    |> Or_error.sexp_of_t (List.sexp_of_t sexp_of_token)
+    |> print_s
   in
   test ".";
   test "bool";
@@ -207,24 +153,15 @@ let%expect_test "lexer" =
   test "abcd";
   test "f x y z";
   test "f (x y) z";
-  [%expect
-    {|
-    (DOT)
-    (BOOL)
-    (ARROW)
-    ((ID abcd))
-    ((ID f) (ID x) (ID y) (ID z))
-    ((ID f) LPAREN (ID x) (ID y) RPAREN (ID z))
-    |}];
   test "'a";
-  test "forall . { *exists n, m }";
-  test "a < b <: c<:d<e";
-  test ":: => :=";
   [%expect
     {|
-    (TICK (ID a))
-    (FORALL DOT LCURLY STAR EXISTS (ID n) COMMA (ID m) RCURLY)
-    ((ID a) LANGLE (ID b) SUBTYPE (ID c) SUBTYPE (ID d) LANGLE (ID e))
-    (DCOLON DARROW ASSIGN)
+    (Ok (DOT))
+    (Ok (BOOL))
+    (Ok (ARROW))
+    (Ok ((ID abcd)))
+    (Ok ((ID f) (ID x) (ID y) (ID z)))
+    (Ok ((ID f) LPAREN (ID x) (ID y) RPAREN (ID z)))
+    (Ok (TICK (ID a)))
     |}]
 ;;
