@@ -7,6 +7,7 @@ module Passes = struct
     | Stlc : Stlc.t pass
     | Uniquify : Stlc.t pass
     | Typecheck : Typecheck.t pass
+    | Uncurry : Uncurry.t pass
     | Anf : Anf.t pass
     | Translate : Glsl.t pass
     | Patch_main : Glsl.t pass
@@ -15,16 +16,20 @@ module Passes = struct
     | Stlc -> Stlc.sexp_of_t
     | Uniquify -> Stlc.sexp_of_t
     | Typecheck -> Typecheck.sexp_of_t
+    | Uncurry -> Uncurry.sexp_of_t
     | Anf -> Anf.sexp_of_t
     | Translate -> Glsl.sexp_of_t
     | Patch_main -> Glsl.sexp_of_t
   ;;
 
+  (* TODO: Maybe something like [typed_variants] in [ppx_typed_fields] can
+   cut down a lot of the repeated code here? This is basically a [Packed.t] *)
   module T = struct
     type t =
       | Stlc
       | Uniquify
       | Typecheck
+      | Uncurry
       | Anf
       | Translate
       | Patch_main
@@ -38,6 +43,7 @@ module Passes = struct
     | Stlc -> Stlc
     | Uniquify -> Uniquify
     | Typecheck -> Typecheck
+    | Uncurry -> Uncurry
     | Anf -> Anf
     | Translate -> Translate
     | Patch_main -> Patch_main
@@ -64,6 +70,8 @@ let compile_stlc ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s :
   trace Uniquify t;
   let%bind t = Typecheck.typecheck t in
   trace Typecheck t;
+  let t = Uncurry.uncurry t in
+  trace Uncurry t;
   let t = Anf.to_anf t in
   trace Anf t;
   let glsl = Translate.translate t in

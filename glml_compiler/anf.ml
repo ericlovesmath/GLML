@@ -15,9 +15,9 @@ type term =
   | Mat of int * int * atom list
   | Index of atom * int
   | Builtin of Glsl.builtin * atom list
-  | App of atom * atom
+  | App of string * atom list
   | If of atom * anf * anf
-  | Lam of string * Stlc.ty * anf
+  | Lam of (string * Stlc.ty) list * anf
 [@@deriving sexp_of]
 
 and anf =
@@ -105,14 +105,23 @@ let rec type_of_term ctx = function
      | Pow -> check_binary_math ()
      | Length | Distance | Dot | Cross | Normalize -> check_geometric ()
      | Abs | Sign | Floor | Ceil | Min | Max | Clamp | Mix -> check_common ())
-  | App (f, _) ->
-    (match type_of_atom ctx f with
-     | TyArrow (_, r) -> r
-     | _ -> failwith "get_term_ty: invalid app")
+  | App (f, args) ->
+    let rec unpeel_type ty n =
+      if n = 0
+      then ty
+      else (
+        match ty with
+        | Stlc.TyArrow (_, r) -> unpeel_type r (n - 1)
+        | _ -> failwith "get_term_ty: applying too many arguments")
+    in
+    unpeel_type (Map.find_exn ctx f) (List.length args)
   | If (_, t, _) -> type_of ctx t
-  | Lam (v, ty_v, t) ->
-    let map = Map.set ctx ~key:v ~data:ty_v in
-    TyArrow (ty_v, type_of map t)
+  | Lam (args, anf) ->
+    let ctx =
+      List.fold args ~init:ctx ~f:(fun map (v, ty) -> Map.set map ~key:v ~data:ty)
+    in
+    let ret_ty = type_of ctx anf in
+    List.fold_right args ~init:ret_ty ~f:(fun (_, ty) acc -> Stlc.TyArrow (ty, acc))
 
 (* TODO: Typechecking stage should maybe occur after ANF? This feels redundant *)
 and type_of ctx = function
@@ -123,16 +132,20 @@ and type_of ctx = function
 ;;
 
 (* TODO: Refactor to use some kind of State monad + let* for implicit CPS *)
-let rec normalize (map : ty String.Map.t) (expr : Stlc.term) : ty String.Map.t * anf =
+let rec normalize (map : Stlc.ty String.Map.t) (expr : Uncurry.term)
+  : Stlc.ty String.Map.t * anf
+  =
   match expr with
   | Var v -> map, Return (Atom (Var v))
   | Float f -> map, Return (Atom (Float f))
   | Int i -> map, Return (Atom (Int i))
   | Bool b -> map, Return (Atom (Bool b))
-  | Lam (v, ty_v, t) ->
-    let map = Map.set map ~key:v ~data:ty_v in
+  | Lam (args, t) ->
+    let map =
+      List.fold args ~init:map ~f:(fun map (v, ty) -> Map.set map ~key:v ~data:ty)
+    in
     let map, t = normalize map t in
-    map, Return (Lam (v, ty_v, t))
+    map, Return (Lam (args, t))
   | Let (v, bind, body) ->
     let map, bind_anf = normalize map bind in
     let ty_v = type_of map bind_anf in
@@ -143,8 +156,11 @@ let rec normalize (map : ty String.Map.t) (expr : Stlc.term) : ty String.Map.t *
       | Return t -> Let (v, t, body_anf)
     in
     map, make_let bind_anf
-  | App (f, x) ->
-    atomize map f (fun map f -> atomize map x (fun map x -> map, Return (App (f, x))))
+  | App (f, args) ->
+    atomize map f (fun map f ->
+      match f with
+      | Var v -> atomize_list map args (fun map args -> map, Return (App (v, args)))
+      | _ -> failwith "normalize: app function must be a variable for now")
   | Bop (op, l, r) ->
     atomize map l (fun map l -> atomize map r (fun map r -> map, Return (Bop (op, l, r))))
   | Vec (n, ts) -> atomize_list map ts (fun map ts -> map, Return (Vec (n, ts)))
@@ -158,7 +174,9 @@ let rec normalize (map : ty String.Map.t) (expr : Stlc.term) : ty String.Map.t *
       let map, e_anf = normalize map e in
       map, Return (If (c, t_anf, e_anf)))
 
-and atomize (map : ty String.Map.t) (expr : Stlc.term) k : ty String.Map.t * anf =
+and atomize (map : Stlc.ty String.Map.t) (expr : Uncurry.term) k
+  : Stlc.ty String.Map.t * anf
+  =
   match expr with
   | Var v -> k map (Var v)
   | Float f -> k map (Float f)
@@ -183,7 +201,9 @@ and atomize_list map ts k =
     atomize map t (fun map t -> atomize_list map ts (fun map ts -> k map (t :: ts)))
 ;;
 
-let normalize_top (map : ty String.Map.t) (t : Stlc.top) : ty String.Map.t * top =
+let normalize_top (map : Stlc.ty String.Map.t) (t : Uncurry.top)
+  : Stlc.ty String.Map.t * top
+  =
   match t with
   | Define (v, bind) ->
     let map, bind_anf = normalize map bind in
@@ -193,7 +213,7 @@ let normalize_top (map : ty String.Map.t) (t : Stlc.top) : ty String.Map.t * top
   | Extern (ty, v) -> map, Extern (ty, v)
 ;;
 
-let to_anf (Program (map, terms) : Typecheck.t) : t =
+let to_anf (Program (map, terms) : Uncurry.t) : t =
   let map, anfs = List.fold_map terms ~init:map ~f:normalize_top in
   Program (map, anfs)
 ;;

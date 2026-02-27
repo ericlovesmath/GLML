@@ -34,10 +34,7 @@ let to_glsl_term (t : Anf.term) : term =
     App (ty, args)
   | Index (t, i) -> Index (to_glsl_atom t, i)
   | Builtin (f, args) -> Builtin (f, List.map args ~f:to_glsl_atom)
-  | App (f, x) ->
-    (match f with
-     | Var v -> App (v, [ to_glsl_atom x ])
-     | _ -> failwith "to_glsl_term: expected function name in app")
+  | App (f, args) -> App (f, List.map args ~f:to_glsl_atom)
   | If (_, _, _) ->
     failwith
       [%string "to_glsl_term: complex If with condition should be handled in tr_block"]
@@ -110,13 +107,15 @@ let translate (Program (map, tops) : Anf.t) : t =
   let globals =
     List.map tops ~f:(fun top ->
       match top with
-      | Define (name, Return (Lam (arg, arg_ty, body))) ->
+      | Define (name, Return (Lam (args, body))) ->
         let ret_type =
-          match Map.find_exn map name with
-          | TyArrow (_, r) -> to_glsl_ty r
-          | ty -> raise_s [%message "translate: non-arrow type function" (ty : Stlc.ty)]
+          let rec unroll = function
+            | Stlc.TyArrow (_, r) -> unroll r
+            | ty -> ty
+          in
+          to_glsl_ty (unroll (Map.find_exn map name))
         in
-        let params = [ to_glsl_ty arg_ty, arg ] in
+        let params = List.map args ~f:(fun (arg, arg_ty) -> to_glsl_ty arg_ty, arg) in
         let body = translate_block map body in
         Function { name; desc = None; params; ret_type; body }
       | Define (_, Return _) ->

@@ -71,8 +71,15 @@ let rec term_of_sexp = function
        Mat (n, n, List.map args ~f:term_of_sexp)
      | [ x; y ] -> Mat (Int.of_string x, Int.of_string y, List.map args ~f:term_of_sexp)
      | _ -> raise_s [%message "term_of_sexp: invalid mat" (s : string)])
-  | List [ Atom "fun"; Atom v; Atom ":"; ty; Atom "->"; t ] when is_ident v ->
-    Lam (v, ty_of_sexp ty, term_of_sexp t)
+  | List (Atom "fun" :: tl) ->
+    let rec build = function
+      | [ Atom "->"; t ] -> term_of_sexp t
+      | Atom v :: Atom ":" :: ty :: tl when is_ident v -> Lam (v, ty_of_sexp ty, build tl)
+      | List [ Atom v; Atom ":"; ty ] :: tl when is_ident v ->
+        Lam (v, ty_of_sexp ty, build tl)
+      | _ -> raise_s [%message "term_of_sexp: unexpected fun format" (tl : Sexp.t list)]
+    in
+    build tl
   | List [ Atom "let"; Atom v; Atom "="; bind; Atom "in"; body ] when is_ident v ->
     Let (v, term_of_sexp bind, term_of_sexp body)
   | List (Atom "let" :: Atom v :: Atom "=" :: bind :: Atom "in" :: tl) when is_ident v ->
@@ -95,9 +102,8 @@ let rec term_of_sexp = function
     (match Glsl.builtin_of_string_opt f with
      | Some b -> Builtin (b, List.map args ~f:term_of_sexp)
      | None ->
-       (match args with
-        | [ x ] -> App (term_of_sexp (Atom f), term_of_sexp x)
-        | _ -> raise_s [%message "t_of_sexp: unexpected list format" (f : string)]))
+       List.fold args ~init:(term_of_sexp (Atom f)) ~f:(fun acc x ->
+         App (acc, term_of_sexp x)))
   | sexp -> raise_s [%message "t_of_sexp: unexpected format" (sexp : Sexp.t)]
 ;;
 

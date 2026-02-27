@@ -237,3 +237,33 @@ let%expect_test "builtins" =
      (tys ((TyVec 2) (TyVec 2))))
     |}]
 ;;
+
+let%expect_test "multi argument functions / lambdas" =
+  test
+    {|
+    (let f (x : float) (y : float) = (+ x y))
+    (let g = fun (x : float) (y : float) -> (- x y))
+    (let main (u : vec2) = (vec3 (f 10.0 5.0) (g 0.0 0.0) 0.0))
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    float f_2(float x_0, float y_1) {
+        return (x_0 + y_1);
+    }
+    float g_5(float x_3, float y_4) {
+        return (x_3 - y_4);
+    }
+    vec3 main_pure(vec2 u_6) {
+        float anf_7 = f_2(10., 5.);
+        float anf_8 = g_5(0., 0.);
+        return vec3(anf_7, anf_8, 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;

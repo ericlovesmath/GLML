@@ -6,6 +6,7 @@ module Passes : sig
     | Stlc
     | Uniquify
     | Typecheck
+    | Uncurry
     | Anf
     | Translate
     | Patch_main

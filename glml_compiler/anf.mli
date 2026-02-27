@@ -14,9 +14,9 @@ type term =
   | Mat of int * int * atom list
   | Index of atom * int
   | Builtin of Glsl.builtin * atom list
-  | App of atom * atom
+  | App of string * atom list
   | If of atom * anf * anf
-  | Lam of string * Stlc.ty * anf
+  | Lam of (string * Stlc.ty) list * anf
 [@@deriving sexp_of]
 
 (** A-normal form representation of the STLC *)
@@ -34,4 +34,4 @@ type t = Program of Stlc.ty String.Map.t * top list [@@deriving sexp_of]
 
 (** Converts [t] to A-normal form, updating the [type map] to account for
     the new created variables. Variables are named in the form [anf_num]. *)
-val to_anf : Typecheck.t -> t
+val to_anf : Uncurry.t -> t
