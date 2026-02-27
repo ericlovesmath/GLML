@@ -1,7 +1,21 @@
 (library
  (name glml_compiler)
  (modules
-   utils glml_compiler
-   stlc uniquify typecheck uncurry anf translate patch_main glsl)
+   utils
+   glml_compiler
+
+   ; Compiler Passes
+   lexer
+   chomp
+   parser
+   stlc
+   uniquify
+   typecheck
+   uncurry
+   anf
+   translate
+   patch_main
+   glsl)
  (libraries core)
- (preprocess (pps ppx_jane)))
+ (preprocess (pps ppx_jane))
+ (inline_tests))
