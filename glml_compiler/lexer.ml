@@ -49,7 +49,7 @@ type token =
   | SUB
   | DIV
   | MUL
-  | NUM of int
+  | NUMERIC of int
   | ID of string
 [@@deriving sexp, equal]
 
@@ -121,7 +121,7 @@ let read_lexeme t =
     | '/' -> skip t; DIV
     | '*' -> skip t; MUL
     | c when Char.is_digit c ->
-        NUM (Int.of_string (read_while Char.is_digit t))
+        NUMERIC (Int.of_string (read_while Char.is_digit t))
     | c when Char.is_alpha c -> (
         let s = read_while Char.is_alpha t in
         match s with
@@ -141,11 +141,7 @@ let read_lexeme t =
         | "vec" -> VEC
         | "mat" -> MAT
         | _ -> ID s)
-    | _ ->
-        let s = read_while (fun c -> not Char.(is_alpha c || equal '#' c || is_whitespace c || equal '.' c)) t in
-        match s with
-        | "->" -> ARROW
-        | _ -> failwith ("invalid token " ^ s)
+    | c -> failwith ("invalid char " ^ Char.to_string c)
     in
     strip t;
     (token, pos)
@@ -178,7 +174,7 @@ let%expect_test "lexer" =
     (Ok (TRUE FALSE EQ ARROW LPAREN RPAREN DOT LANGLE RANGLE))
     (Ok (LCURLY RCURLY SEMI COLON COMMA IF THEN ELSE LET))
     (Ok (IN FUN BAR MATCH WITH LCURLY RCURLY))
-    (Ok (BOOL INT FLOAT TICK (NUM 10) (ID stringy)))
+    (Ok (BOOL INT FLOAT TICK (NUMERIC 10) (ID stringy)))
     (Ok (ADD SUB DIV MUL))
     |}];
   test "let{x:int}=match|a->fun->(f<x>*2)";
@@ -186,9 +182,8 @@ let%expect_test "lexer" =
     {|
     (Ok
      (LET LCURLY (ID x) COLON INT RCURLY EQ MATCH BAR (ID a) ARROW FUN ARROW
-      LPAREN (ID f) LANGLE (ID x) RANGLE MUL (NUM 2) RPAREN))
+      LPAREN (ID f) LANGLE (ID x) RANGLE MUL (NUMERIC 2) RPAREN))
     |}];
   test "vec2 mat2x3";
-  [%expect
-    {| (Ok (VEC (NUM 2) MAT (NUM 2) (ID x) (NUM 3))) |}];
+  [%expect {| (Ok (VEC (NUMERIC 2) MAT (NUMERIC 2) (ID x) (NUMERIC 3))) |}]
 ;;

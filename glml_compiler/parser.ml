@@ -14,7 +14,7 @@ let ident_p =
 
 let num_p =
   satisfy_map (function
-    | NUM i -> Some i
+    | NUMERIC i -> Some i
     | _ -> None)
   <??> "num"
 ;;
@@ -29,39 +29,42 @@ let between brace_type p =
   tok l *> p <* tok r <??> "between"
 ;;
 
-let ty_vec_p = tok VEC *> num_p >>| (fun n -> TyVec n) <??> "ty_vec"
-
-let ty_mat_p =
-  fun st ->
-  (let%bind _ = tok MAT in
-   let%bind n = num_p in
-   let%bind m = tok (ID "x") *> num_p <|> return n in
-   return (TyMat (n, m)) <??> "ty_mat")
-    st
+let ty_vec_p =
+  let%bind _ = tok VEC in
+  let%bind n = num_p in
+  return (TyVec n) <??> "ty_vec"
 ;;
 
-let rec ty_p =
-  fun st ->
-  let ty_p = ty_arrow_p <|> ty_atom_p in
-  (ty_p <|> between `Paren ty_p <??> "ty") st
+let ty_mat_p =
+  let%bind _ = tok MAT in
+  let%bind n = num_p in
+  let%bind m = tok (ID "x") *> num_p <|> return n in
+  return (TyMat (n, m)) <??> "ty_mat"
+;;
 
-and ty_atom_p = fun st -> (ty_singles_p <|> ty_vec_p <|> ty_mat_p) st
-
-and ty_singles_p =
+let ty_singles_p =
   satisfy_map (function
     | BOOL -> Some TyBool
     | INT -> Some TyInt
     | FLOAT -> Some TyFloat
     | _ -> None)
   <??> "ty_single"
+;;
 
-and ty_arrow_p =
+let ty_atom_p = ty_singles_p <|> ty_vec_p <|> ty_mat_p
+
+let rec ty_arrow_p =
   fun st ->
   (let%bind l = ty_atom_p <|> between `Paren ty_p in
    let%bind _ = tok ARROW in
    let%bind r = ty_p in
    return (TyArrow (l, r)) <??> "ty_arrow")
     st
+
+and ty_p =
+  fun st ->
+  let ty_p = ty_arrow_p <|> ty_atom_p in
+  (ty_p <|> between `Paren ty_p <??> "ty") st
 ;;
 
 let%expect_test "ty parse tests" =
@@ -111,15 +114,47 @@ let%expect_test "ty parse tests" =
 
 (* TODO: Float/Int/Vec/Mat/Bop/Index/Builtin Parsers *)
 
-let rec term_p =
+let rec term_let_p =
   fun st ->
-  (let%bind t = t_atom_p <|> between `Paren term_p in
-   t_app_p t <|> return t <??> "term")
+  (tok LET
+   *> commit
+        (let%bind id = ident_p in
+         let%bind bind = tok EQ *> term_p in
+         let%bind body = tok IN *> term_p in
+         return (Let (id, bind, body)))
+   <??> "term_let")
     st
 
-and t_atom_p =
+and term_if_p =
   fun st ->
-  let t_singles_p =
+  (tok IF
+   *> commit
+        (let%bind c = term_p in
+         let%bind t = tok THEN *> term_p in
+         let%bind f = tok ELSE *> term_p in
+         return (If (c, t, f)))
+   <??> "term_if")
+    st
+
+and term_app_p term =
+  let%bind ts = many (term_atom_p <|> between `Paren term_p) in
+  return (List.fold_left ~f:(fun f x -> App (f, x)) ~init:term ts) <??> "term_app"
+
+and term_lam_p =
+  fun st ->
+  (tok FUN
+   *> tok LPAREN
+   *> commit
+        (let%bind id = ident_p in
+         let%bind ty = tok COLON *> ty_p in
+         let%bind t = tok RPAREN *> tok ARROW *> term_p in
+         return (Lam (id, ty, t)))
+   <??> "term_lam")
+    st
+
+and term_atom_p =
+  fun st ->
+  let term_singles_p =
     satisfy_map (function
       | TRUE -> Some (Bool true)
       | FALSE -> Some (Bool false)
@@ -127,42 +162,12 @@ and t_atom_p =
       | _ -> None)
     <??> "term_single"
   in
-  let t_commit_prefix_p =
-    (match%bind peek with
-     | LET -> t_let_p
-     | IF -> t_if_p
-     | FUN -> t_lam_p
-     | _ -> fail "commit: not a fixed prefix")
-    <??> "term_commit_prefix"
-  in
-  (t_singles_p <|> t_commit_prefix_p) st
+  (term_singles_p <|> term_let_p <|> term_if_p <|> term_lam_p <??> "term_atom") st
 
-and t_let_p =
+and term_p =
   fun st ->
-  (let%bind id = tok LET *> ident_p in
-   let%bind bind = tok EQ *> term_p in
-   let%bind body = tok IN *> term_p in
-   return (Let (id, bind, body)) <??> "term_let")
-    st
-
-and t_if_p =
-  fun st ->
-  (let%bind c = tok IF *> term_p in
-   let%bind t = tok THEN *> term_p in
-   let%bind f = tok ELSE *> term_p in
-   return (If (c, t, f)) <??> "term_if")
-    st
-
-and t_app_p t =
-  let%bind ts = many (t_atom_p <|> between `Paren term_p) in
-  return (List.fold_left ~f:(fun f x -> App (f, x)) ~init:t ts) <??> "term_app"
-
-and t_lam_p =
-  fun st ->
-  (let%bind id = tok FUN *> ident_p in
-   let%bind ty = tok COLON *> ty_p in
-   let%bind t = tok ARROW *> term_p in
-   return (Lam (id, ty, t)) <??> "term_lam")
+  (let%bind t = term_atom_p <|> between `Paren term_p in
+   term_app_p t <|> return t <??> "term")
     st
 ;;
 
@@ -192,7 +197,7 @@ let%expect_test "term parse tests" =
     (Ok (App (App (App (Var f) (Var x)) (Var y)) (Var z)))
     (Ok (App (App (Var f) (App (Var x) (Var y))) (Var z)))
     |}];
-  test "fun x : bool -> x";
+  test "fun (x : bool) -> x";
   [%expect {| (Ok (Lam x TyBool (Var x))) |}]
 ;;
 
