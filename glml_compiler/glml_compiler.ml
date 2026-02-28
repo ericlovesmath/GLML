@@ -61,9 +61,8 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   in
   let open Or_error.Let_syntax in
   Utils.reset ();
-  (* let%bind tokens = Lexer.lex (Lexer.of_string s) in *)
-  (* let%bind t = Chomp.run Parser.glml_p tokens in *)
-  let%bind t = Stlc.of_string s in
+  let%bind tokens = Lexer.lex (Lexer.of_string s) in
+  let%bind t = Chomp.run Parser.glml_p tokens in
   trace Stlc t;
   let t = Uniquify.uniquify t in
   trace Uniquify t;

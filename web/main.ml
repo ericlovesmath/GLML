@@ -11,11 +11,11 @@ external init_canvas : unit -> unit = "init"
 external compile_and_link : string -> Js.js_string Js.t Js.opt = "compileAndLinkGLSL"
 
 type syntax =
-  | SexpLike
-  | OCamlLike [@warning "-37"]
+  | SexpLike [@warning "-37"]
+  | OCamlLike
 
 (* Temporary, until my syntax actually moves away from Sexps *)
-let chosen_syntax = SexpLike
+let chosen_syntax = OCamlLike
 
 module Example = struct
   type t =
