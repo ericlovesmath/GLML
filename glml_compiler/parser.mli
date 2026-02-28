@@ -1,2 +1,2 @@
-(** Parser for Stlc.term *)
-val term_p : Stlc.term Chomp.t
+(** Parser for Stlc.t *)
+val glml_p : Stlc.t Chomp.t

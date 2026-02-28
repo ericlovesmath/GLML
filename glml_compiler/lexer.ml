@@ -55,6 +55,7 @@ type token =
   | PERCENT
   | LAND
   | LOR
+  | EXTERN
   | NUMERIC of int
   | ID of string
 [@@deriving sexp, equal]
@@ -162,6 +163,7 @@ let read_lexeme t =
         | "float" -> FLOAT
         | "vec" -> VEC
         | "mat" -> MAT
+        | "extern" -> EXTERN
         | _ -> ID s)
     | c -> failwith ("invalid char " ^ Char.to_string c)
     in
