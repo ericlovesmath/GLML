@@ -115,14 +115,25 @@ let%expect_test "ty parse tests" =
     |}]
 ;;
 
+(* TODO: I want to allow [0.] to be a float, but [0. 5.] is parsed as
+   [0.5 .] right now. Maybe I should just make float literals be part
+   of the lexer. *)
 let term_number_p =
   let%bind sign = tok SUB *> return (-1) <|> tok ADD *> return 1 <|> return 1 in
   let%bind n = num_p in
-  (let%bind m = tok DOT *> (num_p <|> return 0) in
+  (let%bind m = tok DOT *> num_p in
    let unsigned_float = Float.of_string [%string "%{n#Int}.%{m#Int}"] in
    let float = Float.of_int sign *. unsigned_float in
    return (Float float) <??> "term_float")
   <|> (return (Int (sign * n)) <??> "term_int")
+;;
+
+let term_unsigned_number_p =
+  let%bind n = num_p in
+  (let%bind m = tok DOT *> num_p in
+   let f = Float.of_string [%string "%{n#Int}.%{m#Int}"] in
+   return (Float f) <??> "term_ufloat")
+  <|> (return (Int n) <??> "term_uint")
 ;;
 
 let bop_levels =
@@ -158,10 +169,6 @@ and term_if_p =
    <??> "term_if")
     st
 
-and term_app_p term =
-  let%bind ts = many (term_atom_p <|> between `Paren term_p) in
-  return (List.fold_left ~f:(fun f x -> App (f, x)) ~init:term ts) <??> "term_app"
-
 and term_lam_p =
   fun st ->
   (tok FUN
@@ -188,13 +195,8 @@ and term_mat_p =
 and term_vec_p =
   fun st ->
   (let%bind terms = between `Angle (commas term_p) in
-   return (Vec (List.length terms, terms)) <??> "term_index")
+   return (Vec (List.length terms, terms)) <??> "term_vec")
     st
-
-and term_index_p term =
-  let%bind indices = many1 (between `Bracket num_p) in
-  return (List.fold_left indices ~init:term ~f:(fun acc i -> Index (acc, i)))
-  <??> "term_index"
 
 (* NOTE: Builtins should not be special forms, but right now they are not curried so.. *)
 and term_builtin_p =
@@ -229,15 +231,28 @@ and term_atom_p =
    <??> "term_atom")
     st
 
-and term_p =
+and term_head_p =
+  fun st -> (term_atom_p <|> term_number_p <|> between `Paren term_p <??> "term_head") st
+
+and term_postfix_p =
   fun st ->
-  (let base =
-     (* NOTE: [term_number_p] is here because the negative sign at the front conflicts with bop *)
-     let%bind t = term_number_p <|> term_atom_p <|> between `Paren term_p in
-     term_index_p t <|> term_app_p t <|> return t
-   in
-   List.fold_left bop_levels ~init:base ~f:chainl1 <??> "term")
-    st
+  let postfix_chain head_p op_p =
+    let%bind head = head_p in
+    let%bind ops = many op_p in
+    return (List.fold_left ops ~init:head ~f:(fun t op -> op t))
+  in
+  let index_op_p = between `Bracket num_p >>| fun i t -> Index (t, i) in
+  let term_arg_p =
+    (* NOTE: intentionally excludes signed literals to avoid cases like [f -5] *)
+    let first_arg = term_atom_p <|> term_unsigned_number_p <|> between `Paren term_p in
+    postfix_chain first_arg index_op_p <??> "term_arg"
+  in
+  let app_op_p = term_arg_p >>| fun a t -> App (t, a) in
+  let op_p = index_op_p <|> app_op_p in
+  (postfix_chain term_head_p op_p <??> "term_postfix_chain") st
+
+and term_p =
+  fun st -> (List.fold_left bop_levels ~init:term_postfix_p ~f:chainl1 <??> "term") st
 ;;
 
 (* TODO: Pretty print [Stlc.term] for nicer output / testing *)
@@ -282,20 +297,28 @@ let%expect_test "term parse tests" =
     (Ok (Index (Var v) 0))
     (Ok (Builtin Min ((Int 1) (Int 2))))
     |}];
-  test "-113.";
   test "-113.0";
   test "-113";
   test "f x y z";
   test "f (x y) z";
   test "2 * -13 - 10";
+  test "f 5";
+  test "fun (u : vec2) -> < f 10.0 a , 0.0, 0.0 >";
+  test "f - 5";
+  test "f (-5)";
   [%expect
     {|
-    (Ok (Float -113))
     (Ok (Float -113))
     (Ok (Int -113))
     (Ok (App (App (App (Var f) (Var x)) (Var y)) (Var z)))
     (Ok (App (App (Var f) (App (Var x) (Var y))) (Var z)))
     (Ok (Bop Sub (Bop Mul (Int 2) (Int -13)) (Int 10)))
+    (Ok (App (Var f) (Int 5)))
+    (Ok
+     (Lam u (TyVec 2)
+      (Vec 3 ((App (App (Var f) (Float 10)) (Var a)) (Float 0) (Float 0)))))
+    (Ok (Bop Sub (Var f) (Int 5)))
+    (Ok (App (Var f) (Int -5)))
     |}]
 ;;
 
