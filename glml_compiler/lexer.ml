@@ -49,6 +49,12 @@ type token =
   | SUB
   | DIV
   | MUL
+  | HASH
+  | LEQ
+  | GEQ
+  | PERCENT
+  | LAND
+  | LOR
   | NUMERIC of int
   | ID of string
 [@@deriving sexp, equal]
@@ -70,6 +76,7 @@ let advance c t =
 ;;
 
 let peek t = if eof t then failwith "peek: EOF" else String.get t.str t.pos.i
+let peek_opt t = if eof t then None else Some (String.get t.str t.pos.i)
 let skip t = advance (peek t) t
 
 let rec strip t =
@@ -104,14 +111,27 @@ let read_lexeme t =
     | ')' -> skip t; RPAREN
     | '{' -> skip t; LCURLY
     | '}' -> skip t; RCURLY
-    | '<' -> skip t; LANGLE
-    | '>' -> skip t; RANGLE
+    | '<' -> skip t;
+        (match peek_opt t with
+        | Some '=' -> skip t; LEQ
+        | _ -> LANGLE)
+    | '>' -> skip t;
+        (match peek_opt t with
+        | Some '=' -> skip t; GEQ
+        | _ -> RANGLE)
     | '[' -> skip t; LBRACKET
     | ']' -> skip t; RBRACKET
     | ';' -> skip t; SEMI
     | ',' -> skip t; COMMA
     | '.' -> skip t; DOT
-    | '|' -> skip t; BAR
+    | '|' -> skip t;
+        (match peek_opt t with
+        | Some '|' -> skip t; LOR
+        | _ -> BAR)
+    | '&' -> skip t;
+        (match peek_opt t with
+        | Some '&' -> skip t; LAND
+        | _ -> failwith "single & is invalid")
     | '\'' -> skip t; TICK
     | '+' -> skip t; ADD
     | '-' -> skip t;
@@ -120,6 +140,8 @@ let read_lexeme t =
         | _ -> SUB)
     | '/' -> skip t; DIV
     | '*' -> skip t; MUL
+    | '#' -> skip t; HASH
+    | '%' -> skip t; PERCENT
     | c when Char.is_digit c ->
         NUMERIC (Int.of_string (read_while Char.is_digit t))
     | c when Char.is_alpha c -> (
@@ -168,14 +190,14 @@ let%expect_test "lexer" =
   test "{ } ; : , if then else let";
   test "in fun | match with { }";
   test "bool int float ' 10 string_var";
-  test "+ - / *";
+  test "+ - / * # <= >= % && ||";
   [%expect
     {|
     (Ok (TRUE FALSE EQ ARROW LPAREN RPAREN DOT LANGLE RANGLE))
     (Ok (LCURLY RCURLY SEMI COLON COMMA IF THEN ELSE LET))
     (Ok (IN FUN BAR MATCH WITH LCURLY RCURLY))
     (Ok (BOOL INT FLOAT TICK (NUMERIC 10) (ID string_var)))
-    (Ok (ADD SUB DIV MUL))
+    (Ok (ADD SUB DIV MUL HASH LEQ GEQ PERCENT LAND LOR))
     |}];
   test "let{x:int}=match|a->fun->(f<x>*2)";
   [%expect

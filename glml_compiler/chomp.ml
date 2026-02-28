@@ -186,6 +186,17 @@ and many p = many1 p <|> return []
 let sep_by1 sep p = List.cons <$> p <*> many (sep *> p)
 let sep_by sep p = sep_by1 sep p <|> return []
 
+let chainl1 (p : 'a t) (op : ('a -> 'a -> 'a) t) : 'a t =
+  let rec go acc =
+    (let%bind f = op in
+     let%bind rhs = p in
+     go (f acc rhs))
+    <|> return acc
+  in
+  let%bind lhs = p in
+  go lhs
+;;
+
 let run p s =
   Maybe.to_or_error
     (let%bind.Maybe x, st = p (Sequence.of_list s) in

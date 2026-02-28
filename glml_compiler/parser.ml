@@ -125,8 +125,6 @@ let term_number_p =
   <|> (return (Int (sign * n)) <??> "term_int")
 ;;
 
-(* TODO: Bop/Index/Builtin Parsers *)
-
 let rec term_let_p =
   fun st ->
   (tok LET
@@ -187,6 +185,53 @@ and term_index_p term =
   return (List.fold_left indices ~init:term ~f:(fun acc i -> Index (acc, i)))
   <??> "term_index"
 
+(* NOTE: Builtins should not be special forms, but right now they are not curried so.. *)
+and term_builtin_p =
+  fun st ->
+  (let%bind _ = tok HASH in
+   let%bind builtin =
+     satisfy_map (function
+       | ID s -> Option.try_with (fun () -> Glsl.builtin_of_string s)
+       | _ -> None)
+   in
+   let%bind args = between `Paren (commas term_p) in
+   return (Builtin (builtin, args)) <??> "term_builtin")
+    st
+
+(* NOTE: We are reparsing the first term every time we call this but [chainl1] doesn't
+   fit well into our system of passing in the term. If this is a bottleneck, maybe consider
+   rewriting with proper postfix. *)
+and term_bop_p =
+  fun st ->
+  (let bop_tok (t : token) (op : Glsl.binary_op) : (term -> term -> term) t =
+     tok t *> return (fun l r -> Bop (op, l, r))
+   in
+   let bop_mul_p =
+     bop_tok MUL Glsl.Mul <|> bop_tok DIV Glsl.Div <|> bop_tok PERCENT Glsl.Mod
+   in
+   let bop_add_p = bop_tok ADD Glsl.Add <|> bop_tok SUB Glsl.Sub in
+   let bop_rel_p =
+     bop_tok LANGLE Glsl.Lt
+     <|> bop_tok RANGLE Glsl.Gt
+     <|> bop_tok LEQ Glsl.Leq
+     <|> bop_tok GEQ Glsl.Geq
+   in
+   let bop_eq_p = bop_tok EQ Glsl.Eq in
+   let bop_and_p = bop_tok LAND Glsl.And in
+   let bop_or_p = bop_tok LOR Glsl.Or in
+   let rec term_factor_p st =
+     (let%bind t = term_atom_p <|> between `Paren term_p in
+      term_index_p t <|> term_app_p t <|> return t <??> "term_factor")
+       st
+   and term_mul_expr_p st = (chainl1 term_factor_p bop_mul_p <??> "term_mul") st
+   and term_add_expr_p st = (chainl1 term_mul_expr_p bop_add_p <??> "term_add") st
+   and term_rel_expr_p st = (chainl1 term_add_expr_p bop_rel_p <??> "term_rel") st
+   and term_eq_expr_p st = (chainl1 term_rel_expr_p bop_eq_p <??> "term_eq") st
+   and term_and_expr_p st = (chainl1 term_eq_expr_p bop_and_p <??> "term_and") st
+   and term_or_expr_p st = (chainl1 term_and_expr_p bop_or_p <??> "term_or") st in
+   term_or_expr_p)
+    st
+
 and term_atom_p =
   fun st ->
   let term_singles_p =
@@ -197,7 +242,8 @@ and term_atom_p =
       | _ -> None)
     <??> "term_single"
   in
-  (term_singles_p
+  (term_builtin_p
+   <|> term_singles_p
    <|> term_number_p
    <|> term_let_p
    <|> term_if_p
@@ -209,7 +255,7 @@ and term_atom_p =
 
 and term_p =
   fun st ->
-  (let%bind t = term_atom_p <|> between `Paren term_p in
+  (let%bind t = term_atom_p <|> term_bop_p <|> between `Paren term_p in
    term_index_p t <|> term_app_p t <|> return t <??> "term")
     st
 ;;
@@ -233,12 +279,12 @@ let%expect_test "term parse tests" =
   test "<1, 2, 3>";
   test "<<1, 2>, <3, 4>, <5, 6>>";
   test "fun (x : bool) -> x";
-  test "f x";
+  test "f x y";
   test "let bind = true in bind";
   test "if true then x else y";
-  test "TODObop";
+  test "1 + 2 * 44 % 10 && true";
   test "v[0]";
-  test "TODObuiltin";
+  test "#min(1, 2)";
   [%expect
     {|
     (Ok (Var variable_name))
@@ -248,12 +294,12 @@ let%expect_test "term parse tests" =
     (Ok (Vec 3 ((Int 1) (Int 2) (Int 3))))
     (Ok (Mat 3 2 ((Int 1) (Int 2) (Int 3) (Int 4) (Int 5) (Int 6))))
     (Ok (Lam x TyBool (Var x)))
-    (Ok (App (Var f) (Var x)))
+    (Ok (App (App (Var f) (Var x)) (Var y)))
     (Ok (Let bind (Bool true) (Var bind)))
     (Ok (If (Bool true) (Var x) (Var y)))
-    (Ok (Var TODObop))
+    (Error ((chomp_error run_stream_not_fully_consumed) (contexts ())))
     (Ok (Index (Var v) 0))
-    (Ok (Var TODObuiltin))
+    (Ok (Builtin Min ((Int 1) (Int 2))))
     |}];
   test "false";
   test "if false then false else false";
