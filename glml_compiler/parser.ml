@@ -147,14 +147,29 @@ let bop_levels =
   ]
 ;;
 
+let param_p =
+  between
+    `Paren
+    (let%bind id = ident_p in
+     let%bind ty = tok COLON *> ty_p in
+     return (id, ty))
+  <??> "param"
+;;
+
+let make_lambdas params body =
+  List.fold_right params ~init:body ~f:(fun (id, ty) acc -> Lam (id, ty, acc))
+;;
+
 let rec term_let_p =
   fun st ->
   (tok LET
    *> commit
         (let%bind id = ident_p in
-         let%bind bind = tok EQ *> term_p in
+         let%bind params = many param_p in
+         let%bind rhs = tok EQ *> term_p in
+         let rhs = make_lambdas params rhs in
          let%bind body = tok IN *> term_p in
-         return (Let (id, bind, body)))
+         return (Let (id, rhs, body)))
    <??> "term_let")
     st
 
@@ -172,13 +187,10 @@ and term_if_p =
 and term_lam_p =
   fun st ->
   (tok FUN
-   *> tok LPAREN
    *> commit
-        (let%bind id = ident_p in
-         let%bind ty = tok COLON *> ty_p in
-         let%bind t = tok RPAREN *> tok ARROW *> term_p in
-         return (Lam (id, ty, t)))
-   <??> "term_lam")
+        (let%bind params = many1 param_p in
+         let%bind t = tok ARROW *> term_p in
+         return (make_lambdas params t)))
     st
 
 and term_mat_p =
@@ -221,18 +233,18 @@ and term_atom_p =
       | _ -> None)
     <??> "term_single"
   in
-  (term_builtin_p
-   <|> term_singles_p
-   <|> term_let_p
-   <|> term_if_p
-   <|> term_lam_p
-   <|> term_mat_p
-   <|> term_vec_p
-   <??> "term_atom")
-    st
+  (term_builtin_p <|> term_singles_p <|> term_mat_p <|> term_vec_p <??> "term_atom") st
 
 and term_head_p =
-  fun st -> (term_atom_p <|> term_number_p <|> between `Paren term_p <??> "term_head") st
+  fun st ->
+  (term_let_p
+   <|> term_if_p
+   <|> term_lam_p
+   <|> term_atom_p
+   <|> term_number_p
+   <|> between `Paren term_p
+   <??> "term_head")
+    st
 
 and term_postfix_p =
   fun st ->
@@ -319,15 +331,23 @@ let%expect_test "term parse tests" =
       (Vec 3 ((App (App (Var f) (Float 10)) (Var a)) (Float 0) (Float 0)))))
     (Ok (Bop Sub (Var f) (Int 5)))
     (Ok (App (Var f) (Int -5)))
-    |}]
+    |}];
+  test "let f (x : bool) (y : bool) = x && y in f";
+  test "let f = fun (x : bool) (y : bool) -> x && y in f";
+  [%expect
+    {|
+    (Ok (Let f (Lam x TyBool (Lam y TyBool (Bop And (Var x) (Var y)))) (Var f)))
+    (Ok (Let f (Lam x TyBool (Lam y TyBool (Bop And (Var x) (Var y)))) (Var f)))
+    |}];
 ;;
 
 let top_let_p =
   tok LET
   *> commit
        (let%bind id = ident_p in
-        let%bind bind = tok EQ *> term_p in
-        return (Define (id, bind)))
+        let%bind params = many param_p in
+        let%bind rhs = tok EQ *> term_p in
+        return (Define (id, make_lambdas params rhs)))
   <??> "top_let"
 ;;
 
@@ -356,11 +376,19 @@ let%expect_test "glml parse tests" =
     {|
     extern float u_time
     let toplevel = 1 + 2
+    let main = 1 + 2
+    let f = fun (x : bool) (y : bool) -> x && y
+    let main (u : vec2) = f <1, 2> + u
     |};
   [%expect
     {|
     (Ok
      (Program
-      ((Extern TyFloat u_time) (Define toplevel (Bop Add (Int 1) (Int 2))))))
+      ((Extern TyFloat u_time) (Define toplevel (Bop Add (Int 1) (Int 2)))
+       (Define main (Bop Add (Int 1) (Int 2)))
+       (Define f (Lam x TyBool (Lam y TyBool (Bop And (Var x) (Var y)))))
+       (Define main
+        (Lam u (TyVec 2)
+         (Bop Add (App (Var f) (Vec 2 ((Int 1) (Int 2)))) (Var u)))))))
     |}]
 ;;
