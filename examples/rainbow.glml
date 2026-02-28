@@ -9,7 +9,7 @@ let get_uv (coord : vec2) =
 
 let main (coord : vec2) =
   let uv = get_uv coord in
-  let wave = 5.0 * (uv[0] + uv[1]) + (u_time / 1000.0) in
+  let wave = 5.0 * (uv[0] + uv[1]) + u_time in
 
   let r = #sin(wave) * 0.3 + 0.7 in
   let g = #sin(wave + 2.0) * 0.3 + 0.7 in

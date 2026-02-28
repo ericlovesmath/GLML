@@ -82,7 +82,7 @@ function render(currentTime) {
       state.mouseX,
       state.mouseY,
     );
-    gl.uniform1f(gl.getUniformLocation(state.program, "u_time"), currentTime);
+    gl.uniform1f(gl.getUniformLocation(state.program, "u_time"), currentTime / 1000);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 }
