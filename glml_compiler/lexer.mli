@@ -45,6 +45,7 @@ type token =
   | PERCENT
   | LAND
   | LOR
+  | EXTERN
   | NUMERIC of int
   | ID of string
 [@@deriving sexp, equal]

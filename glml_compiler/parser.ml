@@ -299,4 +299,45 @@ let%expect_test "term parse tests" =
     |}]
 ;;
 
-(* TODO: Parser + Tests for [Stlc.t] *)
+let top_let_p =
+  tok LET
+  *> commit
+       (let%bind id = ident_p in
+        let%bind bind = tok EQ *> term_p in
+        return (Define (id, bind)))
+  <??> "top_let"
+;;
+
+let top_extern_p =
+  tok EXTERN
+  *> commit
+       (let%bind ty = ty_p in
+        let%bind v = ident_p in
+        return (Extern (ty, v)))
+  <??> "top_extern"
+;;
+
+let glml_p = many1 (top_let_p <|> top_extern_p) >>| fun tops -> Program tops
+
+let%expect_test "glml parse tests" =
+  let test s =
+    s
+    |> Lexer.of_string
+    |> Lexer.lex
+    |> Or_error.map ~f:(run glml_p)
+    |> Or_error.join
+    |> Or_error.sexp_of_t sexp_of_t
+    |> print_s
+  in
+  test
+    {|
+    extern float u_time
+    let toplevel = 1 + 2
+    |};
+  [%expect
+    {|
+    (Ok
+     (Program
+      ((Extern TyFloat u_time) (Define toplevel (Bop Add (Int 1) (Int 2))))))
+    |}]
+;;
