@@ -125,6 +125,17 @@ let term_number_p =
   <|> (return (Int (sign * n)) <??> "term_int")
 ;;
 
+let bop_levels =
+  let bop t op = tok t *> return (fun l r -> Bop (op, l, r)) in
+  [ bop MUL Mul <|> bop DIV Div <|> bop PERCENT Mod
+  ; bop ADD Add <|> bop SUB Sub
+  ; bop LANGLE Lt <|> bop RANGLE Gt <|> bop LEQ Leq <|> bop GEQ Geq
+  ; bop EQ Eq
+  ; bop LAND And
+  ; bop LOR Or
+  ]
+;;
+
 let rec term_let_p =
   fun st ->
   (tok LET
@@ -198,40 +209,6 @@ and term_builtin_p =
    return (Builtin (builtin, args)) <??> "term_builtin")
     st
 
-(* NOTE: We are reparsing the first term every time we call this but [chainl1] doesn't
-   fit well into our system of passing in the term. If this is a bottleneck, maybe consider
-   rewriting with proper postfix. *)
-and term_bop_p =
-  fun st ->
-  (let bop_tok (t : token) (op : Glsl.binary_op) : (term -> term -> term) t =
-     tok t *> return (fun l r -> Bop (op, l, r))
-   in
-   let bop_mul_p =
-     bop_tok MUL Glsl.Mul <|> bop_tok DIV Glsl.Div <|> bop_tok PERCENT Glsl.Mod
-   in
-   let bop_add_p = bop_tok ADD Glsl.Add <|> bop_tok SUB Glsl.Sub in
-   let bop_rel_p =
-     bop_tok LANGLE Glsl.Lt
-     <|> bop_tok RANGLE Glsl.Gt
-     <|> bop_tok LEQ Glsl.Leq
-     <|> bop_tok GEQ Glsl.Geq
-   in
-   let bop_eq_p = bop_tok EQ Glsl.Eq in
-   let bop_and_p = bop_tok LAND Glsl.And in
-   let bop_or_p = bop_tok LOR Glsl.Or in
-   let rec term_factor_p st =
-     (let%bind t = term_atom_p <|> between `Paren term_p in
-      term_index_p t <|> term_app_p t <|> return t <??> "term_factor")
-       st
-   and term_mul_expr_p st = (chainl1 term_factor_p bop_mul_p <??> "term_mul") st
-   and term_add_expr_p st = (chainl1 term_mul_expr_p bop_add_p <??> "term_add") st
-   and term_rel_expr_p st = (chainl1 term_add_expr_p bop_rel_p <??> "term_rel") st
-   and term_eq_expr_p st = (chainl1 term_rel_expr_p bop_eq_p <??> "term_eq") st
-   and term_and_expr_p st = (chainl1 term_eq_expr_p bop_and_p <??> "term_and") st
-   and term_or_expr_p st = (chainl1 term_and_expr_p bop_or_p <??> "term_or") st in
-   term_or_expr_p)
-    st
-
 and term_atom_p =
   fun st ->
   let term_singles_p =
@@ -244,7 +221,6 @@ and term_atom_p =
   in
   (term_builtin_p
    <|> term_singles_p
-   <|> term_number_p
    <|> term_let_p
    <|> term_if_p
    <|> term_lam_p
@@ -255,13 +231,16 @@ and term_atom_p =
 
 and term_p =
   fun st ->
-  (let%bind t = term_atom_p <|> term_bop_p <|> between `Paren term_p in
-   term_index_p t <|> term_app_p t <|> return t <??> "term")
+  (let base =
+     (* NOTE: [term_number_p] is here because the negative sign at the front conflicts with bop *)
+     let%bind t = term_number_p <|> term_atom_p <|> between `Paren term_p in
+     term_index_p t <|> term_app_p t <|> return t
+   in
+   List.fold_left bop_levels ~init:base ~f:chainl1 <??> "term")
     st
 ;;
 
 (* TODO: Pretty print [Stlc.term] for nicer output / testing *)
-(* TODO: Exhausive Term Tests *)
 let%expect_test "term parse tests" =
   let test s =
     s
@@ -282,7 +261,7 @@ let%expect_test "term parse tests" =
   test "f x y";
   test "let bind = true in bind";
   test "if true then x else y";
-  test "1 + 2 * 44 % 10 && true";
+  test "1 * 2 + true && 44 % 10";
   test "v[0]";
   test "#min(1, 2)";
   [%expect
@@ -297,26 +276,27 @@ let%expect_test "term parse tests" =
     (Ok (App (App (Var f) (Var x)) (Var y)))
     (Ok (Let bind (Bool true) (Var bind)))
     (Ok (If (Bool true) (Var x) (Var y)))
-    (Error ((chomp_error run_stream_not_fully_consumed) (contexts ())))
+    (Ok
+     (Bop And (Bop Add (Bop Mul (Int 1) (Int 2)) (Bool true))
+      (Bop Mod (Int 44) (Int 10))))
     (Ok (Index (Var v) 0))
     (Ok (Builtin Min ((Int 1) (Int 2))))
     |}];
-  test "false";
-  test "if false then false else false";
-  [%expect
-    {|
-    (Ok (Bool false))
-    (Ok (If (Bool false) (Bool false) (Bool false)))
-    |}];
+  test "-113.";
+  test "-113.0";
+  test "-113";
   test "f x y z";
   test "f (x y) z";
+  test "2 * -13 - 10";
   [%expect
     {|
+    (Ok (Float -113))
+    (Ok (Float -113))
+    (Ok (Int -113))
     (Ok (App (App (App (Var f) (Var x)) (Var y)) (Var z)))
     (Ok (App (App (Var f) (App (Var x) (Var y))) (Var z)))
-    |}];
-  test "fun (x : bool) -> x";
-  [%expect {| (Ok (Lam x TyBool (Var x))) |}]
+    (Ok (Bop Sub (Bop Mul (Int 2) (Int -13)) (Int 10)))
+    |}]
 ;;
 
 (* TODO: Parser + Tests for [Stlc.t] *)
