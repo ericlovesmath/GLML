@@ -48,7 +48,7 @@ let%expect_test "simple tests for compile_stlc" =
     |}];
   test
     {|
-    extern float n
+    #extern float n
     let f = fun (x : float) -> x + n
     let main = fun (u : vec2) -> <f 10.0, 0.0, 0.0>
     |};
@@ -72,7 +72,7 @@ let%expect_test "simple tests for compile_stlc" =
     |}];
   test
     {|
-    extern float n
+    #extern float n
     let f (x : float) = x + n
     let main (u : vec2) = < f 10.0, 0.0, 0.0 >
     |};
