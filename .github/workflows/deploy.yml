@@ -22,7 +22,7 @@ jobs:
           restore-prefixes-first-match: nix-${{ runner.os }}-
 
       - name: Build Website
-        run: nix develop --command make web RELEASE=1
+        run: nix develop --command make playground RELEASE=1
 
       - name: Vercel Build and Deploy
         run: |
