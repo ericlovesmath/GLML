@@ -1,4 +1,4 @@
-.PHONY: clean bin js web serve test benchmark
+.PHONY: clean bin js playground serve test benchmark
 
 PROFILE := dev
 ifdef RELEASE
@@ -7,7 +7,7 @@ endif
 
 DUNE_FLAGS := --profile $(PROFILE)
 
-all: bin js web
+all: bin js playground
 
 clean:
 	dune clean
@@ -21,14 +21,14 @@ bin:
 js:
 	dune build $(DUNE_FLAGS) _build/default/jsoo/main.bc.js
 
-web:
+playground:
 	dune build $(DUNE_FLAGS) _build/default/web/main.bc.js
 	mkdir -p dist
-	cp web/index.html dist
-	cp web/style.css dist
-	cp -f _build/default/web/main.bc.js dist
+	cp playground/index.html dist
+	cp playgound/style.css dist
+	cp -f _build/default/playground/main.bc.js dist
 
-serve: web
+serve: playground
 	cd dist; python3 -m http.server
 
 test:
