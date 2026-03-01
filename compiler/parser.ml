@@ -110,8 +110,8 @@ let%expect_test "ty parse tests" =
     {|
     (Error ((chomp_error satisfy_eof) (contexts (between ty))))
     (Error
-     ((chomp_error "satisfy_fail on token RPAREN at 1:2")
-      (contexts ("between at 1:1" "ty at 1:1"))))
+     ((chomp_error "satisfy_fail on <RPAREN> (1:2 - 1:3)")
+      (contexts ("between (1:1 - 1:2)" "ty (1:1 - 1:2)"))))
     |}]
 ;;
 

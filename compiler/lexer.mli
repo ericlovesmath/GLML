@@ -1,8 +1,5 @@
 open Core
 
-type t
-type pos [@@deriving sexp_of]
-
 type token =
   | TRUE
   | FALSE
@@ -50,6 +47,8 @@ type token =
   | ID of string
 [@@deriving sexp, equal]
 
+type t
+type loc [@@deriving sexp_of]
+
 val of_string : string -> t
-val lex : t -> (token * pos) list Or_error.t
-val initial_pos : pos
+val lex : t -> (token * loc) list Or_error.t
