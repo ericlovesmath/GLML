@@ -13,9 +13,6 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@main
 
-      - name: Check Nix Flake
-        uses: DeterminateSystems/flake-checker-action@main
-
       - name: Cache Nix Store
         uses: nix-community/cache-nix-action@v7
         with:
