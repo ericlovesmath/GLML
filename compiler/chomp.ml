@@ -4,24 +4,24 @@ open Lexer
 module Maybe = struct
   type error_info =
     { message : string
-    ; found : (token * pos) option
-    ; contexts : (string * pos option) list
+    ; found : (token * loc) option
+    ; contexts : (string * loc option) list
     }
 
   let sexp_of_error_info { message; found; contexts } =
     let chomp_error =
       match found with
       | None -> message
-      | Some (token, pos) ->
+      | Some (token, loc) ->
         let token = Sexplib.Sexp.to_string_hum (sexp_of_token token) in
-        let pos = Sexplib.Sexp.to_string_hum (sexp_of_pos pos) in
-        [%string "%{message} on token %{token} at %{pos}"]
+        let loc = Sexplib.Sexp.to_string_hum (sexp_of_loc loc) in
+        [%string "%{message} on <%{token}> %{loc}"]
     in
     let string_of_context = function
       | s, None -> s
-      | s, Some pos ->
-        let pos = Sexp.to_string_hum (sexp_of_pos (pos : pos)) in
-        [%string "%{s} at %{pos}"]
+      | s, Some loc ->
+        let loc = Sexp.to_string_hum (sexp_of_loc (loc : loc)) in
+        [%string "%{s} %{loc}"]
     in
     let contexts = List.rev (List.map ~f:string_of_context contexts) in
     [%message (chomp_error : string) (contexts : string list)]
@@ -73,7 +73,7 @@ end
 open Maybe
 
 type 'a maybe = 'a Maybe.t
-type stream = (token * pos) Sequence.t
+type stream = (token * loc) Sequence.t
 type 'a t = stream -> ('a * stream) Maybe.t
 
 include Applicative.Make (struct
