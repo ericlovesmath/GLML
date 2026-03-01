@@ -338,7 +338,7 @@ let%expect_test "term parse tests" =
     {|
     (Ok (Let f (Lam x TyBool (Lam y TyBool (Bop And (Var x) (Var y)))) (Var f)))
     (Ok (Let f (Lam x TyBool (Lam y TyBool (Bop And (Var x) (Var y)))) (Var f)))
-    |}];
+    |}]
 ;;
 
 let top_let_p =
@@ -352,9 +352,10 @@ let top_let_p =
 ;;
 
 let top_extern_p =
-  tok EXTERN
+  tok HASH
   *> commit
-       (let%bind ty = ty_p in
+       (let%bind _ = tok EXTERN in
+        let%bind ty = ty_p in
         let%bind v = ident_p in
         return (Extern (ty, v)))
   <??> "top_extern"
@@ -374,7 +375,7 @@ let%expect_test "glml parse tests" =
   in
   test
     {|
-    extern float u_time
+    #extern float u_time
     let toplevel = 1 + 2
     let main = 1 + 2
     let f = fun (x : bool) (y : bool) -> x && y

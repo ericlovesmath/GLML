@@ -9,10 +9,14 @@ let get_uv (coord : vec2) =
 
 let main (coord : vec2) =
   let uv = get_uv coord in
-  let wave = 5.0 * (uv[0] + uv[1]) + u_time in
+  let size = 5.0 in
 
-  let r = #sin(wave) * 0.3 + 0.7 in
-  let g = #sin(wave + 2.0) * 0.3 + 0.7 in
-  let b = #sin(wave + 4.0) * 0.3 + 0.7 in
+  let cx = #floor(uv[0] * size + u_time * 2.0) in
+  let cy = #floor(uv[1] * size) in
+  let checker_sum = cx + cy in
 
-  < r, g, b >
+  let is_even = checker_sum - #floor(checker_sum / 2.0) * 2.0 in
+
+  if is_even < 0.5
+    then < 0.2, 0.2, 0.2 >
+    else < 0.8, 0.8, 0.8 >

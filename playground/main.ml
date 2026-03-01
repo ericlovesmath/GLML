@@ -21,11 +21,13 @@ module Example = struct
   type t =
     | Mouse_circle
     | Pastel_rainbow
+    | Checkboard
   [@@deriving sexp, compare, equal, enumerate, to_string ~capitalize:"Title Case"]
 
   let to_glml = function
     | Mouse_circle -> [%blob "../examples/mouse_circle.glml"]
     | Pastel_rainbow -> [%blob "../examples/rainbow.glml"]
+    | Checkboard -> [%blob "../examples/checkerboard.glml"]
   ;;
 end
 

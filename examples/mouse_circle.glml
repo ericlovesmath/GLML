@@ -1,6 +1,6 @@
-extern vec2 u_resolution
-extern vec2 u_mouse
-extern float u_time
+#extern vec2 u_resolution
+#extern vec2 u_mouse
+#extern float u_time
 
 // Normalizes coordinates to [-1, 1]
 let get_uv (coord : vec2) =
