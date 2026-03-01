@@ -1,6 +1,8 @@
 open Core
 open Sexplib.Sexp
 
+(* TODO: Improve Lexer in general *)
+
 type token =
   | TRUE
   | FALSE
@@ -48,9 +50,6 @@ type token =
   | ID of string
 [@@deriving sexp, equal]
 
-(* TODO: Improve Lexer in general *)
-(* TODO: Report location on fail *)
-
 type pos =
   { i : int
   ; line : int
@@ -79,119 +78,124 @@ let advance c t =
       else { i = t.pos.i + 1; line = t.pos.line; col = t.pos.col + 1 })
 ;;
 
-let peek t = if eof t then failwith "peek: EOF" else String.get t.str t.pos.i
-let peek_opt t = if eof t then None else Some (String.get t.str t.pos.i)
-let skip t = advance (peek t) t
+let peek t = if eof t then None else Some (String.get t.str t.pos.i)
+
+let skip t =
+  match peek t with
+  | Some c -> advance c t
+  | None -> ()
+;;
 
 let rec strip t =
-  if (not (eof t)) && Char.is_whitespace (peek t)
-  then (
+  match peek t with
+  | Some c when Char.is_whitespace c ->
     skip t;
-    strip t)
+    strip t
+  | _ -> ()
 ;;
 
 let read_while f t =
+  let start_i = t.pos.i in
   let rec go () =
-    if eof t
-    then []
-    else (
-      let c = peek t in
-      if f c
-      then (
-        skip t;
-        c :: go ())
-      else [])
+    match peek t with
+    | Some c when f c ->
+      skip t;
+      go ()
+    | _ -> ()
   in
-  String.of_list (go ())
+  go ();
+  String.sub t.str ~pos:start_i ~len:(t.pos.i - start_i)
 ;;
 
-let read_lexeme t =
+let read_lexeme (t : t) : token Or_error.t =
   let consume tok =
     skip t;
-    tok
+    Ok tok
   in
   match peek t with
-  | '(' -> consume LPAREN
-  | '=' -> consume EQ
-  | ':' -> consume COLON
-  | ')' -> consume RPAREN
-  | '{' -> consume LCURLY
-  | '}' -> consume RCURLY
-  | '<' ->
-    skip t;
-    (match peek_opt t with
-     | Some '=' -> consume LEQ
-     | _ -> LANGLE)
-  | '>' ->
-    skip t;
-    (match peek_opt t with
-     | Some '=' -> consume GEQ
-     | _ -> RANGLE)
-  | '[' -> consume LBRACKET
-  | ']' -> consume RBRACKET
-  | ';' -> consume SEMI
-  | ',' -> consume COMMA
-  | '.' -> consume DOT
-  | '|' ->
-    skip t;
-    (match peek_opt t with
-     | Some '|' -> consume LOR
-     | _ -> BAR)
-  | '&' ->
-    skip t;
-    (match peek_opt t with
-     | Some '&' -> consume LAND
-     | _ -> failwith "single & is invalid")
-  | '\'' -> consume TICK
-  | '+' -> consume ADD
-  | '-' ->
-    skip t;
-    (match peek t with
-     | '>' -> consume ARROW
-     | _ -> SUB)
-  | '/' -> consume DIV
-  | '*' -> consume MUL
-  | '#' -> consume HASH
-  | '%' -> consume PERCENT
-  | c when Char.is_digit c -> NUMERIC (Int.of_string (read_while Char.is_digit t))
-  | c when Char.is_alpha c ->
-    let s = read_while (fun c -> Char.is_alpha c || Char.equal '_' c) t in
-    (match s with
-     | "true" -> TRUE
-     | "false" -> FALSE
-     | "let" -> LET
-     | "in" -> IN
-     | "if" -> IF
-     | "then" -> THEN
-     | "else" -> ELSE
-     | "fun" -> FUN
-     | "match" -> MATCH
-     | "with" -> WITH
-     | "bool" -> BOOL
-     | "int" -> INT
-     | "float" -> FLOAT
-     | "vec" -> VEC
-     | "mat" -> MAT
-     | "extern" -> EXTERN
-     | _ -> ID s)
-  | char ->
-    let pos = t.pos in
-    raise_s [%message "invalid char" (char : char) (pos : pos)]
+  | None -> error_s [%message "lexer: unexpected EOF" (t.pos : pos)]
+  | Some c ->
+    (match c with
+     | '(' -> consume LPAREN
+     | '=' -> consume EQ
+     | ':' -> consume COLON
+     | ')' -> consume RPAREN
+     | '{' -> consume LCURLY
+     | '}' -> consume RCURLY
+     | '<' ->
+       skip t;
+       (match peek t with
+        | Some '=' -> consume LEQ
+        | _ -> Ok LANGLE)
+     | '>' ->
+       skip t;
+       (match peek t with
+        | Some '=' -> consume GEQ
+        | _ -> Ok RANGLE)
+     | '[' -> consume LBRACKET
+     | ']' -> consume RBRACKET
+     | ';' -> consume SEMI
+     | ',' -> consume COMMA
+     | '.' -> consume DOT
+     | '|' ->
+       skip t;
+       (match peek t with
+        | Some '|' -> consume LOR
+        | _ -> Ok BAR)
+     | '&' ->
+       skip t;
+       (match peek t with
+        | Some '&' -> consume LAND
+        | _ -> error_s [%message "lexer: single & is invalid" (t.pos : pos)])
+     | '\'' -> consume TICK
+     | '+' -> consume ADD
+     | '-' ->
+       skip t;
+       (match peek t with
+        | Some '>' -> consume ARROW
+        | _ -> Ok SUB)
+     | '/' -> consume DIV
+     | '*' -> consume MUL
+     | '#' -> consume HASH
+     | '%' -> consume PERCENT
+     | c when Char.is_digit c -> Ok (NUMERIC (Int.of_string (read_while Char.is_digit t)))
+     | c when Char.is_alpha c ->
+       let s = read_while (fun c -> Char.is_alpha c || Char.equal '_' c) t in
+       Ok
+         (match s with
+          | "true" -> TRUE
+          | "false" -> FALSE
+          | "let" -> LET
+          | "in" -> IN
+          | "if" -> IF
+          | "then" -> THEN
+          | "else" -> ELSE
+          | "fun" -> FUN
+          | "match" -> MATCH
+          | "with" -> WITH
+          | "bool" -> BOOL
+          | "int" -> INT
+          | "float" -> FLOAT
+          | "vec" -> VEC
+          | "mat" -> MAT
+          | "extern" -> EXTERN
+          | _ -> ID s)
+     | char -> error_s [%message "lexer: invalid char" (char : char) (t.pos : pos)])
 ;;
 
-(* TODO: Have real non-failable behavior instead of [Or_error.try_with] *)
-let lex t =
-  Or_error.try_with (fun () ->
-    let lexemes = ref [] in
+let lex (t : t) : (token * loc) list Or_error.t =
+  let open Or_error.Let_syntax in
+  let rec loop acc =
     strip t;
-    while not (eof t) do
+    if eof t
+    then Ok (List.rev acc)
+    else (
       let start_pos = t.pos in
-      let lexeme = read_lexeme t in
+      let%bind lexeme = read_lexeme t in
       let end_pos = t.pos in
-      lexemes := (lexeme, (start_pos, end_pos)) :: !lexemes;
-      strip t
-    done;
-    List.rev !lexemes)
+      loop ((lexeme, (start_pos, end_pos)) :: acc))
+  in
+  loop []
 ;;
 
 let%expect_test "lexer" =
