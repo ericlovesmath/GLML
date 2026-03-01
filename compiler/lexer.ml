@@ -1,8 +1,6 @@
 open Core
 open Sexplib.Sexp
 
-(* TODO: Improve Lexer in general *)
-
 type token =
   | TRUE
   | FALSE
@@ -86,14 +84,6 @@ let skip t =
   | None -> ()
 ;;
 
-let rec strip t =
-  match peek t with
-  | Some c when Char.is_whitespace c ->
-    skip t;
-    strip t
-  | _ -> ()
-;;
-
 let read_while f t =
   let start_i = t.pos.i in
   let rec go () =
@@ -105,6 +95,22 @@ let read_while f t =
   in
   go ();
   String.sub t.str ~pos:start_i ~len:(t.pos.i - start_i)
+;;
+
+let rec strip t =
+  match peek t with
+  | Some c when Char.is_whitespace c ->
+    skip t;
+    strip t
+  | Some '/' ->
+    let start_pos = t.pos in
+    skip t;
+    (match peek t with
+     | Some '/' ->
+       let _ = read_while (fun c -> not (Char.equal c '\n')) t in
+       strip t
+     | _ -> t.pos <- start_pos)
+  | _ -> ()
 ;;
 
 let read_lexeme (t : t) : token Or_error.t =
@@ -228,5 +234,15 @@ let%expect_test "lexer" =
       LPAREN (ID f) LANGLE (ID x) RANGLE MUL (NUMERIC 2) RPAREN))
     |}];
   test "vec2 mat2x3";
-  [%expect {| (Ok (VEC (NUMERIC 2) MAT (NUMERIC 2) (ID x) (NUMERIC 3))) |}]
+  [%expect {| (Ok (VEC (NUMERIC 2) MAT (NUMERIC 2) (ID x) (NUMERIC 3))) |}];
+  test
+    {|
+    // top comment
+    x + 2 //inline comment
+    x + 3
+    // outer comment
+    y - x
+    // bottom comment
+    |};
+  [%expect {| (Ok ((ID x) ADD (NUMERIC 2) (ID x) ADD (NUMERIC 3) (ID y) SUB (ID x))) |}]
 ;;

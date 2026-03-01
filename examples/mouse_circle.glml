@@ -2,6 +2,7 @@ extern vec2 u_resolution
 extern vec2 u_mouse
 extern float u_time
 
+// Normalizes coordinates to [-1, 1]
 let get_uv (coord : vec2) =
   let top = 2.0 * coord - u_resolution in
   let bot = #min(u_resolution[0], u_resolution[1]) in
