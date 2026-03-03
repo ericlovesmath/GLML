@@ -1,5 +1,5 @@
 {
-  description = "GLML nix flake";
+  description = "GLML Nix Flake";
 
   inputs = {
     opam-nix.url = "github:tweag/opam-nix";
@@ -12,7 +12,14 @@
     };
   };
 
-  outputs = { self, flake-utils, opam-nix, janestreet-repo, nixpkgs }@inputs:
+  outputs =
+    {
+      self,
+      flake-utils,
+      opam-nix,
+      janestreet-repo,
+      nixpkgs,
+    }@inputs:
     let
       # Uses <package>.opam to solve dependencies from
       package = "GLML";
@@ -24,7 +31,8 @@
         merlin = "*";
       };
     in
-    flake-utils.lib.eachDefaultSystem (system:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         on = opam-nix.lib.${system};
@@ -51,7 +59,9 @@
         scope' = scope.overrideScope overlay;
 
         # Expose OCaml packages defined in [devOpamPackagesQuery] to devshell
-        devOpamPackages = builtins.attrValues (pkgs.lib.getAttrs (builtins.attrNames devOpamPackagesQuery) scope');
+        devOpamPackages = builtins.attrValues (
+          pkgs.lib.getAttrs (builtins.attrNames devOpamPackagesQuery) scope'
+        );
         main = scope'.${package};
       in
       {
@@ -59,13 +69,13 @@
         packages.default = main;
 
         devShells = {
-          # Shell with opam packages
           default = pkgs.mkShell {
             inputsFrom = [ main ];
-            packages = [
+            packages =
               devOpamPackages
-              pkgs.glsl_analyzer
-            ];
+              ++ (with pkgs; [
+                glsl_analyzer
+              ]);
           };
         };
       }
