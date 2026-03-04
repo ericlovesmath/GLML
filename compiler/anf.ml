@@ -8,7 +8,7 @@ type atom =
   | Bool of bool
 [@@deriving sexp_of]
 
-type term =
+type term_desc =
   | Atom of atom
   | Bop of Glsl.binary_op * atom * atom
   | Vec of int * atom list
@@ -20,15 +20,37 @@ type term =
   | Lam of (string * Stlc.ty) list * anf
 [@@deriving sexp_of]
 
-and anf =
+and term =
+  { desc : term_desc
+  ; loc : Lexer.loc [@sexp_drop_if Fn.const true]
+  }
+[@@deriving sexp_of]
+
+and anf_desc =
   | Let of string * term * anf
   | Return of term
 [@@deriving sexp_of]
 
-type top =
+and anf =
+  { desc : anf_desc
+  ; loc : Lexer.loc [@sexp_drop_if Fn.const true]
+  }
+[@@deriving sexp_of]
+
+let sexp_of_term (t : term) = sexp_of_term_desc t.desc
+let sexp_of_anf (a : anf) = sexp_of_anf_desc a.desc
+
+type top_desc =
   | Define of string * anf
   | Extern of ty * string
 [@@deriving sexp_of]
+
+type top =
+  { desc : top_desc
+  ; loc : Lexer.loc
+  }
+
+let sexp_of_top t = sexp_of_top_desc t.desc
 
 type t = Program of Stlc.ty String.Map.t * top list [@@deriving sexp_of]
 
@@ -39,7 +61,8 @@ let type_of_atom ctx = function
   | Bool _ -> TyBool
 ;;
 
-let rec type_of_term ctx = function
+let rec type_of_term ctx (t : term) =
+  match t.desc with
   | Atom a -> type_of_atom ctx a
   | Bop (op, l, r) ->
     let ty_l = type_of_atom ctx l in
@@ -123,61 +146,68 @@ let rec type_of_term ctx = function
     let ret_ty = type_of ctx anf in
     List.fold_right args ~init:ret_ty ~f:(fun (_, ty) acc -> Stlc.TyArrow (ty, acc))
 
-(* TODO: Typechecking stage should maybe occur after ANF? This feels redundant *)
-and type_of ctx = function
+and type_of ctx (anf : anf) =
+  match anf.desc with
   | Let (v, term, body) ->
     let ty_v = type_of_term ctx term in
     type_of (Map.set ctx ~key:v ~data:ty_v) body
   | Return term -> type_of_term ctx term
 ;;
 
-(* TODO: Refactor to use some kind of State monad + let* for implicit CPS *)
 let rec normalize (map : Stlc.ty String.Map.t) (expr : Uncurry.term)
   : Stlc.ty String.Map.t * anf
   =
-  match expr with
-  | Var v -> map, Return (Atom (Var v))
-  | Float f -> map, Return (Atom (Float f))
-  | Int i -> map, Return (Atom (Int i))
-  | Bool b -> map, Return (Atom (Bool b))
+  let pure (desc : term_desc) : anf =
+    { desc = Return { desc; loc = expr.loc }; loc = expr.loc }
+  in
+  match expr.desc with
+  | Var v -> map, pure (Atom (Var v))
+  | Float f -> map, pure (Atom (Float f))
+  | Int i -> map, pure (Atom (Int i))
+  | Bool b -> map, pure (Atom (Bool b))
   | Lam (args, t) ->
     let map =
       List.fold args ~init:map ~f:(fun map (v, ty) -> Map.set map ~key:v ~data:ty)
     in
-    let map, t = normalize map t in
-    map, Return (Lam (args, t))
+    let map, t_anf = normalize map t in
+    map, pure (Lam (args, t_anf))
   | Let (v, bind, body) ->
     let map, bind_anf = normalize map bind in
     let ty_v = type_of map bind_anf in
     let map = Map.set map ~key:v ~data:ty_v in
     let map, body_anf = normalize map body in
-    let rec make_let = function
-      | Let (v, bind, body) -> Let (v, bind, make_let body)
-      | Return t -> Let (v, t, body_anf)
+    let pure (desc : anf_desc) : anf = { desc; loc = expr.loc } in
+    let rec make_let (a : anf) =
+      match a.desc with
+      | Let (v', bind', body') -> pure (Let (v', bind', make_let body'))
+      | Return t -> pure (Let (v, t, body_anf))
     in
     map, make_let bind_anf
   | App (f, args) ->
-    atomize map f (fun map f ->
-      match f with
-      | Var v -> atomize_list map args (fun map args -> map, Return (App (v, args)))
+    atomize map f (fun map f_atom ->
+      match f_atom with
+      | Var v ->
+        atomize_list map args (fun map args_atoms -> map, pure (App (v, args_atoms)))
       | _ -> failwith "normalize: app function must be a variable for now")
   | Bop (op, l, r) ->
-    atomize map l (fun map l -> atomize map r (fun map r -> map, Return (Bop (op, l, r))))
-  | Vec (n, ts) -> atomize_list map ts (fun map ts -> map, Return (Vec (n, ts)))
-  | Mat (x, y, ts) -> atomize_list map ts (fun map ts -> map, Return (Mat (x, y, ts)))
-  | Index (t, i) -> atomize map t (fun map t -> map, Return (Index (t, i)))
-  | Builtin (f, args) ->
-    atomize_list map args (fun map args -> map, Return (Builtin (f, args)))
+    atomize map l (fun map l_atom ->
+      atomize map r (fun map r_atom -> map, pure (Bop (op, l_atom, r_atom))))
+  | Vec (n, ts) -> atomize_list map ts (fun map ts_atoms -> map, pure (Vec (n, ts_atoms)))
+  | Mat (x, y, ts) ->
+    atomize_list map ts (fun map ts_atoms -> map, pure (Mat (x, y, ts_atoms)))
+  | Index (t, i) -> atomize map t (fun map t_atom -> map, pure (Index (t_atom, i)))
+  | Builtin (b, args) ->
+    atomize_list map args (fun map args_atoms -> map, pure (Builtin (b, args_atoms)))
   | If (c, t, e) ->
-    atomize map c (fun map c ->
+    atomize map c (fun map c_atom ->
       let map, t_anf = normalize map t in
       let map, e_anf = normalize map e in
-      map, Return (If (c, t_anf, e_anf)))
+      map, pure (If (c_atom, t_anf, e_anf)))
 
 and atomize (map : Stlc.ty String.Map.t) (expr : Uncurry.term) k
   : Stlc.ty String.Map.t * anf
   =
-  match expr with
+  match expr.desc with
   | Var v -> k map (Var v)
   | Float f -> k map (Float f)
   | Int i -> k map (Int i)
@@ -188,9 +218,11 @@ and atomize (map : Stlc.ty String.Map.t) (expr : Uncurry.term) k
     let v = Utils.fresh "anf" in
     let map = Map.set map ~key:v ~data:ty in
     let map, rem = k map (Var v) in
-    let rec make_let = function
-      | Let (v, bind, body) -> Let (v, bind, make_let body)
-      | Return t -> Let (v, t, rem)
+    let pure (desc : anf_desc) : anf = { desc; loc = expr.loc } in
+    let rec make_let (a : anf) =
+      match a.desc with
+      | Let (v', bind', body') -> pure (Let (v', bind', make_let body'))
+      | Return t -> pure (Let (v, t, rem))
     in
     map, make_let anf_block
 
@@ -204,13 +236,14 @@ and atomize_list map ts k =
 let normalize_top (map : Stlc.ty String.Map.t) (t : Uncurry.top)
   : Stlc.ty String.Map.t * top
   =
-  match t with
+  let pure (desc : top_desc) : top = { desc; loc = t.loc } in
+  match t.desc with
   | Define (v, bind) ->
     let map, bind_anf = normalize map bind in
     let ty_v = type_of map bind_anf in
     let map = Map.set map ~key:v ~data:ty_v in
-    map, Define (v, bind_anf)
-  | Extern (ty, v) -> map, Extern (ty, v)
+    map, pure (Define (v, bind_anf))
+  | Extern (ty, v) -> map, pure (Extern (ty, v))
 ;;
 
 let to_anf (Program (map, terms) : Uncurry.t) : t =

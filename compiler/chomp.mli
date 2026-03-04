@@ -46,3 +46,6 @@ val chainl1 : 'a t -> ('a -> 'a -> 'a) t -> 'a t
 val tok : token -> token t
 val fail : string -> 'a t
 val fatal : string -> 'a t
+
+(** Records the start position before running [p] and the end position after running [p]. *)
+val with_loc : 'a t -> ('a * loc) t

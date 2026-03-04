@@ -73,7 +73,12 @@ end
 open Maybe
 
 type 'a maybe = 'a Maybe.t
-type stream = (token * loc) Sequence.t
+
+type stream =
+  { seq : (token * loc) Sequence.t
+  ; last_pos : pos
+  }
+
 type 'a t = stream -> ('a * stream) Maybe.t
 
 include Applicative.Make (struct
@@ -132,7 +137,7 @@ module Infix_syntax = struct
        | Fail e' -> Fail e')
   ;;
 
-  let pos_of_stream st = Option.map ~f:(fun ((_, pos), _) -> pos) (Sequence.next st)
+  let pos_of_stream st = Option.map ~f:(fun ((_, pos), _) -> pos) (Sequence.next st.seq)
 
   let ( <??> ) p tag =
     fun st ->
@@ -157,26 +162,26 @@ let commit p =
 
 let satisfy (pred : token -> bool) : token t =
   fun st ->
-  match Sequence.next st with
-  | Some ((tok, pos), st') ->
-    if pred tok then Success (tok, st') else fail ~pos ~tok "satisfy_fail"
+  match Sequence.next st.seq with
+  | Some ((tok, ((_, last_pos) as pos)), seq) ->
+    if pred tok then Success (tok, { seq; last_pos }) else fail ~pos ~tok "satisfy_fail"
   | None -> fail "satisfy_eof"
 ;;
 
 let peek : token t =
   fun st ->
-  match Sequence.next st with
+  match Sequence.next st.seq with
   | Some ((c, _), _) -> Success (c, st)
   | None -> fail "peek_eof"
 ;;
 
 let satisfy_map (pred : token -> 'a option) : 'a t =
   fun st ->
-  match Sequence.next st with
+  match Sequence.next st.seq with
   | None -> fail "satisfy_map_eof"
-  | Some ((c, pos), st') ->
+  | Some ((c, ((_, last_pos) as pos)), seq) ->
     (match pred c with
-     | Some c -> Success (c, st')
+     | Some c -> Success (c, { seq; last_pos })
      | None -> fail ~pos "satisfy_map_fail")
 ;;
 
@@ -199,8 +204,10 @@ let chainl1 (p : 'a t) (op : ('a -> 'a -> 'a) t) : 'a t =
 
 let run p s =
   Maybe.to_or_error
-    (let%bind.Maybe x, st = p (Sequence.of_list s) in
-     match Sequence.next st with
+    (let last_pos = { i = 0; line = 0; col = 0 } in
+     (* TODO: move the above to [Lexer]? *)
+     let%bind.Maybe x, st = p { seq = Sequence.of_list s; last_pos } in
+     match Sequence.next st.seq with
      | Some ((_, pos), _) -> fail ~pos "run_stream_not_fully_consumed"
      | None -> Success x)
 ;;
@@ -208,3 +215,16 @@ let run p s =
 let tok t = satisfy (equal_token t)
 let fail message = Fn.const (Fail { message; found = None; contexts = [] })
 let fatal message = Fn.const (Fatal { message; found = None; contexts = [] })
+
+let with_loc (p : 'a t) : ('a * loc) t =
+  fun st ->
+  let start_pos =
+    match Sequence.next st.seq with
+    | Some ((_, (start_p, _)), _) -> start_p
+    | None -> st.last_pos
+  in
+  match p st with
+  | Success (v, st) -> Success ((v, (start_pos, st.last_pos)), st)
+  | Fail e -> Fail e
+  | Fatal e -> Fatal e
+;;

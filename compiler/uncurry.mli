@@ -1,6 +1,6 @@
 open Core
 
-type term =
+type term_desc =
   | Var of string
   | Float of float
   | Int of int
@@ -16,9 +16,21 @@ type term =
   | Builtin of Glsl.builtin * term list
 [@@deriving sexp_of]
 
-type top =
+and term =
+  { desc : term_desc
+  ; loc : Lexer.loc
+  }
+[@@deriving sexp_of]
+
+type top_desc =
   | Define of string * term
   | Extern of Stlc.ty * string
+[@@deriving sexp_of]
+
+type top =
+  { desc : top_desc
+  ; loc : Lexer.loc
+  }
 [@@deriving sexp_of]
 
 type t = Program of Stlc.ty String.Map.t * top list [@@deriving sexp_of]

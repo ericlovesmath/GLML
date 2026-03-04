@@ -7,7 +7,7 @@ type atom =
   | Bool of bool
 [@@deriving sexp_of]
 
-type term =
+type term_desc =
   | Atom of atom
   | Bop of Glsl.binary_op * atom * atom
   | Vec of int * atom list
@@ -19,15 +19,32 @@ type term =
   | Lam of (string * Stlc.ty) list * anf
 [@@deriving sexp_of]
 
-(** A-normal form representation of the STLC *)
-and anf =
+and term =
+  { desc : term_desc
+  ; loc : Lexer.loc
+  }
+[@@deriving sexp_of]
+
+and anf_desc =
   | Let of string * term * anf
   | Return of term
 [@@deriving sexp_of]
 
-type top =
+and anf =
+  { desc : anf_desc
+  ; loc : Lexer.loc
+  }
+[@@deriving sexp_of]
+
+type top_desc =
   | Define of string * anf
   | Extern of Stlc.ty * string
+[@@deriving sexp_of]
+
+type top =
+  { desc : top_desc
+  ; loc : Lexer.loc
+  }
 [@@deriving sexp_of]
 
 type t = Program of Stlc.ty String.Map.t * top list [@@deriving sexp_of]

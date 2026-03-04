@@ -1,5 +1,3 @@
-open Core
-
 type ty =
   | TyFloat
   | TyInt
@@ -9,7 +7,7 @@ type ty =
   | TyArrow of ty * ty
 [@@deriving sexp_of, equal]
 
-type term =
+type term_desc =
   | Var of string
   | Float of float
   | Int of int
@@ -25,13 +23,21 @@ type term =
   | Builtin of Glsl.builtin * term list
 [@@deriving sexp_of]
 
-type top =
+and term =
+  { desc : term_desc
+  ; loc : Lexer.loc
+  }
+[@@deriving sexp_of]
+
+type top_desc =
   | Define of string * term
   | Extern of ty * string
 [@@deriving sexp_of]
 
-type t = Program of top list [@@deriving sexp_of]
+type top =
+  { desc : top_desc
+  ; loc : Lexer.loc
+  }
+[@@deriving sexp_of]
 
-(** Reads string sexp for simple STLC representation, intended to be temporary
-    until a real parser will be written. Failiable. *)
-val of_string : string -> t Or_error.t
+type t = Program of top list [@@deriving sexp_of]

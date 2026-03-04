@@ -20,7 +20,7 @@ let to_glsl_atom (a : Anf.atom) : term =
 ;;
 
 let to_glsl_term (t : Anf.term) : term =
-  match t with
+  match t.desc with
   | Atom a -> to_glsl_atom a
   | Bop (op, l, r) -> Bop (op, to_glsl_atom l, to_glsl_atom r)
   | Vec (n, ts) ->
@@ -58,13 +58,13 @@ let placeholder_value_for_ty (ty : ty) : term =
 let rec translate_set (map : Stlc.ty String.Map.t) (var : string) (anf : Anf.anf)
   : stmt list
   =
-  match anf with
+  match anf.desc with
   | Let (v, bind, body) ->
     let ty = to_glsl_ty (Map.find_exn map v) in
     let stmt = Decl (None, ty, v, to_glsl_term bind) in
     stmt :: translate_set map var body
   | Return t ->
-    (match t with
+    (match t.desc with
      | If (c, t, e) ->
        [ IfStmt
            ( to_glsl_atom c
@@ -75,9 +75,9 @@ let rec translate_set (map : Stlc.ty String.Map.t) (var : string) (anf : Anf.anf
 ;;
 
 let rec translate_block (map : Stlc.ty String.Map.t) (anf : Anf.anf) : stmt list =
-  match anf with
+  match anf.desc with
   | Let (v, term, body) ->
-    (match term with
+    (match term.desc with
      | If (c, t, e) ->
        let ty = to_glsl_ty (Map.find_exn map v) in
        let decl = Decl (None, ty, v, placeholder_value_for_ty ty) in
@@ -93,7 +93,7 @@ let rec translate_block (map : Stlc.ty String.Map.t) (anf : Anf.anf) : stmt list
        let stmt = Decl (None, ty, v, to_glsl_term term) in
        stmt :: translate_block map body)
   | Return t ->
-    (match t with
+    (match t.desc with
      | If (c, t, e) ->
        [ IfStmt
            ( to_glsl_atom c
@@ -105,9 +105,9 @@ let rec translate_block (map : Stlc.ty String.Map.t) (anf : Anf.anf) : stmt list
 
 let translate (Program (map, tops) : Anf.t) : t =
   let globals =
-    List.map tops ~f:(fun top ->
-      match top with
-      | Define (name, Return (Lam (args, body))) ->
+    List.map tops ~f:(fun (top : Anf.top) ->
+      match top.desc with
+      | Define (name, { desc = Return { desc = Lam (args, body); _ }; _ }) ->
         let ret_type =
           let rec unroll = function
             | Stlc.TyArrow (_, r) -> unroll r
@@ -118,9 +118,9 @@ let translate (Program (map, tops) : Anf.t) : t =
         let params = List.map args ~f:(fun (arg, arg_ty) -> to_glsl_ty arg_ty, arg) in
         let body = translate_block map body in
         Function { name; desc = None; params; ret_type; body }
-      | Define (_, Return _) ->
+      | Define (_, { desc = Return _; _ }) ->
         raise_s [%message "translate: expected lam form at toplevel" (top : Anf.top)]
-      | Define (_, Let _) ->
+      | Define (_, { desc = Let _; _ }) ->
         raise_s [%message "translate: expected return toplevel" (top : Anf.top)]
       | Extern (ty, v) -> Global (Uniform, to_glsl_ty ty, v))
   in

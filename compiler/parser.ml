@@ -5,6 +5,18 @@ open Chomp
 open Chomp.Let_syntax
 open Chomp.Infix_syntax
 
+(* TODO: write a proper sexp_of for these types *)
+let rec strip_desc_tag =
+  let open Sexplib.Sexp in
+  function
+  | List [ List [ Atom "desc"; desc ] ] -> strip_desc_tag desc
+  | List xs -> List (List.map xs ~f:strip_desc_tag)
+  | Atom a -> Atom a
+;;
+
+let with_term_loc p = with_loc p >>| fun (desc, loc) -> ({ desc; loc } : term)
+let with_top_loc p = with_loc p >>| fun (desc, loc) -> ({ desc; loc } : top)
+
 let ident_p =
   satisfy_map (function
     | ID s -> Some s
@@ -119,25 +131,31 @@ let%expect_test "ty parse tests" =
    [0.5 .] right now. Maybe I should just make float literals be part
    of the lexer. *)
 let term_number_p =
-  let%bind sign = tok SUB *> return (-1) <|> tok ADD *> return 1 <|> return 1 in
-  let%bind n = num_p in
-  (let%bind m = tok DOT *> num_p in
-   let unsigned_float = Float.of_string [%string "%{n#Int}.%{m#Int}"] in
-   let float = Float.of_int sign *. unsigned_float in
-   return (Float float) <??> "term_float")
-  <|> (return (Int (sign * n)) <??> "term_int")
+  with_term_loc
+    (let%bind sign = tok SUB *> return (-1) <|> tok ADD *> return 1 <|> return 1 in
+     let%bind n = num_p in
+     (let%bind m = tok DOT *> num_p in
+      let unsigned_float = Float.of_string [%string "%{n#Int}.%{m#Int}"] in
+      let float = Float.of_int sign *. unsigned_float in
+      return (Float float) <??> "term_float")
+     <|> (return (Int (sign * n)) <??> "term_int"))
 ;;
 
 let term_unsigned_number_p =
-  let%bind n = num_p in
-  (let%bind m = tok DOT *> num_p in
-   let f = Float.of_string [%string "%{n#Int}.%{m#Int}"] in
-   return (Float f) <??> "term_ufloat")
-  <|> (return (Int n) <??> "term_uint")
+  with_term_loc
+    (let%bind n = num_p in
+     (let%bind m = tok DOT *> num_p in
+      let f = Float.of_string [%string "%{n#Int}.%{m#Int}"] in
+      return (Float f) <??> "term_ufloat")
+     <|> (return (Int n) <??> "term_uint"))
 ;;
 
 let bop_levels =
-  let bop t op = tok t *> return (fun l r -> Bop (op, l, r)) in
+  let bop t op =
+    tok t
+    *> return (fun (l : term) (r : term) ->
+      ({ desc = Bop (op, l, r); loc = fst l.loc, snd r.loc } : term))
+  in
   [ bop MUL Mul <|> bop DIV Div <|> bop PERCENT Mod
   ; bop ADD Add <|> bop SUB Sub
   ; bop LANGLE Lt <|> bop RANGLE Gt <|> bop LEQ Leq <|> bop GEQ Geq
@@ -148,90 +166,110 @@ let bop_levels =
 ;;
 
 let param_p =
-  between
-    `Paren
-    (let%bind id = ident_p in
-     let%bind ty = tok COLON *> ty_p in
-     return (id, ty))
+  with_loc
+    (between
+       `Paren
+       (let%bind id = ident_p in
+        let%bind ty = tok COLON *> ty_p in
+        return (id, ty)))
   <??> "param"
 ;;
 
-let make_lambdas params body =
-  List.fold_right params ~init:body ~f:(fun (id, ty) acc -> Lam (id, ty, acc))
+let make_lambdas params (body : term) =
+  match params with
+  | [] -> body.desc
+  | _ ->
+    let body_term, _ =
+      List.fold_right
+        params
+        ~init:(body, body.loc)
+        ~f:(fun ((id, ty), param_loc) (acc_term, acc_loc) ->
+          let combined_loc = fst param_loc, snd acc_loc in
+          let lam_term : term = { desc = Lam (id, ty, acc_term); loc = combined_loc } in
+          lam_term, combined_loc)
+    in
+    body_term.desc
 ;;
 
 let rec term_let_p =
   fun st ->
-  (tok LET
-   *> commit
-        (let%bind id = ident_p in
-         let%bind params = many param_p in
-         let%bind rhs = tok EQ *> term_p in
-         let rhs = make_lambdas params rhs in
-         let%bind body = tok IN *> term_p in
-         return (Let (id, rhs, body)))
+  (with_term_loc
+     (tok LET
+      *> commit
+           (let%bind id = ident_p in
+            let%bind params = many param_p in
+            let%bind rhs = tok EQ *> term_p in
+            let rhs_desc = make_lambdas params rhs in
+            let%bind body = tok IN *> term_p in
+            return (Let (id, { desc = rhs_desc; loc = rhs.loc }, body))))
    <??> "term_let")
     st
 
 and term_if_p =
   fun st ->
-  (tok IF
-   *> commit
-        (let%bind c = term_p in
-         let%bind t = tok THEN *> term_p in
-         let%bind f = tok ELSE *> term_p in
-         return (If (c, t, f)))
+  (with_term_loc
+     (tok IF
+      *> commit
+           (let%bind c = term_p in
+            let%bind t = tok THEN *> term_p in
+            let%bind f = tok ELSE *> term_p in
+            return (If (c, t, f))))
    <??> "term_if")
     st
 
 and term_lam_p =
   fun st ->
-  (tok FUN
-   *> commit
-        (let%bind params = many1 param_p in
-         let%bind t = tok ARROW *> term_p in
-         return (make_lambdas params t)))
+  (with_term_loc
+     (tok FUN
+      *> commit
+           (let%bind params = many1 param_p in
+            let%bind t = tok ARROW *> term_p in
+            return (make_lambdas params t))))
     st
 
 and term_mat_p =
   fun st ->
-  ((let%bind terms = between `Angle (commas (between `Angle (commas term_p))) in
-    let n = List.length terms in
-    let m = List.length (List.hd_exn terms) in
-    if List.for_all terms ~f:(fun ts -> List.length ts = m)
-    then return (Mat (n, m, List.concat terms))
-    else fail "matrix contains rows of unequal size")
-   <??> "term_mat")
+  (with_term_loc
+     ((let%bind terms = between `Angle (commas (between `Angle (commas term_p))) in
+       let n = List.length terms in
+       let m = List.length (List.hd_exn terms) in
+       if List.for_all terms ~f:(fun ts -> List.length ts = m)
+       then return (Mat (n, m, List.concat terms))
+       else fail "matrix contains rows of unequal size")
+      <??> "term_mat"))
     st
 
 and term_vec_p =
   fun st ->
-  (let%bind terms = between `Angle (commas term_p) in
-   return (Vec (List.length terms, terms)) <??> "term_vec")
+  (with_term_loc
+     (let%bind terms = between `Angle (commas term_p) in
+      return (Vec (List.length terms, terms)) <??> "term_vec"))
     st
 
 (* NOTE: Builtins should not be special forms, but right now they are not curried so.. *)
 and term_builtin_p =
   fun st ->
-  (let%bind _ = tok HASH in
-   let%bind builtin =
-     satisfy_map (function
-       | ID s -> Option.try_with (fun () -> Glsl.builtin_of_string s)
-       | _ -> None)
-   in
-   let%bind args = between `Paren (commas term_p) in
-   return (Builtin (builtin, args)) <??> "term_builtin")
+  (with_term_loc
+     (let%bind _ = tok HASH in
+      let%bind builtin =
+        satisfy_map (function
+          | ID s -> Option.try_with (fun () -> Glsl.builtin_of_string s)
+          | _ -> None)
+      in
+      let%bind args = between `Paren (commas term_p) in
+      return (Builtin (builtin, args)) <??> "term_builtin"))
     st
 
 and term_atom_p =
   fun st ->
   let term_singles_p =
-    satisfy_map (function
-      | TRUE -> Some (Bool true)
-      | FALSE -> Some (Bool false)
-      | ID v -> Some (Var v)
-      | _ -> None)
-    <??> "term_single"
+    with_term_loc
+      (satisfy_map (function
+         | TRUE -> Some (Bool true)
+         | FALSE -> Some (Bool false)
+         | ID v -> Some (Var v)
+         | _ -> None)
+       <??> "term_single")
   in
   (term_builtin_p <|> term_singles_p <|> term_mat_p <|> term_vec_p <??> "term_atom") st
 
@@ -253,13 +291,21 @@ and term_postfix_p =
     let%bind ops = many op_p in
     return (List.fold_left ops ~init:head ~f:(fun t op -> op t))
   in
-  let index_op_p = between `Bracket num_p >>| fun i t -> Index (t, i) in
+  let index_op_p =
+    with_loc (between `Bracket num_p)
+    >>| fun (i, loc) (t : term) ->
+    ({ desc = Index (t, i); loc = fst t.loc, snd loc } : term)
+  in
   let term_arg_p =
     (* NOTE: intentionally excludes signed literals to avoid cases like [f -5] *)
     let first_arg = term_atom_p <|> term_unsigned_number_p <|> between `Paren term_p in
     postfix_chain first_arg index_op_p <??> "term_arg"
   in
-  let app_op_p = term_arg_p >>| fun a t -> App (t, a) in
+  let app_op_p =
+    term_arg_p
+    >>| fun (a : term) (t : term) ->
+    ({ desc = App (t, a); loc = fst t.loc, snd a.loc } : term)
+  in
   let op_p = index_op_p <|> app_op_p in
   (postfix_chain term_head_p op_p <??> "term_postfix_chain") st
 
@@ -276,6 +322,7 @@ let%expect_test "term parse tests" =
     |> Or_error.map ~f:(run term_p)
     |> Or_error.join
     |> Or_error.sexp_of_t sexp_of_term
+    |> strip_desc_tag
     |> print_s
   in
   test "variable_name";
@@ -342,23 +389,26 @@ let%expect_test "term parse tests" =
 ;;
 
 let top_let_p =
-  tok LET
-  *> commit
-       (let%bind id = ident_p in
-        let%bind params = many param_p in
-        let%bind rhs = tok EQ *> term_p in
-        return (Define (id, make_lambdas params rhs)))
-  <??> "top_let"
+  with_top_loc
+    (tok LET
+     *> commit
+          (let%bind id = ident_p in
+           let%bind params = many param_p in
+           let%bind rhs = tok EQ *> term_p in
+           let rhs_desc = make_lambdas params rhs in
+           return (Define (id, { desc = rhs_desc; loc = rhs.loc })))
+     <??> "top_let")
 ;;
 
 let top_extern_p =
-  tok HASH
-  *> commit
-       (let%bind _ = tok EXTERN in
-        let%bind ty = ty_p in
-        let%bind v = ident_p in
-        return (Extern (ty, v)))
-  <??> "top_extern"
+  with_top_loc
+    (tok HASH
+     *> commit
+          (let%bind _ = tok EXTERN in
+           let%bind ty = ty_p in
+           let%bind v = ident_p in
+           return (Extern (ty, v)))
+     <??> "top_extern")
 ;;
 
 let glml_p = many1 (top_let_p <|> top_extern_p) >>| fun tops -> Program tops
@@ -371,6 +421,7 @@ let%expect_test "glml parse tests" =
     |> Or_error.map ~f:(run glml_p)
     |> Or_error.join
     |> Or_error.sexp_of_t sexp_of_t
+    |> strip_desc_tag
     |> print_s
   in
   test
