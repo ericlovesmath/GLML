@@ -20,20 +20,6 @@ let string_of_ty = function
   | TyMat (x, y) -> "mat" ^ Int.to_string x ^ "x" ^ Int.to_string y
 ;;
 
-let ty_of_string = function
-  | "float" -> TyFloat
-  | "int" -> TyInt
-  | "bool" -> TyBool
-  | "void" -> TyVoid
-  | "vec2" -> TyVec 2
-  | "vec3" -> TyVec 3
-  | "vec4" -> TyVec 4
-  | "mat2" -> TyMat (2, 2)
-  | "mat3" -> TyMat (3, 3)
-  | "mat4" -> TyMat (4, 4)
-  | s -> failwith ("Unknown type: " ^ s)
-;;
-
 type binary_op =
   | Add
   | Sub
@@ -105,7 +91,20 @@ type term =
   | Builtin of builtin * term list
   | Swizzle of term * string
   | Index of term * int
-[@@deriving sexp_of]
+
+let rec sexp_of_term = function
+  | Float f -> Atom (Float.to_string f)
+  | Int i -> Atom (Int.to_string i)
+  | Bool b -> Atom (Bool.to_string b)
+  | Var v -> Atom v
+  | Bop (op, l, r) ->
+    List [ Atom (string_of_binary_op op); sexp_of_term l; sexp_of_term r ]
+  | If (c, t, e) -> List [ Atom "if"; sexp_of_term c; sexp_of_term t; sexp_of_term e ]
+  | App (f, args) -> List (Atom f :: List.map args ~f:sexp_of_term)
+  | Builtin (b, args) -> List (Atom (string_of_builtin b) :: List.map args ~f:sexp_of_term)
+  | Swizzle (t, s) -> List [ Atom "."; sexp_of_term t; Atom s ]
+  | Index (t, i) -> List [ Atom "index"; sexp_of_term t; Atom (Int.to_string i) ]
+;;
 
 let rec string_of_term = function
   | Float f -> Float.to_string f
@@ -137,41 +136,6 @@ let rec string_of_term = function
     [%string "%{t}[%{i#Int}]"]
 ;;
 
-let rec term_of_sexp (s : Sexp.t) : term =
-  match s with
-  | Atom "true" -> Bool true
-  | Atom "false" -> Bool false
-  | Atom s ->
-    (match Int.of_string_opt s with
-     | Some i -> Int i
-     | None ->
-       (match Float.of_string_opt s with
-        | Some f -> Float f
-        | None -> Var s))
-  | List (Atom op :: args) ->
-    (match op, args with
-     | "+", [ a; b ] -> Bop (Add, term_of_sexp a, term_of_sexp b)
-     | "-", [ a; b ] -> Bop (Sub, term_of_sexp a, term_of_sexp b)
-     | "*", [ a; b ] -> Bop (Mul, term_of_sexp a, term_of_sexp b)
-     | "/", [ a; b ] -> Bop (Div, term_of_sexp a, term_of_sexp b)
-     | "%", [ a; b ] -> Bop (Mod, term_of_sexp a, term_of_sexp b)
-     | "==", [ a; b ] -> Bop (Eq, term_of_sexp a, term_of_sexp b)
-     | "<", [ a; b ] -> Bop (Lt, term_of_sexp a, term_of_sexp b)
-     | ">", [ a; b ] -> Bop (Gt, term_of_sexp a, term_of_sexp b)
-     | "<=", [ a; b ] -> Bop (Leq, term_of_sexp a, term_of_sexp b)
-     | ">=", [ a; b ] -> Bop (Geq, term_of_sexp a, term_of_sexp b)
-     | "&&", [ a; b ] -> Bop (And, term_of_sexp a, term_of_sexp b)
-     | "||", [ a; b ] -> Bop (Or, term_of_sexp a, term_of_sexp b)
-     | "if", [ c; t; e ] -> If (term_of_sexp c, term_of_sexp t, term_of_sexp e)
-     | ".", [ t; Atom s ] -> Swizzle (term_of_sexp t, s)
-     | "[]", [ t; i ] ->
-       (match i with
-        | Atom i -> Index (term_of_sexp t, Int.of_string i)
-        | _ -> failwith "term_of_sexp: invalid index")
-     | f, args -> App (f, List.map args ~f:term_of_sexp))
-  | List _ -> failwith "Invalid expression structure"
-;;
-
 type qualifier =
   | Uniform
   | Out
@@ -187,7 +151,34 @@ type stmt =
   | For of stmt * term * stmt * stmt
   | Block of stmt list
   | Break
-[@@deriving sexp_of]
+
+let rec sexp_of_stmt (s : stmt) : Sexp.t =
+  match s with
+  | Decl (qual, ty, name, t) ->
+    let qual = Option.sexp_of_t (fun q -> Atom (string_of_qualifier q)) qual in
+    List (Atom "set" :: qual :: [ Atom (string_of_ty ty); Atom name; sexp_of_term t ])
+  | Set (lhs, rhs) -> List [ Atom "set"; sexp_of_term lhs; sexp_of_term rhs ]
+  | Return (Some t) -> List [ Atom "return"; sexp_of_term t ]
+  | Return None -> List [ Atom "return" ]
+  | Expr t -> sexp_of_term t
+  | IfStmt (cond, then_stmt, else_stmt) ->
+    let else_stmt =
+      match else_stmt with
+      | Some s -> [ sexp_of_stmt s ]
+      | None -> []
+    in
+    List ([ Atom "if"; sexp_of_term cond; sexp_of_stmt then_stmt ] @ else_stmt)
+  | For (init, cond, iter, body) ->
+    List
+      [ Atom "for"
+      ; sexp_of_stmt init
+      ; sexp_of_term cond
+      ; sexp_of_stmt iter
+      ; sexp_of_stmt body
+      ]
+  | Block stmts -> List (Atom "Block" :: List.map stmts ~f:sexp_of_stmt)
+  | Break -> Atom "break"
+;;
 
 let indent s =
   s |> String.split_lines |> List.map ~f:(String.append "    ") |> String.concat ~sep:"\n"
@@ -240,26 +231,6 @@ let rec string_of_stmt = function
   | Break -> "break;"
 ;;
 
-let rec stmt_of_sexp (s : Sexp.t) : stmt =
-  match s with
-  | List [ Atom "set"; Atom qual; Atom ty; Atom name; val_expr ] ->
-    Decl (Some (qualifier_of_string qual), ty_of_string ty, name, term_of_sexp val_expr)
-  | List [ Atom "set"; Atom ty_or_var; Atom name_or_expr; val_expr ] ->
-    Decl (None, ty_of_string ty_or_var, name_or_expr, term_of_sexp val_expr)
-  | List [ Atom "set"; lhs; rhs ] -> Set (term_of_sexp lhs, term_of_sexp rhs)
-  | List [ Atom "return"; val_expr ] -> Return (Some (term_of_sexp val_expr))
-  | List [ Atom "return" ] -> Return None
-  | List [ Atom "if"; cond; then_stmt ] ->
-    IfStmt (term_of_sexp cond, stmt_of_sexp then_stmt, None)
-  | List [ Atom "if"; cond; then_stmt; else_stmt ] ->
-    IfStmt (term_of_sexp cond, stmt_of_sexp then_stmt, Some (stmt_of_sexp else_stmt))
-  | List [ Atom "for"; init; cond; iter; body ] ->
-    For (stmt_of_sexp init, term_of_sexp cond, stmt_of_sexp iter, stmt_of_sexp body)
-  | List (Atom "block" :: stmts) -> Block (List.map stmts ~f:stmt_of_sexp)
-  | List [ Atom "break" ] -> Break
-  | _ -> Expr (term_of_sexp s)
-;;
-
 type decl =
   | Global of qualifier * ty * string
   | Function of
@@ -271,32 +242,9 @@ type decl =
       }
 [@@deriving sexp_of]
 
-let decl_of_sexp (s : Sexp.t) : decl =
-  match s with
-  | List [ Atom "global"; Atom qual; Atom ty; Atom name ] ->
-    Global (qualifier_of_string qual, ty_of_string ty, name)
-  | List (Atom "fun" :: Atom name :: List params :: Atom ret_type :: body) ->
-    let params =
-      List.map params ~f:(function
-        | List [ Atom ty; Atom name ] -> ty_of_string ty, name
-        | _ -> failwith "Invalid param decl")
-    in
-    Function
-      { name
-      ; desc = None
-      ; params
-      ; ret_type = ty_of_string ret_type
-      ; body = List.map body ~f:stmt_of_sexp
-      }
-  | _ -> failwith "Invalid declaration"
-;;
-
 type t = Program of decl list [@@deriving sexp_of]
 
-let t_of_sexp (s : Sexp.t) : t = Program (List.t_of_sexp decl_of_sexp s)
-let of_string (s : string) : t = t_of_sexp (Sexp.of_string s)
-
-let to_shader (Program decls : t) : string =
+let to_string (Program decls : t) : string =
   let string_of_decl = function
     | Global (qualifier, ty, name) ->
       let qualifier = string_of_qualifier qualifier in

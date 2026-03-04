@@ -1,4 +1,5 @@
 open Core
+open Sexplib.Sexp
 
 type term_desc =
   | Var of string
@@ -14,13 +15,36 @@ type term_desc =
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
   | Builtin of Glsl.builtin * term list
-[@@deriving sexp_of]
 
 and term =
   { desc : term_desc
-  ; loc : Lexer.loc [@sexp_drop_if Fn.const true]
+  ; loc : Lexer.loc
   }
-[@@deriving sexp_of]
+
+let rec sexp_of_term_desc = function
+  | Var v -> Atom v
+  | Float f -> Atom (Float.to_string f)
+  | Int i -> Atom (Int.to_string i)
+  | Bool b -> Atom (Bool.to_string b)
+  | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_term)
+  | Mat (x, y, ts) ->
+    List
+      (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
+       :: List.map ts ~f:sexp_of_term)
+  | Lam (args, body) ->
+    let args = List.map args ~f:(fun (v, ty) -> List [ Atom v; Stlc.sexp_of_ty ty ]) in
+    List [ Atom "lambda"; List args; sexp_of_term body ]
+  | App (f, args) -> List (Atom "app" :: sexp_of_term f :: List.map args ~f:sexp_of_term)
+  | Let (v, bind, body) ->
+    List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
+  | If (c, t, e) -> List [ Atom "if"; sexp_of_term c; sexp_of_term t; sexp_of_term e ]
+  | Bop (op, l, r) ->
+    List [ Atom (Glsl.string_of_binary_op op); sexp_of_term l; sexp_of_term r ]
+  | Index (t, i) -> List [ Atom "index"; sexp_of_term t; Atom (Int.to_string i) ]
+  | Builtin (b, ts) ->
+    List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
+
+and sexp_of_term t = sexp_of_term_desc t.desc
 
 type top_desc =
   | Define of string * term

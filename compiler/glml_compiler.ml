@@ -76,5 +76,5 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   trace Translate glsl;
   let glsl = Patch_main.patch glsl in
   trace Patch_main glsl;
-  return (Glsl.to_shader glsl)
+  return (Glsl.to_string glsl)
 ;;
