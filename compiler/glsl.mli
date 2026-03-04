@@ -20,7 +20,7 @@ type binary_op =
   | Geq
   | And
   | Or
-[@@deriving sexp_of]
+[@@deriving sexp_of, to_string]
 
 type builtin =
   | Sin
@@ -93,7 +93,4 @@ type decl =
       }
 [@@deriving sexp_of]
 
-type t = Program of decl list [@@deriving sexp_of, of_string]
-
-(** Converts [Glsl.t] into fragment shader as GLSL string *)
-val to_shader : t -> string
+type t = Program of decl list [@@deriving sexp_of, to_string]

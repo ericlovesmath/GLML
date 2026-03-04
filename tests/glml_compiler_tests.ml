@@ -206,7 +206,7 @@ let%expect_test "builtins" =
   test_term "#cross(< 1.0, 1.0 >, < 0.0, 0.0 >)";
   [%expect
     {|
-    ("typecheck: invalid geometric call" (name Cross) (tys ((TyVec 2) (TyVec 2)))
+    ("typecheck: invalid geometric call" (name Cross) (tys ((vec 2) (vec 2)))
      (t.loc (1:27 - 1:61)))
     |}]
 ;;

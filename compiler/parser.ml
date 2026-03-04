@@ -5,15 +5,6 @@ open Chomp
 open Chomp.Let_syntax
 open Chomp.Infix_syntax
 
-(* TODO: write a proper sexp_of for these types *)
-let rec strip_desc_tag =
-  let open Sexplib.Sexp in
-  function
-  | List [ List [ Atom "desc"; desc ] ] -> strip_desc_tag desc
-  | List xs -> List (List.map xs ~f:strip_desc_tag)
-  | Atom a -> Atom a
-;;
-
 let with_term_loc p = with_loc p >>| fun (desc, loc) -> ({ desc; loc } : term)
 let with_top_loc p = with_loc p >>| fun (desc, loc) -> ({ desc; loc } : top)
 
@@ -101,20 +92,20 @@ let%expect_test "ty parse tests" =
   test "float -> int";
   [%expect
     {|
-    (Ok TyFloat)
-    (Ok TyInt)
-    (Ok TyBool)
-    (Ok (TyVec 2))
-    (Ok (TyMat 3 2))
-    (Ok (TyMat 3 3))
-    (Ok (TyArrow TyFloat TyInt))
+    (Ok float)
+    (Ok int)
+    (Ok bool)
+    (Ok (vec 2))
+    (Ok (mat 3 2))
+    (Ok (mat 3 3))
+    (Ok (float -> int))
     |}];
   test "(vec4)";
   test "(mat3x2->vec2)->(vec2->int)";
   [%expect
     {|
-    (Ok (TyVec 4))
-    (Ok (TyArrow (TyArrow (TyMat 3 2) (TyVec 2)) (TyArrow (TyVec 2) TyInt)))
+    (Ok (vec 4))
+    (Ok (((mat 3 2) -> (vec 2)) -> ((vec 2) -> int)))
     |}];
   test "";
   test "()";
@@ -322,7 +313,6 @@ let%expect_test "term parse tests" =
     |> Or_error.map ~f:(run term_p)
     |> Or_error.join
     |> Or_error.sexp_of_t sexp_of_term
-    |> strip_desc_tag
     |> print_s
   in
   test "variable_name";
@@ -340,21 +330,19 @@ let%expect_test "term parse tests" =
   test "#min(1, 2)";
   [%expect
     {|
-    (Ok (Var variable_name))
-    (Ok (Float -13.4))
-    (Ok (Int 33))
-    (Ok (Bool false))
-    (Ok (Vec 3 ((Int 1) (Int 2) (Int 3))))
-    (Ok (Mat 3 2 ((Int 1) (Int 2) (Int 3) (Int 4) (Int 5) (Int 6))))
-    (Ok (Lam x TyBool (Var x)))
-    (Ok (App (App (Var f) (Var x)) (Var y)))
-    (Ok (Let bind (Bool true) (Var bind)))
-    (Ok (If (Bool true) (Var x) (Var y)))
-    (Ok
-     (Bop And (Bop Add (Bop Mul (Int 1) (Int 2)) (Bool true))
-      (Bop Mod (Int 44) (Int 10))))
-    (Ok (Index (Var v) 0))
-    (Ok (Builtin Min ((Int 1) (Int 2))))
+    (Ok variable_name)
+    (Ok -13.4)
+    (Ok 33)
+    (Ok false)
+    (Ok (vec3 1 2 3))
+    (Ok (mat3x2 1 2 3 4 5 6))
+    (Ok (lambda (x bool) x))
+    (Ok (app (app f x) y))
+    (Ok (let bind true bind))
+    (Ok (if true x y))
+    (Ok (&& (+ (* 1 2) true) (% 44 10)))
+    (Ok (index v 0))
+    (Ok (min 1 2))
     |}];
   test "-113.0";
   test "-113";
@@ -367,24 +355,22 @@ let%expect_test "term parse tests" =
   test "f (-5)";
   [%expect
     {|
-    (Ok (Float -113))
-    (Ok (Int -113))
-    (Ok (App (App (App (Var f) (Var x)) (Var y)) (Var z)))
-    (Ok (App (App (Var f) (App (Var x) (Var y))) (Var z)))
-    (Ok (Bop Sub (Bop Mul (Int 2) (Int -13)) (Int 10)))
-    (Ok (App (Var f) (Int 5)))
-    (Ok
-     (Lam u (TyVec 2)
-      (Vec 3 ((App (App (Var f) (Float 10)) (Var a)) (Float 0) (Float 0)))))
-    (Ok (Bop Sub (Var f) (Int 5)))
-    (Ok (App (Var f) (Int -5)))
+    (Ok -113.)
+    (Ok -113)
+    (Ok (app (app (app f x) y) z))
+    (Ok (app (app f (app x y)) z))
+    (Ok (- (* 2 -13) 10))
+    (Ok (app f 5))
+    (Ok (lambda (u (vec 2)) (vec3 (app (app f 10.) a) 0. 0.)))
+    (Ok (- f 5))
+    (Ok (app f -5))
     |}];
   test "let f (x : bool) (y : bool) = x && y in f";
   test "let f = fun (x : bool) (y : bool) -> x && y in f";
   [%expect
     {|
-    (Ok (Let f (Lam x TyBool (Lam y TyBool (Bop And (Var x) (Var y)))) (Var f)))
-    (Ok (Let f (Lam x TyBool (Lam y TyBool (Bop And (Var x) (Var y)))) (Var f)))
+    (Ok (let f (lambda (x bool) (lambda (y bool) (&& x y))) f))
+    (Ok (let f (lambda (x bool) (lambda (y bool) (&& x y))) f))
     |}]
 ;;
 
@@ -421,7 +407,6 @@ let%expect_test "glml parse tests" =
     |> Or_error.map ~f:(run glml_p)
     |> Or_error.join
     |> Or_error.sexp_of_t sexp_of_t
-    |> strip_desc_tag
     |> print_s
   in
   test
@@ -436,11 +421,8 @@ let%expect_test "glml parse tests" =
     {|
     (Ok
      (Program
-      ((Extern TyFloat u_time) (Define toplevel (Bop Add (Int 1) (Int 2)))
-       (Define main (Bop Add (Int 1) (Int 2)))
-       (Define f (Lam x TyBool (Lam y TyBool (Bop And (Var x) (Var y)))))
-       (Define main
-        (Lam u (TyVec 2)
-         (Bop Add (App (Var f) (Vec 2 ((Int 1) (Int 2)))) (Var u)))))))
+      ((Extern float u_time) (Define toplevel (+ 1 2)) (Define main (+ 1 2))
+       (Define f (lambda (x bool) (lambda (y bool) (&& x y))))
+       (Define main (lambda (u (vec 2)) (+ (app f (vec2 1 2)) u))))))
     |}]
 ;;
