@@ -118,27 +118,30 @@ let%expect_test "ty parse tests" =
     |}]
 ;;
 
-(* TODO: I want to allow [0.] to be a float, but [0. 5.] is parsed as
-   [0.5 .] right now. Maybe I should just make float literals be part
-   of the lexer. *)
+let float_p =
+  satisfy_map (function
+    | FLOAT_LIT f -> Some f
+    | _ -> None)
+  <??> "float"
+;;
+
 let term_number_p =
   with_term_loc
     (let%bind sign = tok SUB *> return (-1) <|> tok ADD *> return 1 <|> return 1 in
+     (let%bind f = float_p in
+      return (Float (Float.of_int sign *. f)) <??> "term_float")
+     <|>
      let%bind n = num_p in
-     (let%bind m = tok DOT *> num_p in
-      let unsigned_float = Float.of_string [%string "%{n#Int}.%{m#Int}"] in
-      let float = Float.of_int sign *. unsigned_float in
-      return (Float float) <??> "term_float")
-     <|> (return (Int (sign * n)) <??> "term_int"))
+     return (Int (sign * n)) <??> "term_int")
 ;;
 
 let term_unsigned_number_p =
   with_term_loc
-    (let%bind n = num_p in
-     (let%bind m = tok DOT *> num_p in
-      let f = Float.of_string [%string "%{n#Int}.%{m#Int}"] in
+    ((let%bind f = float_p in
       return (Float f) <??> "term_ufloat")
-     <|> (return (Int n) <??> "term_uint"))
+     <|>
+     let%bind n = num_p in
+     return (Int n) <??> "term_uint")
 ;;
 
 let bop_levels =
@@ -304,7 +307,6 @@ and term_p =
   fun st -> (List.fold_left bop_levels ~init:term_postfix_p ~f:chainl1 <??> "term") st
 ;;
 
-(* TODO: Pretty print [Stlc.term] for nicer output / testing *)
 let%expect_test "term parse tests" =
   let test s =
     s
