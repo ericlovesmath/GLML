@@ -76,7 +76,7 @@ type 'a maybe = 'a Maybe.t
 
 type stream =
   { seq : (token * loc) Sequence.t
-  ; last_pos : pos
+  ; last_loc : loc
   }
 
 type 'a t = stream -> ('a * stream) Maybe.t
@@ -137,21 +137,21 @@ module Infix_syntax = struct
        | Fail e' -> Fail e')
   ;;
 
-  let pos_of_stream st = Option.map ~f:(fun ((_, pos), _) -> pos) (Sequence.next st.seq)
+  let loc_of_stream st = Option.map ~f:(fun ((_, loc), _) -> loc) (Sequence.next st.seq)
 
   let ( <??> ) p tag =
     fun st ->
     match p st with
     | Success res -> Success res
-    | Fatal e -> Fatal { e with contexts = (tag, pos_of_stream st) :: e.contexts }
-    | Fail e -> Fail { e with contexts = (tag, pos_of_stream st) :: e.contexts }
+    | Fatal e -> Fatal { e with contexts = (tag, loc_of_stream st) :: e.contexts }
+    | Fail e -> Fail { e with contexts = (tag, loc_of_stream st) :: e.contexts }
   ;;
 end
 
 open Let_syntax
 open Infix_syntax
 
-let fail ?pos ?tok message = Fail { message; found = Option.both tok pos; contexts = [] }
+let fail ?loc ?tok message = Fail { message; found = Option.both tok loc; contexts = [] }
 
 let commit p =
   fun st ->
@@ -163,8 +163,10 @@ let commit p =
 let satisfy (pred : token -> bool) : token t =
   fun st ->
   match Sequence.next st.seq with
-  | Some ((tok, ((_, last_pos) as pos)), seq) ->
-    if pred tok then Success (tok, { seq; last_pos }) else fail ~pos ~tok "satisfy_fail"
+  | Some ((tok, loc), seq) ->
+    if pred tok
+    then Success (tok, { seq; last_loc = loc })
+    else fail ~loc ~tok "satisfy_fail"
   | None -> fail "satisfy_eof"
 ;;
 
@@ -179,10 +181,10 @@ let satisfy_map (pred : token -> 'a option) : 'a t =
   fun st ->
   match Sequence.next st.seq with
   | None -> fail "satisfy_map_eof"
-  | Some ((c, ((_, last_pos) as pos)), seq) ->
+  | Some ((c, loc), seq) ->
     (match pred c with
-     | Some c -> Success (c, { seq; last_pos })
-     | None -> fail ~pos "satisfy_map_fail")
+     | Some c -> Success (c, { seq; last_loc = loc })
+     | None -> fail ~loc "satisfy_map_fail")
 ;;
 
 let rec many1 p = List.cons <$> p <*>| lazy (many p)
@@ -204,11 +206,10 @@ let chainl1 (p : 'a t) (op : ('a -> 'a -> 'a) t) : 'a t =
 
 let run p s =
   Maybe.to_or_error
-    (let last_pos = { i = 0; line = 0; col = 0 } in
-     (* TODO: move the above to [Lexer]? *)
-     let%bind.Maybe x, st = p { seq = Sequence.of_list s; last_pos } in
+    (let last_loc = Lexer.init_loc in
+     let%bind.Maybe x, st = p { seq = Sequence.of_list s; last_loc } in
      match Sequence.next st.seq with
-     | Some ((_, pos), _) -> fail ~pos "run_stream_not_fully_consumed"
+     | Some ((_, loc), _) -> fail ~loc "run_stream_not_fully_consumed"
      | None -> Success x)
 ;;
 
@@ -218,13 +219,11 @@ let fatal message = Fn.const (Fatal { message; found = None; contexts = [] })
 
 let with_loc (p : 'a t) : ('a * loc) t =
   fun st ->
-  let start_pos =
+  let start_loc =
     match Sequence.next st.seq with
-    | Some ((_, (start_p, _)), _) -> start_p
-    | None -> st.last_pos
+    | Some ((_, loc), _) -> loc
+    | None -> Lexer.loc_end st.last_loc
   in
-  match p st with
-  | Success (v, st) -> Success ((v, (start_pos, st.last_pos)), st)
-  | Fail e -> Fail e
-  | Fatal e -> Fatal e
+  let%map.Maybe v, st = p st in
+  (v, Lexer.merge_loc start_loc st.last_loc), st
 ;;

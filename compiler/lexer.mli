@@ -48,16 +48,10 @@ type token =
 [@@deriving sexp, equal]
 
 type t
+type loc [@@deriving sexp_of]
 
-(* TODO: feels weird to have to expose pos at all *)
-type pos =
-  { i : int
-  ; line : int
-  ; col : int
-  }
-[@@deriving sexp_of]
-
-type loc = pos * pos [@@deriving sexp_of]
-
-val of_string : string -> t
+val init_loc : loc
+val merge_loc : loc -> loc -> loc
+val loc_end : loc -> loc
+val init : string -> t
 val lex : t -> (token * loc) list Or_error.t

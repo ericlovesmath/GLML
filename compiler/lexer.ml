@@ -60,13 +60,21 @@ type loc = pos * pos
 
 let sexp_of_loc (l, r) = List [ sexp_of_pos l; Atom "-"; sexp_of_pos r ]
 
+let init_loc =
+  let p = { i = 0; line = 0; col = 0 } in
+  p, p
+;;
+
+let merge_loc (p1_start, _) (_, p2_end) = p1_start, p2_end
+let loc_end (_, p_end) = p_end, p_end
+
 type t =
   { str : string
   ; len : int
   ; mutable pos : pos
   }
 
-let of_string s = { str = s; len = String.length s; pos = { i = 0; line = 1; col = 1 } }
+let init s = { str = s; len = String.length s; pos = { i = 0; line = 1; col = 1 } }
 let eof t = t.pos.i = t.len
 
 let advance c t =
@@ -207,7 +215,7 @@ let lex (t : t) : (token * loc) list Or_error.t =
 let%expect_test "lexer" =
   let test s =
     s
-    |> of_string
+    |> init
     |> lex
     |> Or_error.map ~f:(List.map ~f:fst)
     |> Or_error.sexp_of_t (List.sexp_of_t sexp_of_token)

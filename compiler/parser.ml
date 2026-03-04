@@ -85,7 +85,7 @@ and ty_p =
 let%expect_test "ty parse tests" =
   let test s =
     s
-    |> Lexer.of_string
+    |> Lexer.init
     |> Lexer.lex
     |> Or_error.map ~f:(run ty_p)
     |> Or_error.join
@@ -154,7 +154,7 @@ let bop_levels =
   let bop t op =
     tok t
     *> return (fun (l : term) (r : term) ->
-      ({ desc = Bop (op, l, r); loc = fst l.loc, snd r.loc } : term))
+      ({ desc = Bop (op, l, r); loc = Lexer.merge_loc l.loc r.loc } : term))
   in
   [ bop MUL Mul <|> bop DIV Div <|> bop PERCENT Mod
   ; bop ADD Add <|> bop SUB Sub
@@ -184,7 +184,7 @@ let make_lambdas params (body : term) =
         params
         ~init:(body, body.loc)
         ~f:(fun ((id, ty), param_loc) (acc_term, acc_loc) ->
-          let combined_loc = fst param_loc, snd acc_loc in
+          let combined_loc = Lexer.merge_loc param_loc acc_loc in
           let lam_term : term = { desc = Lam (id, ty, acc_term); loc = combined_loc } in
           lam_term, combined_loc)
     in
@@ -294,7 +294,7 @@ and term_postfix_p =
   let index_op_p =
     with_loc (between `Bracket num_p)
     >>| fun (i, loc) (t : term) ->
-    ({ desc = Index (t, i); loc = fst t.loc, snd loc } : term)
+    ({ desc = Index (t, i); loc = Lexer.merge_loc t.loc loc } : term)
   in
   let term_arg_p =
     (* NOTE: intentionally excludes signed literals to avoid cases like [f -5] *)
@@ -304,7 +304,7 @@ and term_postfix_p =
   let app_op_p =
     term_arg_p
     >>| fun (a : term) (t : term) ->
-    ({ desc = App (t, a); loc = fst t.loc, snd a.loc } : term)
+    ({ desc = App (t, a); loc = Lexer.merge_loc t.loc a.loc } : term)
   in
   let op_p = index_op_p <|> app_op_p in
   (postfix_chain term_head_p op_p <??> "term_postfix_chain") st
@@ -317,7 +317,7 @@ and term_p =
 let%expect_test "term parse tests" =
   let test s =
     s
-    |> Lexer.of_string
+    |> Lexer.init
     |> Lexer.lex
     |> Or_error.map ~f:(run term_p)
     |> Or_error.join
@@ -416,7 +416,7 @@ let glml_p = many1 (top_let_p <|> top_extern_p) >>| fun tops -> Program tops
 let%expect_test "glml parse tests" =
   let test s =
     s
-    |> Lexer.of_string
+    |> Lexer.init
     |> Lexer.lex
     |> Or_error.map ~f:(run glml_p)
     |> Or_error.join
