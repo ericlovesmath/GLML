@@ -45,6 +45,7 @@ type token =
   | LOR
   | EXTERN
   | NUMERIC of int
+  | FLOAT_LIT of float
   | ID of string
 [@@deriving sexp, equal]
 
@@ -150,7 +151,13 @@ let read_lexeme (t : t) : token Or_error.t =
      | ']' -> consume RBRACKET
      | ';' -> consume SEMI
      | ',' -> consume COMMA
-     | '.' -> consume DOT
+     | '.' ->
+       skip t;
+       (match peek t with
+        | Some c when Char.is_digit c ->
+          let frac_part = read_while Char.is_digit t in
+          Ok (FLOAT_LIT (Float.of_string ("0." ^ frac_part)))
+        | _ -> Ok DOT)
      | '|' ->
        skip t;
        (match peek t with
@@ -172,7 +179,14 @@ let read_lexeme (t : t) : token Or_error.t =
      | '*' -> consume MUL
      | '#' -> consume HASH
      | '%' -> consume PERCENT
-     | c when Char.is_digit c -> Ok (NUMERIC (Int.of_string (read_while Char.is_digit t)))
+     | c when Char.is_digit c ->
+       let int_part = read_while Char.is_digit t in
+       (match peek t with
+        | Some '.' ->
+          skip t;
+          let frac_part = read_while Char.is_digit t in
+          Ok (FLOAT_LIT (Float.of_string (int_part ^ "." ^ frac_part)))
+        | _ -> Ok (NUMERIC (Int.of_string int_part)))
      | c when Char.is_alpha c ->
        let s = read_while (fun c -> Char.is_alpha c || Char.equal '_' c) t in
        Ok
@@ -226,6 +240,7 @@ let%expect_test "lexer" =
   test "in fun | match with { }";
   test "bool int float ' 10 string_var";
   test "+ - / * # <= >= % && ||";
+  test "1.23 .45 6. -1.";
   [%expect
     {|
     (Ok (TRUE FALSE EQ ARROW LPAREN RPAREN DOT LANGLE RANGLE))
@@ -233,6 +248,7 @@ let%expect_test "lexer" =
     (Ok (IN FUN BAR MATCH WITH LCURLY RCURLY))
     (Ok (BOOL INT FLOAT TICK (NUMERIC 10) (ID string_var)))
     (Ok (ADD SUB DIV MUL HASH LEQ GEQ PERCENT LAND LOR))
+    (Ok ((FLOAT_LIT 1.23) (FLOAT_LIT 0.45) (FLOAT_LIT 6) SUB (FLOAT_LIT 1)))
     |}];
   test "let{x:int}=match|a->fun->(f<x>*2)";
   [%expect

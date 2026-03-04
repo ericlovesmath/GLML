@@ -44,6 +44,7 @@ type token =
   | LOR
   | EXTERN
   | NUMERIC of int
+  | FLOAT_LIT of float
   | ID of string
 [@@deriving sexp, equal]
 
