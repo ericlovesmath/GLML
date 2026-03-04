@@ -18,6 +18,7 @@ type term_desc =
 
 and term =
   { desc : term_desc
+  ; ty : Stlc.ty
   ; loc : Lexer.loc
   }
 
@@ -48,33 +49,34 @@ and sexp_of_term t = sexp_of_term_desc t.desc
 
 type top_desc =
   | Define of string * term
-  | Extern of Stlc.ty * string
+  | Extern of string
 [@@deriving sexp_of]
 
 type top =
   { desc : top_desc
+  ; ty : Stlc.ty
   ; loc : Lexer.loc
   }
 
-let sexp_of_top t = sexp_of_top_desc t.desc
+let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; Stlc.sexp_of_ty t.ty ]
 
-type t = Program of Stlc.ty String.Map.t * top list [@@deriving sexp_of]
+type t = Program of top list [@@deriving sexp_of]
 
-let rec collect_lams (t : Stlc.term) : (string * Stlc.ty) list * term =
+let rec collect_lams (t : Typecheck.term) : (string * Stlc.ty) list * term =
   match t.desc with
   | Lam (v, ty, body) ->
     let args, body = collect_lams body in
     (v, ty) :: args, body
   | _ -> [], uncurry_term t
 
-and collect_apps (t : Stlc.term) : term * term list =
+and collect_apps (t : Typecheck.term) : term * term list =
   match t.desc with
   | App (f, x) ->
     let f', args = collect_apps f in
     f', args @ [ uncurry_term x ]
   | _ -> uncurry_term t, []
 
-and uncurry_term_desc (t : Stlc.term_desc) : term_desc =
+and uncurry_term_desc (t : Typecheck.term_desc) : term_desc =
   match t with
   | Var v -> Var v
   | Float f -> Float f
@@ -94,17 +96,17 @@ and uncurry_term_desc (t : Stlc.term_desc) : term_desc =
   | Index (t_sub, i) -> Index (uncurry_term t_sub, i)
   | Builtin (b, ts) -> Builtin (b, List.map ts ~f:uncurry_term)
 
-and uncurry_term (t : Stlc.term) : term = { desc = uncurry_term_desc t.desc; loc = t.loc }
+and uncurry_term (t : Typecheck.term) : term =
+  { desc = uncurry_term_desc t.desc; ty = t.ty; loc = t.loc }
+;;
 
-let uncurry_top (t : Stlc.top) : top =
+let uncurry_top (t : Typecheck.top) : top =
   let desc =
     match t.desc with
     | Define (v, term) -> Define (v, uncurry_term term)
-    | Extern (ty, v) -> Extern (ty, v)
+    | Extern v -> Extern v
   in
-  { desc; loc = t.loc }
+  { desc; ty = t.ty; loc = t.loc }
 ;;
 
-let uncurry (Typecheck.Program (map, tops)) : t =
-  Program (map, List.map tops ~f:uncurry_top)
-;;
+let uncurry (Typecheck.Program tops) : t = Program (List.map tops ~f:uncurry_top)

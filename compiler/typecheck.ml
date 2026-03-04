@@ -1,222 +1,238 @@
 open Core
+open Sexplib.Sexp
 open Stlc
 
-type t = Program of ty String.Map.t * top list [@@deriving sexp_of]
+type term_desc =
+  | Var of string
+  | Float of float
+  | Int of int
+  | Bool of bool
+  (* TODO: Vec, Math, Lam all don't need to store the size/ty now *)
+  | Vec of int * term list
+  | Mat of int * int * term list
+  | Lam of string * ty * term
+  | App of term * term
+  | Let of string * term * term
+  | If of term * term * term
+  | Bop of Glsl.binary_op * term * term
+  | Index of term * int
+  | Builtin of Glsl.builtin * term list
 
-let rec update (map : ty String.Map.t) (t : term) : (ty String.Map.t * ty) Or_error.t =
+and term =
+  { desc : term_desc
+  ; ty : ty
+  ; loc : Lexer.loc
+  }
+
+let rec sexp_of_term_desc = function
+  | Var v -> Atom v
+  | Float f -> Atom (Float.to_string f)
+  | Int i -> Atom (Int.to_string i)
+  | Bool b -> Atom (Bool.to_string b)
+  | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_term)
+  | Mat (x, y, ts) ->
+    List
+      (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
+       :: List.map ts ~f:sexp_of_term)
+  | Lam (v, ty, body) ->
+    List [ Atom "lambda"; List [ Atom v; sexp_of_ty ty ]; sexp_of_term body ]
+  | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
+  | Let (v, bind, body) ->
+    List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
+  | If (c, t, e) -> List [ Atom "if"; sexp_of_term c; sexp_of_term t; sexp_of_term e ]
+  | Bop (op, l, r) ->
+    List [ Atom (Glsl.string_of_binary_op op); sexp_of_term l; sexp_of_term r ]
+  | Index (t, i) -> List [ Atom "index"; sexp_of_term t; Atom (Int.to_string i) ]
+  | Builtin (b, ts) ->
+    List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
+
+and sexp_of_term t = List [ sexp_of_term_desc t.desc; Atom ":"; Stlc.sexp_of_ty t.ty ]
+
+type top_desc =
+  | Define of string * term
+  | Extern of string
+[@@deriving sexp_of]
+
+type top =
+  { desc : top_desc
+  ; ty : ty
+  ; loc : Lexer.loc
+  }
+
+let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; Stlc.sexp_of_ty t.ty ]
+
+type t = Program of top list [@@deriving sexp_of]
+
+let rec update (map : ty String.Map.t) (t : Stlc.term)
+  : (ty String.Map.t * term) Or_error.t
+  =
   let open Or_error.Let_syntax in
+  let make ?(map = map) term ty = Ok (map, ({ desc = term; ty; loc = t.loc } : term)) in
+  let error_s sexp =
+    let sexps =
+      match sexp with
+      | Atom sexp -> [ Atom sexp ]
+      | List sexps -> sexps
+    in
+    let tag =
+      [ Atom "typecheck:" ] @ sexps @ [ List [ Atom "loc"; Lexer.sexp_of_loc t.loc ] ]
+    in
+    error_s (List tag)
+  in
   match t.desc with
   | Var v ->
     (match Map.find map v with
-     | Some ty -> Ok (map, ty)
+     | Some ty -> make (Var v) ty
      | None ->
-       error_s
-         [%message
-           "typecheck: var not found in type map"
-             (v : string)
-             (map : ty String.Map.t)
-             (t.loc : Lexer.loc)])
-  | Float _ -> Ok (map, TyFloat)
-  | Int _ -> Ok (map, TyInt)
-  | Bool _ -> Ok (map, TyBool)
+       error_s [%message "var not found in type map" (v : string) (map : ty String.Map.t)])
+  | Float f -> make (Float f) TyFloat
+  | Int i -> make (Int i) TyInt
+  | Bool b -> make (Bool b) TyBool
   | Vec (n, ts) ->
-    let%bind map, tys =
+    let%bind map, terms =
       List.fold_result ts ~init:(map, []) ~f:(fun (map, acc) t_elem ->
-        let%bind map, ty = update map t_elem in
-        match ty with
-        | TyFloat -> Ok (map, ty :: acc)
-        | _ ->
-          error_s
-            [%message
-              "typecheck: vec expected all floats" (ts : term list) (t.loc : Lexer.loc)])
+        let%bind map, term = update map t_elem in
+        match term.ty with
+        | TyFloat -> Ok (map, term :: acc)
+        | _ -> error_s [%message "vec expected all floats" (ts : Stlc.term list)])
     in
-    let size = List.length tys in
+    let size = List.length terms in
     if size = n
-    then Ok (map, TyVec n)
-    else
-      error_s
-        [%message
-          "typecheck: vec size mismatch" (n : int) (size : int) (t.loc : Lexer.loc)]
-  | Mat (x, y, ts) ->
-    let%bind map, tys =
+    then make ~map (Vec (n, List.rev terms)) (TyVec n)
+    else error_s [%message "vec size mismatch" (n : int) (size : int)]
+  | Mat (n, m, ts) ->
+    let%bind map, terms =
       List.fold_result ts ~init:(map, []) ~f:(fun (map, acc) t_elem ->
-        let%bind map, ty = update map t_elem in
-        match ty with
-        | TyFloat -> Ok (map, ty :: acc)
-        | _ ->
-          error_s
-            [%message
-              "typecheck: mat expected all floats" (ts : term list) (t.loc : Lexer.loc)])
+        let%bind map, term = update map t_elem in
+        match term.ty with
+        | TyFloat -> Ok (map, term :: acc)
+        | _ -> error_s [%message "mat expected all floats" (ts : Stlc.term list)])
     in
-    let size = List.length tys in
-    if size = x * y
-    then Ok (map, TyMat (x, y))
-    else
-      error_s
-        [%message
-          "typecheck: mat size mismatch"
-            (x : int)
-            (y : int)
-            (size : int)
-            (t.loc : Lexer.loc)]
+    let size = List.length terms in
+    if size = n * m
+    then make ~map (Mat (n, m, List.rev terms)) (TyMat (n, m))
+    else error_s [%message "mat size mismatch" (n : int) (m : int) (size : int)]
   | Lam (v, ty_v, body) ->
     let map = Map.set map ~key:v ~data:ty_v in
-    let%bind map, ty_t = update map body in
-    Ok (map, TyArrow (ty_v, ty_t))
+    let%bind map, t = update map body in
+    make ~map (Lam (v, ty_v, t)) (TyArrow (ty_v, t.ty))
   | App (f, x) ->
     (* Pure functions with all unique variable names, so passing maps
        like this should be fine to collect them *)
-    let%bind map, ty_f = update map f in
-    let%bind map, ty_x = update map x in
-    (match ty_f with
-     | TyArrow (l, r) when equal_ty ty_x l -> Ok (map, r)
-     | _ ->
-       error_s
-         [%message "typecheck: invalid app" (ty_f : ty) (ty_x : ty) (t.loc : Lexer.loc)])
+    let%bind map, f = update map f in
+    let%bind map, x = update map x in
+    (match f.ty with
+     | TyArrow (l, r) when equal_ty x.ty l -> make ~map (App (f, x)) r
+     | _ -> error_s [%message "invalid app" (f.ty : ty) (x.ty : ty)])
   | Let (v, bind, body) ->
-    let%bind map, ty_v = update map bind in
-    let map = Map.set map ~key:v ~data:ty_v in
-    update map body
-  | If (c, t_true, e) ->
+    let%bind map, bind = update map bind in
+    let map = Map.set map ~key:v ~data:bind.ty in
+    let%bind map, body = update map body in
+    make ~map (Let (v, bind, body)) body.ty
+  | If (c, t, e) ->
     (* Pure functions with all unique variable names, so passing maps
        like this should be fine to collect them *)
-    let%bind map, ty_c = update map c in
-    let%bind map, ty_t = update map t_true in
-    let%bind map, ty_e = update map e in
-    if not (equal_ty ty_c TyBool)
-    then
-      error_s [%message "typecheck: if cond is not bool" (ty_c : ty) (t.loc : Lexer.loc)]
-    else if not (equal_ty ty_t ty_e)
-    then
-      error_s
-        [%message
-          "typecheck: if/else differs" (ty_t : ty) (ty_e : ty) (t.loc : Lexer.loc)]
-    else Ok (map, ty_t)
+    let%bind map, c = update map c in
+    let%bind map, t = update map t in
+    let%bind map, e = update map e in
+    if not (equal_ty c.ty TyBool)
+    then error_s [%message "if cond is not bool" (c.ty : ty)]
+    else if not (equal_ty t.ty e.ty)
+    then error_s [%message "if/else differs" (t.ty : ty) (e.ty : ty)]
+    else make ~map (If (c, t, e)) t.ty
   | Bop (op, l, r) ->
     (* Pure functions with all unique variable names, so passing maps
        like this should be fine to collect them *)
-    let%bind map, ty_l = update map l in
-    let%bind map, ty_r = update map r in
-    (match op, ty_l, ty_r with
-     | (Add | Sub | Mul | Div | Mod), TyFloat, TyFloat -> Ok (map, TyFloat)
-     | (Add | Sub | Mul | Div | Mod), TyInt, TyInt -> Ok (map, TyInt)
-     | (Add | Sub | Mul | Div | Mod), TyVec n, TyVec n' when n = n' -> Ok (map, TyVec n)
-     | (Mul | Div), TyVec n, TyFloat | (Mul | Div), TyFloat, TyVec n -> Ok (map, TyVec n)
+    let%bind map, l = update map l in
+    let%bind map, r = update map r in
+    let make ty = make ~map (Bop (op, l, r)) ty in
+    (match op, l.ty, r.ty with
+     | (Add | Sub | Mul | Div | Mod), TyFloat, TyFloat -> make TyFloat
+     | (Add | Sub | Mul | Div | Mod), TyInt, TyInt -> make TyInt
+     | (Add | Sub | Mul | Div | Mod), TyVec n, TyVec n' when n = n' -> make (TyVec n)
+     | (Mul | Div), TyVec n, TyFloat | (Mul | Div), TyFloat, TyVec n -> make (TyVec n)
      | (Add | Sub | Mul | Div | Mod), TyMat (x, y), TyMat (x', y') when x = x' && y = y'
-       -> Ok (map, TyMat (x, y))
+       -> make (TyMat (x, y))
      | (Mul | Div), TyMat (x, y), TyFloat | (Mul | Div), TyFloat, TyMat (x, y) ->
-       Ok (map, TyMat (x, y))
-     | (Mul | Div), TyMat (x, y), TyVec n when y = n -> Ok (map, TyVec x)
+       make (TyMat (x, y))
+     | (Mul | Div), TyMat (x, y), TyVec n when y = n -> make (TyVec x)
      | (Add | Sub | Mul | Div | Mod), _, _ ->
-       error_s
-         [%message
-           "typecheck: bop expected int/float" (ty_l : ty) (ty_r : ty) (t.loc : Lexer.loc)]
+       error_s [%message "bop expected int/float" (l.ty : ty) (r.ty : ty)]
      | Eq, TyFloat, TyFloat
      | Eq, TyInt, TyInt
      | Eq, TyBool, TyBool
      | Eq, TyVec _, TyVec _
      | Eq, TyMat _, TyMat _
-     | Eq, _, _ ->
-       error_s
-         [%message "typecheck: unsupport eq" (ty_l : ty) (ty_r : ty) (t.loc : Lexer.loc)]
+     | Eq, _, _ -> error_s [%message "unsupport eq" (l.ty : ty) (r.ty : ty)]
      | (Lt | Gt | Leq | Geq), TyFloat, TyFloat | (Lt | Gt | Leq | Geq), TyInt, TyInt ->
-       Ok (map, TyBool)
+       make TyBool
      | (Lt | Gt | Leq | Geq), _, _ ->
-       error_s
-         [%message
-           "typecheck: bop expected int/float" (ty_l : ty) (ty_r : ty) (t.loc : Lexer.loc)]
-     | (And | Or), TyBool, TyBool -> Ok (map, TyBool)
+       error_s [%message "bop expected int/float" (l.ty : ty) (r.ty : ty)]
+     | (And | Or), TyBool, TyBool -> make TyBool
      | (And | Or), _, _ ->
-       error_s
-         [%message
-           "typecheck: and/or expected bools" (ty_l : ty) (ty_r : ty) (t.loc : Lexer.loc)])
-  | Index (t_sub, i) ->
-    let%bind map, ty = update map t_sub in
-    (match ty with
+       error_s [%message "and/or expected bools" (l.ty : ty) (r.ty : ty)])
+  | Index (t, i) ->
+    let%bind map, t = update map t in
+    let make = make ~map (Index (t, i)) in
+    (match t.ty with
      | TyVec n ->
        if 0 <= i && i < n
-       then Ok (map, TyFloat)
-       else
-         error_s
-           [%message
-             "typecheck: vec index out of bounds" (n : int) (i : int) (t.loc : Lexer.loc)]
+       then make TyFloat
+       else error_s [%message "vec index out of bounds" (n : int) (i : int)]
      | TyMat (x, y) ->
        if 0 <= i && i < x
-       then Ok (map, TyVec y)
-       else
-         error_s
-           [%message
-             "typecheck: mat index out of bounds" (x : int) (i : int) (t.loc : Lexer.loc)]
-     | _ ->
-       error_s [%message "typecheck: expected vec or mat" (ty : ty) (t.loc : Lexer.loc)])
+       then make (TyVec y)
+       else error_s [%message "mat index out of bounds" (x : int) (i : int)]
+     | ty -> error_s [%message "expected vec or mat" (ty : ty)])
   | Builtin (name, args) ->
-    let%bind map, tys =
+    let%bind map, args =
       List.fold_result args ~init:(map, []) ~f:(fun (map, acc) t_arg ->
-        let%bind map, ty = update map t_arg in
-        Ok (map, ty :: acc))
+        let%bind map, term = update map t_arg in
+        Ok (map, term :: acc))
     in
-    let tys = List.rev tys in
+    let args = List.rev args in
+    let tys = List.map ~f:(fun arg -> arg.ty) args in
+    let make = make ~map (Builtin (name, args)) in
     let check_unary_math () =
       match tys with
-      | [ TyFloat ] -> Ok (map, TyFloat)
-      | [ TyVec n ] -> Ok (map, TyVec n)
+      | [ TyFloat ] -> make TyFloat
+      | [ TyVec n ] -> make (TyVec n)
       | _ ->
-        error_s
-          [%message
-            "typecheck: expected float or vec"
-              (name : Glsl.builtin)
-              (tys : ty list)
-              (t.loc : Lexer.loc)]
+        error_s [%message "expected float or vec" (name : Glsl.builtin) (tys : ty list)]
     in
     let check_binary_math () =
       match tys with
-      | [ TyFloat; TyFloat ] -> Ok (map, TyFloat)
-      | [ TyVec n; TyVec n' ] when n = n' -> Ok (map, TyVec n)
-      | [ TyVec n; TyFloat ] | [ TyFloat; TyVec n ] -> Ok (map, TyVec n)
+      | [ TyFloat; TyFloat ] -> make TyFloat
+      | [ TyVec n; TyVec n' ] when n = n' -> make (TyVec n)
+      | [ TyVec n; TyFloat ] | [ TyFloat; TyVec n ] -> make (TyVec n)
       | _ ->
-        error_s
-          [%message
-            "typecheck: expected floats or vecs"
-              (name : Glsl.builtin)
-              (tys : ty list)
-              (t.loc : Lexer.loc)]
+        error_s [%message "expected floats or vecs" (name : Glsl.builtin) (tys : ty list)]
     in
     let check_geometric () =
       match name, tys with
-      | Length, [ TyVec _ ] | Length, [ TyFloat ] -> Ok (map, TyFloat)
-      | Distance, [ TyVec n; TyVec n' ] when n = n' -> Ok (map, TyFloat)
-      | Distance, [ TyFloat; TyFloat ] -> Ok (map, TyFloat)
-      | Dot, [ TyVec n; TyVec n' ] when n = n' -> Ok (map, TyFloat)
-      | Dot, [ TyFloat; TyFloat ] -> Ok (map, TyFloat)
-      | Cross, [ TyVec 3; TyVec 3 ] -> Ok (map, TyVec 3)
-      | Normalize, [ TyVec n ] -> Ok (map, TyVec n)
-      | Normalize, [ TyFloat ] -> Ok (map, TyFloat)
+      | Length, [ TyVec _ ] | Length, [ TyFloat ] -> make TyFloat
+      | Distance, [ TyVec n; TyVec n' ] when n = n' -> make TyFloat
+      | Distance, [ TyFloat; TyFloat ] -> make TyFloat
+      | Dot, [ TyVec n; TyVec n' ] when n = n' -> make TyFloat
+      | Dot, [ TyFloat; TyFloat ] -> make TyFloat
+      | Cross, [ TyVec 3; TyVec 3 ] -> make (TyVec 3)
+      | Normalize, [ TyVec n ] -> make (TyVec n)
+      | Normalize, [ TyFloat ] -> make TyFloat
       | _ ->
-        error_s
-          [%message
-            "typecheck: invalid geometric call"
-              (name : Glsl.builtin)
-              (tys : ty list)
-              (t.loc : Lexer.loc)]
+        error_s [%message "invalid geometric call" (name : Glsl.builtin) (tys : ty list)]
     in
     let check_common () =
       match name, tys with
       | (Abs | Sign | Floor | Ceil), _ -> check_unary_math ()
       | (Min | Max), _ -> check_binary_math ()
-      | Clamp, [ TyFloat; TyFloat; TyFloat ] -> Ok (map, TyFloat)
-      | Clamp, [ TyVec n; TyFloat; TyFloat ] -> Ok (map, TyVec n)
-      | Clamp, [ TyVec n; TyVec n'; TyVec n'' ] when n = n' && n' = n'' ->
-        Ok (map, TyVec n)
-      | Mix, [ TyFloat; TyFloat; TyFloat ] -> Ok (map, TyFloat)
-      | Mix, [ TyVec n; TyVec n'; TyFloat ] when n = n' -> Ok (map, TyVec n)
-      | Mix, [ TyVec n; TyVec n'; TyVec n'' ] when n = n' && n' = n'' -> Ok (map, TyVec n)
+      | Clamp, [ TyFloat; TyFloat; TyFloat ] -> make TyFloat
+      | Clamp, [ TyVec n; TyFloat; TyFloat ] -> make (TyVec n)
+      | Clamp, [ TyVec n; TyVec n'; TyVec n'' ] when n = n' && n' = n'' -> make (TyVec n)
+      | Mix, [ TyFloat; TyFloat; TyFloat ] -> make TyFloat
+      | Mix, [ TyVec n; TyVec n'; TyFloat ] when n = n' -> make (TyVec n)
+      | Mix, [ TyVec n; TyVec n'; TyVec n'' ] when n = n' && n' = n'' -> make (TyVec n)
       | _ ->
-        error_s
-          [%message
-            "typecheck: invalid common call"
-              (name : Glsl.builtin)
-              (tys : ty list)
-              (t.loc : Lexer.loc)]
+        error_s [%message "invalid common call" (name : Glsl.builtin) (tys : ty list)]
     in
     (match name with
      | Sin | Cos | Tan | Asin | Acos | Atan | Exp | Log | Exp2 | Log2 | Sqrt ->
@@ -228,16 +244,16 @@ let rec update (map : ty String.Map.t) (t : term) : (ty String.Map.t * ty) Or_er
 
 let typecheck (Program terms : Stlc.t) : t Or_error.t =
   let open Or_error.Let_syntax in
-  let%map map, _ =
-    List.fold_result terms ~init:(String.Map.empty, []) ~f:(fun (map, acc) t ->
-      match t.desc with
+  let%map _, tops =
+    List.fold_result terms ~init:(String.Map.empty, []) ~f:(fun (map, acc) top ->
+      match top.desc with
       | Define (v, bind) ->
-        let%bind map, ty = update map bind in
-        let map = Map.set map ~key:v ~data:ty in
-        Ok (map, Define (v, bind) :: acc)
+        let%bind map, t = update map bind in
+        let map = Map.set map ~key:v ~data:t.ty in
+        Ok (map, { desc = Define (v, t); ty = t.ty; loc = top.loc } :: acc)
       | Extern (ty, v) ->
         let map = Map.set map ~key:v ~data:ty in
-        Ok (map, Extern (ty, v) :: acc))
+        Ok (map, { desc = Extern v; ty; loc = top.loc } :: acc))
   in
-  Program (map, terms)
+  Program (List.rev tops)
 ;;

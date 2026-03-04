@@ -1,5 +1,3 @@
-open Core
-
 type atom =
   | Var of string
   | Float of float
@@ -21,6 +19,7 @@ type term_desc =
 
 and term =
   { desc : term_desc
+  ; ty : Stlc.ty
   ; loc : Lexer.loc
   }
 [@@deriving sexp_of]
@@ -32,22 +31,24 @@ and anf_desc =
 
 and anf =
   { desc : anf_desc
+  ; ty : Stlc.ty
   ; loc : Lexer.loc
   }
 [@@deriving sexp_of]
 
 type top_desc =
   | Define of string * anf
-  | Extern of Stlc.ty * string
+  | Extern of string
 [@@deriving sexp_of]
 
 type top =
   { desc : top_desc
+  ; ty : Stlc.ty
   ; loc : Lexer.loc
   }
 [@@deriving sexp_of]
 
-type t = Program of Stlc.ty String.Map.t * top list [@@deriving sexp_of]
+type t = Program of top list [@@deriving sexp_of]
 
 (** Converts [t] to A-normal form, updating the [type map] to account for
     the new created variables. Variables are named in the form [anf_num]. *)

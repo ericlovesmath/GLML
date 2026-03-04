@@ -1,5 +1,3 @@
-open Core
-
 type term_desc =
   | Var of string
   | Float of float
@@ -18,21 +16,23 @@ type term_desc =
 
 and term =
   { desc : term_desc
+  ; ty : Stlc.ty
   ; loc : Lexer.loc
   }
 [@@deriving sexp_of]
 
 type top_desc =
   | Define of string * term
-  | Extern of Stlc.ty * string
+  | Extern of string
 [@@deriving sexp_of]
 
 type top =
   { desc : top_desc
+  ; ty : Stlc.ty
   ; loc : Lexer.loc
   }
 [@@deriving sexp_of]
 
-type t = Program of Stlc.ty String.Map.t * top list [@@deriving sexp_of]
+type t = Program of top list [@@deriving sexp_of]
 
 val uncurry : Typecheck.t -> t

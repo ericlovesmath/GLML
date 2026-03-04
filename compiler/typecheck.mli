@@ -1,7 +1,43 @@
 open Core
+open Stlc
 
-type t = Program of Stlc.ty String.Map.t * Stlc.top list [@@deriving sexp_of]
+type term_desc =
+  | Var of string
+  | Float of float
+  | Int of int
+  | Bool of bool
+  (* TODO: Vec, Math, Lam all don't need to store the size/ty now *)
+  | Vec of int * term list
+  | Mat of int * int * term list
+  | Lam of string * ty * term
+  | App of term * term
+  | Let of string * term * term
+  | If of term * term * term
+  | Bop of Glsl.binary_op * term * term
+  | Index of term * int
+  | Builtin of Glsl.builtin * term list
+[@@deriving sexp_of]
 
-(** Creates type map for all variables in [Stlc.t],
-    returns [Error _] if types are not sound *)
+and term =
+  { desc : term_desc
+  ; ty : ty
+  ; loc : Lexer.loc
+  }
+[@@deriving sexp_of]
+
+type top_desc =
+  | Define of string * term
+  | Extern of string
+[@@deriving sexp_of]
+
+type top =
+  { desc : top_desc
+  ; ty : ty
+  ; loc : Lexer.loc
+  }
+[@@deriving sexp_of]
+
+type t = Program of top list [@@deriving sexp_of]
+
+(** Returns a Typed AST, returns [Error _] if types are not sound *)
 val typecheck : Stlc.t -> t Or_error.t

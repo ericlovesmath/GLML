@@ -55,55 +55,42 @@ let placeholder_value_for_ty (ty : ty) : term =
   | TyVoid -> failwith "translate: void is unsupported"
 ;;
 
-let rec translate_set (map : Stlc.ty String.Map.t) (var : string) (anf : Anf.anf)
-  : stmt list
-  =
+let rec translate_set (var : string) (anf : Anf.anf) : stmt list =
   match anf.desc with
   | Let (v, bind, body) ->
-    let ty = to_glsl_ty (Map.find_exn map v) in
-    let stmt = Decl (None, ty, v, to_glsl_term bind) in
-    stmt :: translate_set map var body
+    Decl (None, to_glsl_ty anf.ty, v, to_glsl_term bind) :: translate_set var body
   | Return t ->
     (match t.desc with
      | If (c, t, e) ->
        [ IfStmt
            ( to_glsl_atom c
-           , Block (translate_set map var t)
-           , Some (Block (translate_set map var e)) )
+           , Block (translate_set var t)
+           , Some (Block (translate_set var e)) )
        ]
      | _ -> [ Set (Var var, to_glsl_term t) ])
 ;;
 
-let rec translate_block (map : Stlc.ty String.Map.t) (anf : Anf.anf) : stmt list =
+let rec translate_block (anf : Anf.anf) : stmt list =
   match anf.desc with
   | Let (v, term, body) ->
+    let ty = to_glsl_ty term.ty in
     (match term.desc with
      | If (c, t, e) ->
-       let ty = to_glsl_ty (Map.find_exn map v) in
-       let decl = Decl (None, ty, v, placeholder_value_for_ty ty) in
-       let if_stmt =
-         IfStmt
-           ( to_glsl_atom c
-           , Block (translate_set map v t)
-           , Some (Block (translate_set map v e)) )
-       in
-       decl :: if_stmt :: translate_block map body
-     | _ ->
-       let ty = to_glsl_ty (Map.find_exn map v) in
-       let stmt = Decl (None, ty, v, to_glsl_term term) in
-       stmt :: translate_block map body)
+       Decl (None, ty, v, placeholder_value_for_ty ty)
+       :: IfStmt
+            (to_glsl_atom c, Block (translate_set v t), Some (Block (translate_set v e)))
+       :: translate_block body
+     | _ -> Decl (None, ty, v, to_glsl_term term) :: translate_block body)
   | Return t ->
     (match t.desc with
      | If (c, t, e) ->
        [ IfStmt
-           ( to_glsl_atom c
-           , Block (translate_block map t)
-           , Some (Block (translate_block map e)) )
+           (to_glsl_atom c, Block (translate_block t), Some (Block (translate_block e)))
        ]
      | _ -> [ Return (Some (to_glsl_term t)) ])
 ;;
 
-let translate (Program (map, tops) : Anf.t) : t =
+let translate (Program tops : Anf.t) : t =
   let globals =
     List.map tops ~f:(fun (top : Anf.top) ->
       match top.desc with
@@ -113,16 +100,16 @@ let translate (Program (map, tops) : Anf.t) : t =
             | Stlc.TyArrow (_, r) -> unroll r
             | ty -> ty
           in
-          to_glsl_ty (unroll (Map.find_exn map name))
+          to_glsl_ty (unroll top.ty)
         in
         let params = List.map args ~f:(fun (arg, arg_ty) -> to_glsl_ty arg_ty, arg) in
-        let body = translate_block map body in
+        let body = translate_block body in
         Function { name; desc = None; params; ret_type; body }
       | Define (_, { desc = Return _; _ }) ->
         raise_s [%message "translate: expected lam form at toplevel" (top : Anf.top)]
       | Define (_, { desc = Let _; _ }) ->
         raise_s [%message "translate: expected return toplevel" (top : Anf.top)]
-      | Extern (ty, v) -> Global (Uniform, to_glsl_ty ty, v))
+      | Extern v -> Global (Uniform, to_glsl_ty top.ty, v))
   in
   Program globals
 ;;
