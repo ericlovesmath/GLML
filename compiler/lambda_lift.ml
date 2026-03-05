@@ -80,32 +80,36 @@ type t = Program of top list
 
 let sexp_of_t (Program tops) = List (Atom "Program" :: List.map tops ~f:sexp_of_top)
 
-let free_vars (lift_env : (string * string list) String.Map.t) (t : Uncurry.term)
-  : String.Set.t
-  =
+(** Map of lifted function names to function arguments *)
+type env = (string * (string * Stlc.ty) list) String.Map.t
+
+let free_vars (env : env) (t : Uncurry.term) : Stlc.ty String.Map.t =
   let rec fv (t : Uncurry.term) =
-    let open String.Set in
+    let union m1 m2 =
+      Map.merge m1 m2 ~f:(fun ~key:_ -> function
+        | `Left v | `Right v | `Both (v, _) -> Some v)
+    in
+    let union_list ms = List.fold ms ~init:String.Map.empty ~f:union in
     match t.desc with
     | Var v ->
-      (match Map.find lift_env v with
-       | Some (_, captured) -> of_list captured
-       | None -> singleton v)
-    | Float _ | Int _ | Bool _ -> empty
+      (match Map.find env v with
+       | Some (_, captured) -> String.Map.of_alist_exn captured
+       | None -> String.Map.singleton v t.ty)
+    | Float _ | Int _ | Bool _ -> String.Map.empty
     | Vec (_, ts) | Builtin (_, ts) -> union_list (List.map ts ~f:fv)
     | Mat (_, _, ts) -> union_list (List.map ts ~f:fv)
     | Lam (args, body) ->
-      let args_set = of_list (List.map args ~f:fst) in
-      Set.diff (fv body) args_set
+      List.fold args ~init:(fv body) ~f:(fun acc (arg, _) -> Map.remove acc arg)
     | App (fn, args) -> union_list (fv fn :: List.map args ~f:fv)
-    | Let (v, bind, body) -> Set.union (fv bind) (Set.remove (fv body) v)
+    | Let (v, bind, body) -> union (fv bind) (Map.remove (fv body) v)
     | If (c, t_true, e) -> union_list [ fv c; fv t_true; fv e ]
-    | Bop (_, l, r) -> Set.union (fv l) (fv r)
+    | Bop (_, l, r) -> union (fv l) (fv r)
     | Index (t_sub, _) -> fv t_sub
   in
   fv t
 ;;
 
-let lift (Uncurry.Program tops) =
+let lift (Program tops : Uncurry.t) : t Or_error.t =
   let open Or_error.Let_syntax in
   let globals =
     List.fold tops ~init:String.Set.empty ~f:(fun acc (top : Uncurry.top) ->
@@ -113,11 +117,11 @@ let lift (Uncurry.Program tops) =
       | Define (n, _) -> Set.add acc n
       | Extern n -> Set.add acc n)
   in
-  let rec lift_term type_env lift_env (t : Uncurry.term) : (term * top list) Or_error.t =
+  let rec lift_term (env : env) (t : Uncurry.term) : (term * top list) Or_error.t =
     let make term fvs = return (({ desc = term; ty = t.ty; loc = t.loc } : term), fvs) in
     match t.desc with
     | Var v ->
-      (match Map.find lift_env v with
+      (match Map.find env v with
        | None -> make (Var v) []
        | Some _ ->
          Or_error.error_s
@@ -129,59 +133,46 @@ let lift (Uncurry.Program tops) =
     | Int i -> make (Int i) []
     | Bool b -> make (Bool b) []
     | Vec (n, ts) ->
-      let%bind ts_res = ts |> List.map ~f:(lift_term type_env lift_env) |> Or_error.all in
+      let%bind ts_res = Or_error.all (List.map ~f:(lift_term env) ts) in
       let ts, tops_list = List.unzip ts_res in
       make (Vec (n, ts)) (List.concat tops_list)
     | Mat (x, y, ts) ->
-      let%bind ts_res = ts |> List.map ~f:(lift_term type_env lift_env) |> Or_error.all in
+      let%bind ts_res = Or_error.all (List.map ~f:(lift_term env) ts) in
       let ts, tops_list = List.unzip ts_res in
       make (Mat (x, y, ts)) (List.concat tops_list)
-    | App ({ desc = Var v; _ }, args) ->
-      let%bind args_res =
-        args |> List.map ~f:(lift_term type_env lift_env) |> Or_error.all
-      in
+    | App ({ desc = Var v; ty = fn_ty; loc = fn_loc }, args) ->
+      let%bind args_res = Or_error.all (List.map ~f:(lift_term env) args) in
       let args, args_tops = List.unzip args_res in
       let args_tops = List.concat args_tops in
-      (match Map.find lift_env v with
+      (match Map.find env v with
        | Some (lifted_name, free_vars) ->
          let fv_args =
-           List.map free_vars ~f:(fun fv ->
-             let fv_ty = Map.find_exn type_env fv in
+           List.map free_vars ~f:(fun (fv, fv_ty) ->
              ({ desc = Var fv; ty = fv_ty; loc = t.loc } : term))
          in
-         let fn_ty = Stlc.TyArrow (Stlc.TyInt, t.ty) in
-         make
-           (App ({ desc = Var lifted_name; ty = fn_ty; loc = t.loc }, fv_args @ args))
-           args_tops
+         let lifted_fun : term = { desc = Var lifted_name; ty = fn_ty; loc = fn_loc } in
+         make (App (lifted_fun, fv_args @ args)) args_tops
        | None ->
          let%bind fn, fn_tops =
-           lift_term
-             type_env
-             lift_env
-             { desc = Var v; ty = Stlc.TyArrow (Stlc.TyInt, t.ty); loc = t.loc }
+           lift_term env { desc = Var v; ty = fn_ty; loc = fn_loc }
          in
          make (App (fn, args)) (fn_tops @ args_tops))
     | App (fn, args) ->
-      let%bind fn, fn_tops = lift_term type_env lift_env fn in
-      let%bind args_res =
-        args |> List.map ~f:(lift_term type_env lift_env) |> Or_error.all
-      in
+      let%bind fn, fn_tops = lift_term env fn in
+      let%bind args_res = Or_error.all (List.map ~f:(lift_term env) args) in
       let args, args_tops = List.unzip args_res in
       make (App (fn, args)) (fn_tops @ List.concat args_tops)
     | Let (v, { desc = Lam (args, body); ty = lam_ty; loc = lam_loc }, in_term) ->
-      let fvs = free_vars lift_env body in
-      let fvs = Set.diff fvs (String.Set.of_list (List.map args ~f:fst)) in
-      let fvs = Set.diff fvs globals in
-      let fvs_list = Set.to_list fvs in
-      let fvs_args = List.map fvs_list ~f:(fun fv -> fv, Map.find_exn type_env fv) in
+      let fvs_map = free_vars env body in
+      let fvs_map =
+        List.fold args ~init:fvs_map ~f:(fun acc (arg, _) -> Map.remove acc arg)
+      in
+      let fvs_map = Set.fold globals ~init:fvs_map ~f:Map.remove in
+      let fvs_args = Map.to_alist fvs_map in
       let new_args = fvs_args @ args in
       let lifted_name = Utils.fresh v in
-      let lift_env_body = Map.set lift_env ~key:v ~data:(lifted_name, fvs_list) in
-      let type_env_body =
-        List.fold args ~init:type_env ~f:(fun acc (arg_name, arg_ty) ->
-          Map.set acc ~key:arg_name ~data:arg_ty)
-      in
-      let%bind lifted_body, body_tops = lift_term type_env_body lift_env_body body in
+      let lift_env_body = Map.set env ~key:v ~data:(lifted_name, fvs_args) in
+      let%bind lifted_body, body_tops = lift_term lift_env_body body in
       let ret_ty =
         let rec unroll = function
           | Stlc.TyArrow (_, r) -> unroll r
@@ -196,27 +187,26 @@ let lift (Uncurry.Program tops) =
         ; loc = lam_loc
         }
       in
-      let%map in_term, in_tops = lift_term type_env lift_env_body in_term in
-      in_term, body_tops @ [ new_top ] @ in_tops
+      let%bind in_term, in_tops = lift_term lift_env_body in_term in
+      return (in_term, body_tops @ [ new_top ] @ in_tops)
     | Let (v, bind, body) ->
-      let%bind bind, bind_tops = lift_term type_env lift_env bind in
-      let type_env_body = Map.set type_env ~key:v ~data:bind.ty in
-      let%bind body, body_tops = lift_term type_env_body lift_env body in
+      let%bind bind, bind_tops = lift_term env bind in
+      let%bind body, body_tops = lift_term env body in
       make (Let (v, bind, body)) (bind_tops @ body_tops)
-    | If (c, t_true, e) ->
-      let%bind c, c_tops = lift_term type_env lift_env c in
-      let%bind t_true, t_tops = lift_term type_env lift_env t_true in
-      let%bind e, e_tops = lift_term type_env lift_env e in
-      make (If (c, t_true, e)) (c_tops @ t_tops @ e_tops)
+    | If (c, t, e) ->
+      let%bind c, c_tops = lift_term env c in
+      let%bind t, t_tops = lift_term env t in
+      let%bind e, e_tops = lift_term env e in
+      make (If (c, t, e)) (c_tops @ t_tops @ e_tops)
     | Bop (op, l, r) ->
-      let%bind l, l_tops = lift_term type_env lift_env l in
-      let%bind r, r_tops = lift_term type_env lift_env r in
+      let%bind l, l_tops = lift_term env l in
+      let%bind r, r_tops = lift_term env r in
       make (Bop (op, l, r)) (l_tops @ r_tops)
-    | Index (t_sub, i) ->
-      let%bind t_sub, t_tops = lift_term type_env lift_env t_sub in
-      make (Index (t_sub, i)) t_tops
+    | Index (t, i) ->
+      let%bind t, t_tops = lift_term env t in
+      make (Index (t, i)) t_tops
     | Builtin (b, ts) ->
-      let%bind ts_res = ts |> List.map ~f:(lift_term type_env lift_env) |> Or_error.all in
+      let%bind ts_res = Or_error.all (List.map ~f:(lift_term env) ts) in
       let ts, tops_list = List.unzip ts_res in
       make (Builtin (b, ts)) (List.concat tops_list)
     | Lam (_, _) ->
@@ -225,15 +215,13 @@ let lift (Uncurry.Program tops) =
           "First-class anonymous functions are not supported by the GLSL backend"
             (t.loc : Lexer.loc)]
   in
-  let%bind processed_tops_lists =
+  let%bind top_blocks =
     tops
     |> List.map ~f:(fun (top : Uncurry.top) ->
       let make desc = { desc; ty = top.ty; loc = top.loc } in
       match top.desc with
       | Define (name, { desc = Lam (args, body); ty; loc = _ }) ->
-        let type_env = String.Map.of_alist_exn args in
-        let lift_env = String.Map.empty in
-        let%map body, body_tops = lift_term type_env lift_env body in
+        let%map body, body_tops = lift_term String.Map.empty body in
         let ret_ty =
           let rec unroll = function
             | Stlc.TyArrow (_, r) -> unroll r
@@ -243,12 +231,10 @@ let lift (Uncurry.Program tops) =
         in
         body_tops @ [ make (Define { name; args; body; ret_ty }) ]
       | Define (name, term) ->
-        let type_env = String.Map.empty in
-        let lift_env = String.Map.empty in
-        let%map term, term_tops = lift_term type_env lift_env term in
+        let%map term, term_tops = lift_term String.Map.empty term in
         term_tops @ [ make (Const (name, term)) ]
       | Extern v -> return [ make (Extern v) ])
     |> Or_error.all
   in
-  return (Program (List.concat processed_tops_lists))
+  return (Program (List.concat top_blocks))
 ;;
