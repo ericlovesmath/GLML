@@ -306,10 +306,7 @@ let%expect_test "lambda lifting" =
       f
     |};
   [%expect
-    {|
-    ("First-class functions are not supported by the GLSL backend" (v f_2)
-     (t.loc (4:7 - 4:8)))
-    |}];
+    {| ("first-class functions are not supported" (t.loc (4:7 - 4:8))) |}];
   test
     {|
     let apply_f (f : float -> float) (x : float) = f x
@@ -317,8 +314,5 @@ let%expect_test "lambda lifting" =
       < apply_f (fun (x : float) -> x + 1.0) 10.0, 0.0, 0.0 >
     |};
   [%expect
-    {|
-    ("First-class anonymous functions are not supported by the GLSL backend"
-     (t.loc (4:18 - 4:44)))
-    |}]
+    {| ("first-class anon functions are unsupported" (t.loc (4:18 - 4:44))) |}]
 ;;

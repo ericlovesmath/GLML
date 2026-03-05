@@ -1,5 +1,6 @@
 open Core
 open Sexplib.Sexp
+open Or_error.Let_syntax
 
 type term_desc =
   | Var of string
@@ -109,8 +110,109 @@ let free_vars (env : env) (t : Uncurry.term) : Stlc.ty String.Map.t =
   fv t
 ;;
 
+(** Gets last type in arrow type (return type of function) *)
+let unroll_arrow ty =
+  let rec go = function
+    | Stlc.TyArrow (_, r) -> go r
+    | ty -> ty
+  in
+  go ty
+;;
+
+let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
+  : (term * top list) Or_error.t
+  =
+  let lift = lift_term globals env in
+  let lift_list ts =
+    let%map pairs = Or_error.all (List.map ts ~f:lift) in
+    let terms, tops = List.unzip pairs in
+    terms, List.concat tops
+  in
+  let make term fvs = return (({ desc = term; ty = t.ty; loc = t.loc } : term), fvs) in
+  match t.desc with
+  | Var v ->
+    (match Map.find env v with
+     | None -> make (Var v) []
+     | Some _ ->
+       error_s [%message "first-class functions are not supported" (t.loc : Lexer.loc)])
+  | Float f -> make (Float f) []
+  | Int i -> make (Int i) []
+  | Bool b -> make (Bool b) []
+  | Vec (n, ts) ->
+    let%bind ts, tops = lift_list ts in
+    make (Vec (n, ts)) tops
+  | Mat (n, m, ts) ->
+    let%bind ts, tops = lift_list ts in
+    make (Mat (n, m, ts)) tops
+  | App (f, args) ->
+    let%bind args, args_tops = lift_list args in
+    (match f.desc with
+     | Var v ->
+       let var_name, extra =
+         match Map.find env v with
+         | Some (lifted_name, captured) ->
+           ( lifted_name
+           , List.map captured ~f:(fun (name, ty) ->
+               ({ desc = Var name; ty; loc = f.loc } : term)) )
+         | None -> v, []
+       in
+       let fn : term = { desc = Var var_name; ty = f.ty; loc = f.loc } in
+       make (App (fn, extra @ args)) args_tops
+     | _ ->
+       let%bind f, f_tops = lift f in
+       make (App (f, args)) (f_tops @ args_tops))
+  | Let (v, { desc = Lam (args, body); ty; loc }, bind) ->
+    (* NOTE: This is where the lambda lifting happens *)
+    let captured =
+      let excluded = Set.union globals (String.Set.of_list (v :: List.map args ~f:fst)) in
+      free_vars env body
+      |> Map.filter_keys ~f:(fun k -> not (Set.mem excluded k))
+      |> Map.to_alist
+    in
+    let name = Utils.fresh v in
+    let env = Map.set env ~key:v ~data:(name, captured) in
+    let%bind body, body_tops = lift_term globals env body in
+    let desc = Define { name; args = captured @ args; body; ret_ty = unroll_arrow ty } in
+    let lifted_fn : top = { desc; ty; loc } in
+    let%bind bind, bind_tops = lift_term globals env bind in
+    return (bind, body_tops @ [ lifted_fn ] @ bind_tops)
+  | Let (v, bind, body) ->
+    let%bind bind, bind_tops = lift bind in
+    let%bind body, body_tops = lift body in
+    make (Let (v, bind, body)) (bind_tops @ body_tops)
+  | If (c, t, e) ->
+    let%bind c, c_tops = lift c in
+    let%bind t, t_tops = lift t in
+    let%bind e, e_tops = lift e in
+    make (If (c, t, e)) (c_tops @ t_tops @ e_tops)
+  | Bop (op, l, r) ->
+    let%bind l, l_tops = lift l in
+    let%bind r, r_tops = lift r in
+    make (Bop (op, l, r)) (l_tops @ r_tops)
+  | Index (t, i) ->
+    let%bind t, t_tops = lift t in
+    make (Index (t, i)) t_tops
+  | Builtin (b, ts) ->
+    let%bind ts, tops = lift_list ts in
+    make (Builtin (b, ts)) tops
+  | Lam _ ->
+    error_s [%message "first-class anon functions are unsupported" (t.loc : Lexer.loc)]
+;;
+
+let lift_top (globals : String.Set.t) (top : Uncurry.top) : top list Or_error.t =
+  let make desc = { desc; ty = top.ty; loc = top.loc } in
+  let lift = lift_term globals String.Map.empty in
+  match top.desc with
+  | Define (name, { desc = Lam (args, body); ty; loc = _ }) ->
+    let%map body, body_tops = lift body in
+    body_tops @ [ make (Define { name; args; body; ret_ty = unroll_arrow ty }) ]
+  | Define (name, term) ->
+    let%map term, term_tops = lift term in
+    term_tops @ [ make (Const (name, term)) ]
+  | Extern v -> return [ make (Extern v) ]
+;;
+
 let lift (Program tops : Uncurry.t) : t Or_error.t =
-  let open Or_error.Let_syntax in
   let globals =
     tops
     |> List.map ~f:(fun top ->
@@ -119,114 +221,6 @@ let lift (Program tops : Uncurry.t) : t Or_error.t =
       | Extern v -> v)
     |> String.Set.of_list
   in
-  let unroll_arrow ty =
-    let rec go = function
-      | Stlc.TyArrow (_, r) -> go r
-      | ty -> ty
-    in
-    go ty
-  in
-  let rec lift_term (env : env) (t : Uncurry.term) : (term * top list) Or_error.t =
-    let make term fvs = return (({ desc = term; ty = t.ty; loc = t.loc } : term), fvs) in
-    match t.desc with
-    | Var v ->
-      (match Map.find env v with
-       | None -> make (Var v) []
-       | Some _ ->
-         error_s [%message "first-class functions are not supported" (t.loc : Lexer.loc)])
-    | Float f -> make (Float f) []
-    | Int i -> make (Int i) []
-    | Bool b -> make (Bool b) []
-    | Vec (n, ts) ->
-      let%bind ts_res = Or_error.all (List.map ~f:(lift_term env) ts) in
-      let ts, tops_list = List.unzip ts_res in
-      make (Vec (n, ts)) (List.concat tops_list)
-    | Mat (n, m, ts) ->
-      let%bind ts_res = Or_error.all (List.map ~f:(lift_term env) ts) in
-      let ts, tops_list = List.unzip ts_res in
-      make (Mat (n, m, ts)) (List.concat tops_list)
-    | App (f, args) ->
-      let%bind args_res = Or_error.all (List.map ~f:(lift_term env) args) in
-      let args, args_tops = List.unzip args_res in
-      let args_tops = List.concat args_tops in
-      (match f.desc with
-       | Var v ->
-         (match Map.find env v with
-          | Some (lifted_name, captured) ->
-            let captured_args =
-              List.map captured ~f:(fun (name, ty) ->
-                ({ desc = Var name; ty; loc = t.loc } : term))
-            in
-            let lifted_fn : term = { desc = Var lifted_name; ty = f.ty; loc = f.loc } in
-            make (App (lifted_fn, captured_args @ args)) args_tops
-          | None ->
-            let fn : term = { desc = Var v; ty = f.ty; loc = f.loc } in
-            make (App (fn, args)) args_tops)
-       | _ ->
-         let%bind f, f_tops = lift_term env f in
-         make (App (f, args)) (f_tops @ args_tops))
-    | Let (v, { desc = Lam (args, body); ty = lam_ty; loc = lam_loc }, in_term) ->
-      let captured =
-        let fvs = free_vars env body in
-        let fvs = List.fold args ~init:fvs ~f:(fun acc (arg, _) -> Map.remove acc arg) in
-        let fvs = Map.remove fvs v in
-        let fvs = Set.fold globals ~init:fvs ~f:Map.remove in
-        Map.to_alist fvs
-      in
-      let lifted_name = Utils.fresh v in
-      let env = Map.set env ~key:v ~data:(lifted_name, captured) in
-      let%bind lifted_body, body_tops = lift_term env body in
-      let lifted_fn : top =
-        { desc =
-            Define
-              { name = lifted_name
-              ; args = captured @ args
-              ; body = lifted_body
-              ; ret_ty = unroll_arrow lam_ty
-              }
-        ; ty = lam_ty
-        ; loc = lam_loc
-        }
-      in
-      let%bind in_term, in_tops = lift_term env in_term in
-      return (in_term, body_tops @ [ lifted_fn ] @ in_tops)
-    | Let (v, bind, body) ->
-      let%bind bind, bind_tops = lift_term env bind in
-      let%bind body, body_tops = lift_term env body in
-      make (Let (v, bind, body)) (bind_tops @ body_tops)
-    | If (c, t, e) ->
-      let%bind c, c_tops = lift_term env c in
-      let%bind t, t_tops = lift_term env t in
-      let%bind e, e_tops = lift_term env e in
-      make (If (c, t, e)) (c_tops @ t_tops @ e_tops)
-    | Bop (op, l, r) ->
-      let%bind l, l_tops = lift_term env l in
-      let%bind r, r_tops = lift_term env r in
-      make (Bop (op, l, r)) (l_tops @ r_tops)
-    | Index (t, i) ->
-      let%bind t, t_tops = lift_term env t in
-      make (Index (t, i)) t_tops
-    | Builtin (b, ts) ->
-      let%bind ts_res = Or_error.all (List.map ~f:(lift_term env) ts) in
-      let ts, top_blocks = List.unzip ts_res in
-      make (Builtin (b, ts)) (List.concat top_blocks)
-    | Lam _ ->
-      error_s [%message "first-class anon functions are unsupported" (t.loc : Lexer.loc)]
-  in
-  let%bind top_blocks =
-    tops
-    |> List.map ~f:(fun (top : Uncurry.top) ->
-      let make desc = { desc; ty = top.ty; loc = top.loc } in
-      match top.desc with
-      | Define (name, { desc = Lam (args, body); ty; loc = _ }) ->
-        let%map body, body_tops = lift_term String.Map.empty body in
-        let ret_ty = unroll_arrow ty in
-        body_tops @ [ make (Define { name; args; body; ret_ty }) ]
-      | Define (name, term) ->
-        let%map term, term_tops = lift_term String.Map.empty term in
-        term_tops @ [ make (Const (name, term)) ]
-      | Extern v -> return [ make (Extern v) ])
-    |> Or_error.all
-  in
+  let%bind top_blocks = Or_error.all (List.map tops ~f:(lift_top globals)) in
   return (Program (List.concat top_blocks))
 ;;
