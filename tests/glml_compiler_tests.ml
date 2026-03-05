@@ -284,12 +284,12 @@ let%expect_test "lambda lifting" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
+    float g_3_6(float x_1, float y_2) {
+        return (x_1 + y_2);
+    }
     vec3 f_4_5(float x_1) {
         float anf_7 = g_3_6(x_1, 1.);
         return vec3(anf_7, 0., 0.);
-    }
-    float g_3_6(float x_1, float y_2) {
-        return (x_1 + y_2);
     }
     vec3 main_pure(vec2 u_0) {
         return f_4_5(10.);
@@ -308,7 +308,7 @@ let%expect_test "lambda lifting" =
   [%expect
     {|
     ("First-class functions are not supported by the GLSL backend" (v f_2)
-     (loc (4:7 - 4:8)))
+     (t.loc (4:7 - 4:8)))
     |}];
   test
     {|
@@ -319,6 +319,6 @@ let%expect_test "lambda lifting" =
   [%expect
     {|
     ("First-class anonymous functions are not supported by the GLSL backend"
-     (loc (4:18 - 4:44)))
+     (t.loc (4:18 - 4:44)))
     |}]
 ;;
