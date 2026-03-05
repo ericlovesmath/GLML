@@ -14,7 +14,6 @@ type term_desc =
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list
   | If of atom * anf * anf
-  | Lam of (string * Stlc.ty) list * anf
 [@@deriving sexp_of]
 
 and term =
@@ -37,7 +36,13 @@ and anf =
 [@@deriving sexp_of]
 
 type top_desc =
-  | Define of string * anf
+  | Define of
+      { name : string
+      ; args : (string * Stlc.ty) list
+      ; body : anf
+      ; ret_ty : Stlc.ty
+      }
+  | Const of string * anf
   | Extern of string
 [@@deriving sexp_of]
 
@@ -52,4 +57,4 @@ type t = Program of top list [@@deriving sexp_of]
 
 (** Converts [t] to A-normal form, updating the [type map] to account for
     the new created variables. Variables are named in the form [anf_num]. *)
-val to_anf : Uncurry.t -> t
+val to_anf : Lambda_lift.t -> t

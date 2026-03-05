@@ -23,7 +23,6 @@ type term_desc =
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list
   | If of atom * anf * anf
-  | Lam of (string * Stlc.ty) list * anf
 
 and term =
   { desc : term_desc
@@ -55,9 +54,6 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_atom)
   | App (f, args) -> List (Atom f :: List.map args ~f:sexp_of_atom)
   | If (c, t, e) -> List [ Atom "if"; sexp_of_atom c; sexp_of_anf t; sexp_of_anf e ]
-  | Lam (args, body) ->
-    let args = List.map args ~f:(fun (v, ty) -> List [ Atom v; Stlc.sexp_of_ty ty ]) in
-    List [ Atom "lambda"; List args; sexp_of_anf body ]
 
 and sexp_of_term t = sexp_of_term_desc t.desc
 
@@ -69,9 +65,29 @@ and sexp_of_anf_desc = function
 and sexp_of_anf t = sexp_of_anf_desc t.desc
 
 type top_desc =
-  | Define of string * anf
+  | Define of
+      { name : string
+      ; args : (string * Stlc.ty) list
+      ; body : anf
+      ; ret_ty : Stlc.ty
+      }
+  | Const of string * anf
   | Extern of string
-[@@deriving sexp_of]
+
+let sexp_of_top_desc = function
+  | Define { name; args; body; ret_ty = _ } ->
+    let args_sexp =
+      List.map args ~f:(fun (v, ty) -> List [ Atom v; Stlc.sexp_of_ty ty ])
+    in
+    List
+      [ Atom "Define"
+      ; List [ Atom "name"; Atom name ]
+      ; List [ Atom "args"; List args_sexp ]
+      ; List [ Atom "body"; sexp_of_anf body ]
+      ]
+  | Const (name, term) -> List [ Atom "Const"; Atom name; sexp_of_anf term ]
+  | Extern name -> List [ Atom "Extern"; Atom name ]
+;;
 
 type top =
   { desc : top_desc
@@ -81,9 +97,11 @@ type top =
 
 let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; Stlc.sexp_of_ty t.ty ]
 
-type t = Program of top list [@@deriving sexp_of]
+type t = Program of top list
 
-let rec normalize (expr : Uncurry.term) : anf =
+let sexp_of_t (Program tops) = List (Atom "Program" :: List.map tops ~f:sexp_of_top)
+
+let rec normalize (expr : Lambda_lift.term) : anf =
   let pure (desc : term_desc) : anf =
     { desc = Return { desc; ty = expr.ty; loc = expr.loc }; ty = expr.ty; loc = expr.loc }
   in
@@ -92,7 +110,6 @@ let rec normalize (expr : Uncurry.term) : anf =
   | Float f -> pure (Atom (Float f))
   | Int i -> pure (Atom (Int i))
   | Bool b -> pure (Atom (Bool b))
-  | Lam (args, t) -> pure (Lam (args, normalize t))
   | Let (v, bind, body) ->
     let bind = normalize bind in
     let body = normalize body in
@@ -121,7 +138,7 @@ let rec normalize (expr : Uncurry.term) : anf =
       let e_anf = normalize e in
       pure (If (c_atom, t_anf, e_anf)))
 
-and atomize (expr : Uncurry.term) (k : atom -> anf) : anf =
+and atomize (expr : Lambda_lift.term) (k : atom -> anf) : anf =
   match expr.desc with
   | Var v -> k (Var v)
   | Float f -> k (Float f)
@@ -145,11 +162,13 @@ and atomize_list ts (k : atom list -> anf) =
   | t :: ts -> atomize t (fun t -> atomize_list ts (fun ts -> k (t :: ts)))
 ;;
 
-let normalize_top (t : Uncurry.top) : top =
+let normalize_top (t : Lambda_lift.top) : top =
   let pure desc = { desc; ty = t.ty; loc = t.loc } in
   match t.desc with
-  | Define (v, bind) -> pure (Define (v, normalize bind))
+  | Define { name; args; body; ret_ty } ->
+    pure (Define { name; args; body = normalize body; ret_ty })
+  | Const (name, body) -> pure (Const (name, normalize body))
   | Extern v -> pure (Extern v)
 ;;
 
-let to_anf (Program terms : Uncurry.t) : t = Program (List.map terms ~f:normalize_top)
+let to_anf (Program terms : Lambda_lift.t) : t = Program (List.map terms ~f:normalize_top)

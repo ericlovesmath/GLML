@@ -240,3 +240,85 @@ let%expect_test "multi argument functions / lambdas" =
     }
     |}]
 ;;
+
+let%expect_test "lambda lifting" =
+  test
+    {|
+    let main (u : vec2) =
+      let x = 10.0 in
+      let y = 5.0 in
+      let add (z : float) = x + y + z in
+      < add 1.0, 0.0, 0.0 >
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    float add_4_5(float x_1, float y_2, float z_3) {
+        float anf_6 = (x_1 + y_2);
+        return (anf_6 + z_3);
+    }
+    vec3 main_pure(vec2 u_0) {
+        float x_1 = 10.;
+        float y_2 = 5.;
+        float anf_7 = add_4_5(x_1, y_2, 1.);
+        return vec3(anf_7, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    let main (u : vec2) =
+      let f (x : float) =
+        let g (y : float) = x + y in
+        (< g 1.0, 0.0, 0.0 >)
+      in
+      f 10.0
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 f_4_5(float x_1) {
+        float anf_7 = g_3_6(x_1, 1.);
+        return vec3(anf_7, 0., 0.);
+    }
+    float g_3_6(float x_1, float y_2) {
+        return (x_1 + y_2);
+    }
+    vec3 main_pure(vec2 u_0) {
+        return f_4_5(10.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    let main (u : vec2) =
+      let f = fun (x : float) -> x + 1.0 in
+      f
+    |};
+  [%expect
+    {|
+    ("First-class functions are not supported by the GLSL backend" (v f_2)
+     (loc (4:7 - 4:8)))
+    |}];
+  test
+    {|
+    let apply_f (f : float -> float) (x : float) = f x
+    let main (u : vec2) =
+      < apply_f (fun (x : float) -> x + 1.0) 10.0, 0.0, 0.0 >
+    |};
+  [%expect
+    {|
+    ("First-class anonymous functions are not supported by the GLSL backend"
+     (loc (4:18 - 4:44)))
+    |}]
+;;

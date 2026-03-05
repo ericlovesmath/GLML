@@ -12,6 +12,7 @@
    uniquify
    typecheck
    uncurry
+   lambda_lift
    anf
    translate
    patch_main

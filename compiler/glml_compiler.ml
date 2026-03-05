@@ -8,6 +8,7 @@ module Passes = struct
     | Uniquify : Stlc.t pass
     | Typecheck : Typecheck.t pass
     | Uncurry : Uncurry.t pass
+    | Lambda_lift : Lambda_lift.t pass
     | Anf : Anf.t pass
     | Translate : Glsl.t pass
     | Patch_main : Glsl.t pass
@@ -17,6 +18,7 @@ module Passes = struct
     | Uniquify -> Stlc.sexp_of_t
     | Typecheck -> Typecheck.sexp_of_t
     | Uncurry -> Uncurry.sexp_of_t
+    | Lambda_lift -> Lambda_lift.sexp_of_t
     | Anf -> Anf.sexp_of_t
     | Translate -> Glsl.sexp_of_t
     | Patch_main -> Glsl.sexp_of_t
@@ -30,6 +32,7 @@ module Passes = struct
       | Uniquify
       | Typecheck
       | Uncurry
+      | Lambda_lift
       | Anf
       | Translate
       | Patch_main
@@ -44,6 +47,7 @@ module Passes = struct
     | Uniquify -> Uniquify
     | Typecheck -> Typecheck
     | Uncurry -> Uncurry
+    | Lambda_lift -> Lambda_lift
     | Anf -> Anf
     | Translate -> Translate
     | Patch_main -> Patch_main
@@ -70,6 +74,8 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   trace Typecheck t;
   let t = Uncurry.uncurry t in
   trace Uncurry t;
+  let%bind t = Lambda_lift.lift t in
+  trace Lambda_lift t;
   let t = Anf.to_anf t in
   trace Anf t;
   let glsl = Translate.translate t in

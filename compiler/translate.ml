@@ -38,7 +38,6 @@ let to_glsl_term (t : Anf.term) : term =
   | If (_, _, _) ->
     failwith
       [%string "to_glsl_term: complex If with condition should be handled in tr_block"]
-  | Lam _ -> failwith "to_glsl_term: lambdas not yet supported"
 ;;
 
 let placeholder_value_for_ty (ty : ty) : term =
@@ -94,21 +93,13 @@ let translate (Program tops : Anf.t) : t =
   let globals =
     List.map tops ~f:(fun (top : Anf.top) ->
       match top.desc with
-      | Define (name, { desc = Return { desc = Lam (args, body); _ }; _ }) ->
-        let ret_type =
-          let rec unroll = function
-            | Stlc.TyArrow (_, r) -> unroll r
-            | ty -> ty
-          in
-          to_glsl_ty (unroll top.ty)
-        in
+      | Define { name; args; body; ret_ty } ->
+        let ret_type = to_glsl_ty ret_ty in
         let params = List.map args ~f:(fun (arg, arg_ty) -> to_glsl_ty arg_ty, arg) in
         let body = translate_block body in
         Function { name; desc = None; params; ret_type; body }
-      | Define (_, { desc = Return _; _ }) ->
-        raise_s [%message "translate: expected lam form at toplevel" (top : Anf.top)]
-      | Define (_, { desc = Let _; _ }) ->
-        raise_s [%message "translate: expected return toplevel" (top : Anf.top)]
+      (* TODO: We need to have constant folding and inlining before this works *)
+      | Const _ -> failwith "translate: toplevel constants are unsupported"
       | Extern v -> Global (Uniform, to_glsl_ty top.ty, v))
   in
   Program globals

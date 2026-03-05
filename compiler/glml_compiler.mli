@@ -7,6 +7,7 @@ module Passes : sig
     | Uniquify
     | Typecheck
     | Uncurry
+    | Lambda_lift
     | Anf
     | Translate
     | Patch_main
