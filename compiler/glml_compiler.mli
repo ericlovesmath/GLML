@@ -9,6 +9,7 @@ module Passes : sig
     | Uncurry
     | Lambda_lift
     | Anf
+    | Tail_call
     | Translate
     | Patch_main
   [@@deriving sexp_of, enumerate, string]

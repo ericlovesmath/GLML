@@ -77,6 +77,8 @@ type stmt =
   | Return of term option
   | Expr of term
   | IfStmt of term * stmt * stmt option
+  | WhileStmt of term * stmt
+  | Continue
   | For of stmt * term * stmt * stmt
   | Block of stmt list
   | Break

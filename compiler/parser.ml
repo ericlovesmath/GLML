@@ -189,9 +189,9 @@ let make_lambdas params (body : term) =
 let recur_tag_t =
   between
     `Paren
-    ((let%map ty = tok REC *> tok COLON *> ty_p in
-      Rec (1000, ty))
-     <|> return Nonrec)
+    (let%map ty = tok REC *> tok COLON *> ty_p in
+     Rec (1000, ty))
+  <|> return Nonrec
   <??> "recur_tag"
 ;;
 
@@ -336,7 +336,7 @@ let%expect_test "term parse tests" =
   test "fun (x : bool) -> x";
   test "f x y";
   test "let bind = true in bind";
-  test "let rec f (x : float) = f x in f";
+  test "let (rec : bool) f (x : float) = f x in f";
   test "if true then x else y";
   test "1 * 2 + true && 44 % 10";
   test "v[0]";
@@ -352,6 +352,7 @@ let%expect_test "term parse tests" =
     (Ok (lambda (x bool) x))
     (Ok (app (app f x) y))
     (Ok (let bind true bind))
+    (Ok (let (rec 1000 bool) f (lambda (x float) (app f x)) f))
     (Ok (if true x y))
     (Ok (&& (+ (* 1 2) true) (% 44 10)))
     (Ok (index v 0))
@@ -455,15 +456,17 @@ let%expect_test "glml parse tests" =
     let main = 1 + 2
     let f = fun (x : bool) (y : bool) -> x && y
     let main (u : vec2) = f <1, 2> + u
-    let rec g (x : float) = g x
+    let (rec : float -> float) g (x : float) = g x
     |};
   [%expect
     {|
     (Ok
      (Program
-      ((Extern float u_time) (Define toplevel (+ 1 2)) (Define main (+ 1 2))
-       (Define f (lambda (x bool) (lambda (y bool) (&& x y))))
-       (Define main (lambda (u (vec 2)) (+ (app f (vec2 1 2)) u))))))
+      ((Extern float u_time) (Define Nonrec toplevel (+ 1 2))
+       (Define Nonrec main (+ 1 2))
+       (Define Nonrec f (lambda (x bool) (lambda (y bool) (&& x y))))
+       (Define Nonrec main (lambda (u (vec 2)) (+ (app f (vec2 1 2)) u)))
+       (Define (Rec 1000 (float -> float)) g (lambda (x float) (app g x))))))
     |}]
 ;;
 
@@ -480,9 +483,9 @@ let%expect_test "regression test, toplevel let parsing after record" =
     {|
     (Ok
      (Program
-      ((Define f
+      ((Define Nonrec f
         (lambda (x float)
          (let g (lambda (y float) (+ x y)) (vec3 (app g 1.) 0. 0.))))
-       (Define main (lambda (u (vec 2)) (app f 10.))))))
+       (Define Nonrec main (lambda (u (vec 2)) (app f 10.))))))
     |}]
 ;;

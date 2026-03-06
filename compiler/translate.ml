@@ -19,7 +19,7 @@ let to_glsl_atom (a : Anf.atom) : term =
   | Bool b -> Bool b
 ;;
 
-let to_glsl_term (t : Anf.term) : term =
+let to_glsl_term (t : Tail_call.term) : term =
   match t.desc with
   | Atom a -> to_glsl_atom a
   | Bop (op, l, r) -> Bop (op, to_glsl_atom l, to_glsl_atom r)
@@ -54,7 +54,7 @@ let placeholder_value_for_ty (ty : ty) : term =
   | TyVoid -> failwith "translate: void is unsupported"
 ;;
 
-let rec translate_set (var : string) (anf : Anf.anf) : stmt list =
+let rec translate_set (var : string) (anf : Tail_call.anf) : stmt list =
   match anf.desc with
   | Let (v, bind, body) ->
     Decl (None, to_glsl_ty anf.ty, v, to_glsl_term bind) :: translate_set var body
@@ -67,9 +67,14 @@ let rec translate_set (var : string) (anf : Anf.anf) : stmt list =
            , Some (Block (translate_set var e)) )
        ]
      | _ -> [ Set (Var var, to_glsl_term t) ])
-;;
+  | While (cond, body, tail) ->
+    [ WhileStmt (to_glsl_term cond, Block (translate_block body))
+    ; Set (Var var, to_glsl_term tail)
+    ]
+  | Set (v, a, tail) -> Set (Var v, to_glsl_atom a) :: translate_set var tail
+  | Continue -> [ Continue ]
 
-let rec translate_block (anf : Anf.anf) : stmt list =
+and translate_block (anf : Tail_call.anf) : stmt list =
   match anf.desc with
   | Let (v, term, body) ->
     let ty = to_glsl_ty term.ty in
@@ -87,11 +92,17 @@ let rec translate_block (anf : Anf.anf) : stmt list =
            (to_glsl_atom c, Block (translate_block t), Some (Block (translate_block e)))
        ]
      | _ -> [ Return (Some (to_glsl_term t)) ])
+  | While (cond, body, tail) ->
+    [ WhileStmt (to_glsl_term cond, Block (translate_block body))
+    ; Return (Some (to_glsl_term tail))
+    ]
+  | Set (v, a, tail) -> Set (Var v, to_glsl_atom a) :: translate_block tail
+  | Continue -> [ Continue ]
 ;;
 
-let translate (Program tops : Anf.t) : t =
+let translate (Program tops : Tail_call.t) : t =
   let globals =
-    List.map tops ~f:(fun (top : Anf.top) ->
+    List.map tops ~f:(fun (top : Tail_call.top) ->
       match top.desc with
       | Define { name; args; body; ret_ty } ->
         let ret_type = to_glsl_ty ret_ty in

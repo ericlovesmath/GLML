@@ -28,12 +28,12 @@ let%expect_test "compile examples" =
     === stlc (checkerboard.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time)
-      (Define get_uv
+      (Define Nonrec get_uv
        (lambda (coord (vec 2))
         (let top (- (* 2. coord) u_resolution)
          (let bot (min (index u_resolution 0) (index u_resolution 1))
           (/ top bot)))))
-      (Define main
+      (Define Nonrec main
        (lambda (coord (vec 2))
         (let uv (app get_uv coord)
          (let size 5.
@@ -46,12 +46,12 @@ let%expect_test "compile examples" =
     === uniquify (checkerboard.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time)
-      (Define get_uv_3
+      (Define Nonrec get_uv_3
        (lambda (coord_0 (vec 2))
         (let top_1 (- (* 2. coord_0) u_resolution)
          (let bot_2 (min (index u_resolution 0) (index u_resolution 1))
           (/ top_1 bot_2)))))
-      (Define main
+      (Define Nonrec main
        (lambda (coord_4 (vec 2))
         (let uv_5 (app get_uv_3 coord_4)
          (let size_6 5.
@@ -65,7 +65,7 @@ let%expect_test "compile examples" =
     === typecheck (checkerboard.glml) ===
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
-      ((Define get_uv_3
+      ((Define Nonrec get_uv_3
         ((lambda (coord_0 (vec 2))
           ((let top_1
             ((- ((* (2. : float) (coord_0 : (vec 2))) : (vec 2))
@@ -80,7 +80,7 @@ let%expect_test "compile examples" =
            : (vec 2)))
          : ((vec 2) -> (vec 2))))
        : ((vec 2) -> (vec 2)))
-      ((Define main
+      ((Define Nonrec main
         ((lambda (coord_4 (vec 2))
           ((let uv_5
             ((app (get_uv_3 : ((vec 2) -> (vec 2))) (coord_4 : (vec 2))) :
@@ -127,13 +127,13 @@ let%expect_test "compile examples" =
     === uncurry (checkerboard.glml) ===
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
-      ((Define get_uv_3
+      ((Define Nonrec get_uv_3
         (lambda ((coord_0 (vec 2)))
          (let top_1 (- (* 2. coord_0) u_resolution)
           (let bot_2 (min (index u_resolution 0) (index u_resolution 1))
            (/ top_1 bot_2)))))
        : ((vec 2) -> (vec 2)))
-      ((Define main
+      ((Define Nonrec main
         (lambda ((coord_4 (vec 2)))
          (let uv_5 (app get_uv_3 coord_4)
           (let size_6 5.
@@ -147,13 +147,13 @@ let%expect_test "compile examples" =
 
     === lambda lift (checkerboard.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
-     ((Define (name get_uv_3) (args ((coord_0 (vec 2))))
+     ((Define Nonrec (name get_uv_3) (args ((coord_0 (vec 2))))
        (body
         (let top_1 (- (* 2. coord_0) u_resolution)
          (let bot_2 (min (index u_resolution 0) (index u_resolution 1))
           (/ top_1 bot_2)))))
       : ((vec 2) -> (vec 2)))
-     ((Define (name main) (args ((coord_4 (vec 2))))
+     ((Define Nonrec (name main) (args ((coord_4 (vec 2))))
        (body
         (let uv_5 (app get_uv_3 coord_4)
          (let size_6 5.
@@ -166,6 +166,39 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === anf (checkerboard.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+     ((Define Nonrec (name get_uv_3) (args ((coord_0 (vec 2))))
+       (body
+        (let anf_11 (* 2. coord_0)
+         (let top_1 (- anf_11 u_resolution)
+          (let anf_12 (index u_resolution 0)
+           (let anf_13 (index u_resolution 1)
+            (let bot_2 (min anf_12 anf_13) (return (/ top_1 bot_2)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Define Nonrec (name main) (args ((coord_4 (vec 2))))
+       (body
+        (let uv_5 (get_uv_3 coord_4)
+         (let size_6 5.
+          (let anf_14 (index uv_5 0)
+           (let anf_15 (* anf_14 size_6)
+            (let anf_16 (* u_time 2.)
+             (let anf_17 (+ anf_15 anf_16)
+              (let cx_7 (floor anf_17)
+               (let anf_18 (index uv_5 1)
+                (let anf_19 (* anf_18 size_6)
+                 (let cy_8 (floor anf_19)
+                  (let checker_sum_9 (+ cx_7 cy_8)
+                   (let anf_20 (/ checker_sum_9 2.)
+                    (let anf_21 (floor anf_20)
+                     (let anf_22 (* anf_21 2.)
+                      (let is_even_10 (- checker_sum_9 anf_22)
+                       (let anf_23 (< is_even_10 0.5)
+                        (return
+                         (if anf_23 (return (vec3 0.2 0.2 0.2))
+                          (return (vec3 0.8 0.8 0.8))))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === tail call (checkerboard.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Define (name get_uv_3) (args ((coord_0 (vec 2))))
        (body
@@ -269,12 +302,12 @@ let%expect_test "compile examples" =
     (Program
      ((Extern (vec 2) u_resolution) (Extern (vec 2) u_mouse)
       (Extern float u_time)
-      (Define get_uv
+      (Define Nonrec get_uv
        (lambda (coord (vec 2))
         (let top (- (* 2. coord) u_resolution)
          (let bot (min (index u_resolution 0) (index u_resolution 1))
           (/ top bot)))))
-      (Define main
+      (Define Nonrec main
        (lambda (coord (vec 2))
         (let uv (app get_uv coord)
          (let mouseUV (/ (- (* 2. u_mouse) u_resolution) (index u_resolution 1))
@@ -286,12 +319,12 @@ let%expect_test "compile examples" =
     (Program
      ((Extern (vec 2) u_resolution) (Extern (vec 2) u_mouse)
       (Extern float u_time)
-      (Define get_uv_3
+      (Define Nonrec get_uv_3
        (lambda (coord_0 (vec 2))
         (let top_1 (- (* 2. coord_0) u_resolution)
          (let bot_2 (min (index u_resolution 0) (index u_resolution 1))
           (/ top_1 bot_2)))))
-      (Define main
+      (Define Nonrec main
        (lambda (coord_4 (vec 2))
         (let uv_5 (app get_uv_3 coord_4)
          (let mouseUV_6
@@ -304,7 +337,7 @@ let%expect_test "compile examples" =
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
       ((Extern u_time) : float)
-      ((Define get_uv_3
+      ((Define Nonrec get_uv_3
         ((lambda (coord_0 (vec 2))
           ((let top_1
             ((- ((* (2. : float) (coord_0 : (vec 2))) : (vec 2))
@@ -319,7 +352,7 @@ let%expect_test "compile examples" =
            : (vec 2)))
          : ((vec 2) -> (vec 2))))
        : ((vec 2) -> (vec 2)))
-      ((Define main
+      ((Define Nonrec main
         ((lambda (coord_4 (vec 2))
           ((let uv_5
             ((app (get_uv_3 : ((vec 2) -> (vec 2))) (coord_4 : (vec 2))) :
@@ -355,13 +388,13 @@ let%expect_test "compile examples" =
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
       ((Extern u_time) : float)
-      ((Define get_uv_3
+      ((Define Nonrec get_uv_3
         (lambda ((coord_0 (vec 2)))
          (let top_1 (- (* 2. coord_0) u_resolution)
           (let bot_2 (min (index u_resolution 0) (index u_resolution 1))
            (/ top_1 bot_2)))))
        : ((vec 2) -> (vec 2)))
-      ((Define main
+      ((Define Nonrec main
         (lambda ((coord_4 (vec 2)))
          (let uv_5 (app get_uv_3 coord_4)
           (let mouseUV_6
@@ -374,13 +407,13 @@ let%expect_test "compile examples" =
     === lambda lift (mouse_circle.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
      ((Extern u_time) : float)
-     ((Define (name get_uv_3) (args ((coord_0 (vec 2))))
+     ((Define Nonrec (name get_uv_3) (args ((coord_0 (vec 2))))
        (body
         (let top_1 (- (* 2. coord_0) u_resolution)
          (let bot_2 (min (index u_resolution 0) (index u_resolution 1))
           (/ top_1 bot_2)))))
       : ((vec 2) -> (vec 2)))
-     ((Define (name main) (args ((coord_4 (vec 2))))
+     ((Define Nonrec (name main) (args ((coord_4 (vec 2))))
        (body
         (let uv_5 (app get_uv_3 coord_4)
          (let mouseUV_6
@@ -391,6 +424,35 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === anf (mouse_circle.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
+     ((Define Nonrec (name get_uv_3) (args ((coord_0 (vec 2))))
+       (body
+        (let anf_8 (* 2. coord_0)
+         (let top_1 (- anf_8 u_resolution)
+          (let anf_9 (index u_resolution 0)
+           (let anf_10 (index u_resolution 1)
+            (let bot_2 (min anf_9 anf_10) (return (/ top_1 bot_2)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Define Nonrec (name main) (args ((coord_4 (vec 2))))
+       (body
+        (let uv_5 (get_uv_3 coord_4)
+         (let anf_11 (* 2. u_mouse)
+          (let anf_12 (- anf_11 u_resolution)
+           (let anf_13 (index u_resolution 1)
+            (let mouseUV_6 (/ anf_12 anf_13)
+             (let anf_14 (* u_time 2.)
+              (let anf_15 (sin anf_14)
+               (let anf_16 (* anf_15 0.1)
+                (let radius_7 (+ anf_16 0.15)
+                 (let anf_17 (distance uv_5 mouseUV_6)
+                  (let anf_18 (< anf_17 radius_7)
+                   (return
+                    (if anf_18 (return (vec3 0. 0. 0.5))
+                     (return (vec3 0.5 0.5 1.)))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === tail call (mouse_circle.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
      ((Extern u_time) : float)
      ((Define (name get_uv_3) (args ((coord_0 (vec 2))))
@@ -484,12 +546,12 @@ let%expect_test "compile examples" =
     === stlc (rainbow.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time)
-      (Define get_uv
+      (Define Nonrec get_uv
        (lambda (coord (vec 2))
         (let top (- (* 2. coord) u_resolution)
          (let bot (min (index u_resolution 0) (index u_resolution 1))
           (/ top bot)))))
-      (Define main
+      (Define Nonrec main
        (lambda (coord (vec 2))
         (let uv (app get_uv coord)
          (let wave (+ (* 5. (+ (index uv 0) (index uv 1))) u_time)
@@ -500,12 +562,12 @@ let%expect_test "compile examples" =
     === uniquify (rainbow.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time)
-      (Define get_uv_3
+      (Define Nonrec get_uv_3
        (lambda (coord_0 (vec 2))
         (let top_1 (- (* 2. coord_0) u_resolution)
          (let bot_2 (min (index u_resolution 0) (index u_resolution 1))
           (/ top_1 bot_2)))))
-      (Define main
+      (Define Nonrec main
        (lambda (coord_4 (vec 2))
         (let uv_5 (app get_uv_3 coord_4)
          (let wave_6 (+ (* 5. (+ (index uv_5 0) (index uv_5 1))) u_time)
@@ -516,7 +578,7 @@ let%expect_test "compile examples" =
     === typecheck (rainbow.glml) ===
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
-      ((Define get_uv_3
+      ((Define Nonrec get_uv_3
         ((lambda (coord_0 (vec 2))
           ((let top_1
             ((- ((* (2. : float) (coord_0 : (vec 2))) : (vec 2))
@@ -531,7 +593,7 @@ let%expect_test "compile examples" =
            : (vec 2)))
          : ((vec 2) -> (vec 2))))
        : ((vec 2) -> (vec 2)))
-      ((Define main
+      ((Define Nonrec main
         ((lambda (coord_4 (vec 2))
           ((let uv_5
             ((app (get_uv_3 : ((vec 2) -> (vec 2))) (coord_4 : (vec 2))) :
@@ -578,13 +640,13 @@ let%expect_test "compile examples" =
     === uncurry (rainbow.glml) ===
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
-      ((Define get_uv_3
+      ((Define Nonrec get_uv_3
         (lambda ((coord_0 (vec 2)))
          (let top_1 (- (* 2. coord_0) u_resolution)
           (let bot_2 (min (index u_resolution 0) (index u_resolution 1))
            (/ top_1 bot_2)))))
        : ((vec 2) -> (vec 2)))
-      ((Define main
+      ((Define Nonrec main
         (lambda ((coord_4 (vec 2)))
          (let uv_5 (app get_uv_3 coord_4)
           (let wave_6 (+ (* 5. (+ (index uv_5 0) (index uv_5 1))) u_time)
@@ -595,13 +657,13 @@ let%expect_test "compile examples" =
 
     === lambda lift (rainbow.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
-     ((Define (name get_uv_3) (args ((coord_0 (vec 2))))
+     ((Define Nonrec (name get_uv_3) (args ((coord_0 (vec 2))))
        (body
         (let top_1 (- (* 2. coord_0) u_resolution)
          (let bot_2 (min (index u_resolution 0) (index u_resolution 1))
           (/ top_1 bot_2)))))
       : ((vec 2) -> (vec 2)))
-     ((Define (name main) (args ((coord_4 (vec 2))))
+     ((Define Nonrec (name main) (args ((coord_4 (vec 2))))
        (body
         (let uv_5 (app get_uv_3 coord_4)
          (let wave_6 (+ (* 5. (+ (index uv_5 0) (index uv_5 1))) u_time)
@@ -611,6 +673,37 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === anf (rainbow.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+     ((Define Nonrec (name get_uv_3) (args ((coord_0 (vec 2))))
+       (body
+        (let anf_10 (* 2. coord_0)
+         (let top_1 (- anf_10 u_resolution)
+          (let anf_11 (index u_resolution 0)
+           (let anf_12 (index u_resolution 1)
+            (let bot_2 (min anf_11 anf_12) (return (/ top_1 bot_2)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Define Nonrec (name main) (args ((coord_4 (vec 2))))
+       (body
+        (let uv_5 (get_uv_3 coord_4)
+         (let anf_13 (index uv_5 0)
+          (let anf_14 (index uv_5 1)
+           (let anf_15 (+ anf_13 anf_14)
+            (let anf_16 (* 5. anf_15)
+             (let wave_6 (+ anf_16 u_time)
+              (let anf_17 (sin wave_6)
+               (let anf_18 (* anf_17 0.3)
+                (let r_7 (+ anf_18 0.7)
+                 (let anf_19 (+ wave_6 2.)
+                  (let anf_20 (sin anf_19)
+                   (let anf_21 (* anf_20 0.3)
+                    (let g_8 (+ anf_21 0.7)
+                     (let anf_22 (+ wave_6 4.)
+                      (let anf_23 (sin anf_22)
+                       (let anf_24 (* anf_23 0.3)
+                        (let b_9 (+ anf_24 0.7) (return (vec3 r_7 g_8 b_9)))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === tail call (rainbow.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Define (name get_uv_3) (args ((coord_0 (vec 2))))
        (body

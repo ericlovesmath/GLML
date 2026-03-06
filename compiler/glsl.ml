@@ -148,6 +148,8 @@ type stmt =
   | Return of term option
   | Expr of term
   | IfStmt of term * stmt * stmt option
+  | WhileStmt of term * stmt
+  | Continue
   | For of stmt * term * stmt * stmt
   | Block of stmt list
   | Break
@@ -168,6 +170,8 @@ let rec sexp_of_stmt (s : stmt) : Sexp.t =
       | None -> []
     in
     List ([ Atom "if"; sexp_of_term cond; sexp_of_stmt then_stmt ] @ else_stmt)
+  | WhileStmt (cond, body) -> List [ Atom "while"; sexp_of_term cond; sexp_of_stmt body ]
+  | Continue -> Atom "continue"
   | For (init, cond, iter, body) ->
     List
       [ Atom "for"
@@ -210,6 +214,11 @@ let rec string_of_stmt = function
      | Some e ->
        let e = string_of_stmt e in
        [%string "if (%{cond}) %{t} else %{e}"])
+  | WhileStmt (cond, body) ->
+    let cond = string_of_term cond in
+    let body = string_of_stmt body in
+    [%string "while (%{cond}) %{body}"]
+  | Continue -> "continue;"
   | For (init, cond, iter, body) ->
     let init = string_of_stmt init in
     let cond = string_of_term cond in
