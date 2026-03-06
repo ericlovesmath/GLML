@@ -22,12 +22,14 @@ module Example = struct
     | Mouse_circle
     | Pastel_rainbow
     | Checkboard
+    | Recursive_star
   [@@deriving sexp, compare, equal, enumerate, to_string ~capitalize:"Title Case"]
 
   let to_glml = function
     | Mouse_circle -> [%blob "../examples/mouse_circle.glml"]
     | Pastel_rainbow -> [%blob "../examples/rainbow.glml"]
     | Checkboard -> [%blob "../examples/checkerboard.glml"]
+    | Recursive_star -> [%blob "../examples/recursion.glml"]
   ;;
 end
 
