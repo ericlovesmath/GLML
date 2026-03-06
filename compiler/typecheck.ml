@@ -206,6 +206,7 @@ let rec update (map : ty String.Map.t) (t : Stlc.term)
     let args = List.rev args in
     let tys = List.map ~f:(fun arg -> arg.ty) args in
     let make = make ~map (Builtin (name, args)) in
+    (* TODO: "Row Polymorphism" behavior implemented like you expect in GLSL? *)
     let check_unary_math () =
       match tys with
       | [ TyFloat ] -> make TyFloat

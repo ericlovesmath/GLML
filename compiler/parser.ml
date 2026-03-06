@@ -125,6 +125,7 @@ let float_p =
   <??> "float"
 ;;
 
+(* TODO: Maybe something like [-a] should convert to [-1 * a] *)
 let term_number_p =
   with_term_loc
     (let%bind sign = tok SUB *> return (-1) <|> tok ADD *> return 1 <|> return 1 in
@@ -186,6 +187,8 @@ let make_lambdas params (body : term) =
 ;;
 
 (* TODO: Hardcoded to maximum 1000 loops for now *)
+(* TODO: Maybe just annotating the return type is fine, since
+   we can extract the other types from the function arguments *)
 let recur_tag_t =
   between
     `Paren

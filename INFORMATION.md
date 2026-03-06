@@ -1,30 +1,36 @@
 # Compilation Passes (Currently Working On)
 
 - Button to show GLSL output
-- Lambda lifting
 - Use ternary to replace some `if`'s in GLSL
 - Read Futhark's monomorphization and defunctionalization code
 - Monomorphization (Specialization)
+- Vim syntax file
+- Better pipeline tests
+- Better benchmarking tests
+- Defunctionalization?
+- Implicit error field added to every function to propagate error color back
 
 # Remaining Compilation Passes
 
 - Typechecking (Church-typed LC -> HM -> Size dependent)
 - Closure Conversion (turn closures into explicit struct passing)
-- Lambda Lifting (Higher order functions into toplevel)
 - Lowering (ADTs/matches into tagged unions/switches)
-- Recursion Elimination (Convert tailcalls into while loops)
 - Typeclasses for polymorphic functions
-- Swizzle syntax
-- Function `inlining` / `specialize`
+
+    - TCO must have a hard capped loop so the browser doesn't just casually crash
+
+- Swizzle syntax or some kind of rank polymorphism
+- Function `inlining` / `specialize` (but likely everything is specialized)
 - Dead code elimination
 - Constant folding/propagation
-- Sourcemaps?
+- Doc strings
 
 Interesting Ideas
 
 - `let%glsl` ppx to embed DSL?
 - `wasm_of_ocaml`, but would have to give up on `extern js`
 - Remove Jane Street dependency for `bonsai` and just use `js_of_ocaml` with a javascript framework
+- Local renderer without web
 
 # Idea Dump
 

@@ -305,16 +305,14 @@ let%expect_test "lambda lifting" =
       let f = fun (x : float) -> x + 1.0 in
       f
     |};
-  [%expect
-    {| ("first-class functions are not supported" (t.loc (4:7 - 4:8))) |}];
+  [%expect {| ("first-class functions are not supported" (t.loc (4:7 - 4:8))) |}];
   test
     {|
     let apply_f (f : float -> float) (x : float) = f x
     let main (u : vec2) =
       < apply_f (fun (x : float) -> x + 1.0) 10.0, 0.0, 0.0 >
     |};
-  [%expect
-    {| ("first-class anon functions are unsupported" (t.loc (4:18 - 4:44))) |}]
+  [%expect {| ("first-class anon functions are unsupported" (t.loc (4:18 - 4:44))) |}]
 ;;
 
 let%expect_test "recursive functions" =
@@ -358,4 +356,5 @@ let%expect_test "recursive functions" =
         vec3 color = main_pure(gl_FragCoord.xy);
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
     }
-    |}];
+    |}]
+;;
