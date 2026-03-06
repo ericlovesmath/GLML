@@ -30,10 +30,14 @@ let rec aux (ctx : string String.Map.t) (t : term) : term =
 let uniquify_top (ctx : string String.Map.t) (t : top) : string String.Map.t * top =
   match t.desc with
   | Define (recur, v, bind) ->
-    let bind = aux ctx bind in
     let v' = Utils.fresh v in
-    let ctx = Map.set ctx ~key:v ~data:v' in
-    ctx, { desc = Define (recur, v', bind); loc = t.loc }
+    let ctx' = Map.set ctx ~key:v ~data:v' in
+    let bind =
+      match recur with
+      | Nonrec -> aux ctx bind
+      | Rec _ -> aux ctx' bind
+    in
+    ctx', { desc = Define (recur, v', bind); loc = t.loc }
   | Extern _ -> ctx, t
 ;;
 

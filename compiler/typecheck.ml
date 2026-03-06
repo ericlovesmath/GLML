@@ -175,8 +175,8 @@ let rec update (map : ty String.Map.t) (t : Stlc.term)
      | Eq, TyInt, TyInt
      | Eq, TyBool, TyBool
      | Eq, TyVec _, TyVec _
-     | Eq, TyMat _, TyMat _
-     | Eq, _, _ -> error_s [%message "unsupport eq" (l.ty : ty) (r.ty : ty)]
+     | Eq, TyMat _, TyMat _ -> make TyBool
+     | Eq, _, _ -> error_s [%message "unsupported eq" (l.ty : ty) (r.ty : ty)]
      | (Lt | Gt | Leq | Geq), TyFloat, TyFloat | (Lt | Gt | Leq | Geq), TyInt, TyInt ->
        make TyBool
      | (Lt | Gt | Leq | Geq), _, _ ->
