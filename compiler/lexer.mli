@@ -19,6 +19,7 @@ type token =
   | THEN
   | ELSE
   | LET
+  | REC
   | IN
   | FUN
   | BAR

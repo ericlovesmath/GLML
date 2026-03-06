@@ -7,7 +7,7 @@ type term_desc =
   | Mat of int * int * term list
   | Lam of (string * Stlc.ty) list * term
   | App of term * term list
-  | Let of string * term * term
+  | Let of Stlc.recur * string * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -22,7 +22,7 @@ and term =
 [@@deriving sexp_of]
 
 type top_desc =
-  | Define of string * term
+  | Define of Stlc.recur * string * term
   | Extern of string
 [@@deriving sexp_of]
 

@@ -11,12 +11,12 @@ let rec aux (ctx : string String.Map.t) (t : term) : term =
       let ctx = Map.set ctx ~key:v ~data:v' in
       Lam (v', ty, aux ctx body)
     | App (f, x) -> App (aux ctx f, aux ctx x)
-    | Let (v, bind, body) ->
+    | Let (recur, v, bind, body) ->
       let bind = aux ctx bind in
       let v' = Utils.fresh v in
       let ctx = Map.set ctx ~key:v ~data:v' in
       let body = aux ctx body in
-      Let (v', bind, body)
+      Let (recur, v', bind, body)
     | If (c, t_true, f) -> If (aux ctx c, aux ctx t_true, aux ctx f)
     | Vec (n, ts) -> Vec (n, List.map ts ~f:(aux ctx))
     | Mat (x, y, ts) -> Mat (x, y, List.map ts ~f:(aux ctx))
@@ -29,11 +29,11 @@ let rec aux (ctx : string String.Map.t) (t : term) : term =
 
 let uniquify_top (ctx : string String.Map.t) (t : top) : string String.Map.t * top =
   match t.desc with
-  | Define (v, bind) ->
+  | Define (recur, v, bind) ->
     let bind = aux ctx bind in
     let v' = Utils.fresh v in
     let ctx = Map.set ctx ~key:v ~data:v' in
-    ctx, { desc = Define (v', bind); loc = t.loc }
+    ctx, { desc = Define (recur, v', bind); loc = t.loc }
   | Extern _ -> ctx, t
 ;;
 

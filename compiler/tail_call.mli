@@ -38,7 +38,6 @@ and anf =
 type top_desc =
   | Define of
       { name : string
-      ; recur : Stlc.recur
       ; args : (string * Stlc.ty) list
       ; body : anf
       ; ret_ty : Stlc.ty
@@ -56,6 +55,7 @@ type top =
 
 type t = Program of top list [@@deriving sexp_of]
 
-(** Converts [t] to A-normal form, updating the [type map] to account for
-    the new created variables. Variables are named in the form [anf_num]. *)
-val to_anf : Lambda_lift.t -> t
+(** Removes recursive functions and replaces them with while loops,
+    with a provided hardcap on the number of iterations so that the
+    shader doesn't decide to explode your computer *)
+val remove_rec : Anf.t -> t

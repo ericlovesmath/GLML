@@ -10,7 +10,7 @@ type term_desc =
   | Mat of int * int * term list
   | Lam of (string * Stlc.ty) list * term
   | App of term * term list
-  | Let of string * term * term
+  | Let of Stlc.recur * string * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -36,7 +36,10 @@ let rec sexp_of_term_desc = function
     let args = List.map args ~f:(fun (v, ty) -> List [ Atom v; Stlc.sexp_of_ty ty ]) in
     List [ Atom "lambda"; List args; sexp_of_term body ]
   | App (f, args) -> List (Atom "app" :: sexp_of_term f :: List.map args ~f:sexp_of_term)
-  | Let (v, bind, body) ->
+  | Let (Rec (n, ty), v, bind, body) ->
+    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n); Stlc.sexp_of_ty ty ] in
+    List [ Atom "let"; rec_tag; Atom v; sexp_of_term bind; sexp_of_term body ]
+  | Let (Nonrec, v, bind, body) ->
     List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
   | If (c, t, e) -> List [ Atom "if"; sexp_of_term c; sexp_of_term t; sexp_of_term e ]
   | Bop (op, l, r) ->
@@ -48,7 +51,7 @@ let rec sexp_of_term_desc = function
 and sexp_of_term t = sexp_of_term_desc t.desc
 
 type top_desc =
-  | Define of string * term
+  | Define of Stlc.recur * string * term
   | Extern of string
 [@@deriving sexp_of]
 
@@ -90,7 +93,7 @@ and uncurry_term_desc (t : Typecheck.term_desc) : term_desc =
   | App (f, x) ->
     let f', args = collect_apps f in
     App (f', args @ [ uncurry_term x ])
-  | Let (v, bind, body) -> Let (v, uncurry_term bind, uncurry_term body)
+  | Let (recur, v, bind, body) -> Let (recur, v, uncurry_term bind, uncurry_term body)
   | If (c, t_true, e) -> If (uncurry_term c, uncurry_term t_true, uncurry_term e)
   | Bop (op, l, r) -> Bop (op, uncurry_term l, uncurry_term r)
   | Index (t_sub, i) -> Index (uncurry_term t_sub, i)
@@ -103,7 +106,7 @@ and uncurry_term (t : Typecheck.term) : term =
 let uncurry_top (t : Typecheck.top) : top =
   let desc =
     match t.desc with
-    | Define (v, term) -> Define (v, uncurry_term term)
+    | Define (recur, v, term) -> Define (recur, v, uncurry_term term)
     | Extern v -> Extern v
   in
   { desc; ty = t.ty; loc = t.loc }

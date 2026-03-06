@@ -47,6 +47,7 @@ and sexp_of_term t = sexp_of_term_desc t.desc
 type top_desc =
   | Define of
       { name : string
+      ; recur : Stlc.recur
       ; args : (string * Stlc.ty) list
       ; body : term
       ; ret_ty : Stlc.ty
@@ -55,12 +56,13 @@ type top_desc =
   | Extern of string
 
 let sexp_of_top_desc = function
-  | Define { name; args; body; ret_ty = _ } ->
+  | Define { name; recur; args; body; ret_ty = _ } ->
     let args_sexp =
       List.map args ~f:(fun (v, ty) -> List [ Atom v; Stlc.sexp_of_ty ty ])
     in
     List
       [ Atom "Define"
+      ; Stlc.sexp_of_recur recur
       ; List [ Atom "name"; Atom name ]
       ; List [ Atom "args"; List args_sexp ]
       ; List [ Atom "body"; sexp_of_term body ]
@@ -102,7 +104,7 @@ let free_vars (env : env) (t : Uncurry.term) : Stlc.ty String.Map.t =
     | Lam (args, body) ->
       List.fold args ~init:(fv body) ~f:(fun acc (arg, _) -> Map.remove acc arg)
     | App (fn, args) -> union_list (fv fn :: List.map args ~f:fv)
-    | Let (v, bind, body) -> union (fv bind) (Map.remove (fv body) v)
+    | Let (_, v, bind, body) -> union (fv bind) (Map.remove (fv body) v)
     | If (c, t_true, e) -> union_list [ fv c; fv t_true; fv e ]
     | Bop (_, l, r) -> union (fv l) (fv r)
     | Index (t_sub, _) -> fv t_sub
@@ -161,7 +163,7 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
      | _ ->
        let%bind f, f_tops = lift f in
        make (App (f, args)) (f_tops @ args_tops))
-  | Let (v, { desc = Lam (args, body); ty; loc }, bind) ->
+  | Let (recur, v, { desc = Lam (args, body); ty; loc }, bind) ->
     (* NOTE: This is where the lambda lifting happens *)
     let captured =
       let excluded = Set.union globals (String.Set.of_list (v :: List.map args ~f:fst)) in
@@ -172,11 +174,15 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
     let name = Utils.fresh v in
     let env = Map.set env ~key:v ~data:(name, captured) in
     let%bind body, body_tops = lift_term globals env body in
-    let desc = Define { name; args = captured @ args; body; ret_ty = unroll_arrow ty } in
+    let desc =
+      Define { name; recur; args = captured @ args; body; ret_ty = unroll_arrow ty }
+    in
     let lifted_fn : top = { desc; ty; loc } in
     let%bind bind, bind_tops = lift_term globals env bind in
     return (bind, body_tops @ [ lifted_fn ] @ bind_tops)
-  | Let (v, bind, body) ->
+  | Let (Rec _, _, _, _) ->
+    error_s [%message "lift_term: rec tag on non-lambda" (t.loc : Lexer.loc)]
+  | Let (Nonrec, v, bind, body) ->
     let%bind bind, bind_tops = lift bind in
     let%bind body, body_tops = lift body in
     make (Let (v, bind, body)) (bind_tops @ body_tops)
@@ -203,10 +209,10 @@ let lift_top (globals : String.Set.t) (top : Uncurry.top) : top list Or_error.t 
   let make desc = { desc; ty = top.ty; loc = top.loc } in
   let lift = lift_term globals String.Map.empty in
   match top.desc with
-  | Define (name, { desc = Lam (args, body); ty; loc = _ }) ->
+  | Define (recur, name, { desc = Lam (args, body); ty; loc = _ }) ->
     let%map body, body_tops = lift body in
-    body_tops @ [ make (Define { name; args; body; ret_ty = unroll_arrow ty }) ]
-  | Define (name, term) ->
+    body_tops @ [ make (Define { name; recur; args; body; ret_ty = unroll_arrow ty }) ]
+  | Define (_, name, term) ->
     let%map term, term_tops = lift term in
     term_tops @ [ make (Const (name, term)) ]
   | Extern v -> return [ make (Extern v) ]
@@ -217,7 +223,7 @@ let lift (Program tops : Uncurry.t) : t Or_error.t =
     tops
     |> List.map ~f:(fun top ->
       match top.desc with
-      | Define (v, _) -> v
+      | Define (_, v, _) -> v
       | Extern v -> v)
     |> String.Set.of_list
   in

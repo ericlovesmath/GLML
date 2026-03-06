@@ -12,7 +12,7 @@ type term_desc =
   | Mat of int * int * term list
   | Lam of string * ty * term
   | App of term * term
-  | Let of string * term * term
+  | Let of recur * string * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -37,7 +37,10 @@ let rec sexp_of_term_desc = function
   | Lam (v, ty, body) ->
     List [ Atom "lambda"; List [ Atom v; sexp_of_ty ty ]; sexp_of_term body ]
   | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
-  | Let (v, bind, body) ->
+  | Let (Rec (n, ty), v, bind, body) ->
+    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n); sexp_of_ty ty ] in
+    List [ Atom "let"; rec_tag; Atom v; sexp_of_term bind; sexp_of_term body ]
+  | Let (Nonrec, v, bind, body) ->
     List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
   | If (c, t, e) -> List [ Atom "if"; sexp_of_term c; sexp_of_term t; sexp_of_term e ]
   | Bop (op, l, r) ->
@@ -49,7 +52,7 @@ let rec sexp_of_term_desc = function
 and sexp_of_term t = List [ sexp_of_term_desc t.desc; Atom ":"; Stlc.sexp_of_ty t.ty ]
 
 type top_desc =
-  | Define of string * term
+  | Define of recur * string * term
   | Extern of string
 [@@deriving sexp_of]
 
@@ -124,11 +127,21 @@ let rec update (map : ty String.Map.t) (t : Stlc.term)
     (match f.ty with
      | TyArrow (l, r) when equal_ty x.ty l -> make ~map (App (f, x)) r
      | _ -> error_s [%message "invalid app" (f.ty : ty) (x.ty : ty)])
-  | Let (v, bind, body) ->
+  | Let (Rec (n, ann_ty), v, bind, body) ->
+    let map = Map.set map ~key:v ~data:ann_ty in
+    let%bind map, bind = update map bind in
+    if equal_ty ann_ty bind.ty
+    then (
+      let%bind map, body = update map body in
+      make ~map (Let (Rec (n, ann_ty), v, bind, body)) body.ty)
+    else
+      error_s
+        [%message "typecheck: unexpected type on letrec" (ann_ty : ty) (bind.ty : ty)]
+  | Let (Nonrec, v, bind, body) ->
     let%bind map, bind = update map bind in
     let map = Map.set map ~key:v ~data:bind.ty in
     let%bind map, body = update map body in
-    make ~map (Let (v, bind, body)) body.ty
+    make ~map (Let (Nonrec, v, bind, body)) body.ty
   | If (c, t, e) ->
     (* Pure functions with all unique variable names, so passing maps
        like this should be fine to collect them *)
@@ -247,10 +260,20 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
   let%map _, tops =
     List.fold_result terms ~init:(String.Map.empty, []) ~f:(fun (map, acc) top ->
       match top.desc with
-      | Define (v, bind) ->
+      | Define (Rec (n, ann_ty), v, bind) ->
+        let map = Map.set map ~key:v ~data:ann_ty in
+        let%bind map, t = update map bind in
+        if equal_ty ann_ty t.ty
+        then (
+          let desc = Define (Rec (n, ann_ty), v, t) in
+          Ok (map, { desc; ty = t.ty; loc = top.loc } :: acc))
+        else
+          error_s
+            [%message "typecheck: unexpected type on letrec" (ann_ty : ty) (t.ty : ty)]
+      | Define (Nonrec, v, bind) ->
         let%bind map, t = update map bind in
         let map = Map.set map ~key:v ~data:t.ty in
-        Ok (map, { desc = Define (v, t); ty = t.ty; loc = top.loc } :: acc)
+        Ok (map, { desc = Define (Nonrec, v, t); ty = t.ty; loc = top.loc } :: acc)
       | Extern (ty, v) ->
         let map = Map.set map ~key:v ~data:ty in
         Ok (map, { desc = Extern v; ty; loc = top.loc } :: acc))

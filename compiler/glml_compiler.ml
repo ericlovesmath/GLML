@@ -10,6 +10,7 @@ module Passes = struct
     | Uncurry : Uncurry.t pass
     | Lambda_lift : Lambda_lift.t pass
     | Anf : Anf.t pass
+    | Tail_call : Tail_call.t pass
     | Translate : Glsl.t pass
     | Patch_main : Glsl.t pass
 
@@ -20,6 +21,7 @@ module Passes = struct
     | Uncurry -> Uncurry.sexp_of_t
     | Lambda_lift -> Lambda_lift.sexp_of_t
     | Anf -> Anf.sexp_of_t
+    | Tail_call -> Tail_call.sexp_of_t
     | Translate -> Glsl.sexp_of_t
     | Patch_main -> Glsl.sexp_of_t
   ;;
@@ -34,6 +36,7 @@ module Passes = struct
       | Uncurry
       | Lambda_lift
       | Anf
+      | Tail_call
       | Translate
       | Patch_main
     [@@deriving compare, sexp, enumerate, string ~capitalize:"lower sentence case"]
@@ -49,6 +52,7 @@ module Passes = struct
     | Uncurry -> Uncurry
     | Lambda_lift -> Lambda_lift
     | Anf -> Anf
+    | Tail_call -> Tail_call
     | Translate -> Translate
     | Patch_main -> Patch_main
   ;;
@@ -78,6 +82,8 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   trace Lambda_lift t;
   let t = Anf.to_anf t in
   trace Anf t;
+  let t = Tail_call.remove_rec t in
+  trace Tail_call t;
   let glsl = Translate.translate t in
   trace Translate glsl;
   let glsl = Patch_main.patch glsl in

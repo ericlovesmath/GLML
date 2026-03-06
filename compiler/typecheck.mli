@@ -11,7 +11,7 @@ type term_desc =
   | Mat of int * int * term list
   | Lam of string * ty * term
   | App of term * term
-  | Let of string * term * term
+  | Let of recur * string * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -25,8 +25,10 @@ and term =
   }
 [@@deriving sexp_of]
 
+(* TODO: After typechecking, does [Define] and [Let] even need to
+   include the annotated type, I think I can delete it *)
 type top_desc =
-  | Define of string * term
+  | Define of recur * string * term
   | Extern of string
 [@@deriving sexp_of]
 

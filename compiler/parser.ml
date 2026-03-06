@@ -185,17 +185,28 @@ let make_lambdas params (body : term) =
     body_term.desc
 ;;
 
+(* TODO: Hardcoded to maximum 1000 loops for now *)
+let recur_tag_t =
+  between
+    `Paren
+    ((let%map ty = tok REC *> tok COLON *> ty_p in
+      Rec (1000, ty))
+     <|> return Nonrec)
+  <??> "recur_tag"
+;;
+
 let rec term_let_p =
   fun st ->
   (with_term_loc
      (tok LET
       *> commit
-           (let%bind id = ident_p in
+           (let%bind recur = recur_tag_t in
+            let%bind id = ident_p in
             let%bind params = many param_p in
             let%bind rhs = tok EQ *> term_p in
             let rhs_desc = make_lambdas params rhs in
             let%bind body = tok IN *> term_p in
-            return (Let (id, { desc = rhs_desc; loc = rhs.loc }, body))))
+            return (Let (recur, id, { desc = rhs_desc; loc = rhs.loc }, body))))
    <??> "term_let")
     st
 
@@ -325,6 +336,7 @@ let%expect_test "term parse tests" =
   test "fun (x : bool) -> x";
   test "f x y";
   test "let bind = true in bind";
+  test "let rec f (x : float) = f x in f";
   test "if true then x else y";
   test "1 * 2 + true && 44 % 10";
   test "v[0]";
@@ -403,11 +415,12 @@ let top_let_p =
   with_top_loc
     (tok LET
      *> commit
-          (let%bind id = ident_p in
+          (let%bind recur = recur_tag_t in
+           let%bind id = ident_p in
            let%bind params = many param_p in
            let%bind rhs = tok EQ *> term_p in
            let rhs_desc = make_lambdas params rhs in
-           return (Define (id, { desc = rhs_desc; loc = rhs.loc })))
+           return (Define (recur, id, { desc = rhs_desc; loc = rhs.loc })))
      <??> "top_let")
 ;;
 
@@ -442,6 +455,7 @@ let%expect_test "glml parse tests" =
     let main = 1 + 2
     let f = fun (x : bool) (y : bool) -> x && y
     let main (u : vec2) = f <1, 2> + u
+    let rec g (x : float) = g x
     |};
   [%expect
     {|

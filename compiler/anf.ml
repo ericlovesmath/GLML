@@ -67,6 +67,7 @@ and sexp_of_anf t = sexp_of_anf_desc t.desc
 type top_desc =
   | Define of
       { name : string
+      ; recur : Stlc.recur
       ; args : (string * Stlc.ty) list
       ; body : anf
       ; ret_ty : Stlc.ty
@@ -75,12 +76,13 @@ type top_desc =
   | Extern of string
 
 let sexp_of_top_desc = function
-  | Define { name; args; body; ret_ty = _ } ->
+  | Define { name; recur; args; body; ret_ty = _ } ->
     let args_sexp =
       List.map args ~f:(fun (v, ty) -> List [ Atom v; Stlc.sexp_of_ty ty ])
     in
     List
       [ Atom "Define"
+      ; Stlc.sexp_of_recur recur
       ; List [ Atom "name"; Atom name ]
       ; List [ Atom "args"; List args_sexp ]
       ; List [ Atom "body"; sexp_of_anf body ]
@@ -165,8 +167,8 @@ and atomize_list ts (k : atom list -> anf) =
 let normalize_top (t : Lambda_lift.top) : top =
   let pure desc = { desc; ty = t.ty; loc = t.loc } in
   match t.desc with
-  | Define { name; args; body; ret_ty } ->
-    pure (Define { name; args; body = normalize body; ret_ty })
+  | Define { name; recur; args; body; ret_ty } ->
+    pure (Define { name; recur; args; body = normalize body; ret_ty })
   | Const (name, body) -> pure (Const (name, normalize body))
   | Extern v -> pure (Extern v)
 ;;

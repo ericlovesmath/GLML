@@ -20,6 +20,7 @@ type token =
   | THEN
   | ELSE
   | LET
+  | REC
   | IN
   | FUN
   | BAR
@@ -194,6 +195,7 @@ let read_lexeme (t : t) : token Or_error.t =
           | "true" -> TRUE
           | "false" -> FALSE
           | "let" -> LET
+          | "rec" -> REC
           | "in" -> IN
           | "if" -> IF
           | "then" -> THEN
@@ -239,7 +241,7 @@ let%expect_test "lexer" =
   test "{ } ; : , if then else let";
   test "in fun | match with { }";
   test "bool int float ' 10 string_var";
-  test "+ - / * # <= >= % && ||";
+  test "+ - / * # <= >= % && || extern let";
   test "1.23 .45 6. -1.";
   [%expect
     {|
@@ -247,7 +249,7 @@ let%expect_test "lexer" =
     (Ok (LCURLY RCURLY SEMI COLON COMMA IF THEN ELSE LET))
     (Ok (IN FUN BAR MATCH WITH LCURLY RCURLY))
     (Ok (BOOL INT FLOAT TICK (NUMERIC 10) (ID string_var)))
-    (Ok (ADD SUB DIV MUL HASH LEQ GEQ PERCENT LAND LOR))
+    (Ok (ADD SUB DIV MUL HASH LEQ GEQ PERCENT LAND LOR EXTERN LET))
     (Ok ((FLOAT_LIT 1.23) (FLOAT_LIT 0.45) (FLOAT_LIT 6) SUB (FLOAT_LIT 1)))
     |}];
   test "let{x:int}=match|a->fun->(f<x>*2)";

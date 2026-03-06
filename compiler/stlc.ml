@@ -19,6 +19,11 @@ let rec sexp_of_ty = function
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
 ;;
 
+type recur =
+  | Rec of int * ty
+  | Nonrec
+[@@deriving sexp_of]
+
 type term_desc =
   | Var of string
   | Float of float
@@ -28,7 +33,7 @@ type term_desc =
   | Mat of int * int * term list
   | Lam of string * ty * term
   | App of term * term
-  | Let of string * term * term
+  | Let of recur * string * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -52,7 +57,10 @@ let rec sexp_of_term_desc = function
   | Lam (v, ty, body) ->
     List [ Atom "lambda"; List [ Atom v; sexp_of_ty ty ]; sexp_of_term body ]
   | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
-  | Let (v, bind, body) ->
+  | Let (Rec (n, ty), v, bind, body) ->
+    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n); sexp_of_ty ty ] in
+    List [ Atom "let"; rec_tag; Atom v; sexp_of_term bind; sexp_of_term body ]
+  | Let (Nonrec, v, bind, body) ->
     List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
   | If (c, t, e) -> List [ Atom "if"; sexp_of_term c; sexp_of_term t; sexp_of_term e ]
   | Bop (op, l, r) ->
@@ -64,7 +72,7 @@ let rec sexp_of_term_desc = function
 and sexp_of_term t = sexp_of_term_desc t.desc
 
 type top_desc =
-  | Define of string * term
+  | Define of recur * string * term
   | Extern of ty * string
 [@@deriving sexp_of]
 

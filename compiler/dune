@@ -14,6 +14,7 @@
    uncurry
    lambda_lift
    anf
+   tail_call
    translate
    patch_main
    glsl)

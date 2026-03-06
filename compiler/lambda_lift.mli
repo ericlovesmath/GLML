@@ -25,6 +25,7 @@ and term =
 type top_desc =
   | Define of
       { name : string
+      ; recur : Stlc.recur
       ; args : (string * Stlc.ty) list
       ; body : term
       ; ret_ty : Stlc.ty
