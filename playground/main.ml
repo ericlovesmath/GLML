@@ -23,6 +23,7 @@ module Example = struct
     | Pastel_rainbow
     | Checkboard
     | Recursive_star
+    | Mandelbrot
   [@@deriving sexp, compare, equal, enumerate, to_string ~capitalize:"Title Case"]
 
   let to_glml = function
@@ -30,6 +31,7 @@ module Example = struct
     | Pastel_rainbow -> [%blob "../examples/rainbow.glml"]
     | Checkboard -> [%blob "../examples/checkerboard.glml"]
     | Recursive_star -> [%blob "../examples/recursion.glml"]
+    | Mandelbrot -> [%blob "../examples/mandelbrot.glml"]
   ;;
 end
 

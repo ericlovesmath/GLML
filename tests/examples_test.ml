@@ -296,6 +296,610 @@ let%expect_test "compile examples" =
         ((set () vec3 color (main_pure (. gl_FragCoord xy)))
          (set fragColor (clamp (vec4 (. color xyz) 1.) 0. 1.)))))))
 
+    ====== COMPILING EXAMPLE mandelbrot.glml ======
+
+    === stlc (mandelbrot.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Extern float u_time)
+      (Define Nonrec get_uv
+       (lambda (coord (vec 2))
+        (let top (- (* 2. coord) u_resolution)
+         (let bot (min (index u_resolution 0) (index u_resolution 1))
+          (/ top bot)))))
+      (Define
+       (Rec 1000 (float -> (float -> (float -> (float -> (float -> float))))))
+       mandel
+       (lambda (zx float)
+        (lambda (zy float)
+         (lambda (cx float)
+          (lambda (cy float)
+           (lambda (i float)
+            (if (|| (> (length (vec2 zx zy)) 2.) (> i 150.)) i
+             (let next_zx (+ (- (* zx zx) (* zy zy)) cx)
+              (let next_zy (+ (* (* 2. zx) zy) cy)
+               (app (app (app (app (app mandel next_zx) next_zy) cx) cy)
+                (+ i 1.)))))))))))
+      (Define Nonrec main
+       (lambda (coord (vec 2))
+        (let uv (app get_uv coord)
+         (let zoom (exp (+ (* (sin (* u_time 0.4)) 4.5) 3.5))
+          (let cx (+ -0.7453 (/ (index uv 0) zoom))
+           (let cy (+ 0.1127 (/ (index uv 1) zoom))
+            (let iter (app (app (app (app (app mandel 0.) 0.) cx) cy) 0.)
+             (if (> iter 149.) (vec3 0. 0. 0.)
+              (let n (/ iter 150.)
+               (let r (+ (* (sin (+ (* n 10.) u_time)) 0.5) 0.5)
+                (let g (+ (* (sin (+ (* n 20.) u_time)) 0.5) 0.5)
+                 (let b (+ (* (sin (+ (* n 30.) u_time)) 0.5) 0.5) (vec3 r g b)))))))))))))))
+
+    === uniquify (mandelbrot.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Extern float u_time)
+      (Define Nonrec get_uv_0
+       (lambda (coord_1 (vec 2))
+        (let top_2 (- (* 2. coord_1) u_resolution)
+         (let bot_3 (min (index u_resolution 0) (index u_resolution 1))
+          (/ top_2 bot_3)))))
+      (Define
+       (Rec 1000 (float -> (float -> (float -> (float -> (float -> float))))))
+       mandel_4
+       (lambda (zx_5 float)
+        (lambda (zy_6 float)
+         (lambda (cx_7 float)
+          (lambda (cy_8 float)
+           (lambda (i_9 float)
+            (if (|| (> (length (vec2 zx_5 zy_6)) 2.) (> i_9 150.)) i_9
+             (let next_zx_10 (+ (- (* zx_5 zx_5) (* zy_6 zy_6)) cx_7)
+              (let next_zy_11 (+ (* (* 2. zx_5) zy_6) cy_8)
+               (app
+                (app (app (app (app mandel_4 next_zx_10) next_zy_11) cx_7) cy_8)
+                (+ i_9 1.)))))))))))
+      (Define Nonrec main
+       (lambda (coord_12 (vec 2))
+        (let uv_13 (app get_uv_0 coord_12)
+         (let zoom_14 (exp (+ (* (sin (* u_time 0.4)) 4.5) 3.5))
+          (let cx_15 (+ -0.7453 (/ (index uv_13 0) zoom_14))
+           (let cy_16 (+ 0.1127 (/ (index uv_13 1) zoom_14))
+            (let iter_17
+             (app (app (app (app (app mandel_4 0.) 0.) cx_15) cy_16) 0.)
+             (if (> iter_17 149.) (vec3 0. 0. 0.)
+              (let n_18 (/ iter_17 150.)
+               (let r_19 (+ (* (sin (+ (* n_18 10.) u_time)) 0.5) 0.5)
+                (let g_20 (+ (* (sin (+ (* n_18 20.) u_time)) 0.5) 0.5)
+                 (let b_21 (+ (* (sin (+ (* n_18 30.) u_time)) 0.5) 0.5)
+                  (vec3 r_19 g_20 b_21)))))))))))))))
+
+    === typecheck (mandelbrot.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+      ((Define Nonrec get_uv_0
+        ((lambda (coord_1 (vec 2))
+          ((let top_2
+            ((- ((* (2. : float) (coord_1 : (vec 2))) : (vec 2))
+              (u_resolution : (vec 2)))
+             : (vec 2))
+            ((let bot_3
+              ((min ((index (u_resolution : (vec 2)) 0) : float)
+                ((index (u_resolution : (vec 2)) 1) : float))
+               : float)
+              ((/ (top_2 : (vec 2)) (bot_3 : float)) : (vec 2)))
+             : (vec 2)))
+           : (vec 2)))
+         : ((vec 2) -> (vec 2))))
+       : ((vec 2) -> (vec 2)))
+      ((Define
+        (Rec 1000 (float -> (float -> (float -> (float -> (float -> float))))))
+        mandel_4
+        ((lambda (zx_5 float)
+          ((lambda (zy_6 float)
+            ((lambda (cx_7 float)
+              ((lambda (cy_8 float)
+                ((lambda (i_9 float)
+                  ((if
+                    ((||
+                      ((>
+                        ((length
+                          ((vec2 (zx_5 : float) (zy_6 : float)) : (vec 2)))
+                         : float)
+                        (2. : float))
+                       : bool)
+                      ((> (i_9 : float) (150. : float)) : bool))
+                     : bool)
+                    (i_9 : float)
+                    ((let next_zx_10
+                      ((+
+                        ((- ((* (zx_5 : float) (zx_5 : float)) : float)
+                          ((* (zy_6 : float) (zy_6 : float)) : float))
+                         : float)
+                        (cx_7 : float))
+                       : float)
+                      ((let next_zy_11
+                        ((+
+                          ((* ((* (2. : float) (zx_5 : float)) : float)
+                            (zy_6 : float))
+                           : float)
+                          (cy_8 : float))
+                         : float)
+                        ((app
+                          ((app
+                            ((app
+                              ((app
+                                ((app
+                                  (mandel_4 :
+                                   (float ->
+                                    (float ->
+                                     (float -> (float -> (float -> float))))))
+                                  (next_zx_10 : float))
+                                 :
+                                 (float ->
+                                  (float -> (float -> (float -> float)))))
+                                (next_zy_11 : float))
+                               : (float -> (float -> (float -> float))))
+                              (cx_7 : float))
+                             : (float -> (float -> float)))
+                            (cy_8 : float))
+                           : (float -> float))
+                          ((+ (i_9 : float) (1. : float)) : float))
+                         : float))
+                       : float))
+                     : float))
+                   : float))
+                 : (float -> float)))
+               : (float -> (float -> float))))
+             : (float -> (float -> (float -> float)))))
+           : (float -> (float -> (float -> (float -> float))))))
+         : (float -> (float -> (float -> (float -> (float -> float)))))))
+       : (float -> (float -> (float -> (float -> (float -> float))))))
+      ((Define Nonrec main
+        ((lambda (coord_12 (vec 2))
+          ((let uv_13
+            ((app (get_uv_0 : ((vec 2) -> (vec 2))) (coord_12 : (vec 2))) :
+             (vec 2))
+            ((let zoom_14
+              ((exp
+                ((+
+                  ((*
+                    ((sin ((* (u_time : float) (0.4 : float)) : float)) : float)
+                    (4.5 : float))
+                   : float)
+                  (3.5 : float))
+                 : float))
+               : float)
+              ((let cx_15
+                ((+ (-0.7453 : float)
+                  ((/ ((index (uv_13 : (vec 2)) 0) : float) (zoom_14 : float)) :
+                   float))
+                 : float)
+                ((let cy_16
+                  ((+ (0.1127 : float)
+                    ((/ ((index (uv_13 : (vec 2)) 1) : float) (zoom_14 : float))
+                     : float))
+                   : float)
+                  ((let iter_17
+                    ((app
+                      ((app
+                        ((app
+                          ((app
+                            ((app
+                              (mandel_4 :
+                               (float ->
+                                (float -> (float -> (float -> (float -> float))))))
+                              (0. : float))
+                             : (float -> (float -> (float -> (float -> float)))))
+                            (0. : float))
+                           : (float -> (float -> (float -> float))))
+                          (cx_15 : float))
+                         : (float -> (float -> float)))
+                        (cy_16 : float))
+                       : (float -> float))
+                      (0. : float))
+                     : float)
+                    ((if ((> (iter_17 : float) (149. : float)) : bool)
+                      ((vec3 (0. : float) (0. : float) (0. : float)) : (vec 3))
+                      ((let n_18 ((/ (iter_17 : float) (150. : float)) : float)
+                        ((let r_19
+                          ((+
+                            ((*
+                              ((sin
+                                ((+ ((* (n_18 : float) (10. : float)) : float)
+                                  (u_time : float))
+                                 : float))
+                               : float)
+                              (0.5 : float))
+                             : float)
+                            (0.5 : float))
+                           : float)
+                          ((let g_20
+                            ((+
+                              ((*
+                                ((sin
+                                  ((+ ((* (n_18 : float) (20. : float)) : float)
+                                    (u_time : float))
+                                   : float))
+                                 : float)
+                                (0.5 : float))
+                               : float)
+                              (0.5 : float))
+                             : float)
+                            ((let b_21
+                              ((+
+                                ((*
+                                  ((sin
+                                    ((+
+                                      ((* (n_18 : float) (30. : float)) : float)
+                                      (u_time : float))
+                                     : float))
+                                   : float)
+                                  (0.5 : float))
+                                 : float)
+                                (0.5 : float))
+                               : float)
+                              ((vec3 (r_19 : float) (g_20 : float)
+                                (b_21 : float))
+                               : (vec 3)))
+                             : (vec 3)))
+                           : (vec 3)))
+                         : (vec 3)))
+                       : (vec 3)))
+                     : (vec 3)))
+                   : (vec 3)))
+                 : (vec 3)))
+               : (vec 3)))
+             : (vec 3)))
+           : (vec 3)))
+         : ((vec 2) -> (vec 3))))
+       : ((vec 2) -> (vec 3)))))
+
+    === uncurry (mandelbrot.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+      ((Define Nonrec get_uv_0
+        (lambda ((coord_1 (vec 2)))
+         (let top_2 (- (* 2. coord_1) u_resolution)
+          (let bot_3 (min (index u_resolution 0) (index u_resolution 1))
+           (/ top_2 bot_3)))))
+       : ((vec 2) -> (vec 2)))
+      ((Define
+        (Rec 1000 (float -> (float -> (float -> (float -> (float -> float))))))
+        mandel_4
+        (lambda ((zx_5 float) (zy_6 float) (cx_7 float) (cy_8 float) (i_9 float))
+         (if (|| (> (length (vec2 zx_5 zy_6)) 2.) (> i_9 150.)) i_9
+          (let next_zx_10 (+ (- (* zx_5 zx_5) (* zy_6 zy_6)) cx_7)
+           (let next_zy_11 (+ (* (* 2. zx_5) zy_6) cy_8)
+            (app mandel_4 next_zx_10 next_zy_11 cx_7 cy_8 (+ i_9 1.)))))))
+       : (float -> (float -> (float -> (float -> (float -> float))))))
+      ((Define Nonrec main
+        (lambda ((coord_12 (vec 2)))
+         (let uv_13 (app get_uv_0 coord_12)
+          (let zoom_14 (exp (+ (* (sin (* u_time 0.4)) 4.5) 3.5))
+           (let cx_15 (+ -0.7453 (/ (index uv_13 0) zoom_14))
+            (let cy_16 (+ 0.1127 (/ (index uv_13 1) zoom_14))
+             (let iter_17 (app mandel_4 0. 0. cx_15 cy_16 0.)
+              (if (> iter_17 149.) (vec3 0. 0. 0.)
+               (let n_18 (/ iter_17 150.)
+                (let r_19 (+ (* (sin (+ (* n_18 10.) u_time)) 0.5) 0.5)
+                 (let g_20 (+ (* (sin (+ (* n_18 20.) u_time)) 0.5) 0.5)
+                  (let b_21 (+ (* (sin (+ (* n_18 30.) u_time)) 0.5) 0.5)
+                   (vec3 r_19 g_20 b_21)))))))))))))
+       : ((vec 2) -> (vec 3)))))
+
+    === lambda lift (mandelbrot.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+     ((Define Nonrec (name get_uv_0) (args ((coord_1 (vec 2))))
+       (body
+        (let top_2 (- (* 2. coord_1) u_resolution)
+         (let bot_3 (min (index u_resolution 0) (index u_resolution 1))
+          (/ top_2 bot_3)))))
+      : ((vec 2) -> (vec 2)))
+     ((Define
+       (Rec 1000 (float -> (float -> (float -> (float -> (float -> float))))))
+       (name mandel_4)
+       (args ((zx_5 float) (zy_6 float) (cx_7 float) (cy_8 float) (i_9 float)))
+       (body
+        (if (|| (> (length (vec2 zx_5 zy_6)) 2.) (> i_9 150.)) i_9
+         (let next_zx_10 (+ (- (* zx_5 zx_5) (* zy_6 zy_6)) cx_7)
+          (let next_zy_11 (+ (* (* 2. zx_5) zy_6) cy_8)
+           (app mandel_4 next_zx_10 next_zy_11 cx_7 cy_8 (+ i_9 1.)))))))
+      : (float -> (float -> (float -> (float -> (float -> float))))))
+     ((Define Nonrec (name main) (args ((coord_12 (vec 2))))
+       (body
+        (let uv_13 (app get_uv_0 coord_12)
+         (let zoom_14 (exp (+ (* (sin (* u_time 0.4)) 4.5) 3.5))
+          (let cx_15 (+ -0.7453 (/ (index uv_13 0) zoom_14))
+           (let cy_16 (+ 0.1127 (/ (index uv_13 1) zoom_14))
+            (let iter_17 (app mandel_4 0. 0. cx_15 cy_16 0.)
+             (if (> iter_17 149.) (vec3 0. 0. 0.)
+              (let n_18 (/ iter_17 150.)
+               (let r_19 (+ (* (sin (+ (* n_18 10.) u_time)) 0.5) 0.5)
+                (let g_20 (+ (* (sin (+ (* n_18 20.) u_time)) 0.5) 0.5)
+                 (let b_21 (+ (* (sin (+ (* n_18 30.) u_time)) 0.5) 0.5)
+                  (vec3 r_19 g_20 b_21)))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === anf (mandelbrot.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+     ((Define Nonrec (name get_uv_0) (args ((coord_1 (vec 2))))
+       (body
+        (let anf_22 (* 2. coord_1)
+         (let top_2 (- anf_22 u_resolution)
+          (let anf_23 (index u_resolution 0)
+           (let anf_24 (index u_resolution 1)
+            (let bot_3 (min anf_23 anf_24) (return (/ top_2 bot_3)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Define
+       (Rec 1000 (float -> (float -> (float -> (float -> (float -> float))))))
+       (name mandel_4)
+       (args ((zx_5 float) (zy_6 float) (cx_7 float) (cy_8 float) (i_9 float)))
+       (body
+        (let anf_25 (vec2 zx_5 zy_6)
+         (let anf_26 (length anf_25)
+          (let anf_27 (> anf_26 2.)
+           (let anf_28 (> i_9 150.)
+            (let anf_29 (|| anf_27 anf_28)
+             (return
+              (if anf_29 (return i_9)
+               (let anf_30 (* zx_5 zx_5)
+                (let anf_31 (* zy_6 zy_6)
+                 (let anf_32 (- anf_30 anf_31)
+                  (let next_zx_10 (+ anf_32 cx_7)
+                   (let anf_33 (* 2. zx_5)
+                    (let anf_34 (* anf_33 zy_6)
+                     (let next_zy_11 (+ anf_34 cy_8)
+                      (let anf_35 (+ i_9 1.)
+                       (return (mandel_4 next_zx_10 next_zy_11 cx_7 cy_8 anf_35)))))))))))))))))))
+      : (float -> (float -> (float -> (float -> (float -> float))))))
+     ((Define Nonrec (name main) (args ((coord_12 (vec 2))))
+       (body
+        (let uv_13 (get_uv_0 coord_12)
+         (let anf_36 (* u_time 0.4)
+          (let anf_37 (sin anf_36)
+           (let anf_38 (* anf_37 4.5)
+            (let anf_39 (+ anf_38 3.5)
+             (let zoom_14 (exp anf_39)
+              (let anf_40 (index uv_13 0)
+               (let anf_41 (/ anf_40 zoom_14)
+                (let cx_15 (+ -0.7453 anf_41)
+                 (let anf_42 (index uv_13 1)
+                  (let anf_43 (/ anf_42 zoom_14)
+                   (let cy_16 (+ 0.1127 anf_43)
+                    (let iter_17 (mandel_4 0. 0. cx_15 cy_16 0.)
+                     (let anf_44 (> iter_17 149.)
+                      (return
+                       (if anf_44 (return (vec3 0. 0. 0.))
+                        (let n_18 (/ iter_17 150.)
+                         (let anf_45 (* n_18 10.)
+                          (let anf_46 (+ anf_45 u_time)
+                           (let anf_47 (sin anf_46)
+                            (let anf_48 (* anf_47 0.5)
+                             (let r_19 (+ anf_48 0.5)
+                              (let anf_49 (* n_18 20.)
+                               (let anf_50 (+ anf_49 u_time)
+                                (let anf_51 (sin anf_50)
+                                 (let anf_52 (* anf_51 0.5)
+                                  (let g_20 (+ anf_52 0.5)
+                                   (let anf_53 (* n_18 30.)
+                                    (let anf_54 (+ anf_53 u_time)
+                                     (let anf_55 (sin anf_54)
+                                      (let anf_56 (* anf_55 0.5)
+                                       (let b_21 (+ anf_56 0.5)
+                                        (return (vec3 r_19 g_20 b_21))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === tail call (mandelbrot.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+     ((Define (name get_uv_0) (args ((coord_1 (vec 2))))
+       (body
+        (let anf_22 (* 2. coord_1)
+         (let top_2 (- anf_22 u_resolution)
+          (let anf_23 (index u_resolution 0)
+           (let anf_24 (index u_resolution 1)
+            (let bot_3 (min anf_23 anf_24) (return (/ top_2 bot_3)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Define (name mandel_4)
+       (args ((zx_5 float) (zy_6 float) (cx_7 float) (cy_8 float) (i_9 float)))
+       (body
+        (let _iter_57 0
+         (while (< _iter_57 1000)
+          (let anf_25 (vec2 zx_5 zy_6)
+           (let anf_26 (length anf_25)
+            (let anf_27 (> anf_26 2.)
+             (let anf_28 (> i_9 150.)
+              (let anf_29 (|| anf_27 anf_28)
+               (return
+                (if anf_29 (return i_9)
+                 (let anf_30 (* zx_5 zx_5)
+                  (let anf_31 (* zy_6 zy_6)
+                   (let anf_32 (- anf_30 anf_31)
+                    (let next_zx_10 (+ anf_32 cx_7)
+                     (let anf_33 (* 2. zx_5)
+                      (let anf_34 (* anf_33 zy_6)
+                       (let next_zy_11 (+ anf_34 cy_8)
+                        (let anf_35 (+ i_9 1.)
+                         (set zx_5 next_zx_10
+                          (set zy_6 next_zy_11
+                           (set cx_7 cx_7
+                            (set cy_8 cy_8
+                             (set i_9 anf_35
+                              (let _iter_inc_58 (+ _iter_57 1)
+                               (set _iter_57 _iter_inc_58 continue))))))))))))))))))))))
+          0.))))
+      : (float -> (float -> (float -> (float -> (float -> float))))))
+     ((Define (name main) (args ((coord_12 (vec 2))))
+       (body
+        (let uv_13 (get_uv_0 coord_12)
+         (let anf_36 (* u_time 0.4)
+          (let anf_37 (sin anf_36)
+           (let anf_38 (* anf_37 4.5)
+            (let anf_39 (+ anf_38 3.5)
+             (let zoom_14 (exp anf_39)
+              (let anf_40 (index uv_13 0)
+               (let anf_41 (/ anf_40 zoom_14)
+                (let cx_15 (+ -0.7453 anf_41)
+                 (let anf_42 (index uv_13 1)
+                  (let anf_43 (/ anf_42 zoom_14)
+                   (let cy_16 (+ 0.1127 anf_43)
+                    (let iter_17 (mandel_4 0. 0. cx_15 cy_16 0.)
+                     (let anf_44 (> iter_17 149.)
+                      (return
+                       (if anf_44 (return (vec3 0. 0. 0.))
+                        (let n_18 (/ iter_17 150.)
+                         (let anf_45 (* n_18 10.)
+                          (let anf_46 (+ anf_45 u_time)
+                           (let anf_47 (sin anf_46)
+                            (let anf_48 (* anf_47 0.5)
+                             (let r_19 (+ anf_48 0.5)
+                              (let anf_49 (* n_18 20.)
+                               (let anf_50 (+ anf_49 u_time)
+                                (let anf_51 (sin anf_50)
+                                 (let anf_52 (* anf_51 0.5)
+                                  (let g_20 (+ anf_52 0.5)
+                                   (let anf_53 (* n_18 30.)
+                                    (let anf_54 (+ anf_53 u_time)
+                                     (let anf_55 (sin anf_54)
+                                      (let anf_56 (* anf_55 0.5)
+                                       (let b_21 (+ anf_56 0.5)
+                                        (return (vec3 r_19 g_20 b_21))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === translate (mandelbrot.glml) ===
+    (Program
+     ((Global Uniform (TyVec 2) u_resolution) (Global Uniform TyFloat u_time)
+      (Function (name get_uv_0) (desc ()) (params (((TyVec 2) coord_1)))
+       (ret_type (TyVec 2))
+       (body
+        ((set () vec2 anf_22 (* 2. coord_1))
+         (set () vec2 top_2 (- anf_22 u_resolution))
+         (set () float anf_23 (index u_resolution 0))
+         (set () float anf_24 (index u_resolution 1))
+         (set () float bot_3 (min anf_23 anf_24)) (return (/ top_2 bot_3)))))
+      (Function (name mandel_4) (desc ())
+       (params
+        ((TyFloat zx_5) (TyFloat zy_6) (TyFloat cx_7) (TyFloat cy_8)
+         (TyFloat i_9)))
+       (ret_type TyFloat)
+       (body
+        ((set () int _iter_57 0)
+         (while (< _iter_57 1000)
+          (Block (set () vec2 anf_25 (vec2 zx_5 zy_6))
+           (set () float anf_26 (length anf_25))
+           (set () bool anf_27 (> anf_26 2.)) (set () bool anf_28 (> i_9 150.))
+           (set () bool anf_29 (|| anf_27 anf_28))
+           (if anf_29 (Block (return i_9))
+            (Block (set () float anf_30 (* zx_5 zx_5))
+             (set () float anf_31 (* zy_6 zy_6))
+             (set () float anf_32 (- anf_30 anf_31))
+             (set () float next_zx_10 (+ anf_32 cx_7))
+             (set () float anf_33 (* 2. zx_5))
+             (set () float anf_34 (* anf_33 zy_6))
+             (set () float next_zy_11 (+ anf_34 cy_8))
+             (set () float anf_35 (+ i_9 1.)) (set zx_5 next_zx_10)
+             (set zy_6 next_zy_11) (set cx_7 cx_7) (set cy_8 cy_8)
+             (set i_9 anf_35) (set () int _iter_inc_58 (+ _iter_57 1))
+             (set _iter_57 _iter_inc_58) continue))))
+         (return 0.))))
+      (Function (name main) (desc ()) (params (((TyVec 2) coord_12)))
+       (ret_type (TyVec 3))
+       (body
+        ((set () vec2 uv_13 (get_uv_0 coord_12))
+         (set () float anf_36 (* u_time 0.4)) (set () float anf_37 (sin anf_36))
+         (set () float anf_38 (* anf_37 4.5))
+         (set () float anf_39 (+ anf_38 3.5)) (set () float zoom_14 (exp anf_39))
+         (set () float anf_40 (index uv_13 0))
+         (set () float anf_41 (/ anf_40 zoom_14))
+         (set () float cx_15 (+ -0.7453 anf_41))
+         (set () float anf_42 (index uv_13 1))
+         (set () float anf_43 (/ anf_42 zoom_14))
+         (set () float cy_16 (+ 0.1127 anf_43))
+         (set () float iter_17 (mandel_4 0. 0. cx_15 cy_16 0.))
+         (set () bool anf_44 (> iter_17 149.))
+         (if anf_44 (Block (return (vec3 0. 0. 0.)))
+          (Block (set () float n_18 (/ iter_17 150.))
+           (set () float anf_45 (* n_18 10.))
+           (set () float anf_46 (+ anf_45 u_time))
+           (set () float anf_47 (sin anf_46))
+           (set () float anf_48 (* anf_47 0.5))
+           (set () float r_19 (+ anf_48 0.5)) (set () float anf_49 (* n_18 20.))
+           (set () float anf_50 (+ anf_49 u_time))
+           (set () float anf_51 (sin anf_50))
+           (set () float anf_52 (* anf_51 0.5))
+           (set () float g_20 (+ anf_52 0.5)) (set () float anf_53 (* n_18 30.))
+           (set () float anf_54 (+ anf_53 u_time))
+           (set () float anf_55 (sin anf_54))
+           (set () float anf_56 (* anf_55 0.5))
+           (set () float b_21 (+ anf_56 0.5)) (return (vec3 r_19 g_20 b_21)))))))))
+
+    === patch main (mandelbrot.glml) ===
+    (Program
+     ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
+      (Global Uniform TyFloat u_time)
+      (Function (name get_uv_0) (desc ()) (params (((TyVec 2) coord_1)))
+       (ret_type (TyVec 2))
+       (body
+        ((set () vec2 anf_22 (* 2. coord_1))
+         (set () vec2 top_2 (- anf_22 u_resolution))
+         (set () float anf_23 (index u_resolution 0))
+         (set () float anf_24 (index u_resolution 1))
+         (set () float bot_3 (min anf_23 anf_24)) (return (/ top_2 bot_3)))))
+      (Function (name mandel_4) (desc ())
+       (params
+        ((TyFloat zx_5) (TyFloat zy_6) (TyFloat cx_7) (TyFloat cy_8)
+         (TyFloat i_9)))
+       (ret_type TyFloat)
+       (body
+        ((set () int _iter_57 0)
+         (while (< _iter_57 1000)
+          (Block (set () vec2 anf_25 (vec2 zx_5 zy_6))
+           (set () float anf_26 (length anf_25))
+           (set () bool anf_27 (> anf_26 2.)) (set () bool anf_28 (> i_9 150.))
+           (set () bool anf_29 (|| anf_27 anf_28))
+           (if anf_29 (Block (return i_9))
+            (Block (set () float anf_30 (* zx_5 zx_5))
+             (set () float anf_31 (* zy_6 zy_6))
+             (set () float anf_32 (- anf_30 anf_31))
+             (set () float next_zx_10 (+ anf_32 cx_7))
+             (set () float anf_33 (* 2. zx_5))
+             (set () float anf_34 (* anf_33 zy_6))
+             (set () float next_zy_11 (+ anf_34 cy_8))
+             (set () float anf_35 (+ i_9 1.)) (set zx_5 next_zx_10)
+             (set zy_6 next_zy_11) (set cx_7 cx_7) (set cy_8 cy_8)
+             (set i_9 anf_35) (set () int _iter_inc_58 (+ _iter_57 1))
+             (set _iter_57 _iter_inc_58) continue))))
+         (return 0.))))
+      (Function (name main_pure) (desc ()) (params (((TyVec 2) coord_12)))
+       (ret_type (TyVec 3))
+       (body
+        ((set () vec2 uv_13 (get_uv_0 coord_12))
+         (set () float anf_36 (* u_time 0.4)) (set () float anf_37 (sin anf_36))
+         (set () float anf_38 (* anf_37 4.5))
+         (set () float anf_39 (+ anf_38 3.5)) (set () float zoom_14 (exp anf_39))
+         (set () float anf_40 (index uv_13 0))
+         (set () float anf_41 (/ anf_40 zoom_14))
+         (set () float cx_15 (+ -0.7453 anf_41))
+         (set () float anf_42 (index uv_13 1))
+         (set () float anf_43 (/ anf_42 zoom_14))
+         (set () float cy_16 (+ 0.1127 anf_43))
+         (set () float iter_17 (mandel_4 0. 0. cx_15 cy_16 0.))
+         (set () bool anf_44 (> iter_17 149.))
+         (if anf_44 (Block (return (vec3 0. 0. 0.)))
+          (Block (set () float n_18 (/ iter_17 150.))
+           (set () float anf_45 (* n_18 10.))
+           (set () float anf_46 (+ anf_45 u_time))
+           (set () float anf_47 (sin anf_46))
+           (set () float anf_48 (* anf_47 0.5))
+           (set () float r_19 (+ anf_48 0.5)) (set () float anf_49 (* n_18 20.))
+           (set () float anf_50 (+ anf_49 u_time))
+           (set () float anf_51 (sin anf_50))
+           (set () float anf_52 (* anf_51 0.5))
+           (set () float g_20 (+ anf_52 0.5)) (set () float anf_53 (* n_18 30.))
+           (set () float anf_54 (+ anf_53 u_time))
+           (set () float anf_55 (sin anf_54))
+           (set () float anf_56 (* anf_55 0.5))
+           (set () float b_21 (+ anf_56 0.5)) (return (vec3 r_19 g_20 b_21)))))))
+      (Function (name main) (desc ()) (params ()) (ret_type TyVoid)
+       (body
+        ((set () vec3 color (main_pure (. gl_FragCoord xy)))
+         (set fragColor (clamp (vec4 (. color xyz) 1.) 0. 1.)))))))
+
     ====== COMPILING EXAMPLE mouse_circle.glml ======
 
     === stlc (mouse_circle.glml) ===
