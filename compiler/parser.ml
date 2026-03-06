@@ -268,15 +268,7 @@ and term_atom_p =
   (term_builtin_p <|> term_singles_p <|> term_mat_p <|> term_vec_p <??> "term_atom") st
 
 and term_head_p =
-  fun st ->
-  (term_let_p
-   <|> term_if_p
-   <|> term_lam_p
-   <|> term_atom_p
-   <|> term_number_p
-   <|> between `Paren term_p
-   <??> "term_head")
-    st
+  fun st -> (term_atom_p <|> term_number_p <|> between `Paren term_p <??> "term_head") st
 
 and term_postfix_p =
   fun st ->
@@ -304,19 +296,26 @@ and term_postfix_p =
   (postfix_chain term_head_p op_p <??> "term_postfix_chain") st
 
 and term_p =
-  fun st -> (List.fold_left bop_levels ~init:term_postfix_p ~f:chainl1 <??> "term") st
+  fun st ->
+  (term_let_p
+   <|> term_if_p
+   <|> term_lam_p
+   <|> List.fold_left bop_levels ~init:term_postfix_p ~f:chainl1
+   <??> "term")
+    st
+;;
+
+let test s =
+  s
+  |> Lexer.init
+  |> Lexer.lex
+  |> Or_error.map ~f:(run term_p)
+  |> Or_error.join
+  |> Or_error.sexp_of_t sexp_of_term
+  |> print_s
 ;;
 
 let%expect_test "term parse tests" =
-  let test s =
-    s
-    |> Lexer.init
-    |> Lexer.lex
-    |> Or_error.map ~f:(run term_p)
-    |> Or_error.join
-    |> Or_error.sexp_of_t sexp_of_term
-    |> print_s
-  in
   test "variable_name";
   test "-13.4";
   test "33";
@@ -347,6 +346,7 @@ let%expect_test "term parse tests" =
     (Ok (min 1 2))
     |}];
   test "-113.0";
+  test "-113.";
   test "-113";
   test "f x y z";
   test "f (x y) z";
@@ -357,6 +357,7 @@ let%expect_test "term parse tests" =
   test "f (-5)";
   [%expect
     {|
+    (Ok -113.)
     (Ok -113.)
     (Ok -113)
     (Ok (app (app (app f x) y) z))
@@ -373,6 +374,28 @@ let%expect_test "term parse tests" =
     {|
     (Ok (let f (lambda (x bool) (lambda (y bool) (&& x y))) f))
     (Ok (let f (lambda (x bool) (lambda (y bool) (&& x y))) f))
+    |}]
+;;
+
+let%expect_test "regression test, sequential non-parenthesized terms" =
+  test "let x = 1.0 in x + 1.0";
+  test "1.0 + let x = 1.0 in x";
+  test "1.0 + (let x = 1.0 in x)";
+  test "f let x = 1.0 in x";
+  test "f (let x = 1.0 in x)";
+  test "<1.0, 2.0> let x = 1.0 in x";
+  test "<1.0, let x = 2.0 in x>";
+  test "if true then 1.0 else 2.0 + 3.0";
+  [%expect
+    {|
+    (Ok (let x 1. (+ x 1.)))
+    (Error ((chomp_error run_stream_not_fully_consumed) (contexts ())))
+    (Ok (+ 1. (let x 1. x)))
+    (Error ((chomp_error run_stream_not_fully_consumed) (contexts ())))
+    (Ok (app f (let x 1. x)))
+    (Error ((chomp_error run_stream_not_fully_consumed) (contexts ())))
+    (Ok (vec2 1. (let x 2. x)))
+    (Ok (if true 1. (+ 2. 3.)))
     |}]
 ;;
 
@@ -401,16 +424,17 @@ let top_extern_p =
 
 let glml_p = many1 (top_let_p <|> top_extern_p) >>| fun tops -> Program tops
 
+let test s =
+  s
+  |> Lexer.init
+  |> Lexer.lex
+  |> Or_error.map ~f:(run glml_p)
+  |> Or_error.join
+  |> Or_error.sexp_of_t sexp_of_t
+  |> print_s
+;;
+
 let%expect_test "glml parse tests" =
-  let test s =
-    s
-    |> Lexer.init
-    |> Lexer.lex
-    |> Or_error.map ~f:(run glml_p)
-    |> Or_error.join
-    |> Or_error.sexp_of_t sexp_of_t
-    |> print_s
-  in
   test
     {|
     #extern float u_time
@@ -426,5 +450,25 @@ let%expect_test "glml parse tests" =
       ((Extern float u_time) (Define toplevel (+ 1 2)) (Define main (+ 1 2))
        (Define f (lambda (x bool) (lambda (y bool) (&& x y))))
        (Define main (lambda (u (vec 2)) (+ (app f (vec2 1 2)) u))))))
+    |}]
+;;
+
+let%expect_test "regression test, toplevel let parsing after record" =
+  test
+    {|
+    let f (x : float) =
+      let g (y : float) = x + y in
+      < g 1.0, 0.0, 0.0 >
+
+    let main (u : vec2) = f 10.0
+    |};
+  [%expect
+    {|
+    (Ok
+     (Program
+      ((Define f
+        (lambda (x float)
+         (let g (lambda (y float) (+ x y)) (vec3 (app g 1.) 0. 0.))))
+       (Define main (lambda (u (vec 2)) (app f 10.))))))
     |}]
 ;;
