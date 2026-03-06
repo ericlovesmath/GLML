@@ -1,6 +1,7 @@
 open Core
 open Anf
 open Sexplib.Sexp
+open Or_error.Let_syntax
 
 type term_desc =
   | Atom of atom
@@ -116,44 +117,74 @@ and of_anf (anf : Anf.anf) : anf =
   | Return tail -> pure (Return (of_term tail))
 ;;
 
-let placeholder_value_for_ty (ty : Stlc.ty) (loc : Lexer.loc) : term =
-  let pure desc : term = { desc; ty; loc } in
+let placeholder_value_for_ty (ty : Stlc.ty) (loc : Lexer.loc) : term Or_error.t =
+  let pure desc : term Or_error.t = Ok { desc; ty; loc } in
   match ty with
   | TyInt -> pure (Atom (Int 0))
   | TyFloat -> pure (Atom (Float 0.0))
   | TyBool -> pure (Atom (Bool false))
   | TyVec n -> pure (Vec (n, List.init n ~f:(Fn.const (Float 0.0))))
   | TyMat (n, m) -> pure (Mat (n, m, List.init (n * m) ~f:(Fn.const (Float 0.0))))
-  | TyArrow _ -> failwith "tail_call: arrow can't exist in tail pos"
+  | TyArrow _ -> error_s [%message "tail_call: unexpected arrow in tail" (ty : Stlc.ty)]
+;;
+
+let contains_call (t : Anf.term) (v : string) : bool =
+  let rec contains_call_term (t : Anf.term) : bool =
+    match t.desc with
+    | App (f, _) -> String.equal f v
+    | If (_, t, f) -> contains_call_anf t || contains_call_anf f
+    | _ -> false
+  and contains_call_anf (a : Anf.anf) : bool =
+    match a.desc with
+    | Let (_, b, t) -> contains_call_term b || contains_call_anf t
+    | Return t -> contains_call_term t
+  in
+  contains_call_term t
 ;;
 
 let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : string list)
-  : anf
+  : anf Or_error.t
   =
-  let rec patch (anf : Anf.anf) : anf =
-    let pure desc : anf = { desc; ty = anf.ty; loc = anf.loc } in
+  let rec patch (anf : Anf.anf) : anf Or_error.t =
+    let pure desc : anf Or_error.t = Ok { desc; ty = anf.ty; loc = anf.loc } in
     match anf.desc with
     | Let (v, bind, tail) ->
-      (* TODO: Maybe check that [bind] doesn't recursively call *)
-      pure (Let (v, of_term bind, patch tail))
+      if contains_call bind name
+      then
+        error_s
+          [%message
+            "tail_call: non-tail rec call detected" (name : string) (anf.loc : Lexer.loc)]
+      else (
+        let%bind tail = patch tail in
+        pure (Let (v, of_term bind, tail)))
     | Return { desc = If (c, t, f); ty; loc } ->
-      pure (Return { desc = If (c, patch t, patch f); ty; loc })
+      let%bind t = patch t in
+      let%bind f = patch f in
+      pure (Return { desc = If (c, t, f); ty; loc })
     | Return { desc = App (f, xs); ty = _; loc } when String.equal f name ->
       let tmp = Utils.fresh "_iter_inc" in
       let inc_iter_continue =
         let iter_inc : term = { desc = Bop (Add, Var iter, Int 1); ty = TyInt; loc } in
-        pure (Let (tmp, iter_inc, pure (Set (iter, Var tmp, pure Continue))))
+        let%bind continue = pure Continue in
+        let%bind set_iter_to_tmp = pure (Set (iter, Var tmp, continue)) in
+        pure (Let (tmp, iter_inc, set_iter_to_tmp))
       in
-      (* TODO: No exns, use [Or_error.t] *)
-      List.fold_right2_exn args xs ~init:inc_iter_continue ~f:(fun name arg tail ->
-        pure (Set (name, arg, tail)))
+      let tail =
+        List.fold_right2 args xs ~init:inc_iter_continue ~f:(fun name arg tail ->
+          let%bind tail = tail in
+          pure (Set (name, arg, tail)))
+      in
+      (match tail with
+       | Ok res -> res
+       | Unequal_lengths ->
+         error_s [%message "tail_call: args and xs don't match" (loc : Lexer.loc)])
     | Return tail -> pure (Return (of_term tail))
   in
   patch anf
 ;;
 
-let remove_rec_top (top : Anf.top) : top =
-  let pure desc = { desc; ty = top.ty; loc = top.loc } in
+let remove_rec_top (top : Anf.top) : top Or_error.t =
+  let pure desc = Ok { desc; ty = top.ty; loc = top.loc } in
   match top.desc with
   | Const (v, anf) -> pure (Const (v, of_anf anf))
   | Extern v -> pure (Extern v)
@@ -163,8 +194,8 @@ let remove_rec_top (top : Anf.top) : top =
     let loc = body.loc in
     let iter = Utils.fresh "_iter" in
     let while_cond : term = { desc = Bop (Lt, Var iter, Int limit); ty = top.ty; loc } in
-    let while_body : anf = patch_tail_anf body name iter (List.map ~f:fst args) in
-    let while_after = placeholder_value_for_ty ret_ty body.loc in
+    let%bind while_body = patch_tail_anf body name iter (List.map ~f:fst args) in
+    let%bind while_after = placeholder_value_for_ty ret_ty body.loc in
     let while_anf : anf =
       { desc = While (while_cond, while_body, while_after); ty = top.ty; loc }
     in
@@ -177,4 +208,7 @@ let remove_rec_top (top : Anf.top) : top =
     pure (Define { name; args; body; ret_ty })
 ;;
 
-let remove_rec (Program t : Anf.t) : t = Program (List.map ~f:remove_rec_top t)
+let remove_rec (Program t : Anf.t) : t Or_error.t =
+  let%map tops = Or_error.all (List.map ~f:remove_rec_top t) in
+  Program tops
+;;

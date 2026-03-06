@@ -82,7 +82,7 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   trace Lambda_lift t;
   let t = Anf.to_anf t in
   trace Anf t;
-  let t = Tail_call.remove_rec t in
+  let%bind t = Tail_call.remove_rec t in
   trace Tail_call t;
   let glsl = Translate.translate t in
   trace Translate glsl;
