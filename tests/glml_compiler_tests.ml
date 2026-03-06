@@ -58,11 +58,11 @@ let%expect_test "simple tests for compile_stlc" =
     precision highp float;
     out vec4 fragColor;
     uniform float n;
-    float f_1(float x_0) {
-        return (x_0 + n);
+    float f_0(float x_1) {
+        return (x_1 + n);
     }
     vec3 main_pure(vec2 u_2) {
-        float anf_3 = f_1(10.);
+        float anf_3 = f_0(10.);
         return vec3(anf_3, 0., 0.);
     }
     void main() {
@@ -82,11 +82,11 @@ let%expect_test "simple tests for compile_stlc" =
     precision highp float;
     out vec4 fragColor;
     uniform float n;
-    float f_1(float x_0) {
-        return (x_0 + n);
+    float f_0(float x_1) {
+        return (x_1 + n);
     }
     vec3 main_pure(vec2 u_2) {
-        float anf_3 = f_1(10.);
+        float anf_3 = f_0(10.);
         return vec3(anf_3, 0., 0.);
     }
     void main() {
@@ -223,15 +223,15 @@ let%expect_test "multi argument functions / lambdas" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float f_2(float x_0, float y_1) {
-        return (x_0 + y_1);
+    float f_0(float x_1, float y_2) {
+        return (x_1 + y_2);
     }
-    float g_5(float x_3, float y_4) {
-        return (x_3 - y_4);
+    float g_3(float x_4, float y_5) {
+        return (x_4 - y_5);
     }
     vec3 main_pure(vec2 u_6) {
-        float anf_7 = f_2(10., 5.);
-        float anf_8 = g_5(0., 0.);
+        float anf_7 = f_0(10., 5.);
+        float anf_8 = g_3(0., 0.);
         return vec3(anf_7, anf_8, 0.);
     }
     void main() {
@@ -316,3 +316,46 @@ let%expect_test "lambda lifting" =
   [%expect
     {| ("first-class anon functions are unsupported" (t.loc (4:18 - 4:44))) |}]
 ;;
+
+let%expect_test "recursive functions" =
+  test
+    {|
+    let (rec : int -> int -> int) fact (n : int) (acc : int) =
+      if n = 0 then acc else fact (n - 1) (acc * n)
+
+    let main (u : vec2) =
+      let num = fact 5 1 in
+      < 0., 0., 0. >
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    int fact_0(int n_1, int acc_2) {
+        int _iter_8 = 0;
+        while ((_iter_8 < 1000)) {
+            bool anf_5 = (n_1 == 0);
+            if (anf_5) {
+                return acc_2;
+            } else {
+                int anf_6 = (n_1 - 1);
+                int anf_7 = (acc_2 * n_1);
+                n_1 = anf_6;
+                acc_2 = anf_7;
+                int _iter_inc_9 = (_iter_8 + 1);
+                _iter_8 = _iter_inc_9;
+                continue;
+            }
+        }
+        return 0;
+    }
+    vec3 main_pure(vec2 u_3) {
+        int num_4 = fact_0(5, 1);
+        return vec3(0., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];

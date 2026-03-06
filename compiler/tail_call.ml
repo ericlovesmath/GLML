@@ -136,6 +136,8 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : strin
     | Let (v, bind, tail) ->
       (* TODO: Maybe check that [bind] doesn't recursively call *)
       pure (Let (v, of_term bind, patch tail))
+    | Return { desc = If (c, t, f); ty; loc } ->
+      pure (Return { desc = If (c, patch t, patch f); ty; loc })
     | Return { desc = App (f, xs); ty = _; loc } when String.equal f name ->
       let tmp = Utils.fresh "_iter_inc" in
       let inc_iter_continue =
