@@ -2,17 +2,7 @@ open Core
 
 (** Passes in compiler available to be dumped *)
 module Passes : sig
-  type t =
-    | Stlc
-    | Uniquify
-    | Typecheck
-    | Uncurry
-    | Lambda_lift
-    | Anf
-    | Tail_call
-    | Translate
-    | Patch_main
-  [@@deriving sexp_of, enumerate, string]
+  type t [@@deriving sexp_of, enumerate, string]
 
   include Comparable.S with type t := t
 end
