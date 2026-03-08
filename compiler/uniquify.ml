@@ -23,6 +23,8 @@ let rec aux (ctx : string String.Map.t) (t : term) : term =
     | Bop (op, t1, t2) -> Bop (op, aux ctx t1, aux ctx t2)
     | Index (t_sub, i) -> Index (aux ctx t_sub, i)
     | Builtin (f, args) -> Builtin (f, List.map args ~f:(aux ctx))
+    | Record fields -> Record (List.map fields ~f:(fun (f, t) -> f, aux ctx t))
+    | Field (t, f) -> Field (aux ctx t, f)
   in
   { desc; loc = t.loc }
 ;;
@@ -38,7 +40,7 @@ let uniquify_top (ctx : string String.Map.t) (t : top) : string String.Map.t * t
       | Rec _ -> aux ctx' bind
     in
     ctx', { desc = Define (recur, v', bind); loc = t.loc }
-  | Extern _ -> ctx, t
+  | Extern _ | RecordDef _ -> ctx, t
 ;;
 
 let uniquify (Program terms) =

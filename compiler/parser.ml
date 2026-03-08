@@ -53,6 +53,7 @@ let ty_singles_p =
     | BOOL -> Some TyBool
     | INT -> Some TyInt
     | FLOAT -> Some TyFloat
+    | ID s -> Some (TyRecord s)
     | _ -> None)
   <??> "ty_single"
 ;;
@@ -247,6 +248,22 @@ and term_mat_p =
       <??> "term_mat"))
     st
 
+and term_record_p =
+  fun st ->
+  (with_term_loc
+     (let%map fields =
+        between
+          `Curly
+          (commas
+             (let%bind id = ident_p in
+              let%bind _ = tok EQ in
+              let%bind t = term_p in
+              return (id, t)))
+      in
+      Record fields)
+   <??> "term_record")
+    st
+
 and term_vec_p =
   fun st ->
   (with_term_loc
@@ -279,7 +296,13 @@ and term_atom_p =
          | _ -> None)
        <??> "term_single")
   in
-  (term_builtin_p <|> term_singles_p <|> term_mat_p <|> term_vec_p <??> "term_atom") st
+  (term_builtin_p
+   <|> term_singles_p
+   <|> term_mat_p
+   <|> term_vec_p
+   <|> term_record_p
+   <??> "term_atom")
+    st
 
 and term_head_p =
   fun st -> (term_atom_p <|> term_number_p <|> between `Paren term_p <??> "term_head") st
@@ -290,6 +313,11 @@ and term_postfix_p =
     let%bind head = head_p in
     let%bind ops = many op_p in
     return (List.fold_left ops ~init:head ~f:(fun t op -> op t))
+  in
+  let field_op_p =
+    with_loc (tok DOT *> ident_p)
+    >>| fun (f, loc) (t : term) ->
+    ({ desc = Field (t, f); loc = Lexer.merge_loc t.loc loc } : term)
   in
   let index_op_p =
     with_loc (between `Bracket num_p)
@@ -306,7 +334,7 @@ and term_postfix_p =
     >>| fun (a : term) (t : term) ->
     ({ desc = App (t, a); loc = Lexer.merge_loc t.loc a.loc } : term)
   in
-  let op_p = index_op_p <|> app_op_p in
+  let op_p = field_op_p <|> index_op_p <|> app_op_p in
   (postfix_chain term_head_p op_p <??> "term_postfix_chain") st
 
 and term_p =
@@ -439,7 +467,29 @@ let top_extern_p =
      <??> "top_extern")
 ;;
 
-let glml_p = many1 (top_let_p <|> top_extern_p) >>| fun tops -> Program tops
+let top_record_p =
+  fun st ->
+  (with_top_loc
+     (let%bind _ = tok TYPE in
+      let%bind id = ident_p in
+      let%bind _ = tok EQ in
+      let%bind fields =
+        between
+          `Curly
+          (commas
+             (let%bind f_id = ident_p in
+              let%bind _ = tok COLON in
+              let%bind f_ty = ty_p in
+              return (f_id, f_ty)))
+      in
+      return (RecordDef (id, fields)))
+   <??> "top_record")
+    st
+;;
+
+let glml_p =
+  many1 (top_let_p <|> top_extern_p <|> top_record_p) >>| fun tops -> Program tops
+;;
 
 let test s =
   s
@@ -455,6 +505,10 @@ let%expect_test "glml parse tests" =
   test
     {|
     #extern float u_time
+
+    type point = { x : float, y : int }
+
+    let a_struct = { x = 0.0, y = 0 }
     let toplevel = 1 + 2
     let main = 1 + 2
     let f = fun (x : bool) (y : bool) -> x && y
@@ -465,8 +519,9 @@ let%expect_test "glml parse tests" =
     {|
     (Ok
      (Program
-      ((Extern float u_time) (Define Nonrec toplevel (+ 1 2))
-       (Define Nonrec main (+ 1 2))
+      ((Extern float u_time) (RecordDef point ((x float) (y int)))
+       (Define Nonrec a_struct (record (x 0.) (y 0)))
+       (Define Nonrec toplevel (+ 1 2)) (Define Nonrec main (+ 1 2))
        (Define Nonrec f (lambda (x bool) (lambda (y bool) (&& x y))))
        (Define Nonrec main (lambda (u (vec 2)) (+ (app f (vec2 1 2)) u)))
        (Define (Rec 1000 (float -> float)) g (lambda (x float) (app g x))))))

@@ -17,6 +17,8 @@ type term_desc =
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
   | Builtin of Glsl.builtin * term list
+  | Record of string * term list
+  | Field of term * string
 
 and term =
   { desc : term_desc
@@ -48,12 +50,15 @@ let rec sexp_of_term_desc = function
   | Index (t, i) -> List [ Atom "index"; sexp_of_term t; Atom (Int.to_string i) ]
   | Builtin (b, ts) ->
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
+  | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_term)
+  | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
 
 and sexp_of_term t = List [ sexp_of_term_desc t.desc; Atom ":"; Stlc.sexp_of_ty t.ty ]
 
 type top_desc =
   | Define of recur * string * term
   | Extern of string
+  | RecordDef of string * (string * ty) list
 [@@deriving sexp_of]
 
 type top =
@@ -66,10 +71,15 @@ let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; Stlc.sexp_of_ty t.
 
 type t = Program of top list [@@deriving sexp_of]
 
-let rec update (map : ty String.Map.t) (t : Stlc.term)
+let rec update
+          (map : ty String.Map.t)
+          (structs : (string * ty) list String.Map.t)
+          (fields_env : string String.Map.t)
+          (t : Stlc.term)
   : (ty String.Map.t * term) Or_error.t
   =
   let open Or_error.Let_syntax in
+  let update map t = update map structs fields_env t in
   let make ?(map = map) term ty = Ok (map, ({ desc = term; ty; loc = t.loc } : term)) in
   let error_s sexp =
     let sexps =
@@ -254,30 +264,90 @@ let rec update (map : ty String.Map.t) (t : Stlc.term)
      | Pow -> check_binary_math ()
      | Length | Distance | Dot | Cross | Normalize -> check_geometric ()
      | Abs | Sign | Floor | Ceil | Min | Max | Clamp | Mix -> check_common ())
+  | Record [] -> error_s [%message "empty records are not supported"]
+  (* TODO: This is terrible but... when we implement HM with Bider it should be nuked *)
+  | Record ((first_field, _) :: _ as fields) ->
+    let%bind struct_name, struct_fields =
+      match
+        Map.to_alist structs
+        |> List.find ~f:(fun (_, s_fields) ->
+          List.exists s_fields ~f:(fun (k, _) -> String.equal k first_field))
+      with
+      | Some res -> Ok res
+      | None ->
+        error_s [%message "record does not match any known struct for field" first_field]
+    in
+    let%bind () =
+      if List.length fields <> List.length struct_fields
+      then error_s [%message "incorrect number of fields for struct" struct_name]
+      else Ok ()
+    in
+    let%bind map, ordered_terms =
+      List.fold_result struct_fields ~init:(map, []) ~f:(fun (map, acc) (name, ty) ->
+        match List.Assoc.find fields ~equal:String.equal name with
+        | Some t ->
+          let%bind map, t = update map t in
+          if equal_ty t.ty ty
+          then Ok (map, t :: acc)
+          else error_s [%message "field type mismatch" name (ty : ty) (t.ty : ty)]
+        | None -> error_s [%message "missing field" name])
+    in
+    make ~map (Record (struct_name, List.rev ordered_terms)) (TyRecord struct_name)
+  | Field (t, f) ->
+    let%bind _, t = update map t in
+    (match t.ty with
+     | TyRecord name ->
+       (match Map.find structs name with
+        | Some fields ->
+          (match List.Assoc.find fields ~equal:String.equal f with
+           | Some ty -> make (Field (t, f)) ty
+           | None -> error_s [%message "field not found in struct" name f])
+        | None -> error_s [%message "unknown struct" name])
+     | _ -> error_s [%message "field access on non-struct" (t.ty : ty)])
 ;;
 
 let typecheck (Program terms : Stlc.t) : t Or_error.t =
   let open Or_error.Let_syntax in
-  let%map _, tops =
-    List.fold_result terms ~init:(String.Map.empty, []) ~f:(fun (map, acc) top ->
-      match top.desc with
-      | Define (Rec (n, ann_ty), v, bind) ->
-        let map = Map.set map ~key:v ~data:ann_ty in
-        let%bind map, t = update map bind in
-        if equal_ty ann_ty t.ty
-        then (
-          let desc = Define (Rec (n, ann_ty), v, t) in
-          Ok (map, { desc; ty = t.ty; loc = top.loc } :: acc))
-        else
-          error_s
-            [%message "typecheck: unexpected type on letrec" (ann_ty : ty) (t.ty : ty)]
-      | Define (Nonrec, v, bind) ->
-        let%bind map, t = update map bind in
-        let map = Map.set map ~key:v ~data:t.ty in
-        Ok (map, { desc = Define (Nonrec, v, t); ty = t.ty; loc = top.loc } :: acc)
-      | Extern (ty, v) ->
-        let map = Map.set map ~key:v ~data:ty in
-        Ok (map, { desc = Extern v; ty; loc = top.loc } :: acc))
+  let%map _, _, _, tops =
+    List.fold_result
+      terms
+      ~init:(String.Map.empty, String.Map.empty, String.Map.empty, [])
+      ~f:(fun (map, structs, fields_env, acc) top ->
+        match top.desc with
+        | Define (Rec (n, ann_ty), v, bind) ->
+          let map = Map.set map ~key:v ~data:ann_ty in
+          let%bind map, t = update map structs fields_env bind in
+          if equal_ty ann_ty t.ty
+          then (
+            let desc = Define (Rec (n, ann_ty), v, t) in
+            Ok (map, structs, fields_env, { desc; ty = t.ty; loc = top.loc } :: acc))
+          else
+            error_s
+              [%message "typecheck: unexpected type on letrec" (ann_ty : ty) (t.ty : ty)]
+        | Define (Nonrec, v, bind) ->
+          let%bind map, t = update map structs fields_env bind in
+          let map = Map.set map ~key:v ~data:t.ty in
+          Ok
+            ( map
+            , structs
+            , fields_env
+            , { desc = Define (Nonrec, v, t); ty = t.ty; loc = top.loc } :: acc )
+        | Extern (ty, v) ->
+          let map = Map.set map ~key:v ~data:ty in
+          Ok (map, structs, fields_env, { desc = Extern v; ty; loc = top.loc } :: acc)
+        | RecordDef (name, fields) ->
+          let structs = Map.set structs ~key:name ~data:fields in
+          let fields_env =
+            List.fold fields ~init:fields_env ~f:(fun env (f_name, _) ->
+              Map.set env ~key:f_name ~data:name)
+          in
+          Ok
+            ( map
+            , structs
+            , fields_env
+            , { desc = RecordDef (name, fields); ty = TyRecord name; loc = top.loc }
+              :: acc ))
   in
   Program (List.rev tops)
 ;;
+

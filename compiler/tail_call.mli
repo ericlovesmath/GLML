@@ -10,6 +10,8 @@ type term_desc =
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list
   | If of atom * anf * anf
+  | Record of string * atom list
+  | Field of atom * string
 [@@deriving sexp_of]
 
 and term =
@@ -22,7 +24,7 @@ and term =
 and anf_desc =
   | Let of string * term * anf
   | Return of term
-  | While of term * anf * term
+  | While of term * anf * anf
   | Set of string * atom * anf
   | Continue
 [@@deriving sexp_of]
@@ -43,6 +45,7 @@ type top_desc =
       }
   | Const of string * anf
   | Extern of string
+  | RecordDef of string * (string * Stlc.ty) list
 [@@deriving sexp_of]
 
 type top =

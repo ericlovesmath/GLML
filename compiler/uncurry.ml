@@ -15,6 +15,8 @@ type term_desc =
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
   | Builtin of Glsl.builtin * term list
+  | Record of string * term list
+  | Field of term * string
 
 and term =
   { desc : term_desc
@@ -47,12 +49,15 @@ let rec sexp_of_term_desc = function
   | Index (t, i) -> List [ Atom "index"; sexp_of_term t; Atom (Int.to_string i) ]
   | Builtin (b, ts) ->
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
+  | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_term)
+  | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
 
 and sexp_of_term t = sexp_of_term_desc t.desc
 
 type top_desc =
   | Define of Stlc.recur * string * term
   | Extern of string
+  | RecordDef of string * (string * Stlc.ty) list
 [@@deriving sexp_of]
 
 type top =
@@ -98,6 +103,8 @@ and uncurry_term_desc (t : Typecheck.term_desc) : term_desc =
   | Bop (op, l, r) -> Bop (op, uncurry_term l, uncurry_term r)
   | Index (t_sub, i) -> Index (uncurry_term t_sub, i)
   | Builtin (b, ts) -> Builtin (b, List.map ts ~f:uncurry_term)
+  | Record (s, ts) -> Record (s, List.map ts ~f:uncurry_term)
+  | Field (t, f) -> Field (uncurry_term t, f)
 
 and uncurry_term (t : Typecheck.term) : term =
   { desc = uncurry_term_desc t.desc; ty = t.ty; loc = t.loc }
@@ -108,6 +115,7 @@ let uncurry_top (t : Typecheck.top) : top =
     match t.desc with
     | Define (recur, v, term) -> Define (recur, v, uncurry_term term)
     | Extern v -> Extern v
+    | RecordDef (s, fields) -> RecordDef (s, fields)
   in
   { desc; ty = t.ty; loc = t.loc }
 ;;

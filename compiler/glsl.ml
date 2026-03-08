@@ -8,6 +8,7 @@ type ty =
   | TyVoid
   | TyVec of int
   | TyMat of int * int
+  | TyStruct of string
 [@@deriving sexp_of]
 
 let string_of_ty = function
@@ -18,6 +19,7 @@ let string_of_ty = function
   | TyVec i -> "vec" ^ Int.to_string i
   | TyMat (x, y) when x = y -> "mat" ^ Int.to_string x
   | TyMat (x, y) -> "mat" ^ Int.to_string x ^ "x" ^ Int.to_string y
+  | TyStruct s -> s
 ;;
 
 type binary_op =
@@ -249,6 +251,7 @@ type decl =
       ; ret_type : ty
       ; body : stmt list
       }
+  | Struct of string * (ty * string) list
 [@@deriving sexp_of]
 
 type t = Program of decl list [@@deriving sexp_of]
@@ -275,6 +278,16 @@ let to_string (Program decls : t) : string =
         |> String.concat ~sep:"\n"
       in
       [%string "%{ret_type} %{name}(%{params}) {\n%{body}\n}"]
+    | Struct (name, fields) ->
+      let fields =
+        fields
+        |> List.map ~f:(fun (ty, param) ->
+          let ty = string_of_ty ty in
+          [%string "%{ty} %{param};"])
+        |> List.map ~f:indent
+        |> String.concat ~sep:"\n"
+      in
+      [%string "struct %{name} {\n%{fields}\n};"]
   in
   List.map ~f:string_of_decl decls
   |> List.cons "precision highp float;"

@@ -15,6 +15,8 @@ type term_desc =
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
   | Builtin of Glsl.builtin * term list
+  | Record of string * term list
+  | Field of term * string
 
 and term =
   { desc : term_desc
@@ -41,6 +43,8 @@ let rec sexp_of_term_desc = function
   | Index (t, i) -> List [ Atom "index"; sexp_of_term t; Atom (Int.to_string i) ]
   | Builtin (b, ts) ->
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
+  | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_term)
+  | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
 
 and sexp_of_term t = sexp_of_term_desc t.desc
 
@@ -54,6 +58,7 @@ type top_desc =
       }
   | Const of string * term
   | Extern of string
+  | RecordDef of string * (string * Stlc.ty) list
 
 let sexp_of_top_desc = function
   | Define { name; recur; args; body; ret_ty = _ } ->
@@ -69,6 +74,8 @@ let sexp_of_top_desc = function
       ]
   | Const (name, term) -> List [ Atom "Const"; Atom name; sexp_of_term term ]
   | Extern name -> List [ Atom "Extern"; Atom name ]
+  | RecordDef (name, fields) ->
+    List [ Atom "RecordDef"; Atom name; [%sexp (fields : (string * Stlc.ty) list)] ]
 ;;
 
 type top =
@@ -107,7 +114,9 @@ let free_vars (env : env) (t : Uncurry.term) : Stlc.ty String.Map.t =
     | Let (_, v, bind, body) -> union (fv bind) (Map.remove (fv body) v)
     | If (c, t_true, e) -> union_list [ fv c; fv t_true; fv e ]
     | Bop (_, l, r) -> union (fv l) (fv r)
-    | Index (t_sub, _) -> fv t_sub
+    | Index (t, _) -> fv t
+    | Record (_, ts) -> union_list (List.map ts ~f:fv)
+    | Field (t, _) -> fv t
   in
   fv t
 ;;
@@ -201,6 +210,12 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
   | Builtin (b, ts) ->
     let%bind ts, tops = lift_list ts in
     make (Builtin (b, ts)) tops
+  | Record (s, ts) ->
+    let%bind ts, tops = lift_list ts in
+    make (Record (s, ts)) tops
+  | Field (t, f) ->
+    let%bind t, tops = lift t in
+    make (Field (t, f)) tops
   | Lam _ ->
     error_s [%message "first-class anon functions are unsupported" (t.loc : Lexer.loc)]
 ;;
@@ -216,15 +231,17 @@ let lift_top (globals : String.Set.t) (top : Uncurry.top) : top list Or_error.t 
     let%map term, term_tops = lift term in
     term_tops @ [ make (Const (name, term)) ]
   | Extern v -> return [ make (Extern v) ]
+  | RecordDef (s, fields) -> return [ make (RecordDef (s, fields)) ]
 ;;
 
 let lift (Program tops : Uncurry.t) : t Or_error.t =
   let globals =
     tops
-    |> List.map ~f:(fun top ->
+    |> List.filter_map ~f:(fun top ->
       match top.desc with
-      | Define (_, v, _) -> v
-      | Extern v -> v)
+      | Define (_, v, _) -> Some v
+      | Extern v -> Some v
+      | RecordDef _ -> None)
     |> String.Set.of_list
   in
   let%bind top_blocks = Or_error.all (List.map tops ~f:(lift_top globals)) in

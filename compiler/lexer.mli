@@ -44,6 +44,7 @@ type token =
   | LAND
   | LOR
   | EXTERN
+  | TYPE
   | NUMERIC of int
   | FLOAT_LIT of float
   | ID of string

@@ -23,6 +23,8 @@ type term_desc =
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list
   | If of atom * anf * anf
+  | Record of string * atom list
+  | Field of atom * string
 
 and term =
   { desc : term_desc
@@ -54,6 +56,8 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_atom)
   | App (f, args) -> List (Atom f :: List.map args ~f:sexp_of_atom)
   | If (c, t, e) -> List [ Atom "if"; sexp_of_atom c; sexp_of_anf t; sexp_of_anf e ]
+  | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_atom)
+  | Field (t, f) -> List [ Atom "."; sexp_of_atom t; Atom f ]
 
 and sexp_of_term t = sexp_of_term_desc t.desc
 
@@ -74,6 +78,7 @@ type top_desc =
       }
   | Const of string * anf
   | Extern of string
+  | RecordDef of string * (string * Stlc.ty) list
 
 let sexp_of_top_desc = function
   | Define { name; recur; args; body; ret_ty = _ } ->
@@ -89,6 +94,8 @@ let sexp_of_top_desc = function
       ]
   | Const (name, term) -> List [ Atom "Const"; Atom name; sexp_of_anf term ]
   | Extern name -> List [ Atom "Extern"; Atom name ]
+  | RecordDef (name, fields) ->
+    List [ Atom "RecordDef"; Atom name; [%sexp (fields : (string * Stlc.ty) list)] ]
 ;;
 
 type top =
@@ -139,6 +146,8 @@ let rec normalize (expr : Lambda_lift.term) : anf =
       let t_anf = normalize t in
       let e_anf = normalize e in
       pure (If (c_atom, t_anf, e_anf)))
+  | Record (s, ts) -> atomize_list ts (fun args -> pure (Record (s, args)))
+  | Field (t, f) -> atomize t (fun a -> pure (Field (a, f)))
 
 and atomize (expr : Lambda_lift.term) (k : atom -> anf) : anf =
   match expr.desc with
@@ -171,6 +180,7 @@ let normalize_top (t : Lambda_lift.top) : top =
     pure (Define { name; recur; args; body = normalize body; ret_ty })
   | Const (name, body) -> pure (Const (name, normalize body))
   | Extern v -> pure (Extern v)
+  | RecordDef (s, fields) -> pure (RecordDef (s, fields))
 ;;
 
 let to_anf (Program terms : Lambda_lift.t) : t = Program (List.map terms ~f:normalize_top)

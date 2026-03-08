@@ -358,3 +358,176 @@ let%expect_test "recursive functions" =
     }
     |}]
 ;;
+
+let%expect_test "structs" =
+  test
+    {|
+    type point = { x: float, y: float }
+    type color = { r: float, g: float, b: float }
+
+    let make_red (p: point) =
+      let p_y = p.y in
+      { r = p_y, g = 0.0, b = 0.0 }
+
+    let main (u: vec2) =
+      let p = { x = 1.0, y = 2.0 } in
+      let c = make_red p in
+      <c.r, c.g, c.b>
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct point {
+        float x;
+        float y;
+    };
+    struct color {
+        float r;
+        float g;
+        float b;
+    };
+    color make_red_0(point p_1) {
+        float p_y_2 = p_1.y;
+        return color(p_y_2, 0., 0.);
+    }
+    vec3 main_pure(vec2 u_3) {
+        point p_4 = point(1., 2.);
+        color c_5 = make_red_0(p_4);
+        float anf_6 = c_5.r;
+        float anf_7 = c_5.g;
+        float anf_8 = c_5.b;
+        return vec3(anf_6, anf_7, anf_8);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+  |}];
+  test
+    {|
+    type point = { x: float, y: float }
+    type color = { r: float, g: float, b: float }
+
+    let make_red (p: point) =
+      let col =
+        if true then
+          { r = 1.0, g = 0.0, b = 0.0 }
+        else
+          { r = 0.0, g = 0.0, b = 1.0 }
+      in
+      col
+
+    let main (u: vec2) =
+      let p = { x = 1.0, y = 2.0 } in
+      let c = make_red p in
+      <c.r, c.g, c.b>
+  |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct point {
+        float x;
+        float y;
+    };
+    struct color {
+        float r;
+        float g;
+        float b;
+    };
+    color make_red_0(point p_1) {
+        color col_2 = color(0., 0., 0.);
+        if (true) {
+            col_2 = color(1., 0., 0.);
+        } else {
+            col_2 = color(0., 0., 1.);
+        }
+        return col_2;
+    }
+    vec3 main_pure(vec2 u_3) {
+        point p_4 = point(1., 2.);
+        color c_5 = make_red_0(p_4);
+        float anf_6 = c_5.r;
+        float anf_7 = c_5.g;
+        float anf_8 = c_5.b;
+        return vec3(anf_6, anf_7, anf_8);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+  |}];
+  test
+    {|
+    type point = { x: float, y: float }
+
+    let main (u: vec2) =
+      let p = { x = 1.0, z = 2.0 } in
+      <p.x, p.x, p.x>
+    |};
+  [%expect {| (typecheck: "missing field" y (loc (5:15 - 5:35))) |}]
+;;
+
+let%expect_test "nested structs" =
+  let test_program =
+    {|
+    type point = { x: float, y: float }
+    type segment = { start: point, end: point }
+
+    let make_seg (u: float) =
+      let s =
+        if true then
+          { start = { x = 0.0, y = 0.0 }, end = { x = 1.0, y = 1.0 } }
+        else
+          { start = { x = 1.0, y = 1.0 }, end = { x = 0.0, y = 0.0 } }
+      in
+      s
+
+    let main (u: vec2) =
+      let seg = make_seg 1.0 in
+      let c = seg.end.x in
+      <c, c, c>
+    |}
+  in
+  test test_program;
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct point {
+        float x;
+        float y;
+    };
+    struct segment {
+        point start;
+        point end;
+    };
+    segment make_seg_0(float u_1) {
+        segment s_2 = segment(point(0., 0.), point(0., 0.));
+        if (true) {
+            segment anf_6 = point(0., 0.);
+            segment anf_7 = point(1., 1.);
+            s_2 = segment(anf_6, anf_7);
+        } else {
+            segment anf_8 = point(1., 1.);
+            segment anf_9 = point(0., 0.);
+            s_2 = segment(anf_8, anf_9);
+        }
+        return s_2;
+    }
+    vec3 main_pure(vec2 u_3) {
+        segment seg_4 = make_seg_0(1.);
+        point anf_10 = seg_4.end;
+        float c_5 = anf_10.x;
+        return vec3(c_5, c_5, c_5);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;

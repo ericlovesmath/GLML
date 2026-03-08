@@ -45,6 +45,7 @@ type token =
   | LAND
   | LOR
   | EXTERN
+  | TYPE
   | NUMERIC of int
   | FLOAT_LIT of float
   | ID of string
@@ -209,6 +210,7 @@ let read_lexeme (t : t) : token Or_error.t =
           | "vec" -> VEC
           | "mat" -> MAT
           | "extern" -> EXTERN
+          | "type" -> TYPE
           | _ -> ID s)
      | char -> error_s [%message "lexer: invalid char" (char : char) (t.pos : pos)])
 ;;
@@ -241,7 +243,7 @@ let%expect_test "lexer" =
   test "{ } ; : , if then else let";
   test "in fun | match with { }";
   test "bool int float ' 10 string_var";
-  test "+ - / * # <= >= % && || extern let";
+  test "+ - / * # <= >= % && || extern let type";
   test "1.23 .45 6. -1.";
   [%expect
     {|
@@ -249,7 +251,7 @@ let%expect_test "lexer" =
     (Ok (LCURLY RCURLY SEMI COLON COMMA IF THEN ELSE LET))
     (Ok (IN FUN BAR MATCH WITH LCURLY RCURLY))
     (Ok (BOOL INT FLOAT TICK (NUMERIC 10) (ID string_var)))
-    (Ok (ADD SUB DIV MUL HASH LEQ GEQ PERCENT LAND LOR EXTERN LET))
+    (Ok (ADD SUB DIV MUL HASH LEQ GEQ PERCENT LAND LOR EXTERN LET TYPE))
     (Ok ((FLOAT_LIT 1.23) (FLOAT_LIT 0.45) (FLOAT_LIT 6) SUB (FLOAT_LIT 1)))
     |}];
   test "let{x:int}=match|a->fun->(f<x>*2)";

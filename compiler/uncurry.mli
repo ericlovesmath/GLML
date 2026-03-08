@@ -12,6 +12,8 @@ type term_desc =
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
   | Builtin of Glsl.builtin * term list
+  | Record of string * term list
+  | Field of term * string
 [@@deriving sexp_of]
 
 and term =
@@ -24,6 +26,7 @@ and term =
 type top_desc =
   | Define of Stlc.recur * string * term
   | Extern of string
+  | RecordDef of string * (string * Stlc.ty) list
 [@@deriving sexp_of]
 
 type top =

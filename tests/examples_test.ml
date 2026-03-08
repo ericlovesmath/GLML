@@ -722,7 +722,7 @@ let%expect_test "compile examples" =
                              (set i_9 anf_35
                               (let _iter_inc_58 (+ _iter_57 1)
                                (set _iter_57 _iter_inc_58 continue))))))))))))))))))))))
-          0.))))
+          (return 0.)))))
       : (float -> (float -> (float -> (float -> (float -> float))))))
      ((Define (name main) (args ((coord_12 (vec 2))))
        (body
@@ -1706,7 +1706,7 @@ let%expect_test "compile examples" =
                      (set b_10 anf_25
                       (let _iter_inc_41 (+ _iter_39 1)
                        (set _iter_39 _iter_inc_41 continue))))))))))))))
-          0.))))
+          (return 0.)))))
       : (float -> (float -> float)))
      ((Define (name main) (args ((coord_11 (vec 2))))
        (body

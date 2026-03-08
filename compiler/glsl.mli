@@ -5,6 +5,7 @@ type ty =
   | TyVoid
   | TyVec of int
   | TyMat of int * int
+  | TyStruct of string
 [@@deriving sexp_of]
 
 type binary_op =
@@ -93,6 +94,7 @@ type decl =
       ; ret_type : ty
       ; body : stmt list
       }
+  | Struct of string * (ty * string) list
 [@@deriving sexp_of]
 
 type t = Program of decl list [@@deriving sexp_of, to_string]

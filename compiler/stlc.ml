@@ -8,6 +8,7 @@ type ty =
   | TyVec of int
   | TyMat of int * int
   | TyArrow of ty * ty
+  | TyRecord of string
 [@@deriving equal]
 
 let rec sexp_of_ty = function
@@ -17,6 +18,7 @@ let rec sexp_of_ty = function
   | TyVec i -> List [ Atom "vec"; Atom (Int.to_string i) ]
   | TyMat (x, y) -> List [ Atom "mat"; Atom (Int.to_string x); Atom (Int.to_string y) ]
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
+  | TyRecord s -> Atom s
 ;;
 
 type recur =
@@ -38,6 +40,8 @@ type term_desc =
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
   | Builtin of Glsl.builtin * term list
+  | Record of (string * term) list
+  | Field of term * string
 
 and term =
   { desc : term_desc
@@ -68,12 +72,18 @@ let rec sexp_of_term_desc = function
   | Index (t, i) -> List [ Atom "index"; sexp_of_term t; Atom (Int.to_string i) ]
   | Builtin (b, ts) ->
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
+  | Record fields ->
+    List
+      (Atom "record"
+       :: List.map fields ~f:(fun (f, t) -> List [ Atom f; sexp_of_term t ]))
+  | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
 
 and sexp_of_term t = sexp_of_term_desc t.desc
 
 type top_desc =
   | Define of recur * string * term
   | Extern of ty * string
+  | RecordDef of string * (string * ty) list
 [@@deriving sexp_of]
 
 type top =

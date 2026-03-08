@@ -5,6 +5,7 @@ type ty =
   | TyVec of int
   | TyMat of int * int
   | TyArrow of ty * ty
+  | TyRecord of string
 [@@deriving sexp_of, equal]
 
 (* TODO: The [ty] here is only needed because of the STLC style typechecking,
@@ -29,6 +30,8 @@ type term_desc =
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
   | Builtin of Glsl.builtin * term list
+  | Record of (string * term) list
+  | Field of term * string
 [@@deriving sexp_of]
 
 and term =
@@ -40,6 +43,7 @@ and term =
 type top_desc =
   | Define of recur * string * term
   | Extern of ty * string
+  | RecordDef of string * (string * ty) list
 [@@deriving sexp_of]
 
 type top =
