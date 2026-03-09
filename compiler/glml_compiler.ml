@@ -68,9 +68,9 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   trace Anf t;
   let%bind t = Tail_call.remove_rec t in
   trace Tail_call t;
-  let glsl = Translate.translate t in
+  let%bind glsl = Translate.translate t in
   trace Translate glsl;
-  let glsl = Patch_main.patch glsl in
+  let%bind glsl = Patch_main.patch glsl in
   trace Patch_main glsl;
   return (Glsl.to_string glsl)
 ;;
