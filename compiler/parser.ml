@@ -36,15 +36,20 @@ let between brace_type p =
 ;;
 
 let ty_vec_p =
-  let%bind _ = tok VEC in
-  let%bind n = num_p in
+  let%bind n =
+    satisfy_map (function
+      | VEC n -> Some n
+      | _ -> None)
+  in
   return (TyVec n) <??> "ty_vec"
 ;;
 
 let ty_mat_p =
-  let%bind _ = tok MAT in
-  let%bind n = num_p in
-  let%bind m = tok (ID "x") *> num_p <|> return n in
+  let%bind n, m =
+    satisfy_map (function
+      | MAT (n, m) -> Some (n, m)
+      | _ -> None)
+  in
   return (TyMat (n, m)) <??> "ty_mat"
 ;;
 
@@ -114,7 +119,7 @@ let%expect_test "ty parse tests" =
     {|
     (Error ((chomp_error satisfy_eof) (contexts (between ty))))
     (Error
-     ((chomp_error "satisfy_fail on <RPAREN> (1:2 - 1:3)")
+     ((chomp_error satisfy_map_fail)
       (contexts ("between (1:1 - 1:2)" "ty (1:1 - 1:2)"))))
     |}]
 ;;
@@ -372,6 +377,7 @@ let%expect_test "term parse tests" =
   test "1 * 2 + true && 44 % 10";
   test "v[0]";
   test "#min(1, 2)";
+  test "#exp2(1.)";
   [%expect
     {|
     (Ok variable_name)
@@ -388,6 +394,7 @@ let%expect_test "term parse tests" =
     (Ok (&& (+ (* 1 2) true) (% 44 10)))
     (Ok (index v 0))
     (Ok (min 1 2))
+    (Ok (exp2 1.))
     |}];
   test "-113.0";
   test "-113.";
