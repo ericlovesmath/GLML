@@ -31,8 +31,8 @@ type token =
   | INT
   | FLOAT
   | TICK
-  | VEC
-  | MAT
+  | VEC of int
+  | MAT of int * int
   | ADD
   | SUB
   | DIV

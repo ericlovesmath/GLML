@@ -32,8 +32,8 @@ type token =
   | INT
   | FLOAT
   | TICK
-  | VEC
-  | MAT
+  | VEC of int
+  | MAT of int * int
   | ADD
   | SUB
   | DIV
@@ -124,6 +124,26 @@ let rec strip t =
   | _ -> ()
 ;;
 
+(* TODO: Make [vecs] and [mats] generalizable sizes *)
+let vecs = String.Map.of_alist_exn [ "vec2", VEC 2; "vec3", VEC 3; "vec4", VEC 4 ]
+
+let mats =
+  String.Map.of_alist_exn
+    [ "mat2", MAT (2, 2)
+    ; "mat2x2", MAT (2, 2)
+    ; "mat2x3", MAT (2, 3)
+    ; "mat2x4", MAT (2, 4)
+    ; "mat3", MAT (3, 3)
+    ; "mat3x2", MAT (3, 2)
+    ; "mat3x3", MAT (3, 3)
+    ; "mat3x4", MAT (3, 4)
+    ; "mat4", MAT (4, 4)
+    ; "mat4x2", MAT (4, 2)
+    ; "mat4x3", MAT (4, 3)
+    ; "mat4x4", MAT (4, 4)
+    ]
+;;
+
 let read_lexeme (t : t) : token Or_error.t =
   let consume tok =
     skip t;
@@ -190,28 +210,27 @@ let read_lexeme (t : t) : token Or_error.t =
           Ok (FLOAT_LIT (Float.of_string (int_part ^ "." ^ frac_part)))
         | _ -> Ok (NUMERIC (Int.of_string int_part)))
      | c when Char.is_alpha c ->
-       let s = read_while (fun c -> Char.is_alpha c || Char.equal '_' c) t in
-       Ok
-         (match s with
-          | "true" -> TRUE
-          | "false" -> FALSE
-          | "let" -> LET
-          | "rec" -> REC
-          | "in" -> IN
-          | "if" -> IF
-          | "then" -> THEN
-          | "else" -> ELSE
-          | "fun" -> FUN
-          | "match" -> MATCH
-          | "with" -> WITH
-          | "bool" -> BOOL
-          | "int" -> INT
-          | "float" -> FLOAT
-          | "vec" -> VEC
-          | "mat" -> MAT
-          | "extern" -> EXTERN
-          | "type" -> TYPE
-          | _ -> ID s)
+       let s = read_while (fun c -> Char.is_alphanum c || String.mem "_'" c) t in
+       (match s with
+        | "true" -> Ok TRUE
+        | "false" -> Ok FALSE
+        | "let" -> Ok LET
+        | "rec" -> Ok REC
+        | "in" -> Ok IN
+        | "if" -> Ok IF
+        | "then" -> Ok THEN
+        | "else" -> Ok ELSE
+        | "fun" -> Ok FUN
+        | "match" -> Ok MATCH
+        | "with" -> Ok WITH
+        | "bool" -> Ok BOOL
+        | "int" -> Ok INT
+        | "float" -> Ok FLOAT
+        | "extern" -> Ok EXTERN
+        | "type" -> Ok TYPE
+        | s when Map.mem vecs s -> Map.find_or_error vecs s
+        | s when Map.mem mats s -> Map.find_or_error mats s
+        | _ -> Ok (ID s))
      | char -> error_s [%message "lexer: invalid char" (char : char) (t.pos : pos)])
 ;;
 
@@ -242,7 +261,7 @@ let%expect_test "lexer" =
   test "true false = -> ( ) . < >";
   test "{ } ; : , if then else let";
   test "in fun | match with { }";
-  test "bool int float ' 10 string_var";
+  test "bool int float ' 10 string_var vec mat";
   test "+ - / * # <= >= % && || extern let type";
   test "1.23 .45 6. -1.";
   [%expect
@@ -250,7 +269,7 @@ let%expect_test "lexer" =
     (Ok (TRUE FALSE EQ ARROW LPAREN RPAREN DOT LANGLE RANGLE))
     (Ok (LCURLY RCURLY SEMI COLON COMMA IF THEN ELSE LET))
     (Ok (IN FUN BAR MATCH WITH LCURLY RCURLY))
-    (Ok (BOOL INT FLOAT TICK (NUMERIC 10) (ID string_var)))
+    (Ok (BOOL INT FLOAT TICK (NUMERIC 10) (ID string_var) (ID vec) (ID mat)))
     (Ok (ADD SUB DIV MUL HASH LEQ GEQ PERCENT LAND LOR EXTERN LET TYPE))
     (Ok ((FLOAT_LIT 1.23) (FLOAT_LIT 0.45) (FLOAT_LIT 6) SUB (FLOAT_LIT 1)))
     |}];
@@ -261,8 +280,6 @@ let%expect_test "lexer" =
      (LET LCURLY (ID x) COLON INT RCURLY EQ MATCH BAR (ID a) ARROW FUN ARROW
       LPAREN (ID f) LANGLE (ID x) RANGLE MUL (NUMERIC 2) RPAREN))
     |}];
-  test "vec2 mat2x3";
-  [%expect {| (Ok (VEC (NUMERIC 2) MAT (NUMERIC 2) (ID x) (NUMERIC 3))) |}];
   test
     {|
     // top comment
