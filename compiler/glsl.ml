@@ -113,6 +113,10 @@ let rec string_of_term = function
   | Int i -> Int.to_string i
   | Bool b -> Bool.to_string b
   | Var v -> v
+  | Bop (Mod, t, t') ->
+    let t = string_of_term t in
+    let t' = string_of_term t' in
+    [%string "mod(%{t}, %{t'})"]
   | Bop (bop, t, t') ->
     let bop = string_of_binary_op bop in
     let t = string_of_term t in
