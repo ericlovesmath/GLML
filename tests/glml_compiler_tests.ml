@@ -255,14 +255,14 @@ let%expect_test "lambda lifting" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float add_4_5(float x_1, float y_2, float z_3) {
+    float add_3_5(float x_1, float y_2, float z_4) {
         float anf_6 = (x_1 + y_2);
-        return (anf_6 + z_3);
+        return (anf_6 + z_4);
     }
     vec3 main_pure(vec2 u_0) {
         float x_1 = 10.;
         float y_2 = 5.;
-        float anf_7 = add_4_5(x_1, y_2, 1.);
+        float anf_7 = add_3_5(x_1, y_2, 1.);
         return vec3(anf_7, 0., 0.);
     }
     void main() {
@@ -284,15 +284,15 @@ let%expect_test "lambda lifting" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float g_3_6(float x_1, float y_2) {
-        return (x_1 + y_2);
+    float g_3_6(float x_2, float y_4) {
+        return (x_2 + y_4);
     }
-    vec3 f_4_5(float x_1) {
-        float anf_7 = g_3_6(x_1, 1.);
+    vec3 f_1_5(float x_2) {
+        float anf_7 = g_3_6(x_2, 1.);
         return vec3(anf_7, 0., 0.);
     }
     vec3 main_pure(vec2 u_0) {
-        return f_4_5(10.);
+        return f_1_5(10.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -509,12 +509,12 @@ let%expect_test "nested structs" =
     segment make_seg_0(float u_1) {
         segment s_2 = segment(point(0., 0.), point(0., 0.));
         if (true) {
-            segment anf_6 = point(0., 0.);
-            segment anf_7 = point(1., 1.);
+            point anf_6 = point(0., 0.);
+            point anf_7 = point(1., 1.);
             s_2 = segment(anf_6, anf_7);
         } else {
-            segment anf_8 = point(1., 1.);
-            segment anf_9 = point(0., 0.);
+            point anf_8 = point(1., 1.);
+            point anf_9 = point(0., 0.);
             s_2 = segment(anf_8, anf_9);
         }
         return s_2;

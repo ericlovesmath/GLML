@@ -1,0 +1,79 @@
+#extern vec2 u_resolution
+#extern float u_time
+#extern vec2 u_mouse
+
+// Rotation Matrix
+let rotate (p : vec2) (angle : float) =
+  let s = #sin(angle) in
+  let c = #cos(angle) in
+  <p[0] * c - p[1] * s, p[0] * s + p[1] * c>
+
+let sMin (a : float) (b : float) =
+  let k = 0.1 in
+  let h = #clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0) in
+  #mix(b, a, h) - k * h * (1.0 - h)
+
+let palette (t : float) =
+  let cfg = <0.3, 0.416, 0.557> in
+  #cos((cfg + t) * 6.28318) * 0.5 + 0.5
+
+// SDF of Torus, [sdTorus center radius]
+let sdTorus (p : vec3) (t : vec2) =
+  let q = <#length(<p[0], p[2]>) - t[0], p[1]> in
+  #length(q) - t[1]
+
+let map (p : vec3) =
+  // Rotating the object within the scene
+  let angle = u_time * 2.0 in
+  let p_xy = (rotate <p[0], p[1]>) angle in
+  let p' = <p_xy[0], p_xy[1], p[2]> in
+  let p_yz = (rotate <p'[1], p'[2]>) angle in
+  let p' = <p'[0], p_yz[0], p_yz[1]> in
+  
+  sMin (sdTorus p' <1.0, 0.3>) (sdTorus p <2.0, 0.5>)
+
+// Raymarching Loop
+let march (ro : vec3) (rd : vec3) =
+  let (rec : float -> int -> float) march (t : float) (steps : int) =
+    if steps > 80 then t
+    else
+      let d = map (ro + rd * t) in
+      if d < 0.001 then t
+      else if t > 100.0 then 100.1
+      else (march (t + d) (steps + 1))
+  in
+  march 0.0 0
+
+let main (coord : vec2) =
+  let res_min = #min(u_resolution[0], u_resolution[1]) in
+  let uv = (coord * 2.0 - u_resolution) / res_min in
+  let mouseUV = (u_mouse * 2.0 - u_resolution) / res_min in
+
+  // Ray setup
+  let ro_init = <0.0, 0.0, -10.0> in
+  let rd_init = #normalize(<uv[0], uv[1], 1.0>) in
+
+  // Mouse rotation logic
+  let rotX = 0.0 - mouseUV[1] in
+  let rotY = 0.0 - mouseUV[0] in
+  
+  // Rotate ro and rd on YZ plane
+  let ro_yz = rotate (<ro_init[1], ro_init[2]>) rotX in
+  let rd_yz = rotate (<rd_init[1], rd_init[2]>) rotX in
+  let ro = <ro_init[0], ro_yz[0], ro_yz[1]> in
+  let rd = <rd_init[0], rd_yz[0], rd_yz[1]> in
+  
+  // Rotate ro and rd on XZ plane
+  let ro_xz = rotate (<ro[0], ro[2]>) rotY in
+  let rd_xz = rotate (<rd[0], rd[2]>) rotY in
+  let ro = <ro_xz[0], ro[1], ro_xz[1]> in
+  let rd = <rd_xz[0], rd[1], rd_xz[1]> in
+
+  // Perform raymarching and shade
+  let t = march ro rd in
+  let col = if t > 100.0 then <0.2, 0.2, 0.2> else palette (t * 0.3) in
+  
+  // Mouse Glow logic
+  let glow = 0.02 / #length(uv - mouseUV) in
+
+  col + glow
