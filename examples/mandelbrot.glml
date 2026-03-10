@@ -4,19 +4,20 @@
 // Normalizes coordinates to [-1, 1] and handles aspect ratio
 let get_uv (coord : vec2) =
   let top = 2.0 * coord - u_resolution in
-  let bot = #min(u_resolution[0], u_resolution[1]) in
+  let bot = #min(u_resolution.0, u_resolution.1) in
   top / bot
 
 // Recursive Mandelbrot function
 // zx, zy: Current state
 // cx, cy: Constant location
 // i: Iteration counter (float to avoid casting)
-let (rec : float -> float -> float -> float -> float -> float) mandel (zx : float) (zy : float) (cx : float) (cy : float) (i : float) =
-  if #length(<zx, zy>) > 2. || i > 150. then
+let (rec : float -> float -> float -> float -> float -> float)
+    mandel (zx : float) (zy : float) (cx : float) (cy : float) (i : float) =
+  if #length([zx, zy]) > 2. || i > 150. then
     i
   else
     let next_zx = zx * zx - zy * zy + cx in
-    let next_zy = (2.0 * zx * zy) + cy in
+    let next_zy = 2.0 * zx * zy + cy in
     mandel next_zx next_zy cx cy (i + 1.0)
 
 let main (coord : vec2) =
@@ -24,15 +25,15 @@ let main (coord : vec2) =
 
   // Coordinates for the Seahorse Valley, zooming in and out
   let zoom = #exp(#sin(u_time * 0.4) * 4.5 + 3.5) in
-  let cx = -0.7453 + uv[0] / zoom in
-  let cy = 0.1127 + uv[1] / zoom in
+  let cx = -0.7453 + uv.0 / zoom in
+  let cy = 0.1127 + uv.1 / zoom in
 
   // Mandelbrot starting at <0., 0.>
   let iter = mandel 0.0 0.0 cx cy 0.0 in
 
   if iter > 149.0 then
     // Points inside the set are black
-    < 0.0, 0.0, 0.0 >
+    [ 0.0, 0.0, 0.0 ]
   else
     let n = iter / 150.0 in
 
@@ -40,5 +41,5 @@ let main (coord : vec2) =
     let g = #sin(n * 20.0 + u_time) * 0.5 + 0.5 in
     let b = #sin(n * 30.0 + u_time) * 0.5 + 0.5 in
 
-    < r, g, b >
+    [ r, g, b ]
 

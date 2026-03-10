@@ -173,13 +173,7 @@ let read_lexeme (t : t) : token Or_error.t =
      | ']' -> consume RBRACKET
      | ';' -> consume SEMI
      | ',' -> consume COMMA
-     | '.' ->
-       skip t;
-       (match peek t with
-        | Some c when Char.is_digit c ->
-          let frac_part = read_while Char.is_digit t in
-          Ok (FLOAT_LIT (Float.of_string ("0." ^ frac_part)))
-        | _ -> Ok DOT)
+     | '.' -> consume DOT
      | '|' ->
        skip t;
        (match peek t with
@@ -263,7 +257,7 @@ let%expect_test "lexer" =
   test "in fun | match with { }";
   test "bool int float ' 10 string_var vec mat";
   test "+ - / * # <= >= % && || extern let type";
-  test "1.23 .45 6. -1.";
+  test "1.23 0.45 6. -1.";
   [%expect
     {|
     (Ok (TRUE FALSE EQ ARROW LPAREN RPAREN DOT LANGLE RANGLE))
