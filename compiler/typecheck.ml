@@ -173,7 +173,8 @@ let rec update
      | (Add | Sub | Mul | Div | Mod), TyFloat, TyFloat -> make TyFloat
      | (Add | Sub | Mul | Div | Mod), TyInt, TyInt -> make TyInt
      | (Add | Sub | Mul | Div | Mod), TyVec n, TyVec n' when n = n' -> make (TyVec n)
-     | (Mul | Div), TyVec n, TyFloat | (Mul | Div), TyFloat, TyVec n -> make (TyVec n)
+     | (Add | Sub | Mul | Div | Mod), (TyFloat | TyInt), TyVec n
+     | (Add | Sub | Mul | Div | Mod), TyVec n, (TyFloat | TyInt) -> make (TyVec n)
      | (Add | Sub | Mul | Div | Mod), TyMat (x, y), TyMat (x', y') when x = x' && y = y'
        -> make (TyMat (x, y))
      | (Mul | Div), TyMat (x, y), TyFloat | (Mul | Div), TyFloat, TyMat (x, y) ->
@@ -350,4 +351,3 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
   in
   Program (List.rev tops)
 ;;
-
