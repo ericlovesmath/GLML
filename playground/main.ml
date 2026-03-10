@@ -20,20 +20,22 @@ let chosen_syntax = OCamlLike
 module Example = struct
   type t =
     | Metalic_liquid
-    | Mouse_circle
+    | Raymarching
     | Pastel_rainbow
     | Checkboard
     | Recursive_star
     | Mandelbrot
+    | Mouse_circle
   [@@deriving sexp, compare, equal, enumerate, to_string ~capitalize:"Title Case"]
 
   let to_glml = function
     | Metalic_liquid -> [%blob "../examples/warped_noise.glml"]
-    | Mouse_circle -> [%blob "../examples/mouse_circle.glml"]
+    | Raymarching -> [%blob "../examples/raymarch.glml"]
     | Pastel_rainbow -> [%blob "../examples/rainbow.glml"]
     | Checkboard -> [%blob "../examples/checkerboard.glml"]
     | Recursive_star -> [%blob "../examples/recursion.glml"]
     | Mandelbrot -> [%blob "../examples/mandelbrot.glml"]
+    | Mouse_circle -> [%blob "../examples/mouse_circle.glml"]
   ;;
 end
 

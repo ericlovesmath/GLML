@@ -1397,6 +1397,1420 @@ let%expect_test "compile examples" =
         ((set () vec3 color (main_pure (. gl_FragCoord xy)))
          (set fragColor (clamp (vec4 (. color xyz) 1.) 0. 1.)))))))
 
+    ====== COMPILING EXAMPLE raymarch.glml ======
+
+    === stlc (raymarch.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Extern float u_time)
+      (Extern (vec 2) u_mouse)
+      (Define Nonrec rotate
+       (lambda (p (vec 2))
+        (lambda (angle float)
+         (let s (sin angle)
+          (let c (cos angle)
+           (vec2 (- (* (index p 0) c) (* (index p 1) s))
+            (+ (* (index p 0) s) (* (index p 1) c))))))))
+      (Define Nonrec sMin
+       (lambda (a float)
+        (lambda (b float)
+         (let k 0.1
+          (let h (clamp (+ 0.5 (/ (* 0.5 (- b a)) k)) 0. 1.)
+           (- (mix b a h) (* (* k h) (- 1. h))))))))
+      (Define Nonrec palette
+       (lambda (t float)
+        (let cfg (vec3 0.3 0.416 0.557)
+         (+ (* (cos (* (+ cfg t) 6.28318)) 0.5) 0.5))))
+      (Define Nonrec sdTorus
+       (lambda (p (vec 3))
+        (lambda (t (vec 2))
+         (let q
+          (vec2 (- (length (vec2 (index p 0) (index p 2))) (index t 0))
+           (index p 1))
+          (- (length q) (index t 1))))))
+      (Define Nonrec map
+       (lambda (p (vec 3))
+        (let angle (* u_time 2.)
+         (let p_xy (app (app rotate (vec2 (index p 0) (index p 1))) angle)
+          (let p' (vec3 (index p_xy 0) (index p_xy 1) (index p 2))
+           (let p_yz (app (app rotate (vec2 (index p' 1) (index p' 2))) angle)
+            (let p' (vec3 (index p' 0) (index p_yz 0) (index p_yz 1))
+             (app (app sMin (app (app sdTorus p') (vec2 1. 0.3)))
+              (app (app sdTorus p) (vec2 2. 0.5))))))))))
+      (Define Nonrec march
+       (lambda (ro (vec 3))
+        (lambda (rd (vec 3))
+         (let (rec 1000 (float -> (int -> float))) march
+          (lambda (t float)
+           (lambda (steps int)
+            (if (> steps 80) t
+             (let d (app map (+ ro (* rd t)))
+              (if (< d 0.001) t
+               (if (> t 100.) 100.1 (app (app march (+ t d)) (+ steps 1))))))))
+          (app (app march 0.) 0)))))
+      (Define Nonrec main
+       (lambda (coord (vec 2))
+        (let res_min (min (index u_resolution 0) (index u_resolution 1))
+         (let uv (/ (- (* coord 2.) u_resolution) res_min)
+          (let mouseUV (/ (- (* u_mouse 2.) u_resolution) res_min)
+           (let ro_init (vec3 0. 0. -10.)
+            (let rd_init (normalize (vec3 (index uv 0) (index uv 1) 1.))
+             (let rotX (- 0. (index mouseUV 1))
+              (let rotY (- 0. (index mouseUV 0))
+               (let ro_yz
+                (app (app rotate (vec2 (index ro_init 1) (index ro_init 2)))
+                 rotX)
+                (let rd_yz
+                 (app (app rotate (vec2 (index rd_init 1) (index rd_init 2)))
+                  rotX)
+                 (let ro (vec3 (index ro_init 0) (index ro_yz 0) (index ro_yz 1))
+                  (let rd
+                   (vec3 (index rd_init 0) (index rd_yz 0) (index rd_yz 1))
+                   (let ro_xz
+                    (app (app rotate (vec2 (index ro 0) (index ro 2))) rotY)
+                    (let rd_xz
+                     (app (app rotate (vec2 (index rd 0) (index rd 2))) rotY)
+                     (let ro (vec3 (index ro_xz 0) (index ro 1) (index ro_xz 1))
+                      (let rd (vec3 (index rd_xz 0) (index rd 1) (index rd_xz 1))
+                       (let t (app (app march ro) rd)
+                        (let col
+                         (if (> t 100.) (vec3 0.2 0.2 0.2)
+                          (app palette (* t 0.3)))
+                         (let glow (/ 0.02 (length (- uv mouseUV))) (+ col glow)))))))))))))))))))))))
+
+    === uniquify (raymarch.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Extern float u_time)
+      (Extern (vec 2) u_mouse)
+      (Define Nonrec rotate_0
+       (lambda (p_1 (vec 2))
+        (lambda (angle_2 float)
+         (let s_3 (sin angle_2)
+          (let c_4 (cos angle_2)
+           (vec2 (- (* (index p_1 0) c_4) (* (index p_1 1) s_3))
+            (+ (* (index p_1 0) s_3) (* (index p_1 1) c_4))))))))
+      (Define Nonrec sMin_5
+       (lambda (a_6 float)
+        (lambda (b_7 float)
+         (let k_8 0.1
+          (let h_9 (clamp (+ 0.5 (/ (* 0.5 (- b_7 a_6)) k_8)) 0. 1.)
+           (- (mix b_7 a_6 h_9) (* (* k_8 h_9) (- 1. h_9))))))))
+      (Define Nonrec palette_10
+       (lambda (t_11 float)
+        (let cfg_12 (vec3 0.3 0.416 0.557)
+         (+ (* (cos (* (+ cfg_12 t_11) 6.28318)) 0.5) 0.5))))
+      (Define Nonrec sdTorus_13
+       (lambda (p_14 (vec 3))
+        (lambda (t_15 (vec 2))
+         (let q_16
+          (vec2 (- (length (vec2 (index p_14 0) (index p_14 2))) (index t_15 0))
+           (index p_14 1))
+          (- (length q_16) (index t_15 1))))))
+      (Define Nonrec map_17
+       (lambda (p_18 (vec 3))
+        (let angle_19 (* u_time 2.)
+         (let p_xy_20
+          (app (app rotate_0 (vec2 (index p_18 0) (index p_18 1))) angle_19)
+          (let p_prime_21
+           (vec3 (index p_xy_20 0) (index p_xy_20 1) (index p_18 2))
+           (let p_yz_22
+            (app (app rotate_0 (vec2 (index p_prime_21 1) (index p_prime_21 2)))
+             angle_19)
+            (let p_prime_23
+             (vec3 (index p_prime_21 0) (index p_yz_22 0) (index p_yz_22 1))
+             (app (app sMin_5 (app (app sdTorus_13 p_prime_23) (vec2 1. 0.3)))
+              (app (app sdTorus_13 p_18) (vec2 2. 0.5))))))))))
+      (Define Nonrec march_24
+       (lambda (ro_25 (vec 3))
+        (lambda (rd_26 (vec 3))
+         (let (rec 1000 (float -> (int -> float))) march_27
+          (lambda (t_28 float)
+           (lambda (steps_29 int)
+            (if (> steps_29 80) t_28
+             (let d_30 (app map_17 (+ ro_25 (* rd_26 t_28)))
+              (if (< d_30 0.001) t_28
+               (if (> t_28 100.) 100.1
+                (app (app march_27 (+ t_28 d_30)) (+ steps_29 1))))))))
+          (app (app march_27 0.) 0)))))
+      (Define Nonrec main
+       (lambda (coord_31 (vec 2))
+        (let res_min_32 (min (index u_resolution 0) (index u_resolution 1))
+         (let uv_33 (/ (- (* coord_31 2.) u_resolution) res_min_32)
+          (let mouseUV_34 (/ (- (* u_mouse 2.) u_resolution) res_min_32)
+           (let ro_init_35 (vec3 0. 0. -10.)
+            (let rd_init_36 (normalize (vec3 (index uv_33 0) (index uv_33 1) 1.))
+             (let rotX_37 (- 0. (index mouseUV_34 1))
+              (let rotY_38 (- 0. (index mouseUV_34 0))
+               (let ro_yz_39
+                (app
+                 (app rotate_0 (vec2 (index ro_init_35 1) (index ro_init_35 2)))
+                 rotX_37)
+                (let rd_yz_40
+                 (app
+                  (app rotate_0 (vec2 (index rd_init_36 1) (index rd_init_36 2)))
+                  rotX_37)
+                 (let ro_41
+                  (vec3 (index ro_init_35 0) (index ro_yz_39 0)
+                   (index ro_yz_39 1))
+                  (let rd_42
+                   (vec3 (index rd_init_36 0) (index rd_yz_40 0)
+                    (index rd_yz_40 1))
+                   (let ro_xz_43
+                    (app (app rotate_0 (vec2 (index ro_41 0) (index ro_41 2)))
+                     rotY_38)
+                    (let rd_xz_44
+                     (app (app rotate_0 (vec2 (index rd_42 0) (index rd_42 2)))
+                      rotY_38)
+                     (let ro_45
+                      (vec3 (index ro_xz_43 0) (index ro_41 1)
+                       (index ro_xz_43 1))
+                      (let rd_46
+                       (vec3 (index rd_xz_44 0) (index rd_42 1)
+                        (index rd_xz_44 1))
+                       (let t_47 (app (app march_24 ro_45) rd_46)
+                        (let col_48
+                         (if (> t_47 100.) (vec3 0.2 0.2 0.2)
+                          (app palette_10 (* t_47 0.3)))
+                         (let glow_49 (/ 0.02 (length (- uv_33 mouseUV_34)))
+                          (+ col_48 glow_49)))))))))))))))))))))))
+
+    === typecheck (raymarch.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+      ((Extern u_mouse) : (vec 2))
+      ((Define Nonrec rotate_0
+        ((lambda (p_1 (vec 2))
+          ((lambda (angle_2 float)
+            ((let s_3 ((sin (angle_2 : float)) : float)
+              ((let c_4 ((cos (angle_2 : float)) : float)
+                ((vec2
+                  ((-
+                    ((* ((index (p_1 : (vec 2)) 0) : float) (c_4 : float)) :
+                     float)
+                    ((* ((index (p_1 : (vec 2)) 1) : float) (s_3 : float)) :
+                     float))
+                   : float)
+                  ((+
+                    ((* ((index (p_1 : (vec 2)) 0) : float) (s_3 : float)) :
+                     float)
+                    ((* ((index (p_1 : (vec 2)) 1) : float) (c_4 : float)) :
+                     float))
+                   : float))
+                 : (vec 2)))
+               : (vec 2)))
+             : (vec 2)))
+           : (float -> (vec 2))))
+         : ((vec 2) -> (float -> (vec 2)))))
+       : ((vec 2) -> (float -> (vec 2))))
+      ((Define Nonrec sMin_5
+        ((lambda (a_6 float)
+          ((lambda (b_7 float)
+            ((let k_8 (0.1 : float)
+              ((let h_9
+                ((clamp
+                  ((+ (0.5 : float)
+                    ((/
+                      ((* (0.5 : float)
+                        ((- (b_7 : float) (a_6 : float)) : float))
+                       : float)
+                      (k_8 : float))
+                     : float))
+                   : float)
+                  (0. : float) (1. : float))
+                 : float)
+                ((- ((mix (b_7 : float) (a_6 : float) (h_9 : float)) : float)
+                  ((* ((* (k_8 : float) (h_9 : float)) : float)
+                    ((- (1. : float) (h_9 : float)) : float))
+                   : float))
+                 : float))
+               : float))
+             : float))
+           : (float -> float)))
+         : (float -> (float -> float))))
+       : (float -> (float -> float)))
+      ((Define Nonrec palette_10
+        ((lambda (t_11 float)
+          ((let cfg_12
+            ((vec3 (0.3 : float) (0.416 : float) (0.557 : float)) : (vec 3))
+            ((+
+              ((*
+                ((cos
+                  ((* ((+ (cfg_12 : (vec 3)) (t_11 : float)) : (vec 3))
+                    (6.28318 : float))
+                   : (vec 3)))
+                 : (vec 3))
+                (0.5 : float))
+               : (vec 3))
+              (0.5 : float))
+             : (vec 3)))
+           : (vec 3)))
+         : (float -> (vec 3))))
+       : (float -> (vec 3)))
+      ((Define Nonrec sdTorus_13
+        ((lambda (p_14 (vec 3))
+          ((lambda (t_15 (vec 2))
+            ((let q_16
+              ((vec2
+                ((-
+                  ((length
+                    ((vec2 ((index (p_14 : (vec 3)) 0) : float)
+                      ((index (p_14 : (vec 3)) 2) : float))
+                     : (vec 2)))
+                   : float)
+                  ((index (t_15 : (vec 2)) 0) : float))
+                 : float)
+                ((index (p_14 : (vec 3)) 1) : float))
+               : (vec 2))
+              ((- ((length (q_16 : (vec 2))) : float)
+                ((index (t_15 : (vec 2)) 1) : float))
+               : float))
+             : float))
+           : ((vec 2) -> float)))
+         : ((vec 3) -> ((vec 2) -> float))))
+       : ((vec 3) -> ((vec 2) -> float)))
+      ((Define Nonrec map_17
+        ((lambda (p_18 (vec 3))
+          ((let angle_19 ((* (u_time : float) (2. : float)) : float)
+            ((let p_xy_20
+              ((app
+                ((app (rotate_0 : ((vec 2) -> (float -> (vec 2))))
+                  ((vec2 ((index (p_18 : (vec 3)) 0) : float)
+                    ((index (p_18 : (vec 3)) 1) : float))
+                   : (vec 2)))
+                 : (float -> (vec 2)))
+                (angle_19 : float))
+               : (vec 2))
+              ((let p_prime_21
+                ((vec3 ((index (p_xy_20 : (vec 2)) 0) : float)
+                  ((index (p_xy_20 : (vec 2)) 1) : float)
+                  ((index (p_18 : (vec 3)) 2) : float))
+                 : (vec 3))
+                ((let p_yz_22
+                  ((app
+                    ((app (rotate_0 : ((vec 2) -> (float -> (vec 2))))
+                      ((vec2 ((index (p_prime_21 : (vec 3)) 1) : float)
+                        ((index (p_prime_21 : (vec 3)) 2) : float))
+                       : (vec 2)))
+                     : (float -> (vec 2)))
+                    (angle_19 : float))
+                   : (vec 2))
+                  ((let p_prime_23
+                    ((vec3 ((index (p_prime_21 : (vec 3)) 0) : float)
+                      ((index (p_yz_22 : (vec 2)) 0) : float)
+                      ((index (p_yz_22 : (vec 2)) 1) : float))
+                     : (vec 3))
+                    ((app
+                      ((app (sMin_5 : (float -> (float -> float)))
+                        ((app
+                          ((app (sdTorus_13 : ((vec 3) -> ((vec 2) -> float)))
+                            (p_prime_23 : (vec 3)))
+                           : ((vec 2) -> float))
+                          ((vec2 (1. : float) (0.3 : float)) : (vec 2)))
+                         : float))
+                       : (float -> float))
+                      ((app
+                        ((app (sdTorus_13 : ((vec 3) -> ((vec 2) -> float)))
+                          (p_18 : (vec 3)))
+                         : ((vec 2) -> float))
+                        ((vec2 (2. : float) (0.5 : float)) : (vec 2)))
+                       : float))
+                     : float))
+                   : float))
+                 : float))
+               : float))
+             : float))
+           : float))
+         : ((vec 3) -> float)))
+       : ((vec 3) -> float))
+      ((Define Nonrec march_24
+        ((lambda (ro_25 (vec 3))
+          ((lambda (rd_26 (vec 3))
+            ((let (rec 1000 (float -> (int -> float))) march_27
+              ((lambda (t_28 float)
+                ((lambda (steps_29 int)
+                  ((if ((> (steps_29 : int) (80 : int)) : bool) (t_28 : float)
+                    ((let d_30
+                      ((app (map_17 : ((vec 3) -> float))
+                        ((+ (ro_25 : (vec 3))
+                          ((* (rd_26 : (vec 3)) (t_28 : float)) : (vec 3)))
+                         : (vec 3)))
+                       : float)
+                      ((if ((< (d_30 : float) (0.001 : float)) : bool)
+                        (t_28 : float)
+                        ((if ((> (t_28 : float) (100. : float)) : bool)
+                          (100.1 : float)
+                          ((app
+                            ((app (march_27 : (float -> (int -> float)))
+                              ((+ (t_28 : float) (d_30 : float)) : float))
+                             : (int -> float))
+                            ((+ (steps_29 : int) (1 : int)) : int))
+                           : float))
+                         : float))
+                       : float))
+                     : float))
+                   : float))
+                 : (int -> float)))
+               : (float -> (int -> float)))
+              ((app
+                ((app (march_27 : (float -> (int -> float))) (0. : float)) :
+                 (int -> float))
+                (0 : int))
+               : float))
+             : float))
+           : ((vec 3) -> float)))
+         : ((vec 3) -> ((vec 3) -> float))))
+       : ((vec 3) -> ((vec 3) -> float)))
+      ((Define Nonrec main
+        ((lambda (coord_31 (vec 2))
+          ((let res_min_32
+            ((min ((index (u_resolution : (vec 2)) 0) : float)
+              ((index (u_resolution : (vec 2)) 1) : float))
+             : float)
+            ((let uv_33
+              ((/
+                ((- ((* (coord_31 : (vec 2)) (2. : float)) : (vec 2))
+                  (u_resolution : (vec 2)))
+                 : (vec 2))
+                (res_min_32 : float))
+               : (vec 2))
+              ((let mouseUV_34
+                ((/
+                  ((- ((* (u_mouse : (vec 2)) (2. : float)) : (vec 2))
+                    (u_resolution : (vec 2)))
+                   : (vec 2))
+                  (res_min_32 : float))
+                 : (vec 2))
+                ((let ro_init_35
+                  ((vec3 (0. : float) (0. : float) (-10. : float)) : (vec 3))
+                  ((let rd_init_36
+                    ((normalize
+                      ((vec3 ((index (uv_33 : (vec 2)) 0) : float)
+                        ((index (uv_33 : (vec 2)) 1) : float) (1. : float))
+                       : (vec 3)))
+                     : (vec 3))
+                    ((let rotX_37
+                      ((- (0. : float)
+                        ((index (mouseUV_34 : (vec 2)) 1) : float))
+                       : float)
+                      ((let rotY_38
+                        ((- (0. : float)
+                          ((index (mouseUV_34 : (vec 2)) 0) : float))
+                         : float)
+                        ((let ro_yz_39
+                          ((app
+                            ((app (rotate_0 : ((vec 2) -> (float -> (vec 2))))
+                              ((vec2 ((index (ro_init_35 : (vec 3)) 1) : float)
+                                ((index (ro_init_35 : (vec 3)) 2) : float))
+                               : (vec 2)))
+                             : (float -> (vec 2)))
+                            (rotX_37 : float))
+                           : (vec 2))
+                          ((let rd_yz_40
+                            ((app
+                              ((app (rotate_0 : ((vec 2) -> (float -> (vec 2))))
+                                ((vec2 ((index (rd_init_36 : (vec 3)) 1) : float)
+                                  ((index (rd_init_36 : (vec 3)) 2) : float))
+                                 : (vec 2)))
+                               : (float -> (vec 2)))
+                              (rotX_37 : float))
+                             : (vec 2))
+                            ((let ro_41
+                              ((vec3 ((index (ro_init_35 : (vec 3)) 0) : float)
+                                ((index (ro_yz_39 : (vec 2)) 0) : float)
+                                ((index (ro_yz_39 : (vec 2)) 1) : float))
+                               : (vec 3))
+                              ((let rd_42
+                                ((vec3 ((index (rd_init_36 : (vec 3)) 0) : float)
+                                  ((index (rd_yz_40 : (vec 2)) 0) : float)
+                                  ((index (rd_yz_40 : (vec 2)) 1) : float))
+                                 : (vec 3))
+                                ((let ro_xz_43
+                                  ((app
+                                    ((app
+                                      (rotate_0 :
+                                       ((vec 2) -> (float -> (vec 2))))
+                                      ((vec2
+                                        ((index (ro_41 : (vec 3)) 0) : float)
+                                        ((index (ro_41 : (vec 3)) 2) : float))
+                                       : (vec 2)))
+                                     : (float -> (vec 2)))
+                                    (rotY_38 : float))
+                                   : (vec 2))
+                                  ((let rd_xz_44
+                                    ((app
+                                      ((app
+                                        (rotate_0 :
+                                         ((vec 2) -> (float -> (vec 2))))
+                                        ((vec2
+                                          ((index (rd_42 : (vec 3)) 0) : float)
+                                          ((index (rd_42 : (vec 3)) 2) : float))
+                                         : (vec 2)))
+                                       : (float -> (vec 2)))
+                                      (rotY_38 : float))
+                                     : (vec 2))
+                                    ((let ro_45
+                                      ((vec3
+                                        ((index (ro_xz_43 : (vec 2)) 0) : float)
+                                        ((index (ro_41 : (vec 3)) 1) : float)
+                                        ((index (ro_xz_43 : (vec 2)) 1) : float))
+                                       : (vec 3))
+                                      ((let rd_46
+                                        ((vec3
+                                          ((index (rd_xz_44 : (vec 2)) 0) :
+                                           float)
+                                          ((index (rd_42 : (vec 3)) 1) : float)
+                                          ((index (rd_xz_44 : (vec 2)) 1) :
+                                           float))
+                                         : (vec 3))
+                                        ((let t_47
+                                          ((app
+                                            ((app
+                                              (march_24 :
+                                               ((vec 3) -> ((vec 3) -> float)))
+                                              (ro_45 : (vec 3)))
+                                             : ((vec 3) -> float))
+                                            (rd_46 : (vec 3)))
+                                           : float)
+                                          ((let col_48
+                                            ((if
+                                              ((> (t_47 : float) (100. : float))
+                                               : bool)
+                                              ((vec3 (0.2 : float) (0.2 : float)
+                                                (0.2 : float))
+                                               : (vec 3))
+                                              ((app
+                                                (palette_10 : (float -> (vec 3)))
+                                                ((* (t_47 : float) (0.3 : float))
+                                                 : float))
+                                               : (vec 3)))
+                                             : (vec 3))
+                                            ((let glow_49
+                                              ((/ (0.02 : float)
+                                                ((length
+                                                  ((- (uv_33 : (vec 2))
+                                                    (mouseUV_34 : (vec 2)))
+                                                   : (vec 2)))
+                                                 : float))
+                                               : float)
+                                              ((+ (col_48 : (vec 3))
+                                                (glow_49 : float))
+                                               : (vec 3)))
+                                             : (vec 3)))
+                                           : (vec 3)))
+                                         : (vec 3)))
+                                       : (vec 3)))
+                                     : (vec 3)))
+                                   : (vec 3)))
+                                 : (vec 3)))
+                               : (vec 3)))
+                             : (vec 3)))
+                           : (vec 3)))
+                         : (vec 3)))
+                       : (vec 3)))
+                     : (vec 3)))
+                   : (vec 3)))
+                 : (vec 3)))
+               : (vec 3)))
+             : (vec 3)))
+           : (vec 3)))
+         : ((vec 2) -> (vec 3))))
+       : ((vec 2) -> (vec 3)))))
+
+    === uncurry (raymarch.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+      ((Extern u_mouse) : (vec 2))
+      ((Define Nonrec rotate_0
+        (lambda ((p_1 (vec 2)) (angle_2 float))
+         (let s_3 (sin angle_2)
+          (let c_4 (cos angle_2)
+           (vec2 (- (* (index p_1 0) c_4) (* (index p_1 1) s_3))
+            (+ (* (index p_1 0) s_3) (* (index p_1 1) c_4)))))))
+       : ((vec 2) -> (float -> (vec 2))))
+      ((Define Nonrec sMin_5
+        (lambda ((a_6 float) (b_7 float))
+         (let k_8 0.1
+          (let h_9 (clamp (+ 0.5 (/ (* 0.5 (- b_7 a_6)) k_8)) 0. 1.)
+           (- (mix b_7 a_6 h_9) (* (* k_8 h_9) (- 1. h_9)))))))
+       : (float -> (float -> float)))
+      ((Define Nonrec palette_10
+        (lambda ((t_11 float))
+         (let cfg_12 (vec3 0.3 0.416 0.557)
+          (+ (* (cos (* (+ cfg_12 t_11) 6.28318)) 0.5) 0.5))))
+       : (float -> (vec 3)))
+      ((Define Nonrec sdTorus_13
+        (lambda ((p_14 (vec 3)) (t_15 (vec 2)))
+         (let q_16
+          (vec2 (- (length (vec2 (index p_14 0) (index p_14 2))) (index t_15 0))
+           (index p_14 1))
+          (- (length q_16) (index t_15 1)))))
+       : ((vec 3) -> ((vec 2) -> float)))
+      ((Define Nonrec map_17
+        (lambda ((p_18 (vec 3)))
+         (let angle_19 (* u_time 2.)
+          (let p_xy_20
+           (app rotate_0 (vec2 (index p_18 0) (index p_18 1)) angle_19)
+           (let p_prime_21
+            (vec3 (index p_xy_20 0) (index p_xy_20 1) (index p_18 2))
+            (let p_yz_22
+             (app rotate_0 (vec2 (index p_prime_21 1) (index p_prime_21 2))
+              angle_19)
+             (let p_prime_23
+              (vec3 (index p_prime_21 0) (index p_yz_22 0) (index p_yz_22 1))
+              (app sMin_5 (app sdTorus_13 p_prime_23 (vec2 1. 0.3))
+               (app sdTorus_13 p_18 (vec2 2. 0.5))))))))))
+       : ((vec 3) -> float))
+      ((Define Nonrec march_24
+        (lambda ((ro_25 (vec 3)) (rd_26 (vec 3)))
+         (let (rec 1000 (float -> (int -> float))) march_27
+          (lambda ((t_28 float) (steps_29 int))
+           (if (> steps_29 80) t_28
+            (let d_30 (app map_17 (+ ro_25 (* rd_26 t_28)))
+             (if (< d_30 0.001) t_28
+              (if (> t_28 100.) 100.1
+               (app march_27 (+ t_28 d_30) (+ steps_29 1)))))))
+          (app march_27 0. 0))))
+       : ((vec 3) -> ((vec 3) -> float)))
+      ((Define Nonrec main
+        (lambda ((coord_31 (vec 2)))
+         (let res_min_32 (min (index u_resolution 0) (index u_resolution 1))
+          (let uv_33 (/ (- (* coord_31 2.) u_resolution) res_min_32)
+           (let mouseUV_34 (/ (- (* u_mouse 2.) u_resolution) res_min_32)
+            (let ro_init_35 (vec3 0. 0. -10.)
+             (let rd_init_36
+              (normalize (vec3 (index uv_33 0) (index uv_33 1) 1.))
+              (let rotX_37 (- 0. (index mouseUV_34 1))
+               (let rotY_38 (- 0. (index mouseUV_34 0))
+                (let ro_yz_39
+                 (app rotate_0 (vec2 (index ro_init_35 1) (index ro_init_35 2))
+                  rotX_37)
+                 (let rd_yz_40
+                  (app rotate_0 (vec2 (index rd_init_36 1) (index rd_init_36 2))
+                   rotX_37)
+                  (let ro_41
+                   (vec3 (index ro_init_35 0) (index ro_yz_39 0)
+                    (index ro_yz_39 1))
+                   (let rd_42
+                    (vec3 (index rd_init_36 0) (index rd_yz_40 0)
+                     (index rd_yz_40 1))
+                    (let ro_xz_43
+                     (app rotate_0 (vec2 (index ro_41 0) (index ro_41 2))
+                      rotY_38)
+                     (let rd_xz_44
+                      (app rotate_0 (vec2 (index rd_42 0) (index rd_42 2))
+                       rotY_38)
+                      (let ro_45
+                       (vec3 (index ro_xz_43 0) (index ro_41 1)
+                        (index ro_xz_43 1))
+                       (let rd_46
+                        (vec3 (index rd_xz_44 0) (index rd_42 1)
+                         (index rd_xz_44 1))
+                        (let t_47 (app march_24 ro_45 rd_46)
+                         (let col_48
+                          (if (> t_47 100.) (vec3 0.2 0.2 0.2)
+                           (app palette_10 (* t_47 0.3)))
+                          (let glow_49 (/ 0.02 (length (- uv_33 mouseUV_34)))
+                           (+ col_48 glow_49)))))))))))))))))))))
+       : ((vec 2) -> (vec 3)))))
+
+    === lambda_lift (raymarch.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+     ((Extern u_mouse) : (vec 2))
+     ((Define Nonrec (name rotate_0) (args ((p_1 (vec 2)) (angle_2 float)))
+       (body
+        (let s_3 (sin angle_2)
+         (let c_4 (cos angle_2)
+          (vec2 (- (* (index p_1 0) c_4) (* (index p_1 1) s_3))
+           (+ (* (index p_1 0) s_3) (* (index p_1 1) c_4)))))))
+      : ((vec 2) -> (float -> (vec 2))))
+     ((Define Nonrec (name sMin_5) (args ((a_6 float) (b_7 float)))
+       (body
+        (let k_8 0.1
+         (let h_9 (clamp (+ 0.5 (/ (* 0.5 (- b_7 a_6)) k_8)) 0. 1.)
+          (- (mix b_7 a_6 h_9) (* (* k_8 h_9) (- 1. h_9)))))))
+      : (float -> (float -> float)))
+     ((Define Nonrec (name palette_10) (args ((t_11 float)))
+       (body
+        (let cfg_12 (vec3 0.3 0.416 0.557)
+         (+ (* (cos (* (+ cfg_12 t_11) 6.28318)) 0.5) 0.5))))
+      : (float -> (vec 3)))
+     ((Define Nonrec (name sdTorus_13) (args ((p_14 (vec 3)) (t_15 (vec 2))))
+       (body
+        (let q_16
+         (vec2 (- (length (vec2 (index p_14 0) (index p_14 2))) (index t_15 0))
+          (index p_14 1))
+         (- (length q_16) (index t_15 1)))))
+      : ((vec 3) -> ((vec 2) -> float)))
+     ((Define Nonrec (name map_17) (args ((p_18 (vec 3))))
+       (body
+        (let angle_19 (* u_time 2.)
+         (let p_xy_20
+          (app rotate_0 (vec2 (index p_18 0) (index p_18 1)) angle_19)
+          (let p_prime_21
+           (vec3 (index p_xy_20 0) (index p_xy_20 1) (index p_18 2))
+           (let p_yz_22
+            (app rotate_0 (vec2 (index p_prime_21 1) (index p_prime_21 2))
+             angle_19)
+            (let p_prime_23
+             (vec3 (index p_prime_21 0) (index p_yz_22 0) (index p_yz_22 1))
+             (app sMin_5 (app sdTorus_13 p_prime_23 (vec2 1. 0.3))
+              (app sdTorus_13 p_18 (vec2 2. 0.5))))))))))
+      : ((vec 3) -> float))
+     ((Define (Rec 1000 (float -> (int -> float))) (name march_27_50)
+       (args ((rd_26 (vec 3)) (ro_25 (vec 3)) (t_28 float) (steps_29 int)))
+       (body
+        (if (> steps_29 80) t_28
+         (let d_30 (app map_17 (+ ro_25 (* rd_26 t_28)))
+          (if (< d_30 0.001) t_28
+           (if (> t_28 100.) 100.1
+            (app march_27_50 rd_26 ro_25 (+ t_28 d_30) (+ steps_29 1))))))))
+      : (float -> (int -> float)))
+     ((Define Nonrec (name march_24) (args ((ro_25 (vec 3)) (rd_26 (vec 3))))
+       (body (app march_27_50 rd_26 ro_25 0. 0)))
+      : ((vec 3) -> ((vec 3) -> float)))
+     ((Define Nonrec (name main) (args ((coord_31 (vec 2))))
+       (body
+        (let res_min_32 (min (index u_resolution 0) (index u_resolution 1))
+         (let uv_33 (/ (- (* coord_31 2.) u_resolution) res_min_32)
+          (let mouseUV_34 (/ (- (* u_mouse 2.) u_resolution) res_min_32)
+           (let ro_init_35 (vec3 0. 0. -10.)
+            (let rd_init_36 (normalize (vec3 (index uv_33 0) (index uv_33 1) 1.))
+             (let rotX_37 (- 0. (index mouseUV_34 1))
+              (let rotY_38 (- 0. (index mouseUV_34 0))
+               (let ro_yz_39
+                (app rotate_0 (vec2 (index ro_init_35 1) (index ro_init_35 2))
+                 rotX_37)
+                (let rd_yz_40
+                 (app rotate_0 (vec2 (index rd_init_36 1) (index rd_init_36 2))
+                  rotX_37)
+                 (let ro_41
+                  (vec3 (index ro_init_35 0) (index ro_yz_39 0)
+                   (index ro_yz_39 1))
+                  (let rd_42
+                   (vec3 (index rd_init_36 0) (index rd_yz_40 0)
+                    (index rd_yz_40 1))
+                   (let ro_xz_43
+                    (app rotate_0 (vec2 (index ro_41 0) (index ro_41 2)) rotY_38)
+                    (let rd_xz_44
+                     (app rotate_0 (vec2 (index rd_42 0) (index rd_42 2))
+                      rotY_38)
+                     (let ro_45
+                      (vec3 (index ro_xz_43 0) (index ro_41 1)
+                       (index ro_xz_43 1))
+                      (let rd_46
+                       (vec3 (index rd_xz_44 0) (index rd_42 1)
+                        (index rd_xz_44 1))
+                       (let t_47 (app march_24 ro_45 rd_46)
+                        (let col_48
+                         (if (> t_47 100.) (vec3 0.2 0.2 0.2)
+                          (app palette_10 (* t_47 0.3)))
+                         (let glow_49 (/ 0.02 (length (- uv_33 mouseUV_34)))
+                          (+ col_48 glow_49)))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === anf (raymarch.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+     ((Extern u_mouse) : (vec 2))
+     ((Define Nonrec (name rotate_0) (args ((p_1 (vec 2)) (angle_2 float)))
+       (body
+        (let s_3 (sin angle_2)
+         (let c_4 (cos angle_2)
+          (let anf_51 (index p_1 0)
+           (let anf_52 (* anf_51 c_4)
+            (let anf_53 (index p_1 1)
+             (let anf_54 (* anf_53 s_3)
+              (let anf_55 (- anf_52 anf_54)
+               (let anf_56 (index p_1 0)
+                (let anf_57 (* anf_56 s_3)
+                 (let anf_58 (index p_1 1)
+                  (let anf_59 (* anf_58 c_4)
+                   (let anf_60 (+ anf_57 anf_59) (return (vec2 anf_55 anf_60))))))))))))))))
+      : ((vec 2) -> (float -> (vec 2))))
+     ((Define Nonrec (name sMin_5) (args ((a_6 float) (b_7 float)))
+       (body
+        (let k_8 0.1
+         (let anf_61 (- b_7 a_6)
+          (let anf_62 (* 0.5 anf_61)
+           (let anf_63 (/ anf_62 k_8)
+            (let anf_64 (+ 0.5 anf_63)
+             (let h_9 (clamp anf_64 0. 1.)
+              (let anf_65 (mix b_7 a_6 h_9)
+               (let anf_66 (* k_8 h_9)
+                (let anf_67 (- 1. h_9)
+                 (let anf_68 (* anf_66 anf_67) (return (- anf_65 anf_68))))))))))))))
+      : (float -> (float -> float)))
+     ((Define Nonrec (name palette_10) (args ((t_11 float)))
+       (body
+        (let cfg_12 (vec3 0.3 0.416 0.557)
+         (let anf_69 (+ cfg_12 t_11)
+          (let anf_70 (* anf_69 6.28318)
+           (let anf_71 (cos anf_70)
+            (let anf_72 (* anf_71 0.5) (return (+ anf_72 0.5)))))))))
+      : (float -> (vec 3)))
+     ((Define Nonrec (name sdTorus_13) (args ((p_14 (vec 3)) (t_15 (vec 2))))
+       (body
+        (let anf_73 (index p_14 0)
+         (let anf_74 (index p_14 2)
+          (let anf_75 (vec2 anf_73 anf_74)
+           (let anf_76 (length anf_75)
+            (let anf_77 (index t_15 0)
+             (let anf_78 (- anf_76 anf_77)
+              (let anf_79 (index p_14 1)
+               (let q_16 (vec2 anf_78 anf_79)
+                (let anf_80 (length q_16)
+                 (let anf_81 (index t_15 1) (return (- anf_80 anf_81))))))))))))))
+      : ((vec 3) -> ((vec 2) -> float)))
+     ((Define Nonrec (name map_17) (args ((p_18 (vec 3))))
+       (body
+        (let angle_19 (* u_time 2.)
+         (let anf_82 (index p_18 0)
+          (let anf_83 (index p_18 1)
+           (let anf_84 (vec2 anf_82 anf_83)
+            (let p_xy_20 (rotate_0 anf_84 angle_19)
+             (let anf_85 (index p_xy_20 0)
+              (let anf_86 (index p_xy_20 1)
+               (let anf_87 (index p_18 2)
+                (let p_prime_21 (vec3 anf_85 anf_86 anf_87)
+                 (let anf_88 (index p_prime_21 1)
+                  (let anf_89 (index p_prime_21 2)
+                   (let anf_90 (vec2 anf_88 anf_89)
+                    (let p_yz_22 (rotate_0 anf_90 angle_19)
+                     (let anf_91 (index p_prime_21 0)
+                      (let anf_92 (index p_yz_22 0)
+                       (let anf_93 (index p_yz_22 1)
+                        (let p_prime_23 (vec3 anf_91 anf_92 anf_93)
+                         (let anf_94 (vec2 1. 0.3)
+                          (let anf_95 (sdTorus_13 p_prime_23 anf_94)
+                           (let anf_96 (vec2 2. 0.5)
+                            (let anf_97 (sdTorus_13 p_18 anf_96)
+                             (return (sMin_5 anf_95 anf_97)))))))))))))))))))))))))
+      : ((vec 3) -> float))
+     ((Define (Rec 1000 (float -> (int -> float))) (name march_27_50)
+       (args ((rd_26 (vec 3)) (ro_25 (vec 3)) (t_28 float) (steps_29 int)))
+       (body
+        (let anf_98 (> steps_29 80)
+         (return
+          (if anf_98 (return t_28)
+           (let anf_99 (* rd_26 t_28)
+            (let anf_100 (+ ro_25 anf_99)
+             (let d_30 (map_17 anf_100)
+              (let anf_101 (< d_30 0.001)
+               (return
+                (if anf_101 (return t_28)
+                 (let anf_102 (> t_28 100.)
+                  (return
+                   (if anf_102 (return 100.1)
+                    (let anf_103 (+ t_28 d_30)
+                     (let anf_104 (+ steps_29 1)
+                      (return (march_27_50 rd_26 ro_25 anf_103 anf_104))))))))))))))))))
+      : (float -> (int -> float)))
+     ((Define Nonrec (name march_24) (args ((ro_25 (vec 3)) (rd_26 (vec 3))))
+       (body (return (march_27_50 rd_26 ro_25 0. 0))))
+      : ((vec 3) -> ((vec 3) -> float)))
+     ((Define Nonrec (name main) (args ((coord_31 (vec 2))))
+       (body
+        (let anf_105 (index u_resolution 0)
+         (let anf_106 (index u_resolution 1)
+          (let res_min_32 (min anf_105 anf_106)
+           (let anf_107 (* coord_31 2.)
+            (let anf_108 (- anf_107 u_resolution)
+             (let uv_33 (/ anf_108 res_min_32)
+              (let anf_109 (* u_mouse 2.)
+               (let anf_110 (- anf_109 u_resolution)
+                (let mouseUV_34 (/ anf_110 res_min_32)
+                 (let ro_init_35 (vec3 0. 0. -10.)
+                  (let anf_111 (index uv_33 0)
+                   (let anf_112 (index uv_33 1)
+                    (let anf_113 (vec3 anf_111 anf_112 1.)
+                     (let rd_init_36 (normalize anf_113)
+                      (let anf_114 (index mouseUV_34 1)
+                       (let rotX_37 (- 0. anf_114)
+                        (let anf_115 (index mouseUV_34 0)
+                         (let rotY_38 (- 0. anf_115)
+                          (let anf_116 (index ro_init_35 1)
+                           (let anf_117 (index ro_init_35 2)
+                            (let anf_118 (vec2 anf_116 anf_117)
+                             (let ro_yz_39 (rotate_0 anf_118 rotX_37)
+                              (let anf_119 (index rd_init_36 1)
+                               (let anf_120 (index rd_init_36 2)
+                                (let anf_121 (vec2 anf_119 anf_120)
+                                 (let rd_yz_40 (rotate_0 anf_121 rotX_37)
+                                  (let anf_122 (index ro_init_35 0)
+                                   (let anf_123 (index ro_yz_39 0)
+                                    (let anf_124 (index ro_yz_39 1)
+                                     (let ro_41 (vec3 anf_122 anf_123 anf_124)
+                                      (let anf_125 (index rd_init_36 0)
+                                       (let anf_126 (index rd_yz_40 0)
+                                        (let anf_127 (index rd_yz_40 1)
+                                         (let rd_42
+                                          (vec3 anf_125 anf_126 anf_127)
+                                          (let anf_128 (index ro_41 0)
+                                           (let anf_129 (index ro_41 2)
+                                            (let anf_130 (vec2 anf_128 anf_129)
+                                             (let ro_xz_43
+                                              (rotate_0 anf_130 rotY_38)
+                                              (let anf_131 (index rd_42 0)
+                                               (let anf_132 (index rd_42 2)
+                                                (let anf_133
+                                                 (vec2 anf_131 anf_132)
+                                                 (let rd_xz_44
+                                                  (rotate_0 anf_133 rotY_38)
+                                                  (let anf_134 (index ro_xz_43 0)
+                                                   (let anf_135 (index ro_41 1)
+                                                    (let anf_136
+                                                     (index ro_xz_43 1)
+                                                     (let ro_45
+                                                      (vec3 anf_134 anf_135
+                                                       anf_136)
+                                                      (let anf_137
+                                                       (index rd_xz_44 0)
+                                                       (let anf_138
+                                                        (index rd_42 1)
+                                                        (let anf_139
+                                                         (index rd_xz_44 1)
+                                                         (let rd_46
+                                                          (vec3 anf_137 anf_138
+                                                           anf_139)
+                                                          (let t_47
+                                                           (march_24 ro_45 rd_46)
+                                                           (let anf_140
+                                                            (> t_47 100.)
+                                                            (let col_48
+                                                             (if anf_140
+                                                              (return
+                                                               (vec3 0.2 0.2 0.2))
+                                                              (let anf_141
+                                                               (* t_47 0.3)
+                                                               (return
+                                                                (palette_10
+                                                                 anf_141))))
+                                                             (let anf_142
+                                                              (- uv_33
+                                                               mouseUV_34)
+                                                              (let anf_143
+                                                               (length anf_142)
+                                                               (let glow_49
+                                                                (/ 0.02 anf_143)
+                                                                (return
+                                                                 (+ col_48
+                                                                  glow_49))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === tail_call (raymarch.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+     ((Extern u_mouse) : (vec 2))
+     ((Define (name rotate_0) (args ((p_1 (vec 2)) (angle_2 float)))
+       (body
+        (let s_3 (sin angle_2)
+         (let c_4 (cos angle_2)
+          (let anf_51 (index p_1 0)
+           (let anf_52 (* anf_51 c_4)
+            (let anf_53 (index p_1 1)
+             (let anf_54 (* anf_53 s_3)
+              (let anf_55 (- anf_52 anf_54)
+               (let anf_56 (index p_1 0)
+                (let anf_57 (* anf_56 s_3)
+                 (let anf_58 (index p_1 1)
+                  (let anf_59 (* anf_58 c_4)
+                   (let anf_60 (+ anf_57 anf_59) (return (vec2 anf_55 anf_60))))))))))))))))
+      : ((vec 2) -> (float -> (vec 2))))
+     ((Define (name sMin_5) (args ((a_6 float) (b_7 float)))
+       (body
+        (let k_8 0.1
+         (let anf_61 (- b_7 a_6)
+          (let anf_62 (* 0.5 anf_61)
+           (let anf_63 (/ anf_62 k_8)
+            (let anf_64 (+ 0.5 anf_63)
+             (let h_9 (clamp anf_64 0. 1.)
+              (let anf_65 (mix b_7 a_6 h_9)
+               (let anf_66 (* k_8 h_9)
+                (let anf_67 (- 1. h_9)
+                 (let anf_68 (* anf_66 anf_67) (return (- anf_65 anf_68))))))))))))))
+      : (float -> (float -> float)))
+     ((Define (name palette_10) (args ((t_11 float)))
+       (body
+        (let cfg_12 (vec3 0.3 0.416 0.557)
+         (let anf_69 (+ cfg_12 t_11)
+          (let anf_70 (* anf_69 6.28318)
+           (let anf_71 (cos anf_70)
+            (let anf_72 (* anf_71 0.5) (return (+ anf_72 0.5)))))))))
+      : (float -> (vec 3)))
+     ((Define (name sdTorus_13) (args ((p_14 (vec 3)) (t_15 (vec 2))))
+       (body
+        (let anf_73 (index p_14 0)
+         (let anf_74 (index p_14 2)
+          (let anf_75 (vec2 anf_73 anf_74)
+           (let anf_76 (length anf_75)
+            (let anf_77 (index t_15 0)
+             (let anf_78 (- anf_76 anf_77)
+              (let anf_79 (index p_14 1)
+               (let q_16 (vec2 anf_78 anf_79)
+                (let anf_80 (length q_16)
+                 (let anf_81 (index t_15 1) (return (- anf_80 anf_81))))))))))))))
+      : ((vec 3) -> ((vec 2) -> float)))
+     ((Define (name map_17) (args ((p_18 (vec 3))))
+       (body
+        (let angle_19 (* u_time 2.)
+         (let anf_82 (index p_18 0)
+          (let anf_83 (index p_18 1)
+           (let anf_84 (vec2 anf_82 anf_83)
+            (let p_xy_20 (rotate_0 anf_84 angle_19)
+             (let anf_85 (index p_xy_20 0)
+              (let anf_86 (index p_xy_20 1)
+               (let anf_87 (index p_18 2)
+                (let p_prime_21 (vec3 anf_85 anf_86 anf_87)
+                 (let anf_88 (index p_prime_21 1)
+                  (let anf_89 (index p_prime_21 2)
+                   (let anf_90 (vec2 anf_88 anf_89)
+                    (let p_yz_22 (rotate_0 anf_90 angle_19)
+                     (let anf_91 (index p_prime_21 0)
+                      (let anf_92 (index p_yz_22 0)
+                       (let anf_93 (index p_yz_22 1)
+                        (let p_prime_23 (vec3 anf_91 anf_92 anf_93)
+                         (let anf_94 (vec2 1. 0.3)
+                          (let anf_95 (sdTorus_13 p_prime_23 anf_94)
+                           (let anf_96 (vec2 2. 0.5)
+                            (let anf_97 (sdTorus_13 p_18 anf_96)
+                             (return (sMin_5 anf_95 anf_97)))))))))))))))))))))))))
+      : ((vec 3) -> float))
+     ((Define (name march_27_50)
+       (args ((rd_26 (vec 3)) (ro_25 (vec 3)) (t_28 float) (steps_29 int)))
+       (body
+        (let _iter_144 0
+         (while (< _iter_144 1000)
+          (let anf_98 (> steps_29 80)
+           (return
+            (if anf_98 (return t_28)
+             (let anf_99 (* rd_26 t_28)
+              (let anf_100 (+ ro_25 anf_99)
+               (let d_30 (map_17 anf_100)
+                (let anf_101 (< d_30 0.001)
+                 (return
+                  (if anf_101 (return t_28)
+                   (let anf_102 (> t_28 100.)
+                    (return
+                     (if anf_102 (return 100.1)
+                      (let anf_103 (+ t_28 d_30)
+                       (let anf_104 (+ steps_29 1)
+                        (set rd_26 rd_26
+                         (set ro_25 ro_25
+                          (set t_28 anf_103
+                           (set steps_29 anf_104
+                            (let _iter_inc_145 (+ _iter_144 1)
+                             (set _iter_144 _iter_inc_145 continue))))))))))))))))))))
+          (return 0.)))))
+      : (float -> (int -> float)))
+     ((Define (name march_24) (args ((ro_25 (vec 3)) (rd_26 (vec 3))))
+       (body (return (march_27_50 rd_26 ro_25 0. 0))))
+      : ((vec 3) -> ((vec 3) -> float)))
+     ((Define (name main) (args ((coord_31 (vec 2))))
+       (body
+        (let anf_105 (index u_resolution 0)
+         (let anf_106 (index u_resolution 1)
+          (let res_min_32 (min anf_105 anf_106)
+           (let anf_107 (* coord_31 2.)
+            (let anf_108 (- anf_107 u_resolution)
+             (let uv_33 (/ anf_108 res_min_32)
+              (let anf_109 (* u_mouse 2.)
+               (let anf_110 (- anf_109 u_resolution)
+                (let mouseUV_34 (/ anf_110 res_min_32)
+                 (let ro_init_35 (vec3 0. 0. -10.)
+                  (let anf_111 (index uv_33 0)
+                   (let anf_112 (index uv_33 1)
+                    (let anf_113 (vec3 anf_111 anf_112 1.)
+                     (let rd_init_36 (normalize anf_113)
+                      (let anf_114 (index mouseUV_34 1)
+                       (let rotX_37 (- 0. anf_114)
+                        (let anf_115 (index mouseUV_34 0)
+                         (let rotY_38 (- 0. anf_115)
+                          (let anf_116 (index ro_init_35 1)
+                           (let anf_117 (index ro_init_35 2)
+                            (let anf_118 (vec2 anf_116 anf_117)
+                             (let ro_yz_39 (rotate_0 anf_118 rotX_37)
+                              (let anf_119 (index rd_init_36 1)
+                               (let anf_120 (index rd_init_36 2)
+                                (let anf_121 (vec2 anf_119 anf_120)
+                                 (let rd_yz_40 (rotate_0 anf_121 rotX_37)
+                                  (let anf_122 (index ro_init_35 0)
+                                   (let anf_123 (index ro_yz_39 0)
+                                    (let anf_124 (index ro_yz_39 1)
+                                     (let ro_41 (vec3 anf_122 anf_123 anf_124)
+                                      (let anf_125 (index rd_init_36 0)
+                                       (let anf_126 (index rd_yz_40 0)
+                                        (let anf_127 (index rd_yz_40 1)
+                                         (let rd_42
+                                          (vec3 anf_125 anf_126 anf_127)
+                                          (let anf_128 (index ro_41 0)
+                                           (let anf_129 (index ro_41 2)
+                                            (let anf_130 (vec2 anf_128 anf_129)
+                                             (let ro_xz_43
+                                              (rotate_0 anf_130 rotY_38)
+                                              (let anf_131 (index rd_42 0)
+                                               (let anf_132 (index rd_42 2)
+                                                (let anf_133
+                                                 (vec2 anf_131 anf_132)
+                                                 (let rd_xz_44
+                                                  (rotate_0 anf_133 rotY_38)
+                                                  (let anf_134 (index ro_xz_43 0)
+                                                   (let anf_135 (index ro_41 1)
+                                                    (let anf_136
+                                                     (index ro_xz_43 1)
+                                                     (let ro_45
+                                                      (vec3 anf_134 anf_135
+                                                       anf_136)
+                                                      (let anf_137
+                                                       (index rd_xz_44 0)
+                                                       (let anf_138
+                                                        (index rd_42 1)
+                                                        (let anf_139
+                                                         (index rd_xz_44 1)
+                                                         (let rd_46
+                                                          (vec3 anf_137 anf_138
+                                                           anf_139)
+                                                          (let t_47
+                                                           (march_24 ro_45 rd_46)
+                                                           (let anf_140
+                                                            (> t_47 100.)
+                                                            (let col_48
+                                                             (if anf_140
+                                                              (return
+                                                               (vec3 0.2 0.2 0.2))
+                                                              (let anf_141
+                                                               (* t_47 0.3)
+                                                               (return
+                                                                (palette_10
+                                                                 anf_141))))
+                                                             (let anf_142
+                                                              (- uv_33
+                                                               mouseUV_34)
+                                                              (let anf_143
+                                                               (length anf_142)
+                                                               (let glow_49
+                                                                (/ 0.02 anf_143)
+                                                                (return
+                                                                 (+ col_48
+                                                                  glow_49))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === translate (raymarch.glml) ===
+    (Program
+     ((Global Uniform (TyVec 2) u_resolution) (Global Uniform TyFloat u_time)
+      (Global Uniform (TyVec 2) u_mouse)
+      (Function (name rotate_0) (desc ())
+       (params (((TyVec 2) p_1) (TyFloat angle_2))) (ret_type (TyVec 2))
+       (body
+        ((set () float s_3 (sin angle_2)) (set () float c_4 (cos angle_2))
+         (set () float anf_51 (index p_1 0)) (set () float anf_52 (* anf_51 c_4))
+         (set () float anf_53 (index p_1 1)) (set () float anf_54 (* anf_53 s_3))
+         (set () float anf_55 (- anf_52 anf_54))
+         (set () float anf_56 (index p_1 0)) (set () float anf_57 (* anf_56 s_3))
+         (set () float anf_58 (index p_1 1)) (set () float anf_59 (* anf_58 c_4))
+         (set () float anf_60 (+ anf_57 anf_59)) (return (vec2 anf_55 anf_60)))))
+      (Function (name sMin_5) (desc ()) (params ((TyFloat a_6) (TyFloat b_7)))
+       (ret_type TyFloat)
+       (body
+        ((set () float k_8 0.1) (set () float anf_61 (- b_7 a_6))
+         (set () float anf_62 (* 0.5 anf_61))
+         (set () float anf_63 (/ anf_62 k_8))
+         (set () float anf_64 (+ 0.5 anf_63))
+         (set () float h_9 (clamp anf_64 0. 1.))
+         (set () float anf_65 (mix b_7 a_6 h_9))
+         (set () float anf_66 (* k_8 h_9)) (set () float anf_67 (- 1. h_9))
+         (set () float anf_68 (* anf_66 anf_67)) (return (- anf_65 anf_68)))))
+      (Function (name palette_10) (desc ()) (params ((TyFloat t_11)))
+       (ret_type (TyVec 3))
+       (body
+        ((set () vec3 cfg_12 (vec3 0.3 0.416 0.557))
+         (set () vec3 anf_69 (+ cfg_12 t_11))
+         (set () vec3 anf_70 (* anf_69 6.28318))
+         (set () vec3 anf_71 (cos anf_70)) (set () vec3 anf_72 (* anf_71 0.5))
+         (return (+ anf_72 0.5)))))
+      (Function (name sdTorus_13) (desc ())
+       (params (((TyVec 3) p_14) ((TyVec 2) t_15))) (ret_type TyFloat)
+       (body
+        ((set () float anf_73 (index p_14 0))
+         (set () float anf_74 (index p_14 2))
+         (set () vec2 anf_75 (vec2 anf_73 anf_74))
+         (set () float anf_76 (length anf_75))
+         (set () float anf_77 (index t_15 0))
+         (set () float anf_78 (- anf_76 anf_77))
+         (set () float anf_79 (index p_14 1))
+         (set () vec2 q_16 (vec2 anf_78 anf_79))
+         (set () float anf_80 (length q_16)) (set () float anf_81 (index t_15 1))
+         (return (- anf_80 anf_81)))))
+      (Function (name map_17) (desc ()) (params (((TyVec 3) p_18)))
+       (ret_type TyFloat)
+       (body
+        ((set () float angle_19 (* u_time 2.))
+         (set () float anf_82 (index p_18 0))
+         (set () float anf_83 (index p_18 1))
+         (set () vec2 anf_84 (vec2 anf_82 anf_83))
+         (set () vec2 p_xy_20 (rotate_0 anf_84 angle_19))
+         (set () float anf_85 (index p_xy_20 0))
+         (set () float anf_86 (index p_xy_20 1))
+         (set () float anf_87 (index p_18 2))
+         (set () vec3 p_prime_21 (vec3 anf_85 anf_86 anf_87))
+         (set () float anf_88 (index p_prime_21 1))
+         (set () float anf_89 (index p_prime_21 2))
+         (set () vec2 anf_90 (vec2 anf_88 anf_89))
+         (set () vec2 p_yz_22 (rotate_0 anf_90 angle_19))
+         (set () float anf_91 (index p_prime_21 0))
+         (set () float anf_92 (index p_yz_22 0))
+         (set () float anf_93 (index p_yz_22 1))
+         (set () vec3 p_prime_23 (vec3 anf_91 anf_92 anf_93))
+         (set () vec2 anf_94 (vec2 1. 0.3))
+         (set () float anf_95 (sdTorus_13 p_prime_23 anf_94))
+         (set () vec2 anf_96 (vec2 2. 0.5))
+         (set () float anf_97 (sdTorus_13 p_18 anf_96))
+         (return (sMin_5 anf_95 anf_97)))))
+      (Function (name march_27_50) (desc ())
+       (params
+        (((TyVec 3) rd_26) ((TyVec 3) ro_25) (TyFloat t_28) (TyInt steps_29)))
+       (ret_type TyFloat)
+       (body
+        ((set () int _iter_144 0)
+         (while (< _iter_144 1000)
+          (Block (set () bool anf_98 (> steps_29 80))
+           (if anf_98 (Block (return t_28))
+            (Block (set () vec3 anf_99 (* rd_26 t_28))
+             (set () vec3 anf_100 (+ ro_25 anf_99))
+             (set () float d_30 (map_17 anf_100))
+             (set () bool anf_101 (< d_30 0.001))
+             (if anf_101 (Block (return t_28))
+              (Block (set () bool anf_102 (> t_28 100.))
+               (if anf_102 (Block (return 100.1))
+                (Block (set () float anf_103 (+ t_28 d_30))
+                 (set () int anf_104 (+ steps_29 1)) (set rd_26 rd_26)
+                 (set ro_25 ro_25) (set t_28 anf_103) (set steps_29 anf_104)
+                 (set () int _iter_inc_145 (+ _iter_144 1))
+                 (set _iter_144 _iter_inc_145) continue))))))))
+         (return 0.))))
+      (Function (name march_24) (desc ())
+       (params (((TyVec 3) ro_25) ((TyVec 3) rd_26))) (ret_type TyFloat)
+       (body ((return (march_27_50 rd_26 ro_25 0. 0)))))
+      (Function (name main) (desc ()) (params (((TyVec 2) coord_31)))
+       (ret_type (TyVec 3))
+       (body
+        ((set () float anf_105 (index u_resolution 0))
+         (set () float anf_106 (index u_resolution 1))
+         (set () float res_min_32 (min anf_105 anf_106))
+         (set () vec2 anf_107 (* coord_31 2.))
+         (set () vec2 anf_108 (- anf_107 u_resolution))
+         (set () vec2 uv_33 (/ anf_108 res_min_32))
+         (set () vec2 anf_109 (* u_mouse 2.))
+         (set () vec2 anf_110 (- anf_109 u_resolution))
+         (set () vec2 mouseUV_34 (/ anf_110 res_min_32))
+         (set () vec3 ro_init_35 (vec3 0. 0. -10.))
+         (set () float anf_111 (index uv_33 0))
+         (set () float anf_112 (index uv_33 1))
+         (set () vec3 anf_113 (vec3 anf_111 anf_112 1.))
+         (set () vec3 rd_init_36 (normalize anf_113))
+         (set () float anf_114 (index mouseUV_34 1))
+         (set () float rotX_37 (- 0. anf_114))
+         (set () float anf_115 (index mouseUV_34 0))
+         (set () float rotY_38 (- 0. anf_115))
+         (set () float anf_116 (index ro_init_35 1))
+         (set () float anf_117 (index ro_init_35 2))
+         (set () vec2 anf_118 (vec2 anf_116 anf_117))
+         (set () vec2 ro_yz_39 (rotate_0 anf_118 rotX_37))
+         (set () float anf_119 (index rd_init_36 1))
+         (set () float anf_120 (index rd_init_36 2))
+         (set () vec2 anf_121 (vec2 anf_119 anf_120))
+         (set () vec2 rd_yz_40 (rotate_0 anf_121 rotX_37))
+         (set () float anf_122 (index ro_init_35 0))
+         (set () float anf_123 (index ro_yz_39 0))
+         (set () float anf_124 (index ro_yz_39 1))
+         (set () vec3 ro_41 (vec3 anf_122 anf_123 anf_124))
+         (set () float anf_125 (index rd_init_36 0))
+         (set () float anf_126 (index rd_yz_40 0))
+         (set () float anf_127 (index rd_yz_40 1))
+         (set () vec3 rd_42 (vec3 anf_125 anf_126 anf_127))
+         (set () float anf_128 (index ro_41 0))
+         (set () float anf_129 (index ro_41 2))
+         (set () vec2 anf_130 (vec2 anf_128 anf_129))
+         (set () vec2 ro_xz_43 (rotate_0 anf_130 rotY_38))
+         (set () float anf_131 (index rd_42 0))
+         (set () float anf_132 (index rd_42 2))
+         (set () vec2 anf_133 (vec2 anf_131 anf_132))
+         (set () vec2 rd_xz_44 (rotate_0 anf_133 rotY_38))
+         (set () float anf_134 (index ro_xz_43 0))
+         (set () float anf_135 (index ro_41 1))
+         (set () float anf_136 (index ro_xz_43 1))
+         (set () vec3 ro_45 (vec3 anf_134 anf_135 anf_136))
+         (set () float anf_137 (index rd_xz_44 0))
+         (set () float anf_138 (index rd_42 1))
+         (set () float anf_139 (index rd_xz_44 1))
+         (set () vec3 rd_46 (vec3 anf_137 anf_138 anf_139))
+         (set () float t_47 (march_24 ro_45 rd_46))
+         (set () bool anf_140 (> t_47 100.)) (set () vec3 col_48 (vec3 0.))
+         (if anf_140 (Block (set col_48 (vec3 0.2 0.2 0.2)))
+          (Block (set () float anf_141 (* t_47 0.3))
+           (set col_48 (palette_10 anf_141))))
+         (set () vec2 anf_142 (- uv_33 mouseUV_34))
+         (set () float anf_143 (length anf_142))
+         (set () float glow_49 (/ 0.02 anf_143)) (return (+ col_48 glow_49)))))))
+
+    === patch_main (raymarch.glml) ===
+    (Program
+     ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
+      (Global Uniform TyFloat u_time) (Global Uniform (TyVec 2) u_mouse)
+      (Function (name rotate_0) (desc ())
+       (params (((TyVec 2) p_1) (TyFloat angle_2))) (ret_type (TyVec 2))
+       (body
+        ((set () float s_3 (sin angle_2)) (set () float c_4 (cos angle_2))
+         (set () float anf_51 (index p_1 0)) (set () float anf_52 (* anf_51 c_4))
+         (set () float anf_53 (index p_1 1)) (set () float anf_54 (* anf_53 s_3))
+         (set () float anf_55 (- anf_52 anf_54))
+         (set () float anf_56 (index p_1 0)) (set () float anf_57 (* anf_56 s_3))
+         (set () float anf_58 (index p_1 1)) (set () float anf_59 (* anf_58 c_4))
+         (set () float anf_60 (+ anf_57 anf_59)) (return (vec2 anf_55 anf_60)))))
+      (Function (name sMin_5) (desc ()) (params ((TyFloat a_6) (TyFloat b_7)))
+       (ret_type TyFloat)
+       (body
+        ((set () float k_8 0.1) (set () float anf_61 (- b_7 a_6))
+         (set () float anf_62 (* 0.5 anf_61))
+         (set () float anf_63 (/ anf_62 k_8))
+         (set () float anf_64 (+ 0.5 anf_63))
+         (set () float h_9 (clamp anf_64 0. 1.))
+         (set () float anf_65 (mix b_7 a_6 h_9))
+         (set () float anf_66 (* k_8 h_9)) (set () float anf_67 (- 1. h_9))
+         (set () float anf_68 (* anf_66 anf_67)) (return (- anf_65 anf_68)))))
+      (Function (name palette_10) (desc ()) (params ((TyFloat t_11)))
+       (ret_type (TyVec 3))
+       (body
+        ((set () vec3 cfg_12 (vec3 0.3 0.416 0.557))
+         (set () vec3 anf_69 (+ cfg_12 t_11))
+         (set () vec3 anf_70 (* anf_69 6.28318))
+         (set () vec3 anf_71 (cos anf_70)) (set () vec3 anf_72 (* anf_71 0.5))
+         (return (+ anf_72 0.5)))))
+      (Function (name sdTorus_13) (desc ())
+       (params (((TyVec 3) p_14) ((TyVec 2) t_15))) (ret_type TyFloat)
+       (body
+        ((set () float anf_73 (index p_14 0))
+         (set () float anf_74 (index p_14 2))
+         (set () vec2 anf_75 (vec2 anf_73 anf_74))
+         (set () float anf_76 (length anf_75))
+         (set () float anf_77 (index t_15 0))
+         (set () float anf_78 (- anf_76 anf_77))
+         (set () float anf_79 (index p_14 1))
+         (set () vec2 q_16 (vec2 anf_78 anf_79))
+         (set () float anf_80 (length q_16)) (set () float anf_81 (index t_15 1))
+         (return (- anf_80 anf_81)))))
+      (Function (name map_17) (desc ()) (params (((TyVec 3) p_18)))
+       (ret_type TyFloat)
+       (body
+        ((set () float angle_19 (* u_time 2.))
+         (set () float anf_82 (index p_18 0))
+         (set () float anf_83 (index p_18 1))
+         (set () vec2 anf_84 (vec2 anf_82 anf_83))
+         (set () vec2 p_xy_20 (rotate_0 anf_84 angle_19))
+         (set () float anf_85 (index p_xy_20 0))
+         (set () float anf_86 (index p_xy_20 1))
+         (set () float anf_87 (index p_18 2))
+         (set () vec3 p_prime_21 (vec3 anf_85 anf_86 anf_87))
+         (set () float anf_88 (index p_prime_21 1))
+         (set () float anf_89 (index p_prime_21 2))
+         (set () vec2 anf_90 (vec2 anf_88 anf_89))
+         (set () vec2 p_yz_22 (rotate_0 anf_90 angle_19))
+         (set () float anf_91 (index p_prime_21 0))
+         (set () float anf_92 (index p_yz_22 0))
+         (set () float anf_93 (index p_yz_22 1))
+         (set () vec3 p_prime_23 (vec3 anf_91 anf_92 anf_93))
+         (set () vec2 anf_94 (vec2 1. 0.3))
+         (set () float anf_95 (sdTorus_13 p_prime_23 anf_94))
+         (set () vec2 anf_96 (vec2 2. 0.5))
+         (set () float anf_97 (sdTorus_13 p_18 anf_96))
+         (return (sMin_5 anf_95 anf_97)))))
+      (Function (name march_27_50) (desc ())
+       (params
+        (((TyVec 3) rd_26) ((TyVec 3) ro_25) (TyFloat t_28) (TyInt steps_29)))
+       (ret_type TyFloat)
+       (body
+        ((set () int _iter_144 0)
+         (while (< _iter_144 1000)
+          (Block (set () bool anf_98 (> steps_29 80))
+           (if anf_98 (Block (return t_28))
+            (Block (set () vec3 anf_99 (* rd_26 t_28))
+             (set () vec3 anf_100 (+ ro_25 anf_99))
+             (set () float d_30 (map_17 anf_100))
+             (set () bool anf_101 (< d_30 0.001))
+             (if anf_101 (Block (return t_28))
+              (Block (set () bool anf_102 (> t_28 100.))
+               (if anf_102 (Block (return 100.1))
+                (Block (set () float anf_103 (+ t_28 d_30))
+                 (set () int anf_104 (+ steps_29 1)) (set rd_26 rd_26)
+                 (set ro_25 ro_25) (set t_28 anf_103) (set steps_29 anf_104)
+                 (set () int _iter_inc_145 (+ _iter_144 1))
+                 (set _iter_144 _iter_inc_145) continue))))))))
+         (return 0.))))
+      (Function (name march_24) (desc ())
+       (params (((TyVec 3) ro_25) ((TyVec 3) rd_26))) (ret_type TyFloat)
+       (body ((return (march_27_50 rd_26 ro_25 0. 0)))))
+      (Function (name main_pure) (desc ()) (params (((TyVec 2) coord_31)))
+       (ret_type (TyVec 3))
+       (body
+        ((set () float anf_105 (index u_resolution 0))
+         (set () float anf_106 (index u_resolution 1))
+         (set () float res_min_32 (min anf_105 anf_106))
+         (set () vec2 anf_107 (* coord_31 2.))
+         (set () vec2 anf_108 (- anf_107 u_resolution))
+         (set () vec2 uv_33 (/ anf_108 res_min_32))
+         (set () vec2 anf_109 (* u_mouse 2.))
+         (set () vec2 anf_110 (- anf_109 u_resolution))
+         (set () vec2 mouseUV_34 (/ anf_110 res_min_32))
+         (set () vec3 ro_init_35 (vec3 0. 0. -10.))
+         (set () float anf_111 (index uv_33 0))
+         (set () float anf_112 (index uv_33 1))
+         (set () vec3 anf_113 (vec3 anf_111 anf_112 1.))
+         (set () vec3 rd_init_36 (normalize anf_113))
+         (set () float anf_114 (index mouseUV_34 1))
+         (set () float rotX_37 (- 0. anf_114))
+         (set () float anf_115 (index mouseUV_34 0))
+         (set () float rotY_38 (- 0. anf_115))
+         (set () float anf_116 (index ro_init_35 1))
+         (set () float anf_117 (index ro_init_35 2))
+         (set () vec2 anf_118 (vec2 anf_116 anf_117))
+         (set () vec2 ro_yz_39 (rotate_0 anf_118 rotX_37))
+         (set () float anf_119 (index rd_init_36 1))
+         (set () float anf_120 (index rd_init_36 2))
+         (set () vec2 anf_121 (vec2 anf_119 anf_120))
+         (set () vec2 rd_yz_40 (rotate_0 anf_121 rotX_37))
+         (set () float anf_122 (index ro_init_35 0))
+         (set () float anf_123 (index ro_yz_39 0))
+         (set () float anf_124 (index ro_yz_39 1))
+         (set () vec3 ro_41 (vec3 anf_122 anf_123 anf_124))
+         (set () float anf_125 (index rd_init_36 0))
+         (set () float anf_126 (index rd_yz_40 0))
+         (set () float anf_127 (index rd_yz_40 1))
+         (set () vec3 rd_42 (vec3 anf_125 anf_126 anf_127))
+         (set () float anf_128 (index ro_41 0))
+         (set () float anf_129 (index ro_41 2))
+         (set () vec2 anf_130 (vec2 anf_128 anf_129))
+         (set () vec2 ro_xz_43 (rotate_0 anf_130 rotY_38))
+         (set () float anf_131 (index rd_42 0))
+         (set () float anf_132 (index rd_42 2))
+         (set () vec2 anf_133 (vec2 anf_131 anf_132))
+         (set () vec2 rd_xz_44 (rotate_0 anf_133 rotY_38))
+         (set () float anf_134 (index ro_xz_43 0))
+         (set () float anf_135 (index ro_41 1))
+         (set () float anf_136 (index ro_xz_43 1))
+         (set () vec3 ro_45 (vec3 anf_134 anf_135 anf_136))
+         (set () float anf_137 (index rd_xz_44 0))
+         (set () float anf_138 (index rd_42 1))
+         (set () float anf_139 (index rd_xz_44 1))
+         (set () vec3 rd_46 (vec3 anf_137 anf_138 anf_139))
+         (set () float t_47 (march_24 ro_45 rd_46))
+         (set () bool anf_140 (> t_47 100.)) (set () vec3 col_48 (vec3 0.))
+         (if anf_140 (Block (set col_48 (vec3 0.2 0.2 0.2)))
+          (Block (set () float anf_141 (* t_47 0.3))
+           (set col_48 (palette_10 anf_141))))
+         (set () vec2 anf_142 (- uv_33 mouseUV_34))
+         (set () float anf_143 (length anf_142))
+         (set () float glow_49 (/ 0.02 anf_143)) (return (+ col_48 glow_49)))))
+      (Function (name main) (desc ()) (params ()) (ret_type TyVoid)
+       (body
+        ((set () vec3 color (main_pure (. gl_FragCoord xy)))
+         (set fragColor (clamp (vec4 (. color xyz) 1.) 0. 1.)))))))
+
     ====== COMPILING EXAMPLE recursion.glml ======
 
     === stlc (recursion.glml) ===
