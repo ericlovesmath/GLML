@@ -75,9 +75,9 @@ let rec translate_set (env : record_env) (var : string) (anf : Tail_call.anf)
   : stmt list Or_error.t
   =
   match anf.desc with
-  | Let (v, bind, body) ->
-    let%bind ty = to_glsl_ty anf.ty in
-    let%bind term = to_glsl_term bind in
+  | Let (v, term, body) ->
+    let%bind ty = to_glsl_ty term.ty in
+    let%bind term = to_glsl_term term in
     let%bind tail = translate_set env var body in
     Ok (Decl (None, ty, v, term) :: tail)
   | Return t ->
