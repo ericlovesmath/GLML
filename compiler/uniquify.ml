@@ -29,10 +29,14 @@ let rec uniquify_term (ctx : env) (t : term) : term Or_error.t =
     let%bind x = aux x in
     pure (App (f, x))
   | Let (recur, v, bind, body) ->
-    let%bind bind = aux bind in
     let v' = Utils.fresh v in
-    let ctx = Map.set ctx ~key:v ~data:v' in
-    let%bind body = uniquify_term ctx body in
+    let ctx' = Map.set ctx ~key:v ~data:v' in
+    let%bind bind =
+      match recur with
+      | Nonrec -> uniquify_term ctx bind
+      | Rec _ -> uniquify_term ctx' bind
+    in
+    let%bind body = uniquify_term ctx' body in
     pure (Let (recur, v', bind, body))
   | If (c, t, f) ->
     let%bind c = aux c in
