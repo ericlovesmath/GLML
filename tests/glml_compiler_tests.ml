@@ -10,7 +10,7 @@ let test s =
 let test_term s = test ("let main (coord : vec2) = " ^ s)
 
 let%expect_test "simple tests for compile_stlc" =
-  test_term "let x = 2.0 in < 12.0 * x + 10.0, 0.0, 0.0>";
+  test_term "let x = 2.0 in [ 12.0 * x + 10.0, 0.0, 0.0]";
   [%expect
     {|
     #version 300 es
@@ -27,7 +27,7 @@ let%expect_test "simple tests for compile_stlc" =
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
     }
     |}];
-  test_term "if true && false then < 1.0, 0.0, 0.0 > else < 0.0, 0.0, 0.0 >";
+  test_term "if true && false then [ 1.0, 0.0, 0.0 ] else [ 0.0, 0.0, 0.0 ]";
   [%expect
     {|
     #version 300 es
@@ -50,7 +50,7 @@ let%expect_test "simple tests for compile_stlc" =
     {|
     #extern float n
     let f = fun (x : float) -> x + n
-    let main = fun (u : vec2) -> <f 10.0, 0.0, 0.0>
+    let main = fun (u : vec2) -> [f 10.0, 0.0, 0.0]
     |};
   [%expect
     {|
@@ -74,7 +74,7 @@ let%expect_test "simple tests for compile_stlc" =
     {|
     #extern float n
     let f (x : float) = x + n
-    let main (u : vec2) = < f 10.0, 0.0, 0.0 >
+    let main (u : vec2) = [ f 10.0, 0.0, 0.0 ]
     |};
   [%expect
     {|
@@ -100,10 +100,10 @@ let%expect_test "generic vectors and matrices" =
   test
     {|
     let main (u : vec2) =
-      let m = < <1.0, 0.0, 0.0>, < 0.0, 1.0, 0.0 >, < 0.0, 0.0, 1.0> > in
-      let m = <<1.0, 2.0>, <3.0, 4.0>, <5.0, 6.0>> in
-      let v = < 1.0, 2.0 > in
-      < 1.0, 0.0, 0.0 >
+      let m = [ [1.0, 0.0, 0.0], [ 0.0, 1.0, 0.0 ], [ 0.0, 0.0, 1.0] ] in
+      let m = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]] in
+      let v = [ 1.0, 2.0 ] in
+      [ 1.0, 0.0, 0.0 ]
     |};
   [%expect
     {|
@@ -124,7 +124,7 @@ let%expect_test "generic vectors and matrices" =
 ;;
 
 let%expect_test "indexing" =
-  test_term "let v = < 1.0, 2.0, 3.0 > in < v[0], 0.0, 0.0>";
+  test_term "let v = [ 1.0, 2.0, 3.0 ] in [ v.0, 0.0, 0.0]";
   [%expect
     {|
     #version 300 es
@@ -142,9 +142,9 @@ let%expect_test "indexing" =
     |}];
   test_term
     {|
-    let m = <<1.0, 0.0, 0.0>, <0.0, 1.0, 0.0>, <0.0, 0.0, 1.0>> in
-    let c = m[0] in
-    <c[0], c[1], c[2]>
+    let m = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]] in
+    let c = m.0 in
+    [c.0, c.1, c.2]
     |};
   [%expect
     {|
@@ -164,12 +164,12 @@ let%expect_test "indexing" =
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
     }
     |}];
-  test_term "<0.0, 0.0, 0.0>[4]";
-  [%expect {| (typecheck: "vec index out of bounds" (n 3) (i 4) (loc (1:27 - 1:45))) |}]
+  test_term "[0.0, 0.0, 0.0].4";
+  [%expect {| (typecheck: "vec index out of bounds" (n 3) (i 4) (loc (1:27 - 1:44))) |}]
 ;;
 
 let%expect_test "builtins" =
-  test_term "let v = < 1.0, 2.0, 3.0 > in < #sin(1.0), #dot(v, v), #length(v) >";
+  test_term "let v = [ 1.0, 2.0, 3.0 ] in [ #sin(1.0), #dot(v, v), #length(v) ]";
   [%expect
     {|
     #version 300 es
@@ -187,7 +187,7 @@ let%expect_test "builtins" =
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
     }
     |}];
-  test_term "#cross(<1.0, 2.0, 3.0>, <0.0, 2.0, 5.0>)";
+  test_term "#cross([1.0, 2.0, 3.0], [0.0, 2.0, 5.0])";
   [%expect
     {|
     #version 300 es
@@ -203,7 +203,7 @@ let%expect_test "builtins" =
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
     }
     |}];
-  test_term "#cross(< 1.0, 1.0 >, < 0.0, 0.0 >)";
+  test_term "#cross([ 1.0, 1.0 ], [ 0.0, 0.0 ])";
   [%expect
     {|
     (typecheck: "invalid geometric call" (name Cross) (tys ((vec 2) (vec 2)))
@@ -216,7 +216,7 @@ let%expect_test "multi argument functions / lambdas" =
     {|
     let f (x : float) (y : float) = x + y
     let g = fun (x : float) (y : float) -> x - y
-    let main (u : vec2) = < f 10.0 5.0, g 0.0 0.0, 0.0 >
+    let main (u : vec2) = [ f 10.0 5.0, g 0.0 0.0, 0.0 ]
     |};
   [%expect
     {|
@@ -248,7 +248,7 @@ let%expect_test "lambda lifting" =
       let x = 10.0 in
       let y = 5.0 in
       let add (z : float) = x + y + z in
-      < add 1.0, 0.0, 0.0 >
+      [ add 1.0, 0.0, 0.0 ]
     |};
   [%expect
     {|
@@ -275,7 +275,7 @@ let%expect_test "lambda lifting" =
     let main (u : vec2) =
       let f (x : float) =
         let g (y : float) = x + y in
-        (< g 1.0, 0.0, 0.0 >)
+        ([ g 1.0, 0.0, 0.0 ])
       in
       f 10.0
     |};
@@ -310,7 +310,7 @@ let%expect_test "lambda lifting" =
     {|
     let apply_f (f : float -> float) (x : float) = f x
     let main (u : vec2) =
-      < apply_f (fun (x : float) -> x + 1.0) 10.0, 0.0, 0.0 >
+      [ apply_f (fun (x : float) -> x + 1.0) 10.0, 0.0, 0.0 ]
     |};
   [%expect {| ("first-class anon functions are unsupported" (t.loc (4:18 - 4:44))) |}]
 ;;
@@ -323,7 +323,7 @@ let%expect_test "recursive functions" =
 
     let main (u : vec2) =
       let num = fact 5 1 in
-      < 0., 0., 0. >
+      [ 0., 0., 0. ]
     |};
   [%expect
     {|
@@ -372,7 +372,7 @@ let%expect_test "structs" =
     let main (u: vec2) =
       let p = { x = 1.0, y = 2.0 } in
       let c = make_red p in
-      <c.r, c.g, c.b>
+      [c.r, c.g, c.b]
     |};
   [%expect
     {|
@@ -404,7 +404,7 @@ let%expect_test "structs" =
         vec3 color = main_pure(gl_FragCoord.xy);
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
     }
-  |}];
+    |}];
   test
     {|
     type point = { x: float, y: float }
@@ -422,7 +422,7 @@ let%expect_test "structs" =
     let main (u: vec2) =
       let p = { x = 1.0, y = 2.0 } in
       let c = make_red p in
-      <c.r, c.g, c.b>
+      [c.r, c.g, c.b]
   |};
   [%expect
     {|
@@ -459,14 +459,14 @@ let%expect_test "structs" =
         vec3 color = main_pure(gl_FragCoord.xy);
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
     }
-  |}];
+    |}];
   test
     {|
     type point = { x: float, y: float }
 
     let main (u: vec2) =
       let p = { x = 1.0, z = 2.0 } in
-      <p.x, p.x, p.x>
+      [p.x, p.x, p.x]
     |};
   [%expect {| (typecheck: "missing field" y (loc (5:15 - 5:35))) |}]
 ;;
@@ -489,7 +489,7 @@ let%expect_test "nested structs" =
     let main (u: vec2) =
       let seg = make_seg 1.0 in
       let c = seg.end.x in
-      <c, c, c>
+      [c, c, c]
     |}
   in
   test test_program;

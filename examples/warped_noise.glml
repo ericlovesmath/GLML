@@ -18,15 +18,15 @@ let smoothNoise (p : vec2) =
   let inter = pf * pf * (3.0 - 2.0 * pf) in
 
   // Hash function using a large sine-based offset
-  let v4 = <0.0, 1.0, 27.0, 28.0> in
-  let seed = v4 + i[0] + i[1] * 27.0 in
+  let v4 = [0.0, 1.0, 27.0, 28.0] in
+  let seed = v4 + i.0 + i.1 * 27.0 in
   let hash = fract(#sin(seed % 6.2831853) * 200000.0) in
 
   // Bilinear interpolation logic (expanded from the GLSL mat2/dot trick)
-  let col0 = <hash[0], hash[1]> in
-  let col1 = <hash[2], hash[3]> in
-  let res_v = col0 * (1.0 - inter[1]) + col1 * inter[1] in
-  #dot(res_v, <1.0 - inter[0], inter[0]>)
+  let col0 = [hash.0, hash.1] in
+  let col1 = [hash.2, hash.3] in
+  let res_v = col0 * (1.0 - inter.1) + col1 * inter.1 in
+  #dot(res_v, [1.0 - inter.0, inter.0])
 
 // Fractional Brownian Motion (FBM)
 let fractalNoise (p : vec2) =
@@ -37,16 +37,16 @@ let fractalNoise (p : vec2) =
 
 // Domain Warping: Feeding noise into noise
 let warpedNoise (p : vec2) =
-  let m = <u_time, 0.0 - u_time> * 0.5 in
+  let m = [u_time, 0.0 - u_time] * 0.5 in
   let x = fractalNoise(p + m) in
-  let y = fractalNoise(p + <m[1], m[0]> + x) in
+  let y = fractalNoise(p + [m.1, m.0] + x) in
   let z = fractalNoise(p - m - x + y) in
-  let warp = <x, y> + <y, z> + <z, x> in
-  let mag = #length(<x, y, z>) * 0.25 in
+  let warp = [x, y] + [y, z] + [z, x] in
+  let mag = #length([x, y, z]) * 0.25 in
   fractalNoise(p + warp + mag)
 
 let main (coord : vec2) =
-  let uv = (coord - u_resolution * 0.5) / u_resolution[1] in
+  let uv = (coord - u_resolution * 0.5) / u_resolution.1 in
 
   // Sample noise at two points for "fake" lighting derivatives
   let n = warpedNoise(uv * 6.0) in
@@ -61,17 +61,17 @@ let main (coord : vec2) =
   let b2 = bump2 * bump2 + #pow(bump2, 4.0) * 0.5 in
 
   // Base color logic
-  let base_col = <1.0, 0.7, 0.6> * <b1, (b1 + b2) * 0.4, b2> * 0.3 + 0.5 in
+  let base_col = [1.0, 0.7, 0.6] * [b1, (b1 + b2) * 0.4, b2] * 0.3 + 0.5 in
   let col = n * n * base_col in
 
   // Apply colored spotlights
   let spot1_dist = #length(uv - 0.65) in
   let spot2_dist = #length(uv + 0.5) in
 
-  let a = <0.8, 0.4, 1.0> * 0.35 in
-  let b = <1.0, 0.5, 0.2> * (smoothstep 0.0 1.0 (1.0 - spot1_dist)) in
-  let c = <0.2, 0.4, 1.0> * (smoothstep 0.0 1.0 (1.0 - spot2_dist)) in
-  let spot_logic = a + ((b + c) * 5.0) in
+  let a = [0.8, 0.4, 1.0] * 0.35 in
+  let b = [1.0, 0.5, 0.2] * smoothstep 0.0 1.0 (1.0 - spot1_dist) in
+  let c = [0.2, 0.4, 1.0] * smoothstep 0.0 1.0 (1.0 - spot2_dist) in
+  let spot_logic = a + (b + c) * 5.0 in
 
   let final_col = col * spot_logic in
 

@@ -244,7 +244,7 @@ and term_lam_p =
 and term_mat_p =
   fun st ->
   (with_term_loc
-     ((let%bind terms = between `Angle (commas (between `Angle (commas term_p))) in
+     ((let%bind terms = between `Bracket (commas (between `Bracket (commas term_p))) in
        let n = List.length terms in
        let m = List.length (List.hd_exn terms) in
        if List.for_all terms ~f:(fun ts -> List.length ts = m)
@@ -272,7 +272,7 @@ and term_record_p =
 and term_vec_p =
   fun st ->
   (with_term_loc
-     (let%bind terms = between `Angle (commas term_p) in
+     (let%bind terms = between `Bracket (commas term_p) in
       return (Vec (List.length terms, terms)) <??> "term_vec"))
     st
 
@@ -319,27 +319,29 @@ and term_postfix_p =
     let%bind ops = many op_p in
     return (List.fold_left ops ~init:head ~f:(fun t op -> op t))
   in
-  let field_op_p =
-    with_loc (tok DOT *> ident_p)
-    >>| fun (f, loc) (t : term) ->
-    ({ desc = Field (t, f); loc = Lexer.merge_loc t.loc loc } : term)
-  in
-  let index_op_p =
-    with_loc (between `Bracket num_p)
-    >>| fun (i, loc) (t : term) ->
-    ({ desc = Index (t, i); loc = Lexer.merge_loc t.loc loc } : term)
+  let dot_op_p =
+    let%bind _ = tok DOT in
+    let%map res, loc =
+      with_loc (ident_p >>| Either.first <|> (num_p >>| Either.second))
+    in
+    fun (t : term) : term ->
+      let desc =
+        match res with
+        | First f -> Field (t, f)
+        | Second i -> Index (t, i)
+      in
+      { desc; loc = Lexer.merge_loc t.loc loc }
   in
   let term_arg_p =
     (* NOTE: intentionally excludes signed literals to avoid cases like [f -5] *)
-    let first_arg = term_atom_p <|> term_unsigned_number_p <|> between `Paren term_p in
-    postfix_chain first_arg index_op_p <??> "term_arg"
+    term_atom_p <|> term_unsigned_number_p <|> between `Paren term_p <??> "term_arg"
   in
   let app_op_p =
     term_arg_p
     >>| fun (a : term) (t : term) ->
     ({ desc = App (t, a); loc = Lexer.merge_loc t.loc a.loc } : term)
   in
-  let op_p = field_op_p <|> index_op_p <|> app_op_p in
+  let op_p = dot_op_p <|> app_op_p in
   (postfix_chain term_head_p op_p <??> "term_postfix_chain") st
 
 and term_p =
@@ -367,15 +369,15 @@ let%expect_test "term parse tests" =
   test "-13.4";
   test "33";
   test "false";
-  test "<1, 2, 3>";
-  test "<<1, 2>, <3, 4>, <5, 6>>";
+  test "[1, 2, 3]";
+  test "[[1, 2], [3, 4], [5, 6]]";
   test "fun (x : bool) -> x";
   test "f x y";
   test "let bind = true in bind";
   test "let (rec : bool) f (x : float) = f x in f";
   test "if true then x else y";
   test "1 * 2 + true && 44 % 10";
-  test "v[0]";
+  test "v.0";
   test "#min(1, 2)";
   test "#exp2(1.)";
   [%expect
@@ -403,7 +405,7 @@ let%expect_test "term parse tests" =
   test "f (x y) z";
   test "2 * -13 - 10";
   test "f 5";
-  test "fun (u : vec2) -> < f 10.0 a , 0.0, 0.0 >";
+  test "fun (u : vec2) -> [ f 10.0 a , 0.0, 0.0 ]";
   test "f - 5";
   test "f (-5)";
   [%expect
@@ -434,8 +436,8 @@ let%expect_test "regression test, sequential non-parenthesized terms" =
   test "1.0 + (let x = 1.0 in x)";
   test "f let x = 1.0 in x";
   test "f (let x = 1.0 in x)";
-  test "<1.0, 2.0> let x = 1.0 in x";
-  test "<1.0, let x = 2.0 in x>";
+  test "[1.0, 2.0] let x = 1.0 in x";
+  test "[1.0, let x = 2.0 in x]";
   test "if true then 1.0 else 2.0 + 3.0";
   [%expect
     {|
@@ -519,7 +521,7 @@ let%expect_test "glml parse tests" =
     let toplevel = 1 + 2
     let main = 1 + 2
     let f = fun (x : bool) (y : bool) -> x && y
-    let main (u : vec2) = f <1, 2> + u
+    let main (u : vec2) = f [1, 2] + u
     let (rec : float -> float) g (x : float) = g x
     |};
   [%expect
@@ -540,7 +542,7 @@ let%expect_test "regression test, toplevel let parsing after record" =
     {|
     let f (x : float) =
       let g (y : float) = x + y in
-      < g 1.0, 0.0, 0.0 >
+      [ g 1.0, 0.0, 0.0 ]
 
     let main (u : vec2) = f 10.0
     |};
