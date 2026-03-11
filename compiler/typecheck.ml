@@ -1,13 +1,18 @@
+(** Typechecking is done with Hindley-Milner inference (Algorithm W), but extended
+    with typeclasses and broadcasting specific for operator overloading in GLSL *)
+
+(* TODO: Add more documentation on the relevant papers *)
+
 open Core
 open Sexplib.Sexp
 open Stlc
+open Or_error.Let_syntax
 
 type term_desc =
   | Var of string
   | Float of float
   | Int of int
   | Bool of bool
-  (* TODO: Vec, Math, Lam all don't need to store the size/ty now *)
   | Vec of int * term list
   | Mat of int * int * term list
   | Lam of string * ty * term
@@ -72,217 +77,449 @@ let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; Stlc.sexp_of_ty t.
 
 type t = Program of top list [@@deriving sexp_of]
 
-let rec fail_if_tyvar (ty : ty) : unit Or_error.t =
-  let open Or_error.Let_syntax in
+(** Map from type variable names to their resolved types *)
+type substitution = (string * ty) list [@@deriving sexp_of]
+
+(** Represents polymorphic [forall 'vars. ty] *)
+type type_scheme = string list * ty [@@deriving sexp_of]
+
+(** Maps type variables to type schemes *)
+type context = type_scheme String.Map.t
+
+(** Internal typeclasses grouping GLSL types by their supported operations
+    Most of the typeclasses are borrowed directly from GLSL *)
+type type_class =
+  | GenType
+  | GenBType
+  | GenIType
+  | MatType
+  | Numeric
+  | Comparable
+  | Equatable
+[@@deriving sexp_of] [@@warning "-37"]
+
+(* TODO: Factor out the [loc] into its own type again? *)
+
+(** Constraints emitted during type inference. *)
+type constr =
+  | Eq of Lexer.loc * ty * ty (** Standard equality constraint *)
+  | HasClass of Lexer.loc * type_class * ty (** Membership in a GLSL typeclass *)
+  | Broadcast of Lexer.loc * ty * ty * ty
+  (** Scalar-vector broadcasting (e.g. float + vec3) *)
+  | MulBroadcast of Lexer.loc * ty * ty * ty (** Matrix multiplication rules *)
+  | IndexAccess of Lexer.loc * ty * int * ty (** Vector/Matrix indexing *)
+[@@deriving sexp_of]
+
+(** Generate a fresh type variable (e.g., 'v42). *)
+let fresh_tyvar () = TyVar (Utils.fresh "v")
+
+(** Apply a substitution to a type. *)
+let rec subst_ty (sub : substitution) (ty : ty) : ty =
   match ty with
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ -> Ok ()
-  | TyArrow (t, t') -> fail_if_tyvar t >>= fun () -> fail_if_tyvar t'
-  | TyRecord _ -> Ok ()
-  | TyVar _ -> error_s [%message "typecheck: type variable not supported" (ty : ty)]
+  | TyVar v -> List.Assoc.find ~equal:String.equal sub v |> Option.value ~default:ty
+  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ -> ty
+  | TyArrow (f, x) -> TyArrow (subst_ty sub f, subst_ty sub x)
 ;;
 
-let rec update
-          (map : ty String.Map.t)
-          (structs : (string * ty) list String.Map.t)
-          (fields_env : string String.Map.t)
-          (t : Stlc.term)
-  : (ty String.Map.t * term) Or_error.t
-  =
-  let open Or_error.Let_syntax in
-  let update map t = update map structs fields_env t in
-  let make ?(map = map) term ty = Ok (map, ({ desc = term; ty; loc = t.loc } : term)) in
-  let error_s sexp =
-    let sexps =
-      match sexp with
-      | Atom sexp -> [ Atom sexp ]
-      | List sexps -> sexps
+(** Apply a substitution to all type schemes in a context. *)
+let subst_context (sub : substitution) (ctx : context) : type_scheme String.Map.t =
+  Map.map ctx ~f:(fun (vars, ty) ->
+    let sub =
+      List.filter sub ~f:(fun (v, _) -> not (List.mem vars v ~equal:String.equal))
     in
-    let tag =
-      [ Atom "typecheck:" ] @ sexps @ [ List [ Atom "loc"; Lexer.sexp_of_loc t.loc ] ]
-    in
-    error_s (List tag)
+    vars, subst_ty sub ty)
+;;
+
+(** Apply a substitution to all types within a list of constraints. *)
+let subst_constraints (sub : substitution) (con : constr list) : constr list =
+  List.map con ~f:(function
+    | Eq (loc, l, r) -> Eq (loc, subst_ty sub l, subst_ty sub r)
+    | HasClass (loc, cls, ty) -> HasClass (loc, cls, subst_ty sub ty)
+    | Broadcast (loc, l, r, ret) ->
+      Broadcast (loc, subst_ty sub l, subst_ty sub r, subst_ty sub ret)
+    | MulBroadcast (loc, l, r, ret) ->
+      MulBroadcast (loc, subst_ty sub l, subst_ty sub r, subst_ty sub ret)
+    | IndexAccess (loc, t, i, ret) ->
+      IndexAccess (loc, subst_ty sub t, i, subst_ty sub ret))
+;;
+
+(** Apply substitution to term for final typed AST. *)
+let rec subst_term (sub : substitution) (t : term) : term =
+  let subst = subst_term sub in
+  let (desc : term_desc) =
+    match t.desc with
+    | Var _ | Float _ | Int _ | Bool _ -> t.desc
+    | Vec (n, ts) -> Vec (n, List.map ts ~f:subst)
+    | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:subst)
+    | Lam (v, ty, body) -> Lam (v, subst_ty sub ty, subst body)
+    | App (f, x) -> App (subst f, subst x)
+    | Let (recur, v, bind, body) -> Let (recur, v, subst bind, subst body)
+    | If (c, t, f) -> If (subst c, subst t, subst f)
+    | Bop (op, l, r) -> Bop (op, subst l, subst r)
+    | Index (t, i) -> Index (subst t, i)
+    | Builtin (b, args) -> Builtin (b, List.map args ~f:subst)
+    | Record (name, args) -> Record (name, List.map args ~f:subst)
+    | Field (t, f) -> Field (subst t, f)
   in
-  match t.desc with
-  | Var v ->
-    (match Map.find map v with
-     | Some ty -> make (Var v) ty
-     | None ->
-       error_s [%message "var not found in type map" (v : string) (map : ty String.Map.t)])
-  | Float f -> make (Float f) TyFloat
-  | Int i -> make (Int i) TyInt
-  | Bool b -> make (Bool b) TyBool
-  | Vec (n, ts) ->
-    let%bind map, terms =
-      List.fold_result ts ~init:(map, []) ~f:(fun (map, acc) t_elem ->
-        let%bind map, term = update map t_elem in
-        match term.ty with
-        | TyFloat -> Ok (map, term :: acc)
-        | _ -> error_s [%message "vec expected all floats" (ts : Stlc.term list)])
+  { t with desc; ty = subst_ty sub t.ty }
+;;
+
+let rec ftv_of_ty = function
+  | TyVar v -> String.Set.singleton v
+  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ -> String.Set.empty
+  | TyArrow (t1, t2) -> Set.union (ftv_of_ty t1) (ftv_of_ty t2)
+;;
+
+let ftv_of_context (ctx : context) : String.Set.t =
+  let ftv_of_scheme (vars, ty) = Set.diff (ftv_of_ty ty) (String.Set.of_list vars) in
+  Map.data ctx |> List.map ~f:ftv_of_scheme |> String.Set.union_list
+;;
+
+let ftv_of_constraint (con : constr) : String.Set.t =
+  match con with
+  | Eq (_, l, r) -> Set.union (ftv_of_ty l) (ftv_of_ty r)
+  | HasClass (_, _, ty) -> ftv_of_ty ty
+  | Broadcast (_, l, r, ret) | MulBroadcast (_, l, r, ret) ->
+    String.Set.union_list [ ftv_of_ty l; ftv_of_ty r; ftv_of_ty ret ]
+  | IndexAccess (_, t, _, ret) -> Set.union (ftv_of_ty t) (ftv_of_ty ret)
+;;
+
+(** Generalize a type by quantifying variables not in context or deferred constraints. *)
+let generalize (ctx : context) (deferred : constr list) (ty : ty) : type_scheme =
+  let ftv_ty = ftv_of_ty ty in
+  let ftv_ctx = ftv_of_context ctx in
+  let ftv_deferred = List.map ~f:ftv_of_constraint deferred in
+  let restricted = String.Set.union_list (ftv_ctx :: ftv_deferred) in
+  Set.to_list (Set.diff ftv_ty restricted), ty
+;;
+
+(** Unify two types into a substitution *)
+let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Or_error.t =
+  match con with
+  | [] -> return []
+  | (loc, TyVar v, ty) :: con | (loc, ty, TyVar v) :: con ->
+    let rec has_infinite_type = function
+      | TyVar v' -> String.equal v v'
+      | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ -> false
+      | TyArrow (ty, ty') -> has_infinite_type ty || has_infinite_type ty'
     in
-    let size = List.length terms in
-    if size = n
-    then make ~map (Vec (n, List.rev terms)) (TyVec n)
-    else error_s [%message "vec size mismatch" (n : int) (size : int)]
-  | Mat (n, m, ts) ->
-    let%bind map, terms =
-      List.fold_result ts ~init:(map, []) ~f:(fun (map, acc) t_elem ->
-        let%bind map, term = update map t_elem in
-        match term.ty with
-        | TyFloat -> Ok (map, term :: acc)
-        | _ -> error_s [%message "mat expected all floats" (ts : Stlc.term list)])
-    in
-    let size = List.length terms in
-    if size = n * m
-    then make ~map (Mat (n, m, List.rev terms)) (TyMat (n, m))
-    else error_s [%message "mat size mismatch" (n : int) (m : int) (size : int)]
-  | Lam (v, Some ty_v, body) ->
-    let%bind () = fail_if_tyvar ty_v in
-    let map = Map.set map ~key:v ~data:ty_v in
-    let%bind map, t = update map body in
-    make ~map (Lam (v, ty_v, t)) (TyArrow (ty_v, t.ty))
-  | Lam (_, None, _) -> error_s [%message "typecheck: missing type annotation on lambda"]
-  | App (f, x) ->
-    (* Pure functions with all unique variable names, so passing maps
-       like this should be fine to collect them *)
-    let%bind map, f = update map f in
-    let%bind map, x = update map x in
-    (match f.ty with
-     | TyArrow (l, r) when equal_ty x.ty l -> make ~map (App (f, x)) r
-     | _ -> error_s [%message "invalid app" (f.ty : ty) (x.ty : ty)])
-  | Let (Rec (n, Some ann_ty), v, bind, body) ->
-    let%bind () = fail_if_tyvar ann_ty in
-    let map = Map.set map ~key:v ~data:ann_ty in
-    let%bind map, bind = update map bind in
-    if equal_ty ann_ty bind.ty
-    then (
-      let%bind map, body = update map body in
-      make ~map (Let (Rec (n, Some ann_ty), v, bind, body)) body.ty)
-    else
+    if has_infinite_type ty
+    then
       error_s
-        [%message "typecheck: unexpected type on letrec" (ann_ty : ty) (bind.ty : ty)]
-  | Let (Rec _, _, _, _) ->
-    error_s [%message "typecheck: missing type annotation on letrec"]
+        [%message
+          "typecheck: recursive unification" (loc : Lexer.loc) (v : string) (ty : ty)]
+    else if equal_ty (TyVar v) ty
+    then unify con
+    else (
+      let%bind sub =
+        unify
+          (List.map con ~f:(fun (l, t, t') ->
+             l, subst_ty [ v, ty ] t, subst_ty [ v, ty ] t'))
+      in
+      return ((v, subst_ty sub ty) :: sub))
+  | (loc, TyArrow (f, x), TyArrow (f', x')) :: con ->
+    unify ((loc, f, f') :: (loc, x, x') :: con)
+  | (loc, ty, ty') :: con ->
+    if equal_ty ty ty'
+    then unify con
+    else
+      error_s [%message "typecheck: type mismatch" (loc : Lexer.loc) (ty : ty) (ty' : ty)]
+;;
+
+(** Validate if a concrete type belongs to a GLSL typeclass. *)
+let check_class (cls : type_class) (ty : ty) : bool =
+  match cls, ty with
+  | GenType, (TyFloat | TyVec _)
+  | GenBType, TyBool
+  | GenIType, TyInt
+  | MatType, TyMat _
+  | Numeric, (TyFloat | TyInt | TyVec _ | TyMat _)
+  | Comparable, (TyFloat | TyInt)
+  | Equatable, (TyFloat | TyInt | TyBool | TyVec _ | TyMat _) -> true
+  | _, _ -> false
+;;
+
+(** Resolve GLSL overloading constraints using concrete types. *)
+let resolve_constraints (constrs : constr list)
+  : (constr list * (Lexer.loc * ty * ty) list) Or_error.t
+  =
+  let rec aux deferred eqs = function
+    | [] -> return (List.rev deferred, List.rev eqs)
+    | Eq (loc, l, r) :: rest -> aux deferred ((loc, l, r) :: eqs) rest
+    | HasClass (loc, cls, ty) :: rest ->
+      (match ty with
+       | TyVar _ -> aux (HasClass (loc, cls, ty) :: deferred) eqs rest
+       | _ ->
+         if check_class cls ty
+         then aux deferred eqs rest
+         else
+           error_s
+             [%message
+               "typecheck: class constraint failed"
+                 (loc : Lexer.loc)
+                 (cls : type_class)
+                 (ty : ty)])
+    | Broadcast (loc, l, r, ret) :: rest ->
+      (match l, r with
+       | TyVar _, _ | _, TyVar _ -> aux (Broadcast (loc, l, r, ret) :: deferred) eqs rest
+       | TyFloat, TyFloat -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
+       | TyInt, TyInt -> aux deferred ((loc, ret, TyInt) :: eqs) rest
+       | TyVec n, TyVec n' when n = n' -> aux deferred ((loc, ret, TyVec n) :: eqs) rest
+       | TyFloat, TyVec n | TyVec n, TyFloat | TyInt, TyVec n | TyVec n, TyInt ->
+         aux deferred ((loc, ret, TyVec n) :: eqs) rest
+       | TyMat (x, y), TyMat (w, z) when x = w && y = z ->
+         aux deferred ((loc, ret, TyMat (x, y)) :: eqs) rest
+       | _ ->
+         error_s
+           [%message "typecheck: invalid broadcast" (loc : Lexer.loc) (l : ty) (r : ty)])
+    | MulBroadcast (loc, l, r, ret) :: rest ->
+      (match l, r with
+       | TyVar _, _ | _, TyVar _ ->
+         aux (MulBroadcast (loc, l, r, ret) :: deferred) eqs rest
+       | TyMat (x, y), TyMat (w, z) when x = w && y = z ->
+         aux deferred ((loc, ret, TyMat (x, y)) :: eqs) rest
+       | TyMat (x, y), TyFloat | TyFloat, TyMat (x, y) ->
+         aux deferred ((loc, ret, TyMat (x, y)) :: eqs) rest
+       | TyMat (x, y), TyVec n when y = n ->
+         aux deferred ((loc, ret, TyVec x) :: eqs) rest
+       | TyFloat, TyFloat -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
+       | TyInt, TyInt -> aux deferred ((loc, ret, TyInt) :: eqs) rest
+       | TyVec n, TyVec n' when n = n' -> aux deferred ((loc, ret, TyVec n) :: eqs) rest
+       | TyFloat, TyVec n | TyVec n, TyFloat | TyInt, TyVec n | TyVec n, TyInt ->
+         aux deferred ((loc, ret, TyVec n) :: eqs) rest
+       | _ ->
+         error_s
+           [%message
+             "typecheck: invalid mul/div broadcast" (loc : Lexer.loc) (l : ty) (r : ty)])
+    | IndexAccess (loc, t, i, ret) :: rest ->
+      (match t with
+       | TyVec n ->
+         if 0 <= i && i < n
+         then aux deferred ((loc, ret, TyFloat) :: eqs) rest
+         else
+           error_s
+             [%message "vec index out of bounds" (loc : Lexer.loc) (n : int) (i : int)]
+       | TyMat (x, y) ->
+         if 0 <= i && i < x
+         then aux deferred ((loc, ret, TyVec y) :: eqs) rest
+         else
+           error_s
+             [%message "mat index out of bounds" (loc : Lexer.loc) (x : int) (i : int)]
+       | TyVar _ -> aux (IndexAccess (loc, t, i, ret) :: deferred) eqs rest
+       | ty -> error_s [%message "expected vec or mat" (loc : Lexer.loc) (ty : ty)])
+  in
+  aux [] [] constrs
+;;
+
+(** Solve a set of constraints to produce a substitution. *)
+let solve (constrs : constr list) : substitution Or_error.t =
+  let rec go sub constrs =
+    let%bind deferred, eqs = resolve_constraints constrs in
+    if List.is_empty eqs
+    then
+      if List.is_empty deferred
+      then return sub
+      else
+        error_s
+          [%message "typecheck: unresolved overloaded operators" (deferred : constr list)]
+    else (
+      let%bind new_sub = unify eqs in
+      let sub = List.map sub ~f:(fun (v, t) -> v, subst_ty new_sub t) @ new_sub in
+      let deferred = subst_constraints new_sub deferred in
+      go sub deferred)
+  in
+  go [] constrs
+;;
+
+(** Value restriction check for generalization. *)
+let rec is_value (t : Stlc.term) : bool =
+  match t.desc with
+  | Float _ | Int _ | Bool _ | Var _ | Lam _ -> true
+  | Vec (_, ts) -> List.for_all ts ~f:is_value
+  | Mat (_, _, ts) -> List.for_all ts ~f:is_value
+  | Record fields -> List.for_all fields ~f:(fun (_, t) -> is_value t)
+  | Field (t, _) | Index (t, _) -> is_value t
+  | App _ | Let _ | If _ | Bop _ | Builtin _ -> false
+;;
+
+(** Generate typed term and constraints from STLC term. *)
+let rec gen_term structs fields_env ctx (t : Stlc.term) : (term * constr list) Or_error.t =
+  let loc = t.loc in
+  let make desc ty constrs = Ok (({ desc; ty; loc } : term), constrs) in
+  match t.desc with
+  | Float f -> make (Float f) TyFloat []
+  | Int i -> make (Int i) TyInt []
+  | Bool b -> make (Bool b) TyBool []
+  | Var v ->
+    let%bind vs, ty_scheme =
+      match Map.find ctx v with
+      | Some s -> Ok s
+      | None ->
+        error_s [%message "var not found in type map" (loc : Lexer.loc) (v : string)]
+    in
+    let sub = List.map vs ~f:(fun v -> v, fresh_tyvar ()) in
+    make (Var v) (subst_ty sub ty_scheme) []
+  | Lam (v, ty_ann, body) ->
+    let ty_v =
+      match ty_ann with
+      | Some t -> t
+      | None -> fresh_tyvar ()
+    in
+    let ctx = Map.set ctx ~key:v ~data:([], ty_v) in
+    let%bind body, constrs = gen_term structs fields_env ctx body in
+    make (Lam (v, ty_v, body)) (TyArrow (ty_v, body.ty)) constrs
+  | App (f, x) ->
+    let%bind f, constrs_f = gen_term structs fields_env ctx f in
+    let%bind x, constrs_x = gen_term structs fields_env ctx x in
+    let ret_ty = fresh_tyvar () in
+    let constrs = Eq (loc, f.ty, TyArrow (x.ty, ret_ty)) :: (constrs_f @ constrs_x) in
+    make (App (f, x)) ret_ty constrs
   | Let (Nonrec, v, bind, body) ->
-    let%bind map, bind = update map bind in
-    let map = Map.set map ~key:v ~data:bind.ty in
-    let%bind map, body = update map body in
-    make ~map (Let (Nonrec, v, bind, body)) body.ty
+    let%bind bind', constrs_bind = gen_term structs fields_env ctx bind in
+    let%bind sub_bind = solve constrs_bind in
+    let ty_bind = subst_ty sub_bind bind'.ty in
+    let ctx_subbed = subst_context sub_bind ctx in
+    let scheme =
+      if is_value bind then generalize ctx_subbed [] ty_bind else [], ty_bind
+    in
+    let ctx' = Map.set ctx_subbed ~key:v ~data:scheme in
+    let%bind body, constrs_body = gen_term structs fields_env ctx' body in
+    make (Let (Nonrec, v, bind', body)) body.ty (constrs_bind @ constrs_body)
+  | Let (Rec (n, ty_ann), v, bind, body) ->
+    let ty_v =
+      match ty_ann with
+      | Some t -> t
+      | None -> fresh_tyvar ()
+    in
+    let ctx' = Map.set ctx ~key:v ~data:([], ty_v) in
+    let%bind bind', constrs_bind = gen_term structs fields_env ctx' bind in
+    let%bind sub_bind = solve (Eq (loc, ty_v, bind'.ty) :: constrs_bind) in
+    let ty_bind = subst_ty sub_bind bind'.ty in
+    let ctx_subbed = subst_context sub_bind ctx in
+    let scheme =
+      if is_value bind then generalize ctx_subbed [] ty_bind else [], ty_bind
+    in
+    let ctx = Map.set ctx_subbed ~key:v ~data:scheme in
+    let%bind body', constrs_body = gen_term structs fields_env ctx body in
+    let constrs = (Eq (loc, ty_v, bind'.ty) :: constrs_bind) @ constrs_body in
+    make (Let (Rec (n, ty_ann), v, bind', body')) body'.ty constrs
   | If (c, t, e) ->
-    (* Pure functions with all unique variable names, so passing maps
-       like this should be fine to collect them *)
-    let%bind map, c = update map c in
-    let%bind map, t = update map t in
-    let%bind map, e = update map e in
-    if not (equal_ty c.ty TyBool)
-    then error_s [%message "if cond is not bool" (c.ty : ty)]
-    else if not (equal_ty t.ty e.ty)
-    then error_s [%message "if/else differs" (t.ty : ty) (e.ty : ty)]
-    else make ~map (If (c, t, e)) t.ty
+    let%bind c, constrs_c = gen_term structs fields_env ctx c in
+    let%bind t, constrs_t = gen_term structs fields_env ctx t in
+    let%bind e, constrs_e = gen_term structs fields_env ctx e in
+    let constrs =
+      Eq (loc, c.ty, TyBool) :: Eq (loc, t.ty, e.ty) :: (constrs_c @ constrs_t @ constrs_e)
+    in
+    make (If (c, t, e)) t.ty constrs
   | Bop (op, l, r) ->
-    (* Pure functions with all unique variable names, so passing maps
-       like this should be fine to collect them *)
-    let%bind map, l = update map l in
-    let%bind map, r = update map r in
-    let make ty = make ~map (Bop (op, l, r)) ty in
-    (match op, l.ty, r.ty with
-     | (Add | Sub | Mul | Div | Mod), TyFloat, TyFloat -> make TyFloat
-     | (Add | Sub | Mul | Div | Mod), TyInt, TyInt -> make TyInt
-     | (Add | Sub | Mul | Div | Mod), TyVec n, TyVec n' when n = n' -> make (TyVec n)
-     | (Add | Sub | Mul | Div | Mod), (TyFloat | TyInt), TyVec n
-     | (Add | Sub | Mul | Div | Mod), TyVec n, (TyFloat | TyInt) -> make (TyVec n)
-     | (Add | Sub | Mul | Div | Mod), TyMat (x, y), TyMat (x', y') when x = x' && y = y'
-       -> make (TyMat (x, y))
-     | (Mul | Div), TyMat (x, y), TyFloat | (Mul | Div), TyFloat, TyMat (x, y) ->
-       make (TyMat (x, y))
-     | (Mul | Div), TyMat (x, y), TyVec n when y = n -> make (TyVec x)
-     | (Add | Sub | Mul | Div | Mod), _, _ ->
-       error_s [%message "bop expected int/float" (l.ty : ty) (r.ty : ty)]
-     | Eq, TyFloat, TyFloat
-     | Eq, TyInt, TyInt
-     | Eq, TyBool, TyBool
-     | Eq, TyVec _, TyVec _
-     | Eq, TyMat _, TyMat _ -> make TyBool
-     | Eq, _, _ -> error_s [%message "unsupported eq" (l.ty : ty) (r.ty : ty)]
-     | (Lt | Gt | Leq | Geq), TyFloat, TyFloat | (Lt | Gt | Leq | Geq), TyInt, TyInt ->
-       make TyBool
-     | (Lt | Gt | Leq | Geq), _, _ ->
-       error_s [%message "bop expected int/float" (l.ty : ty) (r.ty : ty)]
-     | (And | Or), TyBool, TyBool -> make TyBool
-     | (And | Or), _, _ ->
-       error_s [%message "and/or expected bools" (l.ty : ty) (r.ty : ty)])
+    let%bind l, constrs_l = gen_term structs fields_env ctx l in
+    let%bind r, constrs_r = gen_term structs fields_env ctx r in
+    let ret_ty = fresh_tyvar () in
+    let op_constrs =
+      match op with
+      | Add | Sub | Mod -> [ Broadcast (loc, l.ty, r.ty, ret_ty) ]
+      | Mul | Div -> [ MulBroadcast (loc, l.ty, r.ty, ret_ty) ]
+      | Eq ->
+        [ HasClass (loc, Equatable, l.ty)
+        ; Eq (loc, l.ty, r.ty)
+        ; Eq (loc, ret_ty, TyBool)
+        ]
+      | Lt | Gt | Leq | Geq ->
+        [ HasClass (loc, Comparable, l.ty)
+        ; Eq (loc, l.ty, r.ty)
+        ; Eq (loc, ret_ty, TyBool)
+        ]
+      | And | Or ->
+        [ Eq (loc, l.ty, TyBool); Eq (loc, r.ty, TyBool); Eq (loc, ret_ty, TyBool) ]
+    in
+    make (Bop (op, l, r)) ret_ty (op_constrs @ constrs_l @ constrs_r)
   | Index (t, i) ->
-    let%bind map, t = update map t in
-    let make = make ~map (Index (t, i)) in
-    (match t.ty with
-     | TyVec n ->
-       if 0 <= i && i < n
-       then make TyFloat
-       else error_s [%message "vec index out of bounds" (n : int) (i : int)]
-     | TyMat (x, y) ->
-       if 0 <= i && i < x
-       then make (TyVec y)
-       else error_s [%message "mat index out of bounds" (x : int) (i : int)]
-     | ty -> error_s [%message "expected vec or mat" (ty : ty)])
-  | Builtin (name, args) ->
-    let%bind map, args =
-      List.fold_result args ~init:(map, []) ~f:(fun (map, acc) t_arg ->
-        let%bind map, term = update map t_arg in
-        Ok (map, term :: acc))
+    let%bind t, constrs_t = gen_term structs fields_env ctx t in
+    let ret_ty = fresh_tyvar () in
+    make (Index (t, i)) ret_ty (IndexAccess (loc, t.ty, i, ret_ty) :: constrs_t)
+  | Builtin (b, args) ->
+    let%bind args, constrs_args =
+      List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
+        let%bind arg', constrs = gen_term structs fields_env ctx arg in
+        return (arg' :: acc_args, constrs @ acc_constrs))
     in
     let args = List.rev args in
-    let tys = List.map ~f:(fun arg -> arg.ty) args in
-    let make = make ~map (Builtin (name, args)) in
-    (* TODO: "Row Polymorphism" behavior implemented like you expect in GLSL? *)
-    let check_unary_math () =
-      match tys with
-      | [ TyFloat ] -> make TyFloat
-      | [ TyVec n ] -> make (TyVec n)
+    let ret_ty = fresh_tyvar () in
+    let arg1 = List.nth args 0 |> Option.map ~f:(fun a -> a.ty) in
+    let arg2 = List.nth args 1 |> Option.map ~f:(fun a -> a.ty) in
+    let arg3 = List.nth args 2 |> Option.map ~f:(fun a -> a.ty) in
+    let%bind builtin_constrs =
+      match b, arg1, arg2, arg3 with
+      | ( ( Sin
+          | Cos
+          | Tan
+          | Asin
+          | Acos
+          | Atan
+          | Exp
+          | Log
+          | Exp2
+          | Log2
+          | Sqrt
+          | Abs
+          | Sign
+          | Floor
+          | Ceil )
+        , Some t1
+        , None
+        , None ) -> Ok [ HasClass (loc, GenType, t1); Eq (loc, ret_ty, t1) ]
+      | (Min | Max | Pow), Some t1, Some t2, None ->
+        Ok [ HasClass (loc, GenType, ret_ty); Broadcast (loc, t1, t2, ret_ty) ]
+      | Clamp, Some t1, Some t2, Some t3 ->
+        let temp = fresh_tyvar () in
+        Ok
+          [ HasClass (loc, GenType, ret_ty)
+          ; Broadcast (loc, t2, t3, temp)
+          ; Broadcast (loc, t1, temp, ret_ty)
+          ]
+      | Mix, Some t1, Some t2, Some t3 ->
+        let temp = fresh_tyvar () in
+        Ok
+          [ HasClass (loc, GenType, ret_ty)
+          ; Broadcast (loc, t1, t2, temp)
+          ; Broadcast (loc, temp, t3, ret_ty)
+          ]
+      | Length, Some t1, None, None ->
+        Ok [ HasClass (loc, GenType, t1); Eq (loc, ret_ty, TyFloat) ]
+      | (Distance | Dot), Some t1, Some t2, None ->
+        Ok [ HasClass (loc, GenType, t1); Eq (loc, t1, t2); Eq (loc, ret_ty, TyFloat) ]
+      | Cross, Some t1, Some t2, None ->
+        Ok [ Eq (loc, t1, TyVec 3); Eq (loc, t2, TyVec 3); Eq (loc, ret_ty, TyVec 3) ]
+      | Normalize, Some t1, None, None ->
+        Ok [ HasClass (loc, GenType, t1); Eq (loc, ret_ty, t1) ]
       | _ ->
-        error_s [%message "expected float or vec" (name : Glsl.builtin) (tys : ty list)]
+        error_s
+          [%message "invalid builtin arguments" (loc : Lexer.loc) (b : Glsl.builtin)]
     in
-    let check_binary_math () =
-      match tys with
-      | [ TyFloat; TyFloat ] -> make TyFloat
-      | [ TyVec n; TyVec n' ] when n = n' -> make (TyVec n)
-      | [ TyVec n; TyFloat ] | [ TyFloat; TyVec n ] -> make (TyVec n)
-      | _ ->
-        error_s [%message "expected floats or vecs" (name : Glsl.builtin) (tys : ty list)]
+    make (Builtin (b, args)) ret_ty (builtin_constrs @ constrs_args)
+  | Vec (n, args) ->
+    let%bind args, constrs_args =
+      List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
+        let%bind arg, constrs = gen_term structs fields_env ctx arg in
+        return (arg :: acc_args, (Eq (loc, arg.ty, TyFloat) :: constrs) @ acc_constrs))
     in
-    let check_geometric () =
-      match name, tys with
-      | Length, [ TyVec _ ] | Length, [ TyFloat ] -> make TyFloat
-      | Distance, [ TyVec n; TyVec n' ] when n = n' -> make TyFloat
-      | Distance, [ TyFloat; TyFloat ] -> make TyFloat
-      | Dot, [ TyVec n; TyVec n' ] when n = n' -> make TyFloat
-      | Dot, [ TyFloat; TyFloat ] -> make TyFloat
-      | Cross, [ TyVec 3; TyVec 3 ] -> make (TyVec 3)
-      | Normalize, [ TyVec n ] -> make (TyVec n)
-      | Normalize, [ TyFloat ] -> make TyFloat
-      | _ ->
-        error_s [%message "invalid geometric call" (name : Glsl.builtin) (tys : ty list)]
+    let args = List.rev args in
+    if List.length args = n
+    then make (Vec (n, args)) (TyVec n) constrs_args
+    else error_s [%message "vec size mismatch" (loc : Lexer.loc) (n : int)]
+  | Mat (n, m, args) ->
+    let%bind args, constrs_args =
+      List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
+        let%bind arg, constrs = gen_term structs fields_env ctx arg in
+        return (arg :: acc_args, (Eq (loc, arg.ty, TyFloat) :: constrs) @ acc_constrs))
     in
-    let check_common () =
-      match name, tys with
-      | (Abs | Sign | Floor | Ceil), _ -> check_unary_math ()
-      | (Min | Max), _ -> check_binary_math ()
-      | Clamp, [ TyFloat; TyFloat; TyFloat ] -> make TyFloat
-      | Clamp, [ TyVec n; TyFloat; TyFloat ] -> make (TyVec n)
-      | Clamp, [ TyVec n; TyVec n'; TyVec n'' ] when n = n' && n' = n'' -> make (TyVec n)
-      | Mix, [ TyFloat; TyFloat; TyFloat ] -> make TyFloat
-      | Mix, [ TyVec n; TyVec n'; TyFloat ] when n = n' -> make (TyVec n)
-      | Mix, [ TyVec n; TyVec n'; TyVec n'' ] when n = n' && n' = n'' -> make (TyVec n)
-      | _ ->
-        error_s [%message "invalid common call" (name : Glsl.builtin) (tys : ty list)]
-    in
-    (match name with
-     | Sin | Cos | Tan | Asin | Acos | Atan | Exp | Log | Exp2 | Log2 | Sqrt ->
-       check_unary_math ()
-     | Pow -> check_binary_math ()
-     | Length | Distance | Dot | Cross | Normalize -> check_geometric ()
-     | Abs | Sign | Floor | Ceil | Min | Max | Clamp | Mix -> check_common ())
-  | Record [] -> error_s [%message "empty records are not supported"]
-  (* TODO: This is terrible but... when we implement HM with Bider it should be nuked *)
+    let args = List.rev args in
+    if List.length args = n * m
+    then make (Mat (n, m, args)) (TyMat (n, m)) constrs_args
+    else error_s [%message "mat size mismatch" (loc : Lexer.loc) (n : int) (m : int)]
+  | Record [] -> error_s [%message "empty records are not supported" (loc : Lexer.loc)]
   | Record ((first_field, _) :: _ as fields) ->
+    (* TODO: This is still such a bad way to check struct equality *)
     let%bind struct_name, struct_fields =
       match
         Map.to_alist structs
@@ -291,81 +528,96 @@ let rec update
       with
       | Some res -> Ok res
       | None ->
-        error_s [%message "record does not match any known struct for field" first_field]
+        error_s
+          [%message
+            "record does not match any known struct" (loc : Lexer.loc) first_field]
     in
-    let%bind () =
-      if List.length fields <> List.length struct_fields
-      then error_s [%message "incorrect number of fields for struct" struct_name]
-      else Ok ()
+    let%bind args, constrs_args =
+      List.fold_result
+        struct_fields
+        ~init:([], [])
+        ~f:(fun (acc_args, acc_constrs) (name, ty) ->
+          match List.Assoc.find fields ~equal:String.equal name with
+          | Some arg ->
+            let%bind arg, constrs = gen_term structs fields_env ctx arg in
+            return (arg :: acc_args, (Eq (loc, arg.ty, ty) :: constrs) @ acc_constrs)
+          | None -> error_s [%message "missing field" (loc : Lexer.loc) name])
     in
-    let%bind map, ordered_terms =
-      List.fold_result struct_fields ~init:(map, []) ~f:(fun (map, acc) (name, ty) ->
-        match List.Assoc.find fields ~equal:String.equal name with
-        | Some t ->
-          let%bind map, t = update map t in
-          if equal_ty t.ty ty
-          then Ok (map, t :: acc)
-          else error_s [%message "field type mismatch" name (ty : ty) (t.ty : ty)]
-        | None -> error_s [%message "missing field" name])
-    in
-    make ~map (Record (struct_name, List.rev ordered_terms)) (TyRecord struct_name)
+    make (Record (struct_name, List.rev args)) (TyRecord struct_name) constrs_args
   | Field (t, f) ->
-    let%bind _, t = update map t in
-    (match t.ty with
-     | TyRecord name ->
-       (match Map.find structs name with
-        | Some fields ->
-          (match List.Assoc.find fields ~equal:String.equal f with
-           | Some ty -> make (Field (t, f)) ty
-           | None -> error_s [%message "field not found in struct" name f])
-        | None -> error_s [%message "unknown struct" name])
-     | _ -> error_s [%message "field access on non-struct" (t.ty : ty)])
+    let%bind t, constrs_t = gen_term structs fields_env ctx t in
+    let ret_ty = fresh_tyvar () in
+    (match Map.find fields_env f with
+     | Some struct_name ->
+       let struct_fields = Map.find_exn structs struct_name in
+       let field_ty = List.Assoc.find_exn struct_fields ~equal:String.equal f in
+       let constrs =
+         Eq (loc, t.ty, TyRecord struct_name) :: Eq (loc, ret_ty, field_ty) :: constrs_t
+       in
+       make (Field (t, f)) ret_ty constrs
+     | None -> error_s [%message "field not found in any struct" (loc : Lexer.loc) f])
 ;;
 
 let typecheck (Program terms : Stlc.t) : t Or_error.t =
-  let open Or_error.Let_syntax in
   let%map _, _, _, tops =
     List.fold_result
       terms
       ~init:(String.Map.empty, String.Map.empty, String.Map.empty, [])
-      ~f:(fun (map, structs, fields_env, acc) top ->
+        (* TODO: There has to be a better way than to pass everything like this *)
+      ~f:(fun (ctx, structs, fields_env, acc) top ->
         match top.desc with
-        | Define (Rec (n, Some ann_ty), v, bind) ->
-          let%bind () = fail_if_tyvar ann_ty in
-          let map = Map.set map ~key:v ~data:ann_ty in
-          let%bind map, t = update map structs fields_env bind in
-          if equal_ty ann_ty t.ty
-          then (
-            let desc = Define (Rec (n, Some ann_ty), v, t) in
-            Ok (map, structs, fields_env, { desc; ty = t.ty; loc = top.loc } :: acc))
-          else
-            error_s
-              [%message "typecheck: unexpected type on letrec" (ann_ty : ty) (t.ty : ty)]
-        | Define (Rec _, _, _) ->
-          error_s [%message "typecheck: missing type annotation on letrec"]
+        | Define (Rec (n, ty_ann), v, bind) ->
+          let ty_v =
+            match ty_ann with
+            | Some t -> t
+            | None -> fresh_tyvar ()
+          in
+          let ctx' = Map.set ctx ~key:v ~data:([], ty_v) in
+          let%bind bind', constrs_bind = gen_term structs fields_env ctx' bind in
+          let%bind sub_bind = solve (Eq (top.loc, ty_v, bind'.ty) :: constrs_bind) in
+          let ty_bind = subst_ty sub_bind bind'.ty in
+          let ctx_subbed = subst_context sub_bind ctx in
+          let scheme =
+            if is_value bind then generalize ctx_subbed [] ty_bind else [], ty_bind
+          in
+          let ctx = Map.set ctx_subbed ~key:v ~data:scheme in
+          let top =
+            { desc = Define (Rec (n, ty_ann), v, subst_term sub_bind bind')
+            ; ty = ty_bind
+            ; loc = top.loc
+            }
+          in
+          Ok (ctx, structs, fields_env, top :: acc)
         | Define (Nonrec, v, bind) ->
-          let%bind map, t = update map structs fields_env bind in
-          let map = Map.set map ~key:v ~data:t.ty in
-          Ok
-            ( map
-            , structs
-            , fields_env
-            , { desc = Define (Nonrec, v, t); ty = t.ty; loc = top.loc } :: acc )
+          let%bind bind', constrs_bind = gen_term structs fields_env ctx bind in
+          let%bind sub_bind = solve constrs_bind in
+          let ty_bind = subst_ty sub_bind bind'.ty in
+          let ctx_subbed = subst_context sub_bind ctx in
+          let scheme =
+            if is_value bind then generalize ctx_subbed [] ty_bind else [], ty_bind
+          in
+          let ctx = Map.set ctx_subbed ~key:v ~data:scheme in
+          let top =
+            { desc = Define (Nonrec, v, subst_term sub_bind bind')
+            ; ty = ty_bind
+            ; loc = top.loc
+            }
+          in
+          Ok (ctx, structs, fields_env, top :: acc)
         | Extern (ty, v) ->
-          let map = Map.set map ~key:v ~data:ty in
-          Ok (map, structs, fields_env, { desc = Extern v; ty; loc = top.loc } :: acc)
+          let ctx = Map.set ctx ~key:v ~data:([], ty) in
+          let top = { desc = Extern v; ty; loc = top.loc } in
+          Ok (ctx, structs, fields_env, top :: acc)
         | RecordDef (name, fields) ->
           let structs = Map.set structs ~key:name ~data:fields in
           let fields_env =
             List.fold fields ~init:fields_env ~f:(fun env (f_name, _) ->
               Map.set env ~key:f_name ~data:name)
           in
-          Ok
-            ( map
-            , structs
-            , fields_env
-            , { desc = RecordDef (name, fields); ty = TyRecord name; loc = top.loc }
-              :: acc ))
+          let top =
+            { desc = RecordDef (name, fields); ty = TyRecord name; loc = top.loc }
+          in
+          Ok (ctx, structs, fields_env, top :: acc))
   in
   Program (List.rev tops)
 ;;
