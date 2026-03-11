@@ -507,33 +507,35 @@ let rec gen_term structs fields_env ctx (t : Stlc.term) : (term * constr list) O
     if List.length args = n * m
     then make (Mat (n, m, args)) (TyMat (n, m)) constrs_args
     else error_s [%message "mat size mismatch" (loc : Lexer.loc) (n : int) (m : int)]
-  | Record [] -> error_s [%message "empty records are not supported" (loc : Lexer.loc)]
-  | Record ((first_field, _) :: _ as fields) ->
-    (* TODO: This is still such a bad way to check struct equality *)
-    let%bind struct_name, struct_fields =
-      match
-        Map.to_alist structs
-        |> List.find ~f:(fun (_, s_fields) ->
-          List.exists s_fields ~f:(fun (k, _) -> String.equal k first_field))
-      with
-      | Some res -> Ok res
-      | None ->
-        error_s
-          [%message
-            "record does not match any known struct" (loc : Lexer.loc) first_field]
-    in
-    let%bind args, constrs_args =
-      List.fold_result
+  | Record fields ->
+    let provided_fields = String.Set.of_list (List.map fields ~f:fst) in
+    let candidates =
+      Map.filter structs ~f:(fun struct_fields ->
         struct_fields
-        ~init:([], [])
-        ~f:(fun (acc_args, acc_constrs) (name, ty) ->
-          match List.Assoc.find fields ~equal:String.equal name with
-          | Some arg ->
-            let%bind arg, constrs = gen_term structs fields_env ctx arg in
-            return (arg :: acc_args, (Eq (loc, arg.ty, ty) :: constrs) @ acc_constrs)
-          | None -> error_s [%message "missing field" (loc : Lexer.loc) name])
+        |> List.map ~f:fst
+        |> String.Set.of_list
+        |> Set.equal provided_fields)
     in
-    make (Record (struct_name, List.rev args)) (TyRecord struct_name) constrs_args
+    let error_record msg =
+      error_s [%message msg (loc : Lexer.loc) (provided_fields : String.Set.t)]
+    in
+    (match Map.to_alist candidates with
+     | [] -> error_record "record does not match any known struct"
+     | _ :: _ :: _ -> error_record "record is ambiguous, matches multiple structs"
+     | [ (struct_name, struct_fields) ] ->
+       let%bind args, constrs_args =
+         List.fold_result
+           struct_fields
+           ~init:([], [])
+           ~f:(fun (acc, acc_constrs) (name, ty) ->
+             match List.Assoc.find fields ~equal:String.equal name with
+             | Some arg ->
+               let%bind arg, constrs = gen_term structs fields_env ctx arg in
+               return (arg :: acc, (Eq (loc, arg.ty, ty) :: constrs) @ acc_constrs)
+             | None ->
+               error_s [%message "(unreachable) missing field" (loc : Lexer.loc) name])
+       in
+       make (Record (struct_name, List.rev args)) (TyRecord struct_name) constrs_args)
   | Field (t, f) ->
     let%bind t, constrs_t = gen_term structs fields_env ctx t in
     let ret_ty = fresh_tyvar () in
