@@ -59,6 +59,7 @@ let ty_singles_p =
     | INT -> Some TyInt
     | FLOAT -> Some TyFloat
     | ID s -> Some (TyRecord s)
+    | TYVAR v -> Some (TyVar v)
     | _ -> None)
   <??> "ty_single"
 ;;
@@ -171,8 +172,9 @@ let param_p =
     (between
        `Paren
        (let%bind id = ident_p in
-        let%bind ty = tok COLON *> ty_p in
-        return (id, ty)))
+        let%bind ty = optional (tok COLON *> ty_p) in
+        return (id, ty))
+     <|> (ident_p >>| fun id -> id, None))
   <??> "param"
 ;;
 
@@ -198,7 +200,7 @@ let make_lambdas params (body : term) =
 let recur_tag_t =
   between
     `Paren
-    (let%map ty = tok REC *> tok COLON *> ty_p in
+    (let%map ty = tok REC *> optional (tok COLON *> ty_p) in
      Rec (1000, ty))
   <|> return Nonrec
   <??> "recur_tag"
@@ -388,10 +390,10 @@ let%expect_test "term parse tests" =
     (Ok false)
     (Ok (vec3 1 2 3))
     (Ok (mat3x2 1 2 3 4 5 6))
-    (Ok (lambda (x bool) x))
+    (Ok (lambda (x (bool)) x))
     (Ok (app (app f x) y))
     (Ok (let bind true bind))
-    (Ok (let (rec 1000 bool) f (lambda (x float) (app f x)) f))
+    (Ok (let (rec 1000 (bool)) f (lambda (x (float)) (app f x)) f))
     (Ok (if true x y))
     (Ok (&& (+ (* 1 2) true) (% 44 10)))
     (Ok (index v 0))
@@ -417,16 +419,22 @@ let%expect_test "term parse tests" =
     (Ok (app (app f (app x y)) z))
     (Ok (- (* 2 -13) 10))
     (Ok (app f 5))
-    (Ok (lambda (u (vec 2)) (vec3 (app (app f 10.) a) 0. 0.)))
+    (Ok (lambda (u ((vec 2))) (vec3 (app (app f 10.) a) 0. 0.)))
     (Ok (- f 5))
     (Ok (app f -5))
     |}];
   test "let f (x : bool) (y : bool) = x && y in f";
   test "let f = fun (x : bool) (y : bool) -> x && y in f";
+  test "let f x y = x && y in f";
+  test "let (rec) f x = f x in f";
+  test "let (rec: 'a) f (x: 'b) = f x in f";
   [%expect
     {|
-    (Ok (let f (lambda (x bool) (lambda (y bool) (&& x y))) f))
-    (Ok (let f (lambda (x bool) (lambda (y bool) (&& x y))) f))
+    (Ok (let f (lambda (x (bool)) (lambda (y (bool)) (&& x y))) f))
+    (Ok (let f (lambda (x (bool)) (lambda (y (bool)) (&& x y))) f))
+    (Ok (let f (lambda (x ()) (lambda (y ()) (&& x y))) f))
+    (Ok (let (rec 1000 ()) f (lambda (x ()) (app f x)) f))
+    (Ok (let (rec 1000 ('a)) f (lambda (x ('b)) (app f x)) f))
     |}]
 ;;
 
@@ -531,9 +539,9 @@ let%expect_test "glml parse tests" =
       ((Extern float u_time) (RecordDef point ((x float) (y int)))
        (Define Nonrec a_struct (record (x 0.) (y 0)))
        (Define Nonrec toplevel (+ 1 2)) (Define Nonrec main (+ 1 2))
-       (Define Nonrec f (lambda (x bool) (lambda (y bool) (&& x y))))
-       (Define Nonrec main (lambda (u (vec 2)) (+ (app f (vec2 1 2)) u)))
-       (Define (Rec 1000 (float -> float)) g (lambda (x float) (app g x))))))
+       (Define Nonrec f (lambda (x (bool)) (lambda (y (bool)) (&& x y))))
+       (Define Nonrec main (lambda (u ((vec 2))) (+ (app f (vec2 1 2)) u)))
+       (Define (Rec 1000 ((float -> float))) g (lambda (x (float)) (app g x))))))
     |}]
 ;;
 
@@ -551,8 +559,8 @@ let%expect_test "regression test, toplevel let parsing after record" =
     (Ok
      (Program
       ((Define Nonrec f
-        (lambda (x float)
-         (let g (lambda (y float) (+ x y)) (vec3 (app g 1.) 0. 0.))))
-       (Define Nonrec main (lambda (u (vec 2)) (app f 10.))))))
+        (lambda (x (float))
+         (let g (lambda (y (float)) (+ x y)) (vec3 (app g 1.) 0. 0.))))
+       (Define Nonrec main (lambda (u ((vec 2))) (app f 10.))))))
     |}]
 ;;

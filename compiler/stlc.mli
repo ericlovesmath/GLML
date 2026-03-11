@@ -6,13 +6,14 @@ type ty =
   | TyMat of int * int
   | TyArrow of ty * ty
   | TyRecord of string
+  | TyVar of string
 [@@deriving sexp_of, equal]
 
 (* TODO: The [ty] here is only needed because of the STLC style typechecking,
    once we do HM or Bidirectional, this should not be needed *)
 type recur =
   (** NOTE: [int] is for the maximum number of recs allowed *)
-  | Rec of int * ty
+  | Rec of int * ty option
   | Nonrec
 [@@deriving sexp_of]
 
@@ -23,7 +24,7 @@ type term_desc =
   | Bool of bool
   | Vec of int * term list
   | Mat of int * int * term list
-  | Lam of string * ty * term
+  | Lam of string * ty option * term
   | App of term * term
   | Let of recur * string * term * term
   | If of term * term * term

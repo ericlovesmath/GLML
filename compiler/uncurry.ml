@@ -38,8 +38,9 @@ let rec sexp_of_term_desc = function
     let args = List.map args ~f:(fun (v, ty) -> List [ Atom v; Stlc.sexp_of_ty ty ]) in
     List [ Atom "lambda"; List args; sexp_of_term body ]
   | App (f, args) -> List (Atom "app" :: sexp_of_term f :: List.map args ~f:sexp_of_term)
-  | Let (Rec (n, ty), v, bind, body) ->
-    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n); Stlc.sexp_of_ty ty ] in
+  | Let (Rec (n, ty_opt), v, bind, body) ->
+    let ty = Option.sexp_of_t Stlc.sexp_of_ty ty_opt in
+    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n); ty ] in
     List [ Atom "let"; rec_tag; Atom v; sexp_of_term bind; sexp_of_term body ]
   | Let (Nonrec, v, bind, body) ->
     List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]

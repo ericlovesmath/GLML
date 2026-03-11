@@ -204,6 +204,8 @@ let chainl1 (p : 'a t) (op : ('a -> 'a -> 'a) t) : 'a t =
   go lhs
 ;;
 
+let optional (p : 'a t) : 'a option t = p >>| Option.some <|> return None
+
 let run p s =
   Maybe.to_or_error
     (let last_loc = Lexer.init_loc in

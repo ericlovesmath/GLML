@@ -39,8 +39,9 @@ let rec sexp_of_term_desc = function
   | Lam (v, ty, body) ->
     List [ Atom "lambda"; List [ Atom v; sexp_of_ty ty ]; sexp_of_term body ]
   | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
-  | Let (Rec (n, ty), v, bind, body) ->
-    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n); sexp_of_ty ty ] in
+  | Let (Rec (n, ty_opt), v, bind, body) ->
+    let ty = Option.sexp_of_t Stlc.sexp_of_ty ty_opt in
+    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n); ty ] in
     List [ Atom "let"; rec_tag; Atom v; sexp_of_term bind; sexp_of_term body ]
   | Let (Nonrec, v, bind, body) ->
     List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
@@ -70,6 +71,15 @@ type top =
 let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; Stlc.sexp_of_ty t.ty ]
 
 type t = Program of top list [@@deriving sexp_of]
+
+let rec fail_if_tyvar (ty : ty) : unit Or_error.t =
+  let open Or_error.Let_syntax in
+  match ty with
+  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ -> Ok ()
+  | TyArrow (t, t') -> fail_if_tyvar t >>= fun () -> fail_if_tyvar t'
+  | TyRecord _ -> Ok ()
+  | TyVar _ -> error_s [%message "typecheck: type variable not supported" (ty : ty)]
+;;
 
 let rec update
           (map : ty String.Map.t)
@@ -125,10 +135,12 @@ let rec update
     if size = n * m
     then make ~map (Mat (n, m, List.rev terms)) (TyMat (n, m))
     else error_s [%message "mat size mismatch" (n : int) (m : int) (size : int)]
-  | Lam (v, ty_v, body) ->
+  | Lam (v, Some ty_v, body) ->
+    let%bind () = fail_if_tyvar ty_v in
     let map = Map.set map ~key:v ~data:ty_v in
     let%bind map, t = update map body in
     make ~map (Lam (v, ty_v, t)) (TyArrow (ty_v, t.ty))
+  | Lam (_, None, _) -> error_s [%message "typecheck: missing type annotation on lambda"]
   | App (f, x) ->
     (* Pure functions with all unique variable names, so passing maps
        like this should be fine to collect them *)
@@ -137,16 +149,19 @@ let rec update
     (match f.ty with
      | TyArrow (l, r) when equal_ty x.ty l -> make ~map (App (f, x)) r
      | _ -> error_s [%message "invalid app" (f.ty : ty) (x.ty : ty)])
-  | Let (Rec (n, ann_ty), v, bind, body) ->
+  | Let (Rec (n, Some ann_ty), v, bind, body) ->
+    let%bind () = fail_if_tyvar ann_ty in
     let map = Map.set map ~key:v ~data:ann_ty in
     let%bind map, bind = update map bind in
     if equal_ty ann_ty bind.ty
     then (
       let%bind map, body = update map body in
-      make ~map (Let (Rec (n, ann_ty), v, bind, body)) body.ty)
+      make ~map (Let (Rec (n, Some ann_ty), v, bind, body)) body.ty)
     else
       error_s
         [%message "typecheck: unexpected type on letrec" (ann_ty : ty) (bind.ty : ty)]
+  | Let (Rec _, _, _, _) ->
+    error_s [%message "typecheck: missing type annotation on letrec"]
   | Let (Nonrec, v, bind, body) ->
     let%bind map, bind = update map bind in
     let map = Map.set map ~key:v ~data:bind.ty in
@@ -315,16 +330,19 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
       ~init:(String.Map.empty, String.Map.empty, String.Map.empty, [])
       ~f:(fun (map, structs, fields_env, acc) top ->
         match top.desc with
-        | Define (Rec (n, ann_ty), v, bind) ->
+        | Define (Rec (n, Some ann_ty), v, bind) ->
+          let%bind () = fail_if_tyvar ann_ty in
           let map = Map.set map ~key:v ~data:ann_ty in
           let%bind map, t = update map structs fields_env bind in
           if equal_ty ann_ty t.ty
           then (
-            let desc = Define (Rec (n, ann_ty), v, t) in
+            let desc = Define (Rec (n, Some ann_ty), v, t) in
             Ok (map, structs, fields_env, { desc; ty = t.ty; loc = top.loc } :: acc))
           else
             error_s
               [%message "typecheck: unexpected type on letrec" (ann_ty : ty) (t.ty : ty)]
+        | Define (Rec _, _, _) ->
+          error_s [%message "typecheck: missing type annotation on letrec"]
         | Define (Nonrec, v, bind) ->
           let%bind map, t = update map structs fields_env bind in
           let map = Map.set map ~key:v ~data:t.ty in

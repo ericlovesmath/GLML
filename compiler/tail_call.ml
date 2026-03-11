@@ -161,6 +161,8 @@ let placeholder_anf_for_ty (env : record_env) (ty : Stlc.ty) (loc : Lexer.loc)
          make ~env:nested_bindings (Record (s, args))
        | None -> error_s [%message "tail_call: unknown struct type" s])
     | TyArrow _ -> error_s [%message "tail_call: unexpected arrow in tail" (ty : Stlc.ty)]
+    | TyVar _ ->
+      error_s [%message "tail_call: type variables not supported" (ty : Stlc.ty)]
   in
   let%map term, bindings = build ty in
   List.fold_right

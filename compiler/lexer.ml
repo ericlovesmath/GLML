@@ -32,6 +32,7 @@ type token =
   | INT
   | FLOAT
   | TICK
+  | TYVAR of string
   | VEC of int
   | MAT of int * int
   | ADD
@@ -184,7 +185,13 @@ let read_lexeme (t : t) : token Or_error.t =
        (match peek t with
         | Some '&' -> consume LAND
         | _ -> error_s [%message "lexer: single & is invalid" (t.pos : pos)])
-     | '\'' -> consume TICK
+     | '\'' ->
+       skip t;
+       (match peek t with
+        | Some c when Char.is_alpha c ->
+          let s = read_while (fun c -> Char.is_alphanum c || String.mem "_'" c) t in
+          Ok (TYVAR s)
+        | _ -> Ok TICK)
      | '+' -> consume ADD
      | '-' ->
        skip t;
@@ -255,16 +262,16 @@ let%expect_test "lexer" =
   test "true false = -> ( ) . < >";
   test "{ } ; : , if then else let";
   test "in fun | match with { }";
-  test "bool int float ' 10 string_var vec mat";
-  test "+ - / * # <= >= % && || extern let type";
+  test "bool int float ' 'a 10 s_var let type";
+  test "+ - / * # <= >= % && || extern  vec2 mat3x3";
   test "1.23 0.45 6. -1.";
   [%expect
     {|
     (Ok (TRUE FALSE EQ ARROW LPAREN RPAREN DOT LANGLE RANGLE))
     (Ok (LCURLY RCURLY SEMI COLON COMMA IF THEN ELSE LET))
     (Ok (IN FUN BAR MATCH WITH LCURLY RCURLY))
-    (Ok (BOOL INT FLOAT TICK (NUMERIC 10) (ID string_var) (ID vec) (ID mat)))
-    (Ok (ADD SUB DIV MUL HASH LEQ GEQ PERCENT LAND LOR EXTERN LET TYPE))
+    (Ok (BOOL INT FLOAT TICK (TYVAR a) (NUMERIC 10) (ID s_var) LET TYPE))
+    (Ok (ADD SUB DIV MUL HASH LEQ GEQ PERCENT LAND LOR EXTERN (VEC 2) (MAT 3 3)))
     (Ok ((FLOAT_LIT 1.23) (FLOAT_LIT 0.45) (FLOAT_LIT 6) SUB (FLOAT_LIT 1)))
     |}];
   test "let{x:int}=match|a->fun->(f<x>*2)";
