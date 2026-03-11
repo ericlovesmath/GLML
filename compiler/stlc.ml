@@ -9,6 +9,7 @@ type ty =
   | TyMat of int * int
   | TyArrow of ty * ty
   | TyRecord of string
+  | TyVar of string
 [@@deriving equal]
 
 let rec sexp_of_ty = function
@@ -19,10 +20,11 @@ let rec sexp_of_ty = function
   | TyMat (x, y) -> List [ Atom "mat"; Atom (Int.to_string x); Atom (Int.to_string y) ]
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
   | TyRecord s -> Atom s
+  | TyVar v -> Atom ("'" ^ v)
 ;;
 
 type recur =
-  | Rec of int * ty
+  | Rec of int * ty option
   | Nonrec
 [@@deriving sexp_of]
 
@@ -33,7 +35,7 @@ type term_desc =
   | Bool of bool
   | Vec of int * term list
   | Mat of int * int * term list
-  | Lam of string * ty * term
+  | Lam of string * ty option * term
   | App of term * term
   | Let of recur * string * term * term
   | If of term * term * term
@@ -58,11 +60,13 @@ let rec sexp_of_term_desc = function
     List
       (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
        :: List.map ts ~f:sexp_of_term)
-  | Lam (v, ty, body) ->
-    List [ Atom "lambda"; List [ Atom v; sexp_of_ty ty ]; sexp_of_term body ]
+  | Lam (v, ty_opt, body) ->
+    let ty = Option.sexp_of_t sexp_of_ty ty_opt in
+    List [ Atom "lambda"; List [ Atom v; ty ]; sexp_of_term body ]
   | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
-  | Let (Rec (n, ty), v, bind, body) ->
-    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n); sexp_of_ty ty ] in
+  | Let (Rec (n, ty_opt), v, bind, body) ->
+    let ty = Option.sexp_of_t sexp_of_ty ty_opt in
+    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n); ty ] in
     List [ Atom "let"; rec_tag; Atom v; sexp_of_term bind; sexp_of_term body ]
   | Let (Nonrec, v, bind, body) ->
     List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
@@ -73,9 +77,8 @@ let rec sexp_of_term_desc = function
   | Builtin (b, ts) ->
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
   | Record fields ->
-    List
-      (Atom "record"
-       :: List.map fields ~f:(fun (f, t) -> List [ Atom f; sexp_of_term t ]))
+    let sexp_of_field (f, t) = List [ Atom f; sexp_of_term t ] in
+    List (Atom "record" :: List.map fields ~f:sexp_of_field)
   | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
 
 and sexp_of_term t = sexp_of_term_desc t.desc

@@ -43,6 +43,7 @@ val many : 'a t -> 'a list t
 val sep_by1 : 'a t -> 'b t -> 'b list t
 val sep_by : 'a t -> 'b t -> 'b list t
 val chainl1 : 'a t -> ('a -> 'a -> 'a) t -> 'a t
+val optional : 'a t -> 'a option t
 val tok : token -> token t
 val fail : string -> 'a t
 val fatal : string -> 'a t

@@ -14,6 +14,8 @@ let to_glsl_ty (ty : Stlc.ty) : ty Or_error.t =
   | TyRecord s -> Ok (TyStruct s)
   | TyArrow _ ->
     error_s [%message "translate: arrow types should not be translated" (ty : Stlc.ty)]
+  | TyVar _ ->
+    error_s [%message "translate: type variables should not be translated" (ty : Stlc.ty)]
 ;;
 
 let to_glsl_atom (a : Anf.atom) : term =
@@ -69,6 +71,8 @@ let rec placeholder_value_for_ty (env : record_env) (ty : Stlc.ty) : term Or_err
     Ok (App (s, fields))
   | TyArrow _ ->
     error_s [%message "translate: arrow types should not be in tail" (ty : Stlc.ty)]
+  | TyVar _ ->
+    error_s [%message "translate: type variables should not be in tail" (ty : Stlc.ty)]
 ;;
 
 let rec translate_set (env : record_env) (var : string) (anf : Tail_call.anf)

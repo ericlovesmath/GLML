@@ -31,6 +31,7 @@ type token =
   | INT
   | FLOAT
   | TICK
+  | TYVAR of string
   | VEC of int
   | MAT of int * int
   | ADD
