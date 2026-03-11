@@ -110,10 +110,8 @@ type constr =
   | IndexAccess of Lexer.loc * ty * int * ty (** Vector/Matrix indexing *)
 [@@deriving sexp_of]
 
-(** Generate a fresh type variable (e.g., 'v42). *)
 let fresh_tyvar () = TyVar (Utils.fresh "v")
 
-(** Apply a substitution to a type. *)
 let rec subst_ty (sub : substitution) (ty : ty) : ty =
   match ty with
   | TyVar v -> List.Assoc.find ~equal:String.equal sub v |> Option.value ~default:ty
@@ -121,7 +119,6 @@ let rec subst_ty (sub : substitution) (ty : ty) : ty =
   | TyArrow (f, x) -> TyArrow (subst_ty sub f, subst_ty sub x)
 ;;
 
-(** Apply a substitution to all type schemes in a context. *)
 let subst_context (sub : substitution) (ctx : context) : type_scheme String.Map.t =
   Map.map ctx ~f:(fun (vars, ty) ->
     let sub =
@@ -130,7 +127,6 @@ let subst_context (sub : substitution) (ctx : context) : type_scheme String.Map.
     vars, subst_ty sub ty)
 ;;
 
-(** Apply a substitution to all types within a list of constraints. *)
 let subst_constraints (sub : substitution) (con : constr list) : constr list =
   List.map con ~f:(function
     | Eq (loc, l, r) -> Eq (loc, subst_ty sub l, subst_ty sub r)
@@ -143,7 +139,7 @@ let subst_constraints (sub : substitution) (con : constr list) : constr list =
       IndexAccess (loc, subst_ty sub t, i, subst_ty sub ret))
 ;;
 
-(** Apply substitution to term for final typed AST. *)
+(** Apply substitution to term *)
 let rec subst_term (sub : substitution) (t : term) : term =
   let subst = subst_term sub in
   let (desc : term_desc) =
@@ -198,12 +194,12 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Or_error.t =
   match con with
   | [] -> return []
   | (loc, TyVar v, ty) :: con | (loc, ty, TyVar v) :: con ->
-    let rec has_infinite_type = function
+    let rec occurs_in = function
       | TyVar v' -> String.equal v v'
       | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ -> false
-      | TyArrow (ty, ty') -> has_infinite_type ty || has_infinite_type ty'
+      | TyArrow (ty, ty') -> occurs_in ty || occurs_in ty'
     in
-    if has_infinite_type ty
+    if occurs_in ty
     then
       error_s
         [%message
@@ -444,12 +440,10 @@ let rec gen_term structs fields_env ctx (t : Stlc.term) : (term * constr list) O
         return (arg' :: acc_args, constrs @ acc_constrs))
     in
     let args = List.rev args in
-    let ret_ty = fresh_tyvar () in
-    let arg1 = List.nth args 0 |> Option.map ~f:(fun a -> a.ty) in
-    let arg2 = List.nth args 1 |> Option.map ~f:(fun a -> a.ty) in
-    let arg3 = List.nth args 2 |> Option.map ~f:(fun a -> a.ty) in
+    let ty = fresh_tyvar () in
+    let arg_tys = List.map args ~f:(fun a -> a.ty) in
     let%bind builtin_constrs =
-      match b, arg1, arg2, arg3 with
+      match b, arg_tys with
       | ( ( Sin
           | Cos
           | Tan
@@ -465,38 +459,34 @@ let rec gen_term structs fields_env ctx (t : Stlc.term) : (term * constr list) O
           | Sign
           | Floor
           | Ceil )
-        , Some t1
-        , None
-        , None ) -> Ok [ HasClass (loc, GenType, t1); Eq (loc, ret_ty, t1) ]
-      | (Min | Max | Pow), Some t1, Some t2, None ->
-        Ok [ HasClass (loc, GenType, ret_ty); Broadcast (loc, t1, t2, ret_ty) ]
-      | Clamp, Some t1, Some t2, Some t3 ->
-        let temp = fresh_tyvar () in
+        , [ t ] ) -> Ok [ HasClass (loc, GenType, t); Eq (loc, ty, t) ]
+      | (Min | Max | Pow), [ t; t' ] ->
+        Ok [ HasClass (loc, GenType, ty); Broadcast (loc, t, t', ty) ]
+      | Clamp, [ t; t'; t'' ] ->
+        let tmp = fresh_tyvar () in
         Ok
-          [ HasClass (loc, GenType, ret_ty)
-          ; Broadcast (loc, t2, t3, temp)
-          ; Broadcast (loc, t1, temp, ret_ty)
+          [ HasClass (loc, GenType, ty)
+          ; Broadcast (loc, t', t'', tmp)
+          ; Broadcast (loc, t, tmp, ty)
           ]
-      | Mix, Some t1, Some t2, Some t3 ->
-        let temp = fresh_tyvar () in
+      | Mix, [ t; t'; t'' ] ->
+        let tmp = fresh_tyvar () in
         Ok
-          [ HasClass (loc, GenType, ret_ty)
-          ; Broadcast (loc, t1, t2, temp)
-          ; Broadcast (loc, temp, t3, ret_ty)
+          [ HasClass (loc, GenType, ty)
+          ; Broadcast (loc, t, t', tmp)
+          ; Broadcast (loc, tmp, t'', ty)
           ]
-      | Length, Some t1, None, None ->
-        Ok [ HasClass (loc, GenType, t1); Eq (loc, ret_ty, TyFloat) ]
-      | (Distance | Dot), Some t1, Some t2, None ->
-        Ok [ HasClass (loc, GenType, t1); Eq (loc, t1, t2); Eq (loc, ret_ty, TyFloat) ]
-      | Cross, Some t1, Some t2, None ->
-        Ok [ Eq (loc, t1, TyVec 3); Eq (loc, t2, TyVec 3); Eq (loc, ret_ty, TyVec 3) ]
-      | Normalize, Some t1, None, None ->
-        Ok [ HasClass (loc, GenType, t1); Eq (loc, ret_ty, t1) ]
+      | Length, [ t ] -> Ok [ HasClass (loc, GenType, t); Eq (loc, ty, TyFloat) ]
+      | (Distance | Dot), [ t; t' ] ->
+        Ok [ HasClass (loc, GenType, t); Eq (loc, t, t'); Eq (loc, ty, TyFloat) ]
+      | Cross, [ t; t' ] ->
+        Ok [ Eq (loc, t, TyVec 3); Eq (loc, t', TyVec 3); Eq (loc, ty, TyVec 3) ]
+      | Normalize, [ t ] -> Ok [ HasClass (loc, GenType, t); Eq (loc, ty, t) ]
       | _ ->
         error_s
           [%message "invalid builtin arguments" (loc : Lexer.loc) (b : Glsl.builtin)]
     in
-    make (Builtin (b, args)) ret_ty (builtin_constrs @ constrs_args)
+    make (Builtin (b, args)) ty (builtin_constrs @ constrs_args)
   | Vec (n, args) ->
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
