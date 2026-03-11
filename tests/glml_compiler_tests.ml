@@ -18,9 +18,9 @@ let%expect_test "simple tests for compile_stlc" =
     out vec4 fragColor;
     vec3 main_pure(vec2 coord_0) {
         float x_1 = 2.;
-        float anf_2 = (12. * x_1);
-        float anf_3 = (anf_2 + 10.);
-        return vec3(anf_3, 0., 0.);
+        float anf_4 = (12. * x_1);
+        float anf_5 = (anf_4 + 10.);
+        return vec3(anf_5, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -34,8 +34,8 @@ let%expect_test "simple tests for compile_stlc" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord_0) {
-        bool anf_1 = (true && false);
-        if (anf_1) {
+        bool anf_2 = (true && false);
+        if (anf_2) {
             return vec3(1., 0., 0.);
         } else {
             return vec3(0., 0., 0.);
@@ -62,8 +62,8 @@ let%expect_test "simple tests for compile_stlc" =
         return (x_1 + n);
     }
     vec3 main_pure(vec2 u_2) {
-        float anf_3 = f_0(10.);
-        return vec3(anf_3, 0., 0.);
+        float anf_5 = f_0(10.);
+        return vec3(anf_5, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -86,8 +86,8 @@ let%expect_test "simple tests for compile_stlc" =
         return (x_1 + n);
     }
     vec3 main_pure(vec2 u_2) {
-        float anf_3 = f_0(10.);
-        return vec3(anf_3, 0., 0.);
+        float anf_5 = f_0(10.);
+        return vec3(anf_5, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -132,8 +132,8 @@ let%expect_test "indexing" =
     out vec4 fragColor;
     vec3 main_pure(vec2 coord_0) {
         vec3 v_1 = vec3(1., 2., 3.);
-        float anf_2 = v_1[0];
-        return vec3(anf_2, 0., 0.);
+        float anf_3 = v_1[0];
+        return vec3(anf_3, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -154,10 +154,10 @@ let%expect_test "indexing" =
     vec3 main_pure(vec2 coord_0) {
         mat3 m_1 = mat3(1., 0., 0., 0., 1., 0., 0., 0., 1.);
         vec3 c_2 = m_1[0];
-        float anf_3 = c_2[0];
-        float anf_4 = c_2[1];
-        float anf_5 = c_2[2];
-        return vec3(anf_3, anf_4, anf_5);
+        float anf_7 = c_2[0];
+        float anf_8 = c_2[1];
+        float anf_9 = c_2[2];
+        return vec3(anf_7, anf_8, anf_9);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -165,7 +165,7 @@ let%expect_test "indexing" =
     }
     |}];
   test_term "[0.0, 0.0, 0.0].4";
-  [%expect {| (typecheck: "vec index out of bounds" (n 3) (i 4) (loc (1:27 - 1:44))) |}]
+  [%expect {| ("vec index out of bounds" (loc (1:27 - 1:44)) (n 3) (i 4)) |}]
 ;;
 
 let%expect_test "builtins" =
@@ -177,10 +177,10 @@ let%expect_test "builtins" =
     out vec4 fragColor;
     vec3 main_pure(vec2 coord_0) {
         vec3 v_1 = vec3(1., 2., 3.);
-        float anf_2 = sin(1.);
-        float anf_3 = dot(v_1, v_1);
-        float anf_4 = length(v_1);
-        return vec3(anf_2, anf_3, anf_4);
+        float anf_5 = sin(1.);
+        float anf_6 = dot(v_1, v_1);
+        float anf_7 = length(v_1);
+        return vec3(anf_5, anf_6, anf_7);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -194,9 +194,9 @@ let%expect_test "builtins" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord_0) {
-        vec3 anf_1 = vec3(1., 2., 3.);
-        vec3 anf_2 = vec3(0., 2., 5.);
-        return cross(anf_1, anf_2);
+        vec3 anf_2 = vec3(1., 2., 3.);
+        vec3 anf_3 = vec3(0., 2., 5.);
+        return cross(anf_2, anf_3);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -205,10 +205,7 @@ let%expect_test "builtins" =
     |}];
   test_term "#cross([ 1.0, 1.0 ], [ 0.0, 0.0 ])";
   [%expect
-    {|
-    (typecheck: "invalid geometric call" (name Cross) (tys ((vec 2) (vec 2)))
-     (loc (1:27 - 1:61)))
-    |}]
+    {| ("typecheck: type mismatch" (loc (1:27 - 1:61)) (ty (vec 2)) (ty' (vec 3))) |}]
 ;;
 
 let%expect_test "multi argument functions / lambdas" =
@@ -230,9 +227,9 @@ let%expect_test "multi argument functions / lambdas" =
         return (x_4 - y_5);
     }
     vec3 main_pure(vec2 u_6) {
-        float anf_7 = f_0(10., 5.);
-        float anf_8 = g_3(0., 0.);
-        return vec3(anf_7, anf_8, 0.);
+        float anf_13 = f_0(10., 5.);
+        float anf_14 = g_3(0., 0.);
+        return vec3(anf_13, anf_14, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -255,15 +252,15 @@ let%expect_test "lambda lifting" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float add_3_5(float x_1, float y_2, float z_4) {
-        float anf_6 = (x_1 + y_2);
-        return (anf_6 + z_4);
+    float add_3_8(float x_1, float y_2, float z_4) {
+        float anf_9 = (x_1 + y_2);
+        return (anf_9 + z_4);
     }
     vec3 main_pure(vec2 u_0) {
         float x_1 = 10.;
         float y_2 = 5.;
-        float anf_7 = add_3_5(x_1, y_2, 1.);
-        return vec3(anf_7, 0., 0.);
+        float anf_10 = add_3_8(x_1, y_2, 1.);
+        return vec3(anf_10, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -284,15 +281,15 @@ let%expect_test "lambda lifting" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float g_3_6(float x_2, float y_4) {
+    float g_3_9(float x_2, float y_4) {
         return (x_2 + y_4);
     }
-    vec3 f_1_5(float x_2) {
-        float anf_7 = g_3_6(x_2, 1.);
-        return vec3(anf_7, 0., 0.);
+    vec3 f_1_8(float x_2) {
+        float anf_10 = g_3_9(x_2, 1.);
+        return vec3(anf_10, 0., 0.);
     }
     vec3 main_pure(vec2 u_0) {
-        return f_1_5(10.);
+        return f_1_8(10.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -331,18 +328,18 @@ let%expect_test "recursive functions" =
     precision highp float;
     out vec4 fragColor;
     int fact_0(int n_1, int acc_2) {
-        int _iter_8 = 0;
-        while ((_iter_8 < 1000)) {
-            bool anf_5 = (n_1 == 0);
-            if (anf_5) {
+        int _iter_15 = 0;
+        while ((_iter_15 < 1000)) {
+            bool anf_12 = (n_1 == 0);
+            if (anf_12) {
                 return acc_2;
             } else {
-                int anf_6 = (n_1 - 1);
-                int anf_7 = (acc_2 * n_1);
-                n_1 = anf_6;
-                acc_2 = anf_7;
-                int _iter_inc_9 = (_iter_8 + 1);
-                _iter_8 = _iter_inc_9;
+                int anf_13 = (n_1 - 1);
+                int anf_14 = (acc_2 * n_1);
+                n_1 = anf_13;
+                acc_2 = anf_14;
+                int _iter_inc_16 = (_iter_15 + 1);
+                _iter_15 = _iter_inc_16;
                 continue;
             }
         }
@@ -395,10 +392,10 @@ let%expect_test "structs" =
     vec3 main_pure(vec2 u_3) {
         point p_4 = point(1., 2.);
         color c_5 = make_red_0(p_4);
-        float anf_6 = c_5.r;
-        float anf_7 = c_5.g;
-        float anf_8 = c_5.b;
-        return vec3(anf_6, anf_7, anf_8);
+        float anf_11 = c_5.r;
+        float anf_12 = c_5.g;
+        float anf_13 = c_5.b;
+        return vec3(anf_11, anf_12, anf_13);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -450,10 +447,10 @@ let%expect_test "structs" =
     vec3 main_pure(vec2 u_3) {
         point p_4 = point(1., 2.);
         color c_5 = make_red_0(p_4);
-        float anf_6 = c_5.r;
-        float anf_7 = c_5.g;
-        float anf_8 = c_5.b;
-        return vec3(anf_6, anf_7, anf_8);
+        float anf_10 = c_5.r;
+        float anf_11 = c_5.g;
+        float anf_12 = c_5.b;
+        return vec3(anf_10, anf_11, anf_12);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -468,7 +465,7 @@ let%expect_test "structs" =
       let p = { x = 1.0, z = 2.0 } in
       [p.x, p.x, p.x]
     |};
-  [%expect {| (typecheck: "missing field" y (loc (5:15 - 5:35))) |}]
+  [%expect {| ("missing field" (loc (5:15 - 5:35)) y) |}]
 ;;
 
 let%expect_test "nested structs" =
@@ -509,20 +506,20 @@ let%expect_test "nested structs" =
     segment make_seg_0(float u_1) {
         segment s_2 = segment(point(0., 0.), point(0., 0.));
         if (true) {
-            point anf_6 = point(0., 0.);
-            point anf_7 = point(1., 1.);
-            s_2 = segment(anf_6, anf_7);
-        } else {
-            point anf_8 = point(1., 1.);
             point anf_9 = point(0., 0.);
-            s_2 = segment(anf_8, anf_9);
+            point anf_10 = point(1., 1.);
+            s_2 = segment(anf_9, anf_10);
+        } else {
+            point anf_11 = point(1., 1.);
+            point anf_12 = point(0., 0.);
+            s_2 = segment(anf_11, anf_12);
         }
         return s_2;
     }
     vec3 main_pure(vec2 u_3) {
         segment seg_4 = make_seg_0(1.);
-        point anf_10 = seg_4.end;
-        float c_5 = anf_10.x;
+        point anf_13 = seg_4.end;
+        float c_5 = anf_13.x;
         return vec3(c_5, c_5, c_5);
     }
     void main() {
