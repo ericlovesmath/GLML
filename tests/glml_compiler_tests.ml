@@ -465,7 +465,10 @@ let%expect_test "structs" =
       let p = { x = 1.0, z = 2.0 } in
       [p.x, p.x, p.x]
     |};
-  [%expect {| ("missing field" (loc (5:15 - 5:35)) y) |}]
+  [%expect {|
+    ("record does not match any known struct" (loc (5:15 - 5:35))
+     (provided_fields (x z)))
+    |}]
 ;;
 
 let%expect_test "nested structs" =
