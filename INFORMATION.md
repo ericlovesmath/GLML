@@ -9,6 +9,8 @@
 - Better benchmarking tests
 - Defunctionalization?
 - Implicit error field added to every function to propagate error color back
+- Move mod to nonbinop version as that is a gentype, add more builtins
+- Rewrite examples to not have to explicitly type everything
 
 # Remaining Compilation Passes
 

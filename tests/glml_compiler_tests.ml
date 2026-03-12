@@ -465,7 +465,8 @@ let%expect_test "structs" =
       let p = { x = 1.0, z = 2.0 } in
       [p.x, p.x, p.x]
     |};
-  [%expect {|
+  [%expect
+    {|
     ("record does not match any known struct" (loc (5:15 - 5:35))
      (provided_fields (x z)))
     |}]
@@ -524,6 +525,154 @@ let%expect_test "nested structs" =
         point anf_13 = seg_4.end;
         float c_5 = anf_13.x;
         return vec3(c_5, c_5, c_5);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "monomorphization tests" =
+  test
+    {|
+    let id x = x
+    let main (coord : vec2) =
+      let a = id 1.0 in
+      let b = id true in
+      if b then [a, 0.0, 0.0] else [0.0, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    bool id_0_bool_to_bool_10(bool x_1) {
+        return x_1;
+    }
+    float id_0_float_to_float_11(float x_1) {
+        return x_1;
+    }
+    vec3 main_pure(vec2 coord_2) {
+        float a_3 = id_0_float_to_float_11(1.);
+        bool b_4 = id_0_bool_to_bool_10(true);
+        if (b_4) {
+            return vec3(a_3, 0., 0.);
+        } else {
+            return vec3(0., 0., 0.);
+        }
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+  |}];
+  test
+    {|
+    let main (coord : vec2) =
+      let id x = x in
+      let a = id 1.0 in
+      let b = id true in
+      if b then [a, 0.0, 0.0] else [0.0, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    bool id_1_bool_to_bool_10_12(bool x_2) {
+        return x_2;
+    }
+    float id_1_float_to_float_11_13(float x_2) {
+        return x_2;
+    }
+    vec3 main_pure(vec2 coord_0) {
+        float a_3 = id_1_float_to_float_11_13(1.);
+        bool b_4 = id_1_bool_to_bool_10_12(true);
+        if (b_4) {
+            return vec3(a_3, 0., 0.);
+        } else {
+            return vec3(0., 0., 0.);
+        }
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+  |}];
+  (* Unused polymorphic function *)
+  test
+    {|
+    let id x = x
+    let main (coord : vec2) = [1.0, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 main_pure(vec2 coord_2) {
+        return vec3(1., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+  |}];
+  (* Validate no duplication of polymorphic function *)
+  test
+    {|
+    let main (coord : vec2) =
+      let id x = x in
+      let a = id 1.0 in
+      let b = id 2.0 in
+      [a, b, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    float id_1_float_to_float_10_11(float x_2) {
+        return x_2;
+    }
+    vec3 main_pure(vec2 coord_0) {
+        float a_3 = id_1_float_to_float_10_11(1.);
+        float b_4 = id_1_float_to_float_10_11(2.);
+        return vec3(a_3, b_4, 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "advanced monomorphization example" =
+  test
+    {|
+    let id x = x
+    let const x y = x
+    let main (coord : vec2) =
+      let a = id 1.0 in
+      let b = const 2.0 true in
+      [a, b, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    float const_2_float_to_bool_to_float_17(float x_3, bool y_4) {
+        return x_3;
+    }
+    float id_0_float_to_float_18(float x_1) {
+        return x_1;
+    }
+    vec3 main_pure(vec2 coord_5) {
+        float a_6 = id_0_float_to_float_18(1.);
+        float b_7 = const_2_float_to_bool_to_float_17(2., true);
+        return vec3(a_6, b_7, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
