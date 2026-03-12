@@ -11,6 +11,7 @@
    stlc
    uniquify
    typecheck
+   monomorphize
    uncurry
    lambda_lift
    anf

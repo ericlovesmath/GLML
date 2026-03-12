@@ -42,4 +42,10 @@ type top =
 
 type t = Program of top list [@@deriving sexp_of]
 
+type substitution = (string * Stlc.ty) list
+
+(* TODO: Add documentation to functions below (used in monomorphization) *)
+
+val subst_ty : substitution -> Stlc.ty -> Stlc.ty
+val subst_term : substitution -> term -> term
 val typecheck : Stlc.t -> t Or_error.t

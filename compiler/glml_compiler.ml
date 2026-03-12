@@ -7,6 +7,7 @@ module Passes = struct
     | Stlc of Stlc.t
     | Uniquify of Stlc.t
     | Typecheck of Typecheck.t
+    | Monomorphize of Typecheck.t
     | Uncurry of Uncurry.t
     | Lambda_lift of Lambda_lift.t
     | Anf of Anf.t
@@ -21,6 +22,7 @@ module Passes = struct
     | Stlc -> Stlc.sexp_of_t
     | Uniquify -> Stlc.sexp_of_t
     | Typecheck -> Typecheck.sexp_of_t
+    | Monomorphize -> Typecheck.sexp_of_t
     | Uncurry -> Uncurry.sexp_of_t
     | Lambda_lift -> Lambda_lift.sexp_of_t
     | Anf -> Anf.sexp_of_t
@@ -60,6 +62,8 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   trace Uniquify t;
   let%bind t = Typecheck.typecheck t in
   trace Typecheck t;
+  let%bind t = Monomorphize.monomorphize t in
+  trace Monomorphize t;
   let t = Uncurry.uncurry t in
   trace Uncurry t;
   let%bind t = Lambda_lift.lift t in
