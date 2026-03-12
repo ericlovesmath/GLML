@@ -200,8 +200,9 @@ let make_lambdas params (body : term) =
 let recur_tag_t =
   between
     `Paren
-    (let%map ty = tok REC *> optional (tok COLON *> ty_p) in
-     Rec (1000, ty))
+    (let%map ty = tok REC *> tok COLON *> ty_p in
+     Rec (1000, Some ty))
+  <|> tok REC *> return (Rec (1000, None))
   <|> return Nonrec
   <??> "recur_tag"
 ;;
@@ -426,7 +427,7 @@ let%expect_test "term parse tests" =
   test "let f (x : bool) (y : bool) = x && y in f";
   test "let f = fun (x : bool) (y : bool) -> x && y in f";
   test "let f x y = x && y in f";
-  test "let (rec) f x = f x in f";
+  test "let rec f x = f x in f";
   test "let (rec: 'a) f (x: 'b) = f x in f";
   [%expect
     {|
