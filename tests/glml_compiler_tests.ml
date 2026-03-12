@@ -328,18 +328,18 @@ let%expect_test "recursive functions" =
     precision highp float;
     out vec4 fragColor;
     int fact_0(int n_1, int acc_2) {
-        int _iter_15 = 0;
-        while ((_iter_15 < 1000)) {
-            bool anf_12 = (n_1 == 0);
-            if (anf_12) {
+        int _iter_16 = 0;
+        while ((_iter_16 < 1000)) {
+            bool anf_13 = (n_1 == 0);
+            if (anf_13) {
                 return acc_2;
             } else {
-                int anf_13 = (n_1 - 1);
-                int anf_14 = (acc_2 * n_1);
-                n_1 = anf_13;
-                acc_2 = anf_14;
-                int _iter_inc_16 = (_iter_15 + 1);
-                _iter_15 = _iter_inc_16;
+                int anf_14 = (n_1 - 1);
+                int anf_15 = (acc_2 * n_1);
+                n_1 = anf_14;
+                acc_2 = anf_15;
+                int _iter_inc_17 = (_iter_16 + 1);
+                _iter_16 = _iter_inc_17;
                 continue;
             }
         }
