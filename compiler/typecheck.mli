@@ -27,6 +27,7 @@ and term =
 [@@deriving sexp_of]
 
 type top_desc =
+  (** TODO: This recur doesn't need to be here anymore, or at least doesn't need ty *)
   | Define of recur * string * term
   | Extern of string
   | RecordDef of string * (string * ty) list

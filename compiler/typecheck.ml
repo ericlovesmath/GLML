@@ -265,7 +265,7 @@ let resolve_constraints structs (constrs : constr list)
        | TyFloat, TyFloat -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
        | TyInt, TyInt -> aux deferred ((loc, ret, TyInt) :: eqs) rest
        | TyVec n, TyVec n' when n = n' -> aux deferred ((loc, ret, TyVec n) :: eqs) rest
-       | TyFloat, TyVec n | TyVec n, TyFloat | TyInt, TyVec n | TyVec n, TyInt ->
+       | TyFloat, TyVec n | TyVec n, TyFloat ->
          aux deferred ((loc, ret, TyVec n) :: eqs) rest
        | TyMat (x, y), TyMat (w, z) when x = w && y = z ->
          aux deferred ((loc, ret, TyMat (x, y)) :: eqs) rest
@@ -282,10 +282,12 @@ let resolve_constraints structs (constrs : constr list)
          aux deferred ((loc, ret, TyMat (x, y)) :: eqs) rest
        | TyMat (x, y), TyVec n when y = n ->
          aux deferred ((loc, ret, TyVec x) :: eqs) rest
+       | TyVec n, TyMat (x, y) when n = x ->
+         aux deferred ((loc, ret, TyVec y) :: eqs) rest
        | TyFloat, TyFloat -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
        | TyInt, TyInt -> aux deferred ((loc, ret, TyInt) :: eqs) rest
        | TyVec n, TyVec n' when n = n' -> aux deferred ((loc, ret, TyVec n) :: eqs) rest
-       | TyFloat, TyVec n | TyVec n, TyFloat | TyInt, TyVec n | TyVec n, TyInt ->
+       | TyFloat, TyVec n | TyVec n, TyFloat ->
          aux deferred ((loc, ret, TyVec n) :: eqs) rest
        | _ ->
          error_s
@@ -356,8 +358,43 @@ let rec is_value (t : Stlc.term) : bool =
   | App _ | Let _ | If _ | Bop _ | Builtin _ -> false
 ;;
 
+(** Infer the type of a binding (used between top-level Define and inner Let).
+    Returns [substituted term * resolved type * new context] *)
+let rec infer_binding
+          (structs : substitution String.Map.t)
+          (ctx : context)
+          (loc : Lexer.loc)
+          (bind_stlc : Stlc.term)
+          (recur : recur)
+          (v : string)
+  : (term * ty * context) Or_error.t
+  =
+  let ty_v_opt =
+    match recur with
+    | Nonrec -> None
+    | Rec (_, ty_ann) -> Some (Option.value ty_ann ~default:(fresh_tyvar ()))
+  in
+  let ctx_gen =
+    match ty_v_opt with
+    | None -> ctx
+    | Some ty_v -> Map.set ctx ~key:v ~data:([], ty_v)
+  in
+  let%bind bind, constrs_bind = gen_term structs ctx_gen bind_stlc in
+  let constrs =
+    match ty_v_opt with
+    | None -> constrs_bind
+    | Some ty_v -> Eq (loc, ty_v, bind.ty) :: constrs_bind
+  in
+  let%bind sub_bind = solve structs constrs in
+  let ty_bind = subst_ty sub_bind bind.ty in
+  let bind = subst_term sub_bind bind in
+  let ctx = subst_context sub_bind ctx in
+  let scheme = if is_value bind_stlc then generalize ctx [] ty_bind else [], ty_bind in
+  let ctx = Map.set ctx ~key:v ~data:scheme in
+  Ok (bind, ty_bind, ctx)
+
 (** Generate typed term and constraints from STLC term. *)
-let rec gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
+and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
   let loc = t.loc in
   let make desc ty constrs = Ok (({ desc; ty; loc } : term), constrs) in
   match t.desc with
@@ -389,34 +426,13 @@ let rec gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
     let constrs = Eq (loc, f.ty, TyArrow (x.ty, ret_ty)) :: (constrs_f @ constrs_x) in
     make (App (f, x)) ret_ty constrs
   | Let (Nonrec, v, bind, body) ->
-    let%bind bind', constrs_bind = gen_term structs ctx bind in
-    let%bind sub_bind = solve structs constrs_bind in
-    let ty_bind = subst_ty sub_bind bind'.ty in
-    let ctx_subbed = subst_context sub_bind ctx in
-    let scheme =
-      if is_value bind then generalize ctx_subbed [] ty_bind else [], ty_bind
-    in
-    let ctx' = Map.set ctx_subbed ~key:v ~data:scheme in
-    let%bind body, constrs_body = gen_term structs ctx' body in
-    make (Let (Nonrec, v, bind', body)) body.ty (constrs_bind @ constrs_body)
+    let%bind bind, _, ctx = infer_binding structs ctx loc bind Nonrec v in
+    let%bind body, constrs_body = gen_term structs ctx body in
+    make (Let (Nonrec, v, bind, body)) body.ty constrs_body
   | Let (Rec (n, ty_ann), v, bind, body) ->
-    let ty_v =
-      match ty_ann with
-      | Some t -> t
-      | None -> fresh_tyvar ()
-    in
-    let ctx' = Map.set ctx ~key:v ~data:([], ty_v) in
-    let%bind bind', constrs_bind = gen_term structs ctx' bind in
-    let%bind sub_bind = solve structs (Eq (loc, ty_v, bind'.ty) :: constrs_bind) in
-    let ty_bind = subst_ty sub_bind bind'.ty in
-    let ctx_subbed = subst_context sub_bind ctx in
-    let scheme =
-      if is_value bind then generalize ctx_subbed [] ty_bind else [], ty_bind
-    in
-    let ctx = Map.set ctx_subbed ~key:v ~data:scheme in
-    let%bind body', constrs_body = gen_term structs ctx body in
-    let constrs = (Eq (loc, ty_v, bind'.ty) :: constrs_bind) @ constrs_body in
-    make (Let (Rec (n, ty_ann), v, bind', body')) body'.ty constrs
+    let%bind bind, _, ctx = infer_binding structs ctx loc bind (Rec (n, ty_ann)) v in
+    let%bind body, constrs_body = gen_term structs ctx body in
+    make (Let (Rec (n, ty_ann), v, bind, body)) body.ty constrs_body
   | If (c, t, e) ->
     let%bind c, constrs_c = gen_term structs ctx c in
     let%bind t, constrs_t = gen_term structs ctx t in
@@ -431,7 +447,12 @@ let rec gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
     let ret_ty = fresh_tyvar () in
     let op_constrs =
       match op with
-      | Add | Sub | Mod -> [ Broadcast (loc, l.ty, r.ty, ret_ty) ]
+      | Add | Sub -> [ Broadcast (loc, l.ty, r.ty, ret_ty) ]
+      | Mod ->
+        [ HasClass (loc, GenType, l.ty)
+        ; HasClass (loc, GenType, r.ty)
+        ; Broadcast (loc, l.ty, r.ty, ret_ty)
+        ]
       | Mul | Div -> [ MulBroadcast (loc, l.ty, r.ty, ret_ty) ]
       | Eq ->
         [ HasClass (loc, Equatable, l.ty)
@@ -569,44 +590,14 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
       ~f:(fun (ctx, structs, acc) top ->
         match top.desc with
         | Define (Rec (n, ty_ann), v, bind) ->
-          let ty_v =
-            match ty_ann with
-            | Some t -> t
-            | None -> fresh_tyvar ()
+          let%bind bind, ty, ctx =
+            infer_binding structs ctx top.loc bind (Rec (n, ty_ann)) v
           in
-          let ctx' = Map.set ctx ~key:v ~data:([], ty_v) in
-          let%bind bind', constrs_bind = gen_term structs ctx' bind in
-          let%bind sub_bind =
-            solve structs (Eq (top.loc, ty_v, bind'.ty) :: constrs_bind)
-          in
-          let ty_bind = subst_ty sub_bind bind'.ty in
-          let ctx_subbed = subst_context sub_bind ctx in
-          let scheme =
-            if is_value bind then generalize ctx_subbed [] ty_bind else [], ty_bind
-          in
-          let ctx = Map.set ctx_subbed ~key:v ~data:scheme in
-          let top =
-            { desc = Define (Rec (n, ty_ann), v, subst_term sub_bind bind')
-            ; ty = ty_bind
-            ; loc = top.loc
-            }
-          in
+          let top = { desc = Define (Rec (n, ty_ann), v, bind); ty; loc = top.loc } in
           Ok (ctx, structs, top :: acc)
         | Define (Nonrec, v, bind) ->
-          let%bind bind', constrs_bind = gen_term structs ctx bind in
-          let%bind sub_bind = solve structs constrs_bind in
-          let ty_bind = subst_ty sub_bind bind'.ty in
-          let ctx_subbed = subst_context sub_bind ctx in
-          let scheme =
-            if is_value bind then generalize ctx_subbed [] ty_bind else [], ty_bind
-          in
-          let ctx = Map.set ctx_subbed ~key:v ~data:scheme in
-          let top =
-            { desc = Define (Nonrec, v, subst_term sub_bind bind')
-            ; ty = ty_bind
-            ; loc = top.loc
-            }
-          in
+          let%bind bind, ty, ctx = infer_binding structs ctx top.loc bind Nonrec v in
+          let top = { desc = Define (Nonrec, v, bind); ty; loc = top.loc } in
           Ok (ctx, structs, top :: acc)
         | Extern (ty, v) ->
           let ctx = Map.set ctx ~key:v ~data:([], ty) in
