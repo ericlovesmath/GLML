@@ -108,6 +108,7 @@ type constr =
   (** Scalar-vector broadcasting (e.g. float + vec3) *)
   | MulBroadcast of Lexer.loc * ty * ty * ty (** Matrix multiplication rules *)
   | IndexAccess of Lexer.loc * ty * int * ty (** Vector/Matrix indexing *)
+  | FieldAccess of Lexer.loc * ty * string * ty (** Field access on a record *)
 [@@deriving sexp_of]
 
 let fresh_tyvar () = TyVar (Utils.fresh "v")
@@ -136,7 +137,9 @@ let subst_constraints (sub : substitution) (con : constr list) : constr list =
     | MulBroadcast (loc, l, r, ret) ->
       MulBroadcast (loc, subst_ty sub l, subst_ty sub r, subst_ty sub ret)
     | IndexAccess (loc, t, i, ret) ->
-      IndexAccess (loc, subst_ty sub t, i, subst_ty sub ret))
+      IndexAccess (loc, subst_ty sub t, i, subst_ty sub ret)
+    | FieldAccess (loc, t, f, ret) ->
+      FieldAccess (loc, subst_ty sub t, f, subst_ty sub ret))
 ;;
 
 (** Apply substitution to term *)
@@ -177,7 +180,8 @@ let ftv_of_constraint (con : constr) : String.Set.t =
   | HasClass (_, _, ty) -> ftv_of_ty ty
   | Broadcast (_, l, r, ret) | MulBroadcast (_, l, r, ret) ->
     String.Set.union_list [ ftv_of_ty l; ftv_of_ty r; ftv_of_ty ret ]
-  | IndexAccess (_, t, _, ret) -> Set.union (ftv_of_ty t) (ftv_of_ty ret)
+  | IndexAccess (_, t, _, ret) | FieldAccess (_, t, _, ret) ->
+    Set.union (ftv_of_ty t) (ftv_of_ty ret)
 ;;
 
 (** Generalize a type by quantifying variables not in context or deferred constraints. *)
@@ -236,7 +240,7 @@ let check_class (cls : type_class) (ty : ty) : bool =
 ;;
 
 (** Resolve GLSL overloading constraints using concrete types. *)
-let resolve_constraints (constrs : constr list)
+let resolve_constraints structs (constrs : constr list)
   : (constr list * (Lexer.loc * ty * ty) list) Or_error.t
   =
   let rec aux deferred eqs = function
@@ -303,14 +307,28 @@ let resolve_constraints (constrs : constr list)
              [%message "mat index out of bounds" (loc : Lexer.loc) (x : int) (i : int)]
        | TyVar _ -> aux (IndexAccess (loc, t, i, ret) :: deferred) eqs rest
        | ty -> error_s [%message "expected vec or mat" (loc : Lexer.loc) (ty : ty)])
+    | FieldAccess (loc, ty, f, ret) :: rest ->
+      (match ty with
+       | TyVar _ -> aux (FieldAccess (loc, ty, f, ret) :: deferred) eqs rest
+       | TyRecord struct_name ->
+         (match Map.find structs struct_name with
+          | None -> error_s [%message "unknown struct" (loc : Lexer.loc) struct_name]
+          | Some fields ->
+            (match List.Assoc.find fields ~equal:String.equal f with
+             | None ->
+               error_s
+                 [%message "field not found in struct" (loc : Lexer.loc) f struct_name]
+             | Some field_ty -> aux deferred ((loc, ret, field_ty) :: eqs) rest))
+       | ty ->
+         error_s [%message "field access on non-record type" (loc : Lexer.loc) (ty : ty)])
   in
   aux [] [] constrs
 ;;
 
 (** Solve a set of constraints to produce a substitution. *)
-let solve (constrs : constr list) : substitution Or_error.t =
+let solve structs (constrs : constr list) : substitution Or_error.t =
   let rec go sub constrs =
-    let%bind deferred, eqs = resolve_constraints constrs in
+    let%bind deferred, eqs = resolve_constraints structs constrs in
     if List.is_empty eqs
     then
       if List.is_empty deferred
@@ -339,7 +357,7 @@ let rec is_value (t : Stlc.term) : bool =
 ;;
 
 (** Generate typed term and constraints from STLC term. *)
-let rec gen_term structs fields_env ctx (t : Stlc.term) : (term * constr list) Or_error.t =
+let rec gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
   let loc = t.loc in
   let make desc ty constrs = Ok (({ desc; ty; loc } : term), constrs) in
   match t.desc with
@@ -362,24 +380,24 @@ let rec gen_term structs fields_env ctx (t : Stlc.term) : (term * constr list) O
       | None -> fresh_tyvar ()
     in
     let ctx = Map.set ctx ~key:v ~data:([], ty_v) in
-    let%bind body, constrs = gen_term structs fields_env ctx body in
+    let%bind body, constrs = gen_term structs ctx body in
     make (Lam (v, ty_v, body)) (TyArrow (ty_v, body.ty)) constrs
   | App (f, x) ->
-    let%bind f, constrs_f = gen_term structs fields_env ctx f in
-    let%bind x, constrs_x = gen_term structs fields_env ctx x in
+    let%bind f, constrs_f = gen_term structs ctx f in
+    let%bind x, constrs_x = gen_term structs ctx x in
     let ret_ty = fresh_tyvar () in
     let constrs = Eq (loc, f.ty, TyArrow (x.ty, ret_ty)) :: (constrs_f @ constrs_x) in
     make (App (f, x)) ret_ty constrs
   | Let (Nonrec, v, bind, body) ->
-    let%bind bind', constrs_bind = gen_term structs fields_env ctx bind in
-    let%bind sub_bind = solve constrs_bind in
+    let%bind bind', constrs_bind = gen_term structs ctx bind in
+    let%bind sub_bind = solve structs constrs_bind in
     let ty_bind = subst_ty sub_bind bind'.ty in
     let ctx_subbed = subst_context sub_bind ctx in
     let scheme =
       if is_value bind then generalize ctx_subbed [] ty_bind else [], ty_bind
     in
     let ctx' = Map.set ctx_subbed ~key:v ~data:scheme in
-    let%bind body, constrs_body = gen_term structs fields_env ctx' body in
+    let%bind body, constrs_body = gen_term structs ctx' body in
     make (Let (Nonrec, v, bind', body)) body.ty (constrs_bind @ constrs_body)
   | Let (Rec (n, ty_ann), v, bind, body) ->
     let ty_v =
@@ -388,28 +406,28 @@ let rec gen_term structs fields_env ctx (t : Stlc.term) : (term * constr list) O
       | None -> fresh_tyvar ()
     in
     let ctx' = Map.set ctx ~key:v ~data:([], ty_v) in
-    let%bind bind', constrs_bind = gen_term structs fields_env ctx' bind in
-    let%bind sub_bind = solve (Eq (loc, ty_v, bind'.ty) :: constrs_bind) in
+    let%bind bind', constrs_bind = gen_term structs ctx' bind in
+    let%bind sub_bind = solve structs (Eq (loc, ty_v, bind'.ty) :: constrs_bind) in
     let ty_bind = subst_ty sub_bind bind'.ty in
     let ctx_subbed = subst_context sub_bind ctx in
     let scheme =
       if is_value bind then generalize ctx_subbed [] ty_bind else [], ty_bind
     in
     let ctx = Map.set ctx_subbed ~key:v ~data:scheme in
-    let%bind body', constrs_body = gen_term structs fields_env ctx body in
+    let%bind body', constrs_body = gen_term structs ctx body in
     let constrs = (Eq (loc, ty_v, bind'.ty) :: constrs_bind) @ constrs_body in
     make (Let (Rec (n, ty_ann), v, bind', body')) body'.ty constrs
   | If (c, t, e) ->
-    let%bind c, constrs_c = gen_term structs fields_env ctx c in
-    let%bind t, constrs_t = gen_term structs fields_env ctx t in
-    let%bind e, constrs_e = gen_term structs fields_env ctx e in
+    let%bind c, constrs_c = gen_term structs ctx c in
+    let%bind t, constrs_t = gen_term structs ctx t in
+    let%bind e, constrs_e = gen_term structs ctx e in
     let constrs =
       Eq (loc, c.ty, TyBool) :: Eq (loc, t.ty, e.ty) :: (constrs_c @ constrs_t @ constrs_e)
     in
     make (If (c, t, e)) t.ty constrs
   | Bop (op, l, r) ->
-    let%bind l, constrs_l = gen_term structs fields_env ctx l in
-    let%bind r, constrs_r = gen_term structs fields_env ctx r in
+    let%bind l, constrs_l = gen_term structs ctx l in
+    let%bind r, constrs_r = gen_term structs ctx r in
     let ret_ty = fresh_tyvar () in
     let op_constrs =
       match op with
@@ -430,13 +448,13 @@ let rec gen_term structs fields_env ctx (t : Stlc.term) : (term * constr list) O
     in
     make (Bop (op, l, r)) ret_ty (op_constrs @ constrs_l @ constrs_r)
   | Index (t, i) ->
-    let%bind t, constrs_t = gen_term structs fields_env ctx t in
+    let%bind t, constrs_t = gen_term structs ctx t in
     let ret_ty = fresh_tyvar () in
     make (Index (t, i)) ret_ty (IndexAccess (loc, t.ty, i, ret_ty) :: constrs_t)
   | Builtin (b, args) ->
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
-        let%bind arg', constrs = gen_term structs fields_env ctx arg in
+        let%bind arg', constrs = gen_term structs ctx arg in
         return (arg' :: acc_args, constrs @ acc_constrs))
     in
     let args = List.rev args in
@@ -490,7 +508,7 @@ let rec gen_term structs fields_env ctx (t : Stlc.term) : (term * constr list) O
   | Vec (n, args) ->
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
-        let%bind arg, constrs = gen_term structs fields_env ctx arg in
+        let%bind arg, constrs = gen_term structs ctx arg in
         return (arg :: acc_args, (Eq (loc, arg.ty, TyFloat) :: constrs) @ acc_constrs))
     in
     let args = List.rev args in
@@ -500,7 +518,7 @@ let rec gen_term structs fields_env ctx (t : Stlc.term) : (term * constr list) O
   | Mat (n, m, args) ->
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
-        let%bind arg, constrs = gen_term structs fields_env ctx arg in
+        let%bind arg, constrs = gen_term structs ctx arg in
         return (arg :: acc_args, (Eq (loc, arg.ty, TyFloat) :: constrs) @ acc_constrs))
     in
     let args = List.rev args in
@@ -530,33 +548,25 @@ let rec gen_term structs fields_env ctx (t : Stlc.term) : (term * constr list) O
            ~f:(fun (acc, acc_constrs) (name, ty) ->
              match List.Assoc.find fields ~equal:String.equal name with
              | Some arg ->
-               let%bind arg, constrs = gen_term structs fields_env ctx arg in
+               let%bind arg, constrs = gen_term structs ctx arg in
                return (arg :: acc, (Eq (loc, arg.ty, ty) :: constrs) @ acc_constrs)
              | None ->
                error_s [%message "(unreachable) missing field" (loc : Lexer.loc) name])
        in
        make (Record (struct_name, List.rev args)) (TyRecord struct_name) constrs_args)
   | Field (t, f) ->
-    let%bind t, constrs_t = gen_term structs fields_env ctx t in
+    let%bind t, constrs_t = gen_term structs ctx t in
     let ret_ty = fresh_tyvar () in
-    (match Map.find fields_env f with
-     | Some struct_name ->
-       let struct_fields = Map.find_exn structs struct_name in
-       let field_ty = List.Assoc.find_exn struct_fields ~equal:String.equal f in
-       let constrs =
-         Eq (loc, t.ty, TyRecord struct_name) :: Eq (loc, ret_ty, field_ty) :: constrs_t
-       in
-       make (Field (t, f)) ret_ty constrs
-     | None -> error_s [%message "field not found in any struct" (loc : Lexer.loc) f])
+    make (Field (t, f)) ret_ty (FieldAccess (loc, t.ty, f, ret_ty) :: constrs_t)
 ;;
 
 let typecheck (Program terms : Stlc.t) : t Or_error.t =
-  let%map _, _, _, tops =
+  let%map _, _, tops =
     List.fold_result
       terms
-      ~init:(String.Map.empty, String.Map.empty, String.Map.empty, [])
+      ~init:(String.Map.empty, String.Map.empty, [])
         (* TODO: There has to be a better way than to pass everything like this *)
-      ~f:(fun (ctx, structs, fields_env, acc) top ->
+      ~f:(fun (ctx, structs, acc) top ->
         match top.desc with
         | Define (Rec (n, ty_ann), v, bind) ->
           let ty_v =
@@ -565,8 +575,10 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
             | None -> fresh_tyvar ()
           in
           let ctx' = Map.set ctx ~key:v ~data:([], ty_v) in
-          let%bind bind', constrs_bind = gen_term structs fields_env ctx' bind in
-          let%bind sub_bind = solve (Eq (top.loc, ty_v, bind'.ty) :: constrs_bind) in
+          let%bind bind', constrs_bind = gen_term structs ctx' bind in
+          let%bind sub_bind =
+            solve structs (Eq (top.loc, ty_v, bind'.ty) :: constrs_bind)
+          in
           let ty_bind = subst_ty sub_bind bind'.ty in
           let ctx_subbed = subst_context sub_bind ctx in
           let scheme =
@@ -579,10 +591,10 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
             ; loc = top.loc
             }
           in
-          Ok (ctx, structs, fields_env, top :: acc)
+          Ok (ctx, structs, top :: acc)
         | Define (Nonrec, v, bind) ->
-          let%bind bind', constrs_bind = gen_term structs fields_env ctx bind in
-          let%bind sub_bind = solve constrs_bind in
+          let%bind bind', constrs_bind = gen_term structs ctx bind in
+          let%bind sub_bind = solve structs constrs_bind in
           let ty_bind = subst_ty sub_bind bind'.ty in
           let ctx_subbed = subst_context sub_bind ctx in
           let scheme =
@@ -595,21 +607,17 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
             ; loc = top.loc
             }
           in
-          Ok (ctx, structs, fields_env, top :: acc)
+          Ok (ctx, structs, top :: acc)
         | Extern (ty, v) ->
           let ctx = Map.set ctx ~key:v ~data:([], ty) in
           let top = { desc = Extern v; ty; loc = top.loc } in
-          Ok (ctx, structs, fields_env, top :: acc)
+          Ok (ctx, structs, top :: acc)
         | RecordDef (name, fields) ->
           let structs = Map.set structs ~key:name ~data:fields in
-          let fields_env =
-            List.fold fields ~init:fields_env ~f:(fun env (f_name, _) ->
-              Map.set env ~key:f_name ~data:name)
-          in
           let top =
             { desc = RecordDef (name, fields); ty = TyRecord name; loc = top.loc }
           in
-          Ok (ctx, structs, fields_env, top :: acc))
+          Ok (ctx, structs, top :: acc))
   in
   Program (List.rev tops)
 ;;
