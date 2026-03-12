@@ -14,7 +14,7 @@ let rotate (angle : float) =
   [[c, -1. * s], [s, c]]
 
 // Euclidean GCD
-let (rec : float -> float -> float) gcd (a : float) (b : float) =
+let rec gcd a b =
   if a < 0.05 then b
   else if b < 0.05 then a
   else if a > b then gcd (a - b) b
