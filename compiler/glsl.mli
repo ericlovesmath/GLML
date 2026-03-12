@@ -49,6 +49,10 @@ type builtin =
   | Dot
   | Cross
   | Normalize
+  | Fract
+  | Step
+  | Smoothstep
+  | Reflect
 [@@deriving sexp_of, string]
 
 val builtin_of_string_opt : string -> builtin option

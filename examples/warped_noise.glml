@@ -3,12 +3,6 @@
 
 // GLSL SOURCE: https://www.shadertoy.com/view/Xl2XWz
 
-let fract (v : vec4) = v - #floor(v)
-
-let smoothstep (edge0 : float) (edge1 : float) (x : float) =
-  let t = #clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0) in
-  t * t * (3.0 - 2.0 * t)
-
 // Compact noise function
 let smoothNoise (p : vec2) =
   let i = #floor(p) in
@@ -18,7 +12,7 @@ let smoothNoise (p : vec2) =
   // Hash function using a large sine-based offset
   let v4 = [0.0, 1.0, 27.0, 28.0] in
   let seed = v4 + i.0 + i.1 * 27.0 in
-  let hash = fract(#sin(seed % 6.2831853) * 200000.0) in
+  let hash = #fract(#sin(seed % 6.2831853) * 200000.0) in
 
   // Bilinear interpolation logic (expanded from the GLSL mat2/dot trick)
   let col0 = [hash.0, hash.1] in
@@ -68,8 +62,8 @@ let main (coord : vec2) =
 
   let spot_logic =
     [0.8, 0.4, 1.0] * 0.35 +
-    (([1.0, 0.5, 0.2] * smoothstep 0.0 1.0 (1.0 - spot1_dist)) +
-     ([0.2, 0.4, 1.0] * smoothstep 0.0 1.0 (1.0 - spot2_dist))) * 5.0
+    (([1.0, 0.5, 0.2] * #smoothstep(0.0, 1.0, 1.0 - spot1_dist)) +
+     ([0.2, 0.4, 1.0] * #smoothstep(0.0, 1.0, 1.0 - spot2_dist))) * 5.0
   in
   let final_col = col * spot_logic in
 

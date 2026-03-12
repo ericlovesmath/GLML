@@ -63,6 +63,10 @@ type builtin =
   | Dot
   | Cross
   | Normalize
+  | Fract
+  | Step
+  | Smoothstep
+  | Reflect
 [@@deriving sexp_of, string ~capitalize:"lower sentence case"]
 
 let builtin_of_string_opt s = Option.try_with (fun () -> builtin_of_string s)

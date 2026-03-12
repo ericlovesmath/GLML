@@ -521,6 +521,17 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
       | Cross, [ t; t' ] ->
         Ok [ Eq (loc, t, TyVec 3); Eq (loc, t', TyVec 3); Eq (loc, ty, TyVec 3) ]
       | Normalize, [ t ] -> Ok [ HasClass (loc, GenType, t); Eq (loc, ty, t) ]
+      | Fract, [ t ] -> Ok [ HasClass (loc, GenType, t); Eq (loc, ty, t) ]
+      | Step, [ t; t' ] -> Ok [ HasClass (loc, GenType, ty); Broadcast (loc, t, t', ty) ]
+      | Reflect, [ t; t' ] ->
+        Ok [ HasClass (loc, GenType, t); Eq (loc, t, t'); Eq (loc, ty, t) ]
+      | Smoothstep, [ t; t'; t'' ] ->
+        let tmp = fresh_tyvar () in
+        Ok
+          [ HasClass (loc, GenType, ty)
+          ; Broadcast (loc, t, t', tmp)
+          ; Broadcast (loc, tmp, t'', ty)
+          ]
       | _ ->
         error_s
           [%message "invalid builtin arguments" (loc : Lexer.loc) (b : Glsl.builtin)]
