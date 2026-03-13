@@ -98,13 +98,15 @@ header {
 
   .glml-pane {
     order: 2;
-    flex: none;
-    height: 40vh;
+    flex: 1;
   }
 
   .glsl-pane {
-    order: 3;
-    flex: 1;
+    display: none;
+  }
+
+  .monaco-editor .accessibilityHelpButton {
+    display: none !important;
   }
 }
 
