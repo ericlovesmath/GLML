@@ -2,6 +2,10 @@ import * as monaco from "monaco-editor";
 import { initVimMode } from "monaco-vim";
 import { initRenderer, compileAndLinkGLSL } from "./renderer";
 import { EXAMPLES } from "./examples";
+import { registerCatppuccin, registerGLML } from "./monaco-extensions";
+
+registerCatppuccin();
+registerGLML();
 
 self.MonacoEnvironment = {
   getWorker: function () {
@@ -17,7 +21,7 @@ const COMPILE = document.getElementById("compile-btn") as HTMLButtonElement;
 const SELECT = document.getElementById("example-select") as HTMLSelectElement;
 
 const EDITOR_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {
-  theme: "vs-dark",
+  theme: "catppuccin",
   minimap: { enabled: false },
   fontSize: 13,
   lineNumbers: "on",
@@ -29,7 +33,7 @@ const inputEditor = monaco.editor.create(
   document.getElementById("glml-input")!,
   {
     ...EDITOR_OPTIONS,
-    language: "plaintext",
+    language: "glml",
   },
 );
 
