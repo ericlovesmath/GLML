@@ -105,3 +105,42 @@ header {
 #error-output:empty {
   display: none;
 }
+
+.vim-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: #aaa;
+  user-select: none;
+}
+
+.vim-toggle input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: #6a6aaa;
+}
+
+#vim-status {
+  height: 18px;
+  padding: 0 8px;
+  font-size: 0.75rem;
+  font-family: monospace;
+  color: #aaa;
+  background: #2a2a4a;
+  overflow: hidden;
+}
+
+#vim-status input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #aaa;
+  font-size: 0.75rem;
+  font-family: monospace;
+  padding: 0;
+  margin: 0;
+  width: auto;
+  height: 18px;
+  vertical-align: top;
+}
