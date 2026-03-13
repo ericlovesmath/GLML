@@ -1,8 +1,15 @@
 # GLML (OpenGL Meta Language)
 
-GLML is an early stage functional domain-specific language for writing fragment shaders, targeting GLSL. The goal is an ML-style language with [size-dependent types](https://futhark-lang.org/publications/fhpnc23.pdf).
+Try the playground *(on browsers with WebGL support)*: [https://www.ericchanlee.com/glml](https://www.ericchanlee.com/glml/)
 
-See [INFORMATION.md](INFORMATION.md) for a working roadmap and referenced resources.
+![GLML Playground Screenshot](./docs/playground.png)
+
+GLML is an early stage functional domain-specific language for writing fragment shaders, targeting GLSL. Right now, it is primarily based on Hindley-Milner typing and features typeclasses for operator overloading. The long-term goal is to evolve into an ML-style language with [size-dependent types](https://futhark-lang.org/publications/fhpnc23.pdf).
+
+See [docs/INFORMATION.md](docs/INFORMATION.md) for a working roadmap and referenced resources.
+
+## Try the Playground
+
 
 ## Build
 
@@ -19,4 +26,4 @@ opam install . --deps-only
 ## Usage
 
 - **CLI**: `dune exec GLML -- compile <file>`
-- **Web**: `make serve`
+- **Web Playground**: `make serve`

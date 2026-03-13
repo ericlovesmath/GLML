@@ -18,6 +18,20 @@ body {
 
 header {
   padding: 6px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+header a {
+  color: #aaa;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+header a:hover {
+  color: #e0e0e0;
+  text-decoration: underline;
 }
 
 .main-layout {

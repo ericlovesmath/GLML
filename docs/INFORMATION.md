@@ -1,16 +1,16 @@
+Currently a mess, will organize later (if ever)
+
 # Compilation Passes (Currently Working On)
 
-- Button to show GLSL output
+- Button to show GLSL output on mobile
 - Use ternary to replace some `if`'s in GLSL
-- Read Futhark's monomorphization and defunctionalization code
-- Monomorphization (Specialization)
-- Vim syntax file
-- Better pipeline tests
+- Read Futhark's monomorphization and defunctionalization code for partial application
+- Vim/Emacs syntax file
 - Better benchmarking tests
+- Better pipeline tests
 - Defunctionalization?
 - Implicit error field added to every function to propagate error color back
 - Move mod to nonbinop version as that is a gentype, add more builtins
-- Rewrite examples to not have to explicitly type everything
 - Allow clicking through all passes in GLSL output window
 
 # Remaining Compilation Passes
@@ -19,9 +19,6 @@
 - Closure Conversion (turn closures into explicit struct passing)
 - Lowering (ADTs/matches into tagged unions/switches)
 - Typeclasses for polymorphic functions
-
-    - TCO must have a hard capped loop so the browser doesn't just casually crash
-
 - Swizzle syntax or some kind of rank polymorphism
 - Function `inlining` / `specialize` (but likely everything is specialized)
 - Dead code elimination
@@ -31,8 +28,7 @@
 Interesting Ideas
 
 - `let%glsl` ppx to embed DSL?
-- `wasm_of_ocaml`, but would have to give up on `extern js`
-- Remove Jane Street dependency for `bonsai` and just use `js_of_ocaml` with a javascript framework
+- `wasm_of_ocaml` build?
 - Local renderer without web
 
 # Idea Dump

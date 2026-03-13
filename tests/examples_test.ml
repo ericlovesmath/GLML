@@ -207,7 +207,7 @@ let%expect_test "compile examples" =
                (if (< is_even_10 0.5) (vec3 0.2 0.2 0.2) (vec3 0.8 0.8 0.8))))))))))
        : ((vec 2) -> (vec 3)))))
 
-    === lambda_lift (checkerboard.glml) ===
+    === lambda lift (checkerboard.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Define Nonrec (name get_uv_0) (args ((coord_1 (vec 2))))
        (body
@@ -260,7 +260,7 @@ let%expect_test "compile examples" =
                           (return (vec3 0.8 0.8 0.8))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
-    === tail_call (checkerboard.glml) ===
+    === tail call (checkerboard.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Define (name get_uv_0) (args ((coord_1 (vec 2))))
        (body
@@ -323,7 +323,7 @@ let%expect_test "compile examples" =
          (if anf_44 (Block (return (vec3 0.2 0.2 0.2)))
           (Block (return (vec3 0.8 0.8 0.8)))))))))
 
-    === patch_main (checkerboard.glml) ===
+    === patch main (checkerboard.glml) ===
     (Program
      ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
       (Global Uniform TyFloat u_time)
@@ -816,7 +816,7 @@ let%expect_test "compile examples" =
                    (vec3 r_19 g_20 b_21)))))))))))))
        : ((vec 2) -> (vec 3)))))
 
-    === lambda_lift (mandelbrot.glml) ===
+    === lambda lift (mandelbrot.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Define Nonrec (name get_uv_0) (args ((coord_1 (vec 2))))
        (body
@@ -914,7 +914,7 @@ let%expect_test "compile examples" =
                                         (return (vec3 r_19 g_20 b_21))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
-    === tail_call (mandelbrot.glml) ===
+    === tail call (mandelbrot.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Define (name get_uv_0) (args ((coord_1 (vec 2))))
        (body
@@ -1059,7 +1059,7 @@ let%expect_test "compile examples" =
            (set () float anf_115 (* anf_114 0.5))
            (set () float b_21 (+ anf_115 0.5)) (return (vec3 r_19 g_20 b_21)))))))))
 
-    === patch_main (mandelbrot.glml) ===
+    === patch main (mandelbrot.glml) ===
     (Program
      ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
       (Global Uniform TyFloat u_time)
@@ -1292,7 +1292,7 @@ let%expect_test "compile examples" =
              (vec3 0.5 0.5 1.)))))))
        : ((vec 2) -> (vec 3)))))
 
-    === lambda_lift (mouse_circle.glml) ===
+    === lambda lift (mouse_circle.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
      ((Extern u_time) : float)
      ((Define Nonrec (name get_uv_0) (args ((coord_1 (vec 2))))
@@ -1340,7 +1340,7 @@ let%expect_test "compile examples" =
                      (return (vec3 0.5 0.5 1.)))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
-    === tail_call (mouse_circle.glml) ===
+    === tail call (mouse_circle.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
      ((Extern u_time) : float)
      ((Define (name get_uv_0) (args ((coord_1 (vec 2))))
@@ -1397,7 +1397,7 @@ let%expect_test "compile examples" =
          (if anf_35 (Block (return (vec3 0. 0. 0.5)))
           (Block (return (vec3 0.5 0.5 1.)))))))))
 
-    === patch_main (mouse_circle.glml) ===
+    === patch main (mouse_circle.glml) ===
     (Program
      ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
       (Global Uniform (TyVec 2) u_mouse) (Global Uniform TyFloat u_time)
@@ -1605,7 +1605,7 @@ let%expect_test "compile examples" =
              (let b_9 (+ (* (sin (+ wave_6 4.)) 0.3) 0.7) (vec3 r_7 g_8 b_9))))))))
        : ((vec 2) -> (vec 3)))))
 
-    === lambda_lift (rainbow.glml) ===
+    === lambda lift (rainbow.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Define Nonrec (name get_uv_0) (args ((coord_1 (vec 2))))
        (body
@@ -1653,7 +1653,7 @@ let%expect_test "compile examples" =
                         (let b_9 (+ anf_47 0.7) (return (vec3 r_7 g_8 b_9)))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
-    === tail_call (rainbow.glml) ===
+    === tail call (rainbow.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Define (name get_uv_0) (args ((coord_1 (vec 2))))
        (body
@@ -1711,7 +1711,7 @@ let%expect_test "compile examples" =
          (set () float anf_46 (sin anf_45)) (set () float anf_47 (* anf_46 0.3))
          (set () float b_9 (+ anf_47 0.7)) (return (vec3 r_7 g_8 b_9)))))))
 
-    === patch_main (rainbow.glml) ===
+    === patch main (rainbow.glml) ===
     (Program
      ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
       (Global Uniform TyFloat u_time)
@@ -2700,7 +2700,7 @@ let%expect_test "compile examples" =
                            (+ col_48 glow_49)))))))))))))))))))))
        : ((vec 2) -> (vec 3)))))
 
-    === lambda_lift (raymarch.glml) ===
+    === lambda lift (raymarch.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Extern u_mouse) : (vec 2))
      ((Define Nonrec (name rotate_0) (args ((p_1 (vec 2)) (angle_2 float)))
@@ -2984,7 +2984,7 @@ let%expect_test "compile examples" =
                                                                   glow_49))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
-    === tail_call (raymarch.glml) ===
+    === tail call (raymarch.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Extern u_mouse) : (vec 2))
      ((Define (name rotate_0) (args ((p_1 (vec 2)) (angle_2 float)))
@@ -3344,7 +3344,7 @@ let%expect_test "compile examples" =
          (set () float anf_268 (length anf_267))
          (set () float glow_49 (/ 0.02 anf_268)) (return (+ col_48 glow_49)))))))
 
-    === patch_main (raymarch.glml) ===
+    === patch main (raymarch.glml) ===
     (Program
      ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
       (Global Uniform TyFloat u_time) (Global Uniform (TyVec 2) u_mouse)
@@ -3797,7 +3797,7 @@ let%expect_test "compile examples" =
               (vec3 res_16 (* res_16 0.5) (- 1. res_16)))))))))
        : ((vec 2) -> (vec 3)))))
 
-    === lambda_lift (recursion.glml) ===
+    === lambda lift (recursion.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Define Nonrec (name get_uv_0) (args ((coord_1 (vec 2))))
        (body
@@ -3879,7 +3879,7 @@ let%expect_test "compile examples" =
                           (return (vec3 res_16 anf_77 anf_78))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
-    === tail_call (recursion.glml) ===
+    === tail call (recursion.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Define (name get_uv_0) (args ((coord_1 (vec 2))))
        (body
@@ -3995,7 +3995,7 @@ let%expect_test "compile examples" =
          (set () float anf_77 (* res_16 0.5)) (set () float anf_78 (- 1. res_16))
          (return (vec3 res_16 anf_77 anf_78)))))))
 
-    === patch_main (recursion.glml) ===
+    === patch main (recursion.glml) ===
     (Program
      ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
       (Global Uniform TyFloat u_time)
@@ -4860,7 +4860,7 @@ let%expect_test "compile examples" =
                       (sqrt (max final_col_34 0.)))))))))))))))))
        : ((vec 2) -> (vec 3)))))
 
-    === lambda_lift (warped_noise.glml) ===
+    === lambda lift (warped_noise.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Define Nonrec (name smoothNoise_0) (args ((p_1 (vec 2))))
        (body
@@ -5087,7 +5087,7 @@ let%expect_test "compile examples" =
                                                               (sqrt anf_243)))))))))))))))))))))))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
-    === tail_call (warped_noise.glml) ===
+    === tail call (warped_noise.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Define (name smoothNoise_0) (args ((p_1 (vec 2))))
        (body
@@ -5381,7 +5381,7 @@ let%expect_test "compile examples" =
          (set () vec3 final_col_34 (* col_30 spot_logic_33))
          (set () vec3 anf_243 (max final_col_34 0.)) (return (sqrt anf_243)))))))
 
-    === patch_main (warped_noise.glml) ===
+    === patch main (warped_noise.glml) ===
     (Program
      ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
       (Global Uniform TyFloat u_time)
