@@ -1,3 +1,4 @@
+import { inject } from "@vercel/analytics";
 import type * as Monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { initRenderer, compileAndLinkGLSL } from "./renderer";
 import { EXAMPLES } from "./examples";
@@ -5,6 +6,8 @@ import { EXAMPLES } from "./examples";
 const ERROR_OUT = document.getElementById("error-output") as HTMLDivElement;
 const COMPILE = document.getElementById("compile-btn") as HTMLButtonElement;
 const SELECT = document.getElementById("example-select") as HTMLSelectElement;
+
+inject();
 
 async function main(): Promise<void> {
   const canvas = document.getElementById("gl-canvas") as HTMLCanvasElement;
