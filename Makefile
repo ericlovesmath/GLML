@@ -1,4 +1,4 @@
-.PHONY: clean bin js playground serve web vite test benchmark
+.PHONY: clean bin js playground serve test benchmark
 
 PROFILE := dev
 ifdef RELEASE
@@ -21,21 +21,13 @@ bin:
 js:
 	dune build $(DUNE_FLAGS) _build/default/jsoo/main.bc.js
 
-playground:
-	dune build $(DUNE_FLAGS) _build/default/playground/main.bc.js
-	mkdir -p dist
-	cp playground/index.html dist
-	cp playground/style.css dist
-	cp -f _build/default/playground/main.bc.js dist
+playground: js
+	mkdir -p playground/public
+	cp -f _build/default/jsoo/main.bc.js playground/public/
+	cd playground && npm install && npm run build
 
 serve: playground
-	cd dist; python3 -m http.server
-
-# TODO: Replace the playground with this
-vite: js
-	mkdir -p web/public
-	cp -f _build/default/jsoo/main.bc.js web/public/
-	cd web && npm install && npm run dev
+	cd playground && npm run dev
 
 test:
 	dune runtest
