@@ -1,16 +1,51 @@
+import * as monaco from "monaco-editor";
 import { initRenderer, compileAndLinkGLSL } from "./renderer";
 import { EXAMPLES } from "./examples";
 
-const GLSL_OUT = document.getElementById("glsl-output") as HTMLTextAreaElement;
+self.MonacoEnvironment = {
+  getWorker: function () {
+    return new Worker(
+      new URL("monaco-editor/esm/vs/editor/editor.worker.js", import.meta.url),
+      { type: "module" },
+    );
+  },
+};
+
 const ERROR_OUT = document.getElementById("error-output") as HTMLDivElement;
-const INPUT = document.getElementById("glml-input") as HTMLTextAreaElement;
 const COMPILE = document.getElementById("compile-btn") as HTMLButtonElement;
 const SELECT = document.getElementById("example-select") as HTMLSelectElement;
+
+const EDITOR_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {
+  theme: "vs-dark",
+  minimap: { enabled: false },
+  fontSize: 13,
+  lineNumbers: "on",
+  scrollBeyondLastLine: false,
+  automaticLayout: true,
+};
+
+const inputEditor = monaco.editor.create(
+  document.getElementById("glml-input")!,
+  {
+    ...EDITOR_OPTIONS,
+    language: "plaintext",
+  },
+);
+
+const outputEditor = monaco.editor.create(
+  document.getElementById("glsl-output")!,
+  {
+    ...EDITOR_OPTIONS,
+    // Monaco has no GLSL :(
+    language: "c",
+    readOnly: true,
+  },
+);
 
 function compile(source: string): void {
   const result = window.glml.compile(source);
   if (result.glsl !== null) {
-    GLSL_OUT.value = result.glsl;
+    outputEditor.setValue(result.glsl);
     ERROR_OUT.textContent = "";
 
     const glsl_error = compileAndLinkGLSL(result.glsl);
@@ -18,7 +53,7 @@ function compile(source: string): void {
       ERROR_OUT.textContent = "WebGL: " + glsl_error;
     }
   } else {
-    GLSL_OUT.value = "";
+    outputEditor.setValue("");
     ERROR_OUT.textContent = result.error ?? "Unknown error";
   }
 }
@@ -35,16 +70,16 @@ function main(): void {
 
   SELECT.addEventListener("change", () => {
     const source = EXAMPLES[SELECT.selectedIndex][1];
-    INPUT.value = source;
+    inputEditor.setValue(source);
     compile(source);
   });
 
   COMPILE.addEventListener("click", () => {
-    compile(INPUT.value);
+    compile(inputEditor.getValue());
   });
 
-  INPUT.value = EXAMPLES[0][1];
-  compile(INPUT.value);
+  inputEditor.setValue(EXAMPLES[0][1]);
+  compile(EXAMPLES[0][1]);
 }
 
 main();
