@@ -86,22 +86,24 @@ header {
     flex-direction: column;
   }
 
-  .glml-pane {
-    flex: none;
-    height: 40vh;
-  }
-
   .right-column {
-    flex: none;
-    height: 60vh;
+    display: contents;
   }
 
   .webgl-pane {
+    order: 1;
     height: 300px;
     flex: none;
   }
 
+  .glml-pane {
+    order: 2;
+    flex: none;
+    height: 40vh;
+  }
+
   .glsl-pane {
+    order: 3;
     flex: 1;
   }
 }
@@ -181,6 +183,32 @@ header {
 .vim-toggle input[type="checkbox"] {
   cursor: pointer;
   accent-color: #6a6aaa;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border: 1px solid #555;
+  border-radius: 2px;
+  background: #2a2a4a;
+  position: relative;
+}
+
+.vim-toggle input[type="checkbox"]:checked {
+  background: #6a6aaa;
+  border-color: #6a6aaa;
+}
+
+.vim-toggle input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0px;
+  width: 4px;
+  height: 7px;
+  border: 2px solid #fff;
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg);
 }
 
 #vim-status {

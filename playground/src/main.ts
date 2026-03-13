@@ -2,7 +2,11 @@ import * as monaco from "monaco-editor";
 import { initVimMode } from "monaco-vim";
 import { initRenderer, compileAndLinkGLSL } from "./renderer";
 import { EXAMPLES } from "./examples";
-import { registerCatppuccin, registerGLML, registerGLSL } from "./monaco-extensions";
+import {
+  registerCatppuccin,
+  registerGLML,
+  registerGLSL,
+} from "./monaco-extensions";
 
 registerCatppuccin();
 registerGLML();
@@ -89,12 +93,14 @@ function main(): void {
 
   const VIM_TOGGLE = document.getElementById("vim-toggle") as HTMLInputElement;
   const VIM_STATUS = document.getElementById("vim-status")!;
-  let vimMode: ReturnType<typeof initVimMode> | null = initVimMode(
-    inputEditor,
-    VIM_STATUS,
-  );
+  const savedVim = localStorage.getItem("vimMode") === "true";
+  VIM_TOGGLE.checked = savedVim;
+  let vimMode: ReturnType<typeof initVimMode> | null = savedVim
+    ? initVimMode(inputEditor, VIM_STATUS)
+    : null;
 
   VIM_TOGGLE.addEventListener("change", () => {
+    localStorage.setItem("vimMode", VIM_TOGGLE.checked ? "true" : "false");
     if (VIM_TOGGLE.checked) {
       vimMode = initVimMode(inputEditor, VIM_STATUS);
     } else {
