@@ -54,17 +54,10 @@ header {
   color: #aaa;
 }
 
-textarea {
+#glml-input,
+#glsl-output {
   flex: 1;
   min-height: 0;
-  resize: none;
-  padding: 6px 8px;
-  font-family: monospace;
-  font-size: 0.85rem;
-  background: #16162a;
-  color: #e0e0e0;
-  border: 1px solid #333;
-  outline: none;
 }
 
 #compile-btn {
