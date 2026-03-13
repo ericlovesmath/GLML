@@ -15,11 +15,10 @@
   <header>
     <h3>GLML Playground</h3>
   </header>
-  <div class="canvas-container">
-    <canvas id="gl-canvas"></canvas>
-  </div>
-  <div class="editor-container">
-    <div class="pane">
+  <div class="main-layout">
+
+    <div class="pane glml-pane">
+
       <div class="pane-header">
         <span>GLML</span>
         <select id="example-select"></select>
@@ -28,18 +27,31 @@
         </label>
         <button id="compile-btn">Compile</button>
       </div>
+
       <div id="glml-input"></div>
       <div id="vim-status"></div>
     </div>
-    <div class="pane">
-      <div class="pane-header"><span>GLSL Output</span></div>
-      <div class="textarea-wrapper">
-        <div id="glsl-output"></div>
-        <p id="error-output"></p>
-      </div>
-    </div>
-  </div>
 
+    <div class="right-column">
+
+      <div class="webgl-pane">
+        <div class="pane-header"><span>WebGL Output</span></div>
+        <div class="canvas-container">
+          <canvas id="gl-canvas"></canvas>
+        </div>
+      </div>
+
+      <div class="pane glsl-pane">
+        <div class="pane-header"><span>GLSL Output</span></div>
+        <div class="textarea-wrapper">
+          <div id="glsl-output"></div>
+          <p id="error-output"></p>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
 </body>
 
 </html>
