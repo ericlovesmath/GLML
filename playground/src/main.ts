@@ -1,4 +1,4 @@
-import * as monaco from "monaco-editor";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { initVimMode } from "monaco-vim";
 import { initRenderer, compileAndLinkGLSL } from "./renderer";
 import { EXAMPLES } from "./examples";
@@ -12,14 +12,6 @@ registerCatppuccin();
 registerGLML();
 registerGLSL();
 
-self.MonacoEnvironment = {
-  getWorker: function () {
-    return new Worker(
-      new URL("monaco-editor/esm/vs/editor/editor.worker.js", import.meta.url),
-      { type: "module" },
-    );
-  },
-};
 
 const ERROR_OUT = document.getElementById("error-output") as HTMLDivElement;
 const COMPILE = document.getElementById("compile-btn") as HTMLButtonElement;
