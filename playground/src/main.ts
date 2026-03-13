@@ -1,67 +1,70 @@
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
-import { initVimMode } from "monaco-vim";
+import type * as Monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { initRenderer, compileAndLinkGLSL } from "./renderer";
 import { EXAMPLES } from "./examples";
-import {
-  registerCatppuccin,
-  registerGLML,
-  registerGLSL,
-} from "./monaco-extensions";
-
-registerCatppuccin();
-registerGLML();
-registerGLSL();
-
 
 const ERROR_OUT = document.getElementById("error-output") as HTMLDivElement;
 const COMPILE = document.getElementById("compile-btn") as HTMLButtonElement;
 const SELECT = document.getElementById("example-select") as HTMLSelectElement;
 
-const EDITOR_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {
-  theme: "catppuccin",
-  minimap: { enabled: false },
-  fontSize: 13,
-  lineNumbers: "on",
-  scrollBeyondLastLine: false,
-  automaticLayout: true,
-};
-
-const inputEditor = monaco.editor.create(
-  document.getElementById("glml-input")!,
-  {
-    ...EDITOR_OPTIONS,
-    language: "glml",
-  },
-);
-
-const outputEditor = monaco.editor.create(
-  document.getElementById("glsl-output")!,
-  {
-    ...EDITOR_OPTIONS,
-    language: "glsl",
-    readOnly: true,
-  },
-);
-
-function compile(source: string): void {
-  const result = window.glml.compile(source);
-  if (result.glsl !== null) {
-    outputEditor.setValue(result.glsl);
-    ERROR_OUT.textContent = "";
-
-    const glsl_error = compileAndLinkGLSL(result.glsl);
-    if (glsl_error !== null) {
-      ERROR_OUT.textContent = "WebGL: " + glsl_error;
-    }
-  } else {
-    outputEditor.setValue("");
-    ERROR_OUT.textContent = result.error ?? "Unknown error";
-  }
-}
-
-function main(): void {
+async function main(): Promise<void> {
   const canvas = document.getElementById("gl-canvas") as HTMLCanvasElement;
   initRenderer(canvas);
+
+  const [
+    monaco,
+    { registerCatppuccin, registerGLML, registerGLSL },
+    { initVimMode },
+  ] = await Promise.all([
+    import("monaco-editor/esm/vs/editor/editor.api"),
+    import("./monaco-extensions"),
+    import("monaco-vim"),
+  ]);
+
+  registerCatppuccin();
+  registerGLML();
+  registerGLSL();
+
+  const EDITOR_OPTIONS: Monaco.editor.IStandaloneEditorConstructionOptions = {
+    theme: "catppuccin",
+    minimap: { enabled: false },
+    fontSize: 13,
+    lineNumbers: "on",
+    scrollBeyondLastLine: false,
+    automaticLayout: true,
+  };
+
+  const inputEditor = monaco.editor.create(
+    document.getElementById("glml-input")!,
+    {
+      ...EDITOR_OPTIONS,
+      language: "glml",
+    },
+  );
+
+  const outputEditor = monaco.editor.create(
+    document.getElementById("glsl-output")!,
+    {
+      ...EDITOR_OPTIONS,
+      language: "glsl",
+      readOnly: true,
+    },
+  );
+
+  function compile(source: string): void {
+    const result = window.glml.compile(source);
+    if (result.glsl !== null) {
+      outputEditor.setValue(result.glsl);
+      ERROR_OUT.textContent = "";
+
+      const glsl_error = compileAndLinkGLSL(result.glsl);
+      if (glsl_error !== null) {
+        ERROR_OUT.textContent = "WebGL: " + glsl_error;
+      }
+    } else {
+      outputEditor.setValue("");
+      ERROR_OUT.textContent = result.error ?? "Unknown error";
+    }
+  }
 
   for (const [name] of EXAMPLES) {
     const opt = document.createElement("option");
