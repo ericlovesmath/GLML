@@ -2,10 +2,11 @@ import * as monaco from "monaco-editor";
 import { initVimMode } from "monaco-vim";
 import { initRenderer, compileAndLinkGLSL } from "./renderer";
 import { EXAMPLES } from "./examples";
-import { registerCatppuccin, registerGLML } from "./monaco-extensions";
+import { registerCatppuccin, registerGLML, registerGLSL } from "./monaco-extensions";
 
 registerCatppuccin();
 registerGLML();
+registerGLSL();
 
 self.MonacoEnvironment = {
   getWorker: function () {
@@ -41,8 +42,7 @@ const outputEditor = monaco.editor.create(
   document.getElementById("glsl-output")!,
   {
     ...EDITOR_OPTIONS,
-    // Monaco has no GLSL :(
-    language: "c",
+    language: "glsl",
     readOnly: true,
   },
 );

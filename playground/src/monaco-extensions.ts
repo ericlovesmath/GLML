@@ -27,6 +27,102 @@ export function registerCatppuccin(): void {
   });
 }
 
+export function registerGLSL(): void {
+  monaco.languages.register({ id: "glsl" });
+
+  monaco.languages.setMonarchTokensProvider("glsl", {
+    keywords: [
+      "if",
+      "else",
+      "for",
+      "while",
+      "return",
+      "continue",
+      "break",
+      "struct",
+      "precision",
+    ],
+    qualifiers: ["uniform", "out", "const", "in", "inout"],
+    types: [
+      "float",
+      "int",
+      "bool",
+      "void",
+      "vec2",
+      "vec3",
+      "vec4",
+      "mat2",
+      "mat3",
+      "mat4",
+      "mat2x2",
+      "mat2x3",
+      "mat2x4",
+      "mat3x2",
+      "mat3x3",
+      "mat3x4",
+      "mat4x2",
+      "mat4x3",
+      "mat4x4",
+    ],
+    builtins: [
+      "sin",
+      "cos",
+      "tan",
+      "asin",
+      "acos",
+      "atan",
+      "pow",
+      "exp",
+      "log",
+      "exp2",
+      "log2",
+      "sqrt",
+      "abs",
+      "sign",
+      "floor",
+      "ceil",
+      "fract",
+      "min",
+      "max",
+      "clamp",
+      "mix",
+      "length",
+      "distance",
+      "dot",
+      "cross",
+      "normalize",
+      "step",
+      "smoothstep",
+      "reflect",
+      "mod",
+    ],
+    constants: ["true", "false"],
+    tokenizer: {
+      root: [
+        [/\/\/.*$/, "comment"],
+        [/#\w+/, "keyword"],
+        [/\d+\.\d*|\d+/, "number"],
+        [
+          /[a-zA-Z_]\w*/,
+          {
+            cases: {
+              "@qualifiers": "keyword",
+              "@keywords": "keyword",
+              "@types": "type",
+              "@builtins": "builtin",
+              "@constants": "constant",
+              "@default": "identifier",
+            },
+          },
+        ],
+        [/==|!=|<=|>=|&&|\|\|/, "operator"],
+        [/[+\-*\/%<>=!&|]/, "operator"],
+        [/[(){}[\].,;:]/, "delimiter"],
+      ],
+    },
+  });
+}
+
 export function registerGLML(): void {
   monaco.languages.register({ id: "glml" });
 
@@ -67,11 +163,8 @@ export function registerGLML(): void {
     tokenizer: {
       root: [
         [/\/\/.*$/, "comment"],
-
         [/#extern\b/, "keyword"],
-
         [/#[a-z]\w*/, "builtin"],
-
         [/'[a-zA-Z]\w*/, "typevar"],
 
         [
@@ -87,11 +180,8 @@ export function registerGLML(): void {
         ],
 
         [/\d+\.?\d*/, "number"],
-
         [/->|<=|>=|==|&&|\|\|/, "operator"],
-
         [/[+\-*/%<>=|]/, "operator"],
-
         [/[(){}[\].,;:']/, "delimiter"],
       ],
     },
