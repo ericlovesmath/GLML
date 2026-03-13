@@ -1,4 +1,4 @@
-.PHONY: clean bin js playground serve test benchmark
+.PHONY: clean bin js playground serve web vite test benchmark
 
 PROFILE := dev
 ifdef RELEASE
@@ -30,6 +30,12 @@ playground:
 
 serve: playground
 	cd dist; python3 -m http.server
+
+# TODO: Replace the playground with this
+vite: js
+	mkdir -p web/public
+	cp -f _build/default/jsoo/main.bc.js web/public/
+	cd web && npm install && npm run dev
 
 test:
 	dune runtest
