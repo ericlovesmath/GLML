@@ -20,28 +20,90 @@ header {
   padding: 6px 12px;
 }
 
-.canvas-container {
+.main-layout {
   display: flex;
-  justify-content: center;
-  background: #000;
-  height: 350px;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+  gap: 6px;
+  padding: 6px 12px 6px 12px;
 }
 
-.editor-container {
+.glml-pane {
+  flex: 1.2;
   display: flex;
-  gap: 6px;
-  padding: 6px 12px;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.right-column {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
   min-height: 0;
 }
 
-.pane {
+.webgl-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.canvas-container {
+  display: flex;
+  justify-content: center;
+  background: #1a1a2e;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.glsl-pane {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .main-layout {
+    flex-direction: column;
+  }
+
+  .glml-pane {
+    flex: none;
+    height: 40vh;
+  }
+
+  .right-column {
+    flex: none;
+    height: 60vh;
+  }
+
+  .webgl-pane {
+    height: 300px;
+    flex: none;
+  }
+
+  .glsl-pane {
+    flex: 1;
+  }
 }
 
 .pane-header {
