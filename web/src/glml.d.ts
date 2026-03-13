@@ -14,6 +14,4 @@ declare global {
   const glml: GlmlCompiler;
 }
 
-/// <reference types="vite/client" />
-
 export {};
