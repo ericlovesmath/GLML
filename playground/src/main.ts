@@ -1,4 +1,5 @@
 import * as monaco from "monaco-editor";
+import { initVimMode } from "monaco-vim";
 import { initRenderer, compileAndLinkGLSL } from "./renderer";
 import { EXAMPLES } from "./examples";
 
@@ -76,6 +77,27 @@ function main(): void {
 
   COMPILE.addEventListener("click", () => {
     compile(inputEditor.getValue());
+  });
+
+  inputEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () =>
+    compile(inputEditor.getValue()),
+  );
+
+  const VIM_TOGGLE = document.getElementById("vim-toggle") as HTMLInputElement;
+  const VIM_STATUS = document.getElementById("vim-status")!;
+  let vimMode: ReturnType<typeof initVimMode> | null = initVimMode(
+    inputEditor,
+    VIM_STATUS,
+  );
+
+  VIM_TOGGLE.addEventListener("change", () => {
+    if (VIM_TOGGLE.checked) {
+      vimMode = initVimMode(inputEditor, VIM_STATUS);
+    } else {
+      vimMode?.dispose();
+      vimMode = null;
+      VIM_STATUS.textContent = "";
+    }
   });
 
   inputEditor.setValue(EXAMPLES[0][1]);
