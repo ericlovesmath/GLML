@@ -3,20 +3,17 @@ open Core
 (** Passes in compiler available to be dumped, using GADT witnesses to have
     generic [sexp_of_pass] function with [trace] *)
 module Passes = struct
-  type dump_asts =
-    | Stlc of Stlc.t
-    | Uniquify of Stlc.t
-    | Typecheck of Typecheck.t
-    | Monomorphize of Typecheck.t
-    | Uncurry of Uncurry.t
-    | Lambda_lift of Lambda_lift.t
-    | Anf of Anf.t
-    | Tail_call of Tail_call.t
-    | Translate of Glsl.t
-    | Patch_main of Glsl.t
-  [@@deriving typed_variants]
-
-  type 'a pass = 'a Typed_variant_of_dump_asts.t
+  type _ pass =
+    | Stlc : Stlc.t pass
+    | Uniquify : Stlc.t pass
+    | Typecheck : Typecheck.t pass
+    | Monomorphize : Typecheck.t pass
+    | Uncurry : Uncurry.t pass
+    | Lambda_lift : Lambda_lift.t pass
+    | Anf : Anf.t pass
+    | Tail_call : Tail_call.t pass
+    | Translate : Glsl.t pass
+    | Patch_main : Glsl.t pass
 
   let sexp_of_pass : type a. a pass -> a -> Sexp.t = function
     | Stlc -> Stlc.sexp_of_t
@@ -31,17 +28,38 @@ module Passes = struct
     | Patch_main -> Glsl.sexp_of_t
   ;;
 
+  (* TODO: Maybe something like [typed_variants] in [ppx_typed_fields] can
+   cut down a lot of the repeated code here? This is basically a [Packed.t] *)
   module T = struct
-    include Typed_variant_of_dump_asts.Packed
-
-    let to_string ({ f = T p } : t) = Typed_variant_of_dump_asts.name p
-    let of_string s = List.find_exn all ~f:(fun t -> String.equal s (to_string t))
+    type t =
+      | Stlc
+      | Uniquify
+      | Typecheck
+      | Monomorphize
+      | Uncurry
+      | Lambda_lift
+      | Anf
+      | Tail_call
+      | Translate
+      | Patch_main
+    [@@deriving compare, sexp, enumerate, string ~capitalize:"lower sentence case"]
   end
 
   include T
   include Comparable.Make (T)
 
-  let of_pass : type a. a pass -> t = Typed_variant_of_dump_asts.Packed.pack
+  let of_pass : type a. a pass -> t = function
+    | Stlc -> Stlc
+    | Uniquify -> Uniquify
+    | Typecheck -> Typecheck
+    | Monomorphize -> Monomorphize
+    | Uncurry -> Uncurry
+    | Lambda_lift -> Lambda_lift
+    | Anf -> Anf
+    | Tail_call -> Tail_call
+    | Translate -> Translate
+    | Patch_main -> Patch_main
+  ;;
 end
 
 let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : string)

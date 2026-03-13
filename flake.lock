@@ -52,22 +52,6 @@
         "type": "github"
       }
     },
-    "janestreet-repo": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1768352831,
-        "narHash": "sha256-ztk4YyFdNTdX5lOdL/Pn0sr6TGmFqXUD8hvlh2w8jHM=",
-        "owner": "janestreet",
-        "repo": "opam-repository",
-        "rev": "7189f37af7eef83849b191d8f1e0e5d66ee78ce5",
-        "type": "github"
-      },
-      "original": {
-        "owner": "janestreet",
-        "repo": "opam-repository",
-        "type": "github"
-      }
-    },
     "mirage-opam-overlays": {
       "flake": false,
       "locked": {
@@ -181,7 +165,6 @@
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
-        "janestreet-repo": "janestreet-repo",
         "nixpkgs": [
           "opam-nix",
           "nixpkgs"

@@ -23,10 +23,7 @@
    ocaml
    js_of_ocaml
    js_of_ocaml-ppx
-   bonsai
-   bonsai_web_components
    core
    core_bench
-   ppx_jane
-   ppx_blob)
+   ppx_jane)
  (tags ("graphics" "shader" "DSL" "GLSL" "GLML" "compiler" "playground")))

@@ -1,14 +1,15 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from "vite";
 
 export default defineConfig({
-  publicDir: 'public',
+  base: "",
+  publicDir: "public",
   build: {
-    outDir: 'dist',
+    outDir: "dist",
     emptyOutDir: true,
   },
   server: {
     fs: {
-      allow: ['.', '../examples'],
+      allow: [".", "../examples"],
     },
   },
 });

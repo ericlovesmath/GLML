@@ -14,12 +14,9 @@ depends: [
   "ocaml"
   "js_of_ocaml"
   "js_of_ocaml-ppx"
-  "bonsai"
-  "bonsai_web_components"
   "core"
   "core_bench"
   "ppx_jane"
-  "ppx_blob"
   "odoc" {with-doc}
 ]
 build: [
