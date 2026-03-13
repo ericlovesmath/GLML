@@ -109,4 +109,8 @@ async function main(): Promise<void> {
   compile(EXAMPLES[0][1]);
 }
 
-main();
+if (document.readyState === "complete") {
+  main().catch(console.error);
+} else {
+  window.addEventListener("load", () => main().catch(console.error));
+}
