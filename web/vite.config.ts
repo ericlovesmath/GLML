@@ -6,4 +6,9 @@ export default defineConfig({
     outDir: '../dist/web',
     emptyOutDir: true,
   },
+  server: {
+    fs: {
+      allow: ['.', '../examples'],
+    },
+  },
 });

@@ -1,26 +1,11 @@
 import { initRenderer, compileAndLinkGLSL } from "./renderer";
+import { EXAMPLES } from "./examples";
 
 const GLSL_OUT = document.getElementById("glsl-output") as HTMLTextAreaElement;
 const ERROR_OUT = document.getElementById("error-output") as HTMLDivElement;
 const INPUT = document.getElementById("glml-input") as HTMLTextAreaElement;
 const COMPILE = document.getElementById("compile-btn") as HTMLButtonElement;
-
-const DEFAULT_EXAMPLE = `#extern vec2 u_resolution
-#extern float u_time
-
-let get_uv (coord : vec2) =
-  let top = 2.0 * coord - u_resolution in
-  let bot = #min(u_resolution.0, u_resolution.1) in
-  top / bot
-
-let main (coord : vec2) =
-  let uv = get_uv coord in
-  let wave = 5.0 * (uv.0 + uv.1) + u_time in
-  let r = #sin(wave) * 0.3 + 0.7 in
-  let g = #sin(wave + 2.0) * 0.3 + 0.7 in
-  let b = #sin(wave + 4.0) * 0.3 + 0.7 in
-  [ r, g, b ]
-`;
+const SELECT = document.getElementById("example-select") as HTMLSelectElement;
 
 function compile(source: string): void {
   const result = window.glml.compile(source);
@@ -42,12 +27,23 @@ function main(): void {
   const canvas = document.getElementById("gl-canvas") as HTMLCanvasElement;
   initRenderer(canvas);
 
-  INPUT.value = DEFAULT_EXAMPLE;
+  for (const [name] of EXAMPLES) {
+    const opt = document.createElement("option");
+    opt.textContent = name;
+    SELECT.appendChild(opt);
+  }
+
+  SELECT.addEventListener("change", () => {
+    const source = EXAMPLES[SELECT.selectedIndex][1];
+    INPUT.value = source;
+    compile(source);
+  });
 
   COMPILE.addEventListener("click", () => {
     compile(INPUT.value);
   });
 
+  INPUT.value = EXAMPLES[0][1];
   compile(INPUT.value);
 }
 

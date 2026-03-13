@@ -60,6 +60,15 @@ textarea {
   outline: none;
 }
 
+#example-select {
+  background: #16162a;
+  color: #aaa;
+  border: 1px solid #444;
+  font-size: 0.8rem;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
 #error-output {
   padding: 4px 10px;
   font-size: 0.8rem;
