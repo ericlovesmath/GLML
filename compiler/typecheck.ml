@@ -8,6 +8,30 @@ open Sexplib.Sexp
 open Stlc
 open Or_error.Let_syntax
 
+(** Internal typeclasses grouping GLSL types by their supported operations
+    Most of the typeclasses are borrowed directly from GLSL *)
+type type_class =
+  | GenType
+  | GenBType
+  | GenIType
+  | MatType
+  | Numeric
+  | Comparable
+  | Equatable
+[@@deriving sexp_of]
+
+(** Constraints emitted during type inference. *)
+type constr =
+  (* TODO: Factor out the [loc] into its own type again? *)
+  | Eq of Lexer.loc * ty * ty (** Standard equality constraint *)
+  | HasClass of Lexer.loc * type_class * ty (** Membership in a GLSL typeclass *)
+  | Broadcast of Lexer.loc * ty * ty * ty
+  (** Scalar-vector broadcasting (e.g. float + vec3) *)
+  | MulBroadcast of Lexer.loc * ty * ty * ty (** Matrix multiplication rules *)
+  | IndexAccess of Lexer.loc * ty * int * ty (** Vector/Matrix indexing *)
+  | FieldAccess of Lexer.loc * ty * string * ty (** Field access on a record *)
+[@@deriving sexp_of]
+
 type term_desc =
   | Var of string
   | Float of float
@@ -17,7 +41,7 @@ type term_desc =
   | Mat of int * int * term list
   | Lam of string * ty * term
   | App of term * term
-  | Let of recur * string * term * term
+  | Let of recur * string * constr list * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -44,11 +68,11 @@ let rec sexp_of_term_desc = function
   | Lam (v, ty, body) ->
     List [ Atom "lambda"; List [ Atom v; sexp_of_ty ty ]; sexp_of_term body ]
   | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
-  | Let (Rec (n, ty_opt), v, bind, body) ->
+  | Let (Rec (n, ty_opt), v, _constrs, bind, body) ->
     let ty = Option.sexp_of_t Stlc.sexp_of_ty ty_opt in
     let rec_tag = List [ Atom "rec"; Atom (Int.to_string n); ty ] in
     List [ Atom "let"; rec_tag; Atom v; sexp_of_term bind; sexp_of_term body ]
-  | Let (Nonrec, v, bind, body) ->
+  | Let (Nonrec, v, _constrs, bind, body) ->
     List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
   | If (c, t, e) -> List [ Atom "if"; sexp_of_term c; sexp_of_term t; sexp_of_term e ]
   | Bop (op, l, r) ->
@@ -71,6 +95,7 @@ type top =
   { desc : top_desc
   ; ty : ty
   ; loc : Lexer.loc
+  ; scheme_constrs : constr list
   }
 
 let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; Stlc.sexp_of_ty t.ty ]
@@ -80,36 +105,11 @@ type t = Program of top list [@@deriving sexp_of]
 (** Map from type variable names to their resolved types *)
 type substitution = (string * ty) list [@@deriving sexp_of]
 
-(** Represents polymorphic [forall 'vars. ty] *)
-type type_scheme = string list * ty [@@deriving sexp_of]
+(** Represents polymorphic [forall 'vars. constrs => ty] *)
+type type_scheme = string list * constr list * ty [@@deriving sexp_of]
 
 (** Maps type variables to type schemes *)
 type context = type_scheme String.Map.t
-
-(** Internal typeclasses grouping GLSL types by their supported operations
-    Most of the typeclasses are borrowed directly from GLSL *)
-type type_class =
-  | GenType
-  | GenBType
-  | GenIType
-  | MatType
-  | Numeric
-  | Comparable
-  | Equatable
-[@@deriving sexp_of] [@@warning "-37"]
-
-(* TODO: Factor out the [loc] into its own type again? *)
-
-(** Constraints emitted during type inference. *)
-type constr =
-  | Eq of Lexer.loc * ty * ty (** Standard equality constraint *)
-  | HasClass of Lexer.loc * type_class * ty (** Membership in a GLSL typeclass *)
-  | Broadcast of Lexer.loc * ty * ty * ty
-  (** Scalar-vector broadcasting (e.g. float + vec3) *)
-  | MulBroadcast of Lexer.loc * ty * ty * ty (** Matrix multiplication rules *)
-  | IndexAccess of Lexer.loc * ty * int * ty (** Vector/Matrix indexing *)
-  | FieldAccess of Lexer.loc * ty * string * ty (** Field access on a record *)
-[@@deriving sexp_of]
 
 let fresh_tyvar () = TyVar (Utils.fresh "v")
 
@@ -118,14 +118,6 @@ let rec subst_ty (sub : substitution) (ty : ty) : ty =
   | TyVar v -> List.Assoc.find ~equal:String.equal sub v |> Option.value ~default:ty
   | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ -> ty
   | TyArrow (f, x) -> TyArrow (subst_ty sub f, subst_ty sub x)
-;;
-
-let subst_context (sub : substitution) (ctx : context) : type_scheme String.Map.t =
-  Map.map ctx ~f:(fun (vars, ty) ->
-    let sub =
-      List.filter sub ~f:(fun (v, _) -> not (List.mem vars v ~equal:String.equal))
-    in
-    vars, subst_ty sub ty)
 ;;
 
 let subst_constraints (sub : substitution) (con : constr list) : constr list =
@@ -142,6 +134,14 @@ let subst_constraints (sub : substitution) (con : constr list) : constr list =
       FieldAccess (loc, subst_ty sub t, f, subst_ty sub ret))
 ;;
 
+let subst_context (sub : substitution) (ctx : context) : type_scheme String.Map.t =
+  Map.map ctx ~f:(fun (vars, constrs, ty) ->
+    let sub =
+      List.filter sub ~f:(fun (v, _) -> not (List.mem vars v ~equal:String.equal))
+    in
+    vars, subst_constraints sub constrs, subst_ty sub ty)
+;;
+
 (** Apply substitution to term *)
 let rec subst_term (sub : substitution) (t : term) : term =
   let subst = subst_term sub in
@@ -152,7 +152,8 @@ let rec subst_term (sub : substitution) (t : term) : term =
     | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:subst)
     | Lam (v, ty, body) -> Lam (v, subst_ty sub ty, subst body)
     | App (f, x) -> App (subst f, subst x)
-    | Let (recur, v, bind, body) -> Let (recur, v, subst bind, subst body)
+    | Let (recur, v, constrs, bind, body) ->
+      Let (recur, v, subst_constraints sub constrs, subst bind, subst body)
     | If (c, t, f) -> If (subst c, subst t, subst f)
     | Bop (op, l, r) -> Bop (op, subst l, subst r)
     | Index (t, i) -> Index (subst t, i)
@@ -169,11 +170,6 @@ let rec ftv_of_ty = function
   | TyArrow (t1, t2) -> Set.union (ftv_of_ty t1) (ftv_of_ty t2)
 ;;
 
-let ftv_of_context (ctx : context) : String.Set.t =
-  let ftv_of_scheme (vars, ty) = Set.diff (ftv_of_ty ty) (String.Set.of_list vars) in
-  Map.data ctx |> List.map ~f:ftv_of_scheme |> String.Set.union_list
-;;
-
 let ftv_of_constraint (con : constr) : String.Set.t =
   match con with
   | Eq (_, l, r) -> Set.union (ftv_of_ty l) (ftv_of_ty r)
@@ -184,13 +180,30 @@ let ftv_of_constraint (con : constr) : String.Set.t =
     Set.union (ftv_of_ty t) (ftv_of_ty ret)
 ;;
 
-(** Generalize a type by quantifying variables not in context or deferred constraints. *)
-let generalize (ctx : context) (deferred : constr list) (ty : ty) : type_scheme =
+let ftv_of_context (ctx : context) : String.Set.t =
+  let ftv_of_scheme (vars, constrs, ty) =
+    let bound = String.Set.of_list vars in
+    let ftv_constrs = String.Set.union_list (List.map constrs ~f:ftv_of_constraint) in
+    Set.diff (Set.union (ftv_of_ty ty) ftv_constrs) bound
+  in
+  Map.data ctx |> List.map ~f:ftv_of_scheme |> String.Set.union_list
+;;
+
+(** Generalize a type by quantifying variables not in context.
+    Constraints whose free vars are all generalizable go into the scheme;
+    remaining constraints propagate upward. *)
+let generalize (ctx : context) (deferred : constr list) (ty : ty)
+  : type_scheme * constr list
+  =
   let ftv_ty = ftv_of_ty ty in
+  let ftv_deferred_all = String.Set.union_list (List.map deferred ~f:ftv_of_constraint) in
   let ftv_ctx = ftv_of_context ctx in
-  let ftv_deferred = List.map ~f:ftv_of_constraint deferred in
-  let restricted = String.Set.union_list (ftv_ctx :: ftv_deferred) in
-  Set.to_list (Set.diff ftv_ty restricted), ty
+  let generalizable = Set.diff (Set.union ftv_ty ftv_deferred_all) ftv_ctx in
+  let scheme_constrs, remaining =
+    List.partition_tf deferred ~f:(fun c ->
+      Set.is_subset (ftv_of_constraint c) ~of_:generalizable)
+  in
+  (Set.to_list generalizable, scheme_constrs, ty), remaining
 ;;
 
 (** Unify two types into a substitution *)
@@ -203,13 +216,13 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Or_error.t =
       | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ -> false
       | TyArrow (ty, ty') -> occurs_in ty || occurs_in ty'
     in
-    if occurs_in ty
+    if equal_ty (TyVar v) ty
+    then unify con
+    else if occurs_in ty
     then
       error_s
         [%message
           "typecheck: recursive unification" (loc : Lexer.loc) (v : string) (ty : ty)]
-    else if equal_ty (TyVar v) ty
-    then unify con
     else (
       let%bind sub =
         unify
@@ -261,6 +274,12 @@ let resolve_constraints structs (constrs : constr list)
                  (ty : ty)])
     | Broadcast (loc, l, r, ret) :: rest ->
       (match l, r with
+       | TyVar a, TyVar b when String.equal a b ->
+         aux (Broadcast (loc, l, r, ret) :: deferred) ((loc, ret, l) :: eqs) rest
+       | TyFloat, TyVar _ ->
+         aux (Broadcast (loc, l, r, ret) :: deferred) ((loc, ret, r) :: eqs) rest
+       | TyVar _, TyFloat ->
+         aux (Broadcast (loc, l, r, ret) :: deferred) ((loc, ret, l) :: eqs) rest
        | TyVar _, _ | _, TyVar _ -> aux (Broadcast (loc, l, r, ret) :: deferred) eqs rest
        | TyFloat, TyFloat -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
        | TyInt, TyInt -> aux deferred ((loc, ret, TyInt) :: eqs) rest
@@ -274,6 +293,12 @@ let resolve_constraints structs (constrs : constr list)
            [%message "typecheck: invalid broadcast" (loc : Lexer.loc) (l : ty) (r : ty)])
     | MulBroadcast (loc, l, r, ret) :: rest ->
       (match l, r with
+       | TyVar a, TyVar b when String.equal a b ->
+         aux (MulBroadcast (loc, l, r, ret) :: deferred) ((loc, ret, l) :: eqs) rest
+       | TyFloat, TyVar _ ->
+         aux (MulBroadcast (loc, l, r, ret) :: deferred) ((loc, ret, r) :: eqs) rest
+       | TyVar _, TyFloat ->
+         aux (MulBroadcast (loc, l, r, ret) :: deferred) ((loc, ret, l) :: eqs) rest
        | TyVar _, _ | _, TyVar _ ->
          aux (MulBroadcast (loc, l, r, ret) :: deferred) eqs rest
        | TyMat (x, y), TyMat (w, z) when x = w && y = z ->
@@ -327,24 +352,35 @@ let resolve_constraints structs (constrs : constr list)
   aux [] [] constrs
 ;;
 
-(** Solve a set of constraints to produce a substitution. *)
-let solve structs (constrs : constr list) : substitution Or_error.t =
+(** Solve a set of constraints to produce a substitution and deferred constraints. *)
+let solve structs (constrs : constr list) : (substitution * constr list) Or_error.t =
   let rec go sub constrs =
     let%bind deferred, eqs = resolve_constraints structs constrs in
     if List.is_empty eqs
-    then
-      if List.is_empty deferred
-      then return sub
-      else
-        error_s
-          [%message "typecheck: unresolved overloaded operators" (deferred : constr list)]
+    then return (sub, deferred)
     else (
       let%bind new_sub = unify eqs in
-      let sub = List.map sub ~f:(fun (v, t) -> v, subst_ty new_sub t) @ new_sub in
-      let deferred = subst_constraints new_sub deferred in
-      go sub deferred)
+      if List.is_empty new_sub
+      then return (sub, deferred)
+      else (
+        let sub = List.map sub ~f:(fun (v, t) -> v, subst_ty new_sub t) @ new_sub in
+        let deferred = subst_constraints new_sub deferred in
+        go sub deferred))
   in
   go [] constrs
+;;
+
+(** Solve scheme constraints given an initial substitution from monomorphization.
+    Applies the sub to constraints, solves, and combines substitutions. *)
+let solve_scheme_constrs (constrs : constr list) (sub : substitution)
+  : substitution Or_error.t
+  =
+  if List.is_empty constrs
+  then return sub
+  else (
+    let constrs = subst_constraints sub constrs in
+    let%bind sub', _ = solve String.Map.empty constrs in
+    return (List.map sub ~f:(fun (v, t) -> v, subst_ty sub' t) @ sub'))
 ;;
 
 (** Value restriction check for generalization. *)
@@ -359,7 +395,7 @@ let rec is_value (t : Stlc.term) : bool =
 ;;
 
 (** Infer the type of a binding (used between top-level Define and inner Let).
-    Returns [substituted term * resolved type * new context] *)
+    Returns [substituted term * resolved type * new context * scheme constraints * remaining constraints] *)
 let rec infer_binding
           (structs : substitution String.Map.t)
           (ctx : context)
@@ -367,7 +403,7 @@ let rec infer_binding
           (bind_stlc : Stlc.term)
           (recur : recur)
           (v : string)
-  : (term * ty * context) Or_error.t
+  : (term * ty * context * constr list * constr list) Or_error.t
   =
   let ty_v_opt =
     match recur with
@@ -377,7 +413,7 @@ let rec infer_binding
   let ctx_gen =
     match ty_v_opt with
     | None -> ctx
-    | Some ty_v -> Map.set ctx ~key:v ~data:([], ty_v)
+    | Some ty_v -> Map.set ctx ~key:v ~data:([], [], ty_v)
   in
   let%bind bind, constrs_bind = gen_term structs ctx_gen bind_stlc in
   let constrs =
@@ -385,13 +421,19 @@ let rec infer_binding
     | None -> constrs_bind
     | Some ty_v -> Eq (loc, ty_v, bind.ty) :: constrs_bind
   in
-  let%bind sub_bind = solve structs constrs in
+  let%bind sub_bind, deferred = solve structs constrs in
   let ty_bind = subst_ty sub_bind bind.ty in
   let bind = subst_term sub_bind bind in
   let ctx = subst_context sub_bind ctx in
-  let scheme = if is_value bind_stlc then generalize ctx [] ty_bind else [], ty_bind in
+  let deferred = subst_constraints sub_bind deferred in
+  let scheme, remaining =
+    if is_value bind_stlc
+    then generalize ctx deferred ty_bind
+    else ([], [], ty_bind), deferred
+  in
+  let _, scheme_constrs, _ = scheme in
   let ctx = Map.set ctx ~key:v ~data:scheme in
-  Ok (bind, ty_bind, ctx)
+  Ok (bind, ty_bind, ctx, scheme_constrs, remaining)
 
 (** Generate typed term and constraints from STLC term. *)
 and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
@@ -402,21 +444,21 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
   | Int i -> make (Int i) TyInt []
   | Bool b -> make (Bool b) TyBool []
   | Var v ->
-    let%bind vs, ty_scheme =
+    let%bind vs, scheme_constrs, ty_scheme =
       match Map.find ctx v with
       | Some s -> Ok s
       | None ->
         error_s [%message "var not found in type map" (loc : Lexer.loc) (v : string)]
     in
     let sub = List.map vs ~f:(fun v -> v, fresh_tyvar ()) in
-    make (Var v) (subst_ty sub ty_scheme) []
+    make (Var v) (subst_ty sub ty_scheme) (subst_constraints sub scheme_constrs)
   | Lam (v, ty_ann, body) ->
     let ty_v =
       match ty_ann with
       | Some t -> t
       | None -> fresh_tyvar ()
     in
-    let ctx = Map.set ctx ~key:v ~data:([], ty_v) in
+    let ctx = Map.set ctx ~key:v ~data:([], [], ty_v) in
     let%bind body, constrs = gen_term structs ctx body in
     make (Lam (v, ty_v, body)) (TyArrow (ty_v, body.ty)) constrs
   | App (f, x) ->
@@ -426,13 +468,20 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
     let constrs = Eq (loc, f.ty, TyArrow (x.ty, ret_ty)) :: (constrs_f @ constrs_x) in
     make (App (f, x)) ret_ty constrs
   | Let (Nonrec, v, bind, body) ->
-    let%bind bind, _, ctx = infer_binding structs ctx loc bind Nonrec v in
+    let%bind bind, _, ctx, scheme_constrs, remaining =
+      infer_binding structs ctx loc bind Nonrec v
+    in
     let%bind body, constrs_body = gen_term structs ctx body in
-    make (Let (Nonrec, v, bind, body)) body.ty constrs_body
+    make (Let (Nonrec, v, scheme_constrs, bind, body)) body.ty (remaining @ constrs_body)
   | Let (Rec (n, ty_ann), v, bind, body) ->
-    let%bind bind, _, ctx = infer_binding structs ctx loc bind (Rec (n, ty_ann)) v in
+    let%bind bind, _, ctx, scheme_constrs, remaining =
+      infer_binding structs ctx loc bind (Rec (n, ty_ann)) v
+    in
     let%bind body, constrs_body = gen_term structs ctx body in
-    make (Let (Rec (n, ty_ann), v, bind, body)) body.ty constrs_body
+    make
+      (Let (Rec (n, ty_ann), v, scheme_constrs, bind, body))
+      body.ty
+      (remaining @ constrs_body)
   | If (c, t, e) ->
     let%bind c, constrs_c = gen_term structs ctx c in
     let%bind t, constrs_t = gen_term structs ctx t in
@@ -601,23 +650,49 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
       ~f:(fun (ctx, structs, acc) top ->
         match top.desc with
         | Define (Rec (n, ty_ann), v, bind) ->
-          let%bind bind, ty, ctx =
+          let%bind bind, ty, ctx, scheme_constrs, remaining =
             infer_binding structs ctx top.loc bind (Rec (n, ty_ann)) v
           in
-          let top = { desc = Define (Rec (n, ty_ann), v, bind); ty; loc = top.loc } in
-          Ok (ctx, structs, top :: acc)
+          if not (List.is_empty remaining)
+          then
+            error_s
+              [%message
+                "typecheck: unresolved top-level constraints" (remaining : constr list)]
+          else (
+            let top =
+              { desc = Define (Rec (n, ty_ann), v, bind)
+              ; ty
+              ; loc = top.loc
+              ; scheme_constrs
+              }
+            in
+            Ok (ctx, structs, top :: acc))
         | Define (Nonrec, v, bind) ->
-          let%bind bind, ty, ctx = infer_binding structs ctx top.loc bind Nonrec v in
-          let top = { desc = Define (Nonrec, v, bind); ty; loc = top.loc } in
-          Ok (ctx, structs, top :: acc)
+          let%bind bind, ty, ctx, scheme_constrs, remaining =
+            infer_binding structs ctx top.loc bind Nonrec v
+          in
+          if not (List.is_empty remaining)
+          then
+            error_s
+              [%message
+                "typecheck: unresolved top-level constraints" (remaining : constr list)]
+          else (
+            let top =
+              { desc = Define (Nonrec, v, bind); ty; loc = top.loc; scheme_constrs }
+            in
+            Ok (ctx, structs, top :: acc))
         | Extern (ty, v) ->
-          let ctx = Map.set ctx ~key:v ~data:([], ty) in
-          let top = { desc = Extern v; ty; loc = top.loc } in
+          let ctx = Map.set ctx ~key:v ~data:([], [], ty) in
+          let top = { desc = Extern v; ty; loc = top.loc; scheme_constrs = [] } in
           Ok (ctx, structs, top :: acc)
         | RecordDef (name, fields) ->
           let structs = Map.set structs ~key:name ~data:fields in
           let top =
-            { desc = RecordDef (name, fields); ty = TyRecord name; loc = top.loc }
+            { desc = RecordDef (name, fields)
+            ; ty = TyRecord name
+            ; loc = top.loc
+            ; scheme_constrs = []
+            }
           in
           Ok (ctx, structs, top :: acc))
   in

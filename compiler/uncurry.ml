@@ -99,7 +99,7 @@ and uncurry_term_desc (t : Typecheck.term_desc) : term_desc =
   | App (f, x) ->
     let f', args = collect_apps f in
     App (f', args @ [ uncurry_term x ])
-  | Let (recur, v, bind, body) -> Let (recur, v, uncurry_term bind, uncurry_term body)
+  | Let (recur, v, _, bind, body) -> Let (recur, v, uncurry_term bind, uncurry_term body)
   | If (c, t_true, e) -> If (uncurry_term c, uncurry_term t_true, uncurry_term e)
   | Bop (op, l, r) -> Bop (op, uncurry_term l, uncurry_term r)
   | Index (t_sub, i) -> Index (uncurry_term t_sub, i)

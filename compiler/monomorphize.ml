@@ -45,7 +45,7 @@ let collect_var_usages (name : string) (t : Typecheck.term) : ty list =
       List.fold ts ~init:acc ~f:walk
     | Lam (_, _, body) -> walk acc body
     | App (f, x) -> walk (walk acc f) x
-    | Let (_, _, bind, body) -> walk (walk acc bind) body
+    | Let (_, _, _, bind, body) -> walk (walk acc bind) body
     | If (c, t, e) -> walk (walk (walk acc c) t) e
     | Bop (_, l, r) -> walk (walk acc l) r
     | Index (t, _) | Field (t, _) -> walk acc t
@@ -65,10 +65,10 @@ let rec rename_var (src : string) (dst : string) (t : Typecheck.term) : Typechec
     | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:rename)
     | Lam (v, ty, body) -> if String.equal v src then t.desc else Lam (v, ty, rename body)
     | App (f, x) -> App (rename f, rename x)
-    | Let (recur, v, bind, body) ->
+    | Let (recur, v, constrs, bind, body) ->
       let bind = rename bind in
       let body = if String.equal v src then body else rename body in
-      Let (recur, v, bind, body)
+      Let (recur, v, constrs, bind, body)
     | If (c, t, e) -> If (rename c, rename t, rename e)
     | Bop (op, l, r) -> Bop (op, rename l, rename r)
     | Index (t, i) -> Index (rename t, i)
@@ -97,10 +97,10 @@ let rec rewrite_var_at_type
     | Lam (v, ty, body) ->
       if String.equal v name then t.desc else Lam (v, ty, rewrite body)
     | App (f, x) -> App (rewrite f, rewrite x)
-    | Let (recur, v, bind, body) ->
+    | Let (recur, v, constrs, bind, body) ->
       let bind = rewrite bind in
       let body = if String.equal v name then body else rewrite body in
-      Let (recur, v, bind, body)
+      Let (recur, v, constrs, bind, body)
     | If (c, t, e) -> If (rewrite c, rewrite t, rewrite e)
     | Bop (op, l, r) -> Bop (op, rewrite l, rewrite r)
     | Index (t, i) -> Index (rewrite t, i)
@@ -117,6 +117,7 @@ type poly_def =
   ; poly_bind : Typecheck.term
   ; poly_recur : recur
   ; poly_loc : Lexer.loc
+  ; poly_constrs : Typecheck.constr list
   }
 
 type poly_env = poly_def String.Map.t
@@ -138,7 +139,7 @@ let collect_poly_refs (poly_env : poly_env) (t : Typecheck.term) : (string * ty)
       List.fold ts ~init:acc ~f:walk
     | Lam (_, _, body) -> walk acc body
     | App (f, x) -> walk (walk acc f) x
-    | Let (_, _, bind, body) -> walk (walk acc bind) body
+    | Let (_, _, _, bind, body) -> walk (walk acc bind) body
     | If (c, t, e) -> walk (walk (walk acc c) t) e
     | Bop (_, l, r) -> walk (walk acc l) r
     | Index (t, _) | Field (t, _) -> walk acc t
@@ -177,6 +178,7 @@ let rec resolve_spec
     let spec_name = Utils.fresh (name ^ "_" ^ mangle_ty concrete_ty) in
     let spec_map = add_spec env name concrete_ty spec_name in
     let sub = subst ~poly:entry.poly_type ~concrete:concrete_ty in
+    let sub = Typecheck.solve_scheme_constrs entry.poly_constrs sub |> Or_error.ok_exn in
     let body = Typecheck.subst_term sub entry.poly_bind in
     (* For recursive functions, rename self-references *)
     let body =
@@ -199,7 +201,11 @@ let rec resolve_spec
       | Nonrec -> Nonrec
     in
     let top : Typecheck.top =
-      { desc = Define (recur, spec_name, body); ty = concrete_ty; loc = entry.poly_loc }
+      { desc = Define (recur, spec_name, body)
+      ; ty = concrete_ty
+      ; loc = entry.poly_loc
+      ; scheme_constrs = []
+      }
     in
     env, spec_name, dep_defs @ inner_defs @ [ top ]
 
@@ -231,7 +237,7 @@ and rewrite_refs (poly_env : poly_env) (env : spec_map) (t : Typecheck.term)
       let env, f, defs1 = rewrite_refs poly_env env f in
       let env, x, defs2 = rewrite_refs poly_env env x in
       App (f, x), env, defs1 @ defs2
-    | Let (recur, v, bind, body) when has_tyvars bind.ty ->
+    | Let (recur, v, constrs, bind, body) when has_tyvars bind.ty ->
       (* Specialization for inner polymorphic lets *)
       let usages = collect_var_usages v body in
       if List.is_empty usages
@@ -243,6 +249,7 @@ and rewrite_refs (poly_env : poly_env) (env : spec_map) (t : Typecheck.term)
         let env, specs, defs1 =
           List.fold usages ~init:(env, [], []) ~f:(fun (env, specs, defs) concrete_ty ->
             let sub = subst ~poly:bind.ty ~concrete:concrete_ty in
+            let sub = Typecheck.solve_scheme_constrs constrs sub |> Or_error.ok_exn in
             let spec_bind = Typecheck.subst_term sub bind in
             let spec_name = Utils.fresh (v ^ "_" ^ mangle_ty concrete_ty) in
             let env, spec_bind, new_defs = rewrite_refs poly_env env spec_bind in
@@ -269,7 +276,7 @@ and rewrite_refs (poly_env : poly_env) (env : spec_map) (t : Typecheck.term)
                  | Rec (n, _) -> Rec (n, Some concrete_ty)
                  | Nonrec -> Nonrec
                in
-               ({ desc = Let (recur, spec_name, spec_bind, acc)
+               ({ desc = Let (recur, spec_name, [], spec_bind, acc)
                 ; ty = acc.ty
                 ; loc = t.loc
                 }
@@ -277,10 +284,10 @@ and rewrite_refs (poly_env : poly_env) (env : spec_map) (t : Typecheck.term)
             .desc
         , env
         , defs1 @ defs2 ))
-    | Let (recur, v, bind, body) ->
+    | Let (recur, v, constrs, bind, body) ->
       let env, bind, defs1 = rewrite_refs poly_env env bind in
       let env, body, defs2 = rewrite_refs poly_env env body in
-      Let (recur, v, bind, body), env, defs1 @ defs2
+      Let (recur, v, constrs, bind, body), env, defs1 @ defs2
     | If (c, t, e) ->
       let env, c, defs1 = rewrite_refs poly_env env c in
       let env, t, defs2 = rewrite_refs poly_env env t in
@@ -328,6 +335,7 @@ let monomorphize (Program tops : Typecheck.t) : Typecheck.t Or_error.t =
             ; poly_bind = bind
             ; poly_recur = recur
             ; poly_loc = top.loc
+            ; poly_constrs = top.scheme_constrs
             }
           in
           let poly_env = Map.set poly_env ~key:v ~data:entry in

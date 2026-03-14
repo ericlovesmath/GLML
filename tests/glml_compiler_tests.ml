@@ -680,3 +680,98 @@ let%expect_test "advanced monomorphization example" =
     }
     |}]
 ;;
+
+let%expect_test "constrained polymorphism tests" =
+  test
+    {|
+    let f x y = x * y
+    let main (coord : vec2) = [f 1.0 2.0, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    float f_0_float_to_float_to_float_12(float x_1, float y_2) {
+        return (x_1 * y_2);
+    }
+    vec3 main_pure(vec2 coord_3) {
+        float anf_13 = f_0_float_to_float_to_float_12(1., 2.);
+        return vec3(anf_13, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+  |}];
+  test
+    {|
+    let scale x = x * 2.0 - 1.0
+
+    let main (coord : vec2) =
+      let v = scale [scale 1.0, 2.0] in
+      [v.0, v.1, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    float scale_0_float_to_float_13(float x_1) {
+        float anf_15 = (x_1 * 2.);
+        return (anf_15 - 1.);
+    }
+    vec2 scale_0_vec2_to_vec2_14(vec2 x_1) {
+        vec2 anf_16 = (x_1 * 2.);
+        return (anf_16 - 1.);
+    }
+    vec3 main_pure(vec2 coord_2) {
+        float anf_17 = scale_0_float_to_float_13(1.);
+        vec2 anf_18 = vec2(anf_17, 2.);
+        vec2 v_3 = scale_0_vec2_to_vec2_14(anf_18);
+        float anf_19 = v_3[0];
+        float anf_20 = v_3[1];
+        return vec3(anf_19, anf_20, 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+  |}];
+  test
+    {|
+    let f v = (v - #floor(v)).0
+
+    let main (coord : vec2) =
+      let a = f [0.5, 1.5] in
+      let b = f [0.5, 1.5, 2.5] in
+      [a, b, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    float f_0_vec3_to_float_15(vec3 v_1) {
+        vec3 anf_17 = floor(v_1);
+        vec3 anf_18 = (v_1 - anf_17);
+        return anf_18[0];
+    }
+    float f_0_vec2_to_float_16(vec2 v_1) {
+        vec2 anf_19 = floor(v_1);
+        vec2 anf_20 = (v_1 - anf_19);
+        return anf_20[0];
+    }
+    vec3 main_pure(vec2 coord_2) {
+        vec2 anf_21 = vec2(0.5, 1.5);
+        float a_3 = f_0_vec2_to_float_16(anf_21);
+        vec3 anf_22 = vec3(0.5, 1.5, 2.5);
+        float b_4 = f_0_vec3_to_float_15(anf_22);
+        return vec3(a_3, b_4, 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
