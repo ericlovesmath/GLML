@@ -31,6 +31,8 @@ async function main(): Promise<void> {
     theme: "catppuccin",
     minimap: { enabled: false },
     fontSize: 13,
+    fontFamily:
+      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
     lineNumbers: "on",
     scrollBeyondLastLine: false,
     automaticLayout: true,
