@@ -8,10 +8,10 @@ import warpedNoise from "../../examples/warped_noise.glml?raw";
 
 export const EXAMPLES: [string, string][] = [
   ["Metallic Liquid", warpedNoise],
+  ["Raymarching", raymarch],
+  ["Mandelbrot", mandelbrot],
+  ["Recursive Star", recursion],
+  ["Mouse Tracking", mouseCircle],
   ["Pastel Rainbow", rainbow],
   ["Checkerboard", checkerboard],
-  ["Mandelbrot", mandelbrot],
-  ["Mouse Circle", mouseCircle],
-  ["Recursive Star", recursion],
-  ["Raymarching", raymarch],
 ];

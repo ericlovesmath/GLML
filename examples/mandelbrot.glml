@@ -2,7 +2,7 @@
 #extern float u_time
 
 // Normalizes coordinates to [-1, 1] and handles aspect ratio
-let get_uv (coord : vec2) =
+let get_uv coord =
   let top = 2.0 * coord - u_resolution in
   let bot = #min(u_resolution.0, u_resolution.1) in
   top / bot
@@ -11,7 +11,7 @@ let get_uv (coord : vec2) =
 // zx, zy: Current state
 // cx, cy: Constant location
 // i: Iteration counter (float to avoid casting)
-let rec mandel (zx : float) (zy : float) (cx : float) (cy : float) i =
+let rec mandel zx zy cx cy i =
   if #length([zx, zy]) > 2. || i > 150. then
     i
   else

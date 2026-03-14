@@ -21,7 +21,7 @@ let smoothNoise (p : vec2) =
   #dot(res_v, [1.0 - inter.0, inter.0])
 
 // Fractional Brownian Motion (FBM)
-let fractalNoise (p : vec2) =
+let fractalNoise p =
   smoothNoise(p) * 0.5333 +
   smoothNoise(p * 2.0) * 0.2667 +
   smoothNoise(p * 4.0) * 0.1333 +
