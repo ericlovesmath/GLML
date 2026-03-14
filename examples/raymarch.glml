@@ -33,7 +33,7 @@ let map (p : vec3) =
 
 // Raymarching Loop
 let march (ro : vec3) (rd : vec3) =
-  let march (t : float) (steps : int) =
+  let rec march (t : float) (steps : int) =
     if steps > 80 then t
     else
       let d = map (ro + rd * t) in
