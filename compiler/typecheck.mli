@@ -64,7 +64,31 @@ type t = Program of top list [@@deriving sexp_of]
 
 type substitution = (string * Stlc.ty) list
 
-(* TODO: Add documentation to functions below (used in monomorphization) *)
+(** Applies a [substitution] to all type annotations in a typed [term].
+    Used by [Monomorphize] to instantiate polymorphic bindings at concrete types. *)
 val subst_term : substitution -> term -> term
+
+(** Given a scheme's deferred constraints and a substitution mapping its tyvars
+    to concrete types, applies [substitution], then solves the remaining constraints.
+    Used by [Monomorphize] after instantiate polymorphic bindings. *)
 val solve_scheme_constrs : constr list -> substitution -> substitution Or_error.t
+
+(** Typechecker using Hindley-Milner extended with GLSL-specific constraints.
+
+    Inference generates typed terms and collects [constr] goals, solved with unification,
+    and contains the following constraints (closed universe of "typeclasses")
+
+    - [Broadcast (l, r, ret)] — Broadcasting binary operators for Scalar/Vec/Mats, e.g. [float op vec3 = vec3], [vec3 op vec3 = vec3]
+    - [MulBroadcast (l, r, ret)] — Broadcasting [*] for Vec/Mat, e.g. [mat3x4 * vec4 = vec3], [mat2x3 * mat4x2 = mat4x3]
+    - [IndexAccess (t, i, ret)] — Vec/Mat indexing, e.g. [vec.0 = float]
+    - [FieldAccess (t, field, ret)] — Record field access
+    - [Eq (ty, ty')] — Polymorphic equality
+    - [HasClass (cls, ty)] — Enforces typeclass membership (used to defer constraint checking), e.g. [#sin] has class [GenType] (float, vec)
+
+    Helpful references that were used:
+
+    - Typing Haskell in Haskell: [https://web.cecs.pdx.edu/~mpj/thih/thih.pdf]
+    - Type Inference with Constrained Types: [https://www.cs.tufts.edu/~nr/cs257/archive/martin-odersky/hmx.pdf]
+    - Demystifying Typeclasses: [https://okmij.org/ftp/Computation/typeclass.html]
+    *)
 val typecheck : Stlc.t -> t Or_error.t

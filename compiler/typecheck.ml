@@ -1,8 +1,6 @@
 (** Typechecking is done with Hindley-Milner inference (Algorithm W), but extended
     with typeclasses and broadcasting specific for operator overloading in GLSL *)
 
-(* TODO: Add more documentation on the relevant papers *)
-
 open Core
 open Sexplib.Sexp
 open Stlc
