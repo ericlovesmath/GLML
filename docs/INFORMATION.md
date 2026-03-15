@@ -12,6 +12,11 @@ Currently a mess, will organize later (if ever)
 - Implicit error field added to every function to propagate error color back
 - Move mod to nonbinop version as that is a gentype, add more builtins
 - Allow clicking through all passes in GLSL output window
+- main is mangled so make sure that doesn't happen, must be fixed to coord vec2
+- add types to monomorphorphization stage
+- Add builtin GLSL function callers or GLSL extern libraries
+- Add user definable constrained functions
+- Add support for LSP hover or something like an [inspect]
 
 # Remaining Compilation Passes
 

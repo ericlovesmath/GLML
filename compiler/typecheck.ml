@@ -19,15 +19,19 @@ type type_class =
 [@@deriving sexp_of]
 
 (** Constraints emitted during type inference. *)
+type constr_desc =
+  | Eq of ty * ty (** Standard equality constraint *)
+  | HasClass of type_class * ty (** Membership in a GLSL typeclass *)
+  | Broadcast of ty * ty * ty (** Scalar-vector broadcasting (e.g. float + vec3) *)
+  | MulBroadcast of ty * ty * ty (** Matrix multiplication rules *)
+  | IndexAccess of ty * int * ty (** Vector/Matrix indexing *)
+  | FieldAccess of ty * string * ty (** Field access on a record *)
+[@@deriving sexp_of]
+
 type constr =
-  (* TODO: Factor out the [loc] into its own type again? *)
-  | Eq of Lexer.loc * ty * ty (** Standard equality constraint *)
-  | HasClass of Lexer.loc * type_class * ty (** Membership in a GLSL typeclass *)
-  | Broadcast of Lexer.loc * ty * ty * ty
-  (** Scalar-vector broadcasting (e.g. float + vec3) *)
-  | MulBroadcast of Lexer.loc * ty * ty * ty (** Matrix multiplication rules *)
-  | IndexAccess of Lexer.loc * ty * int * ty (** Vector/Matrix indexing *)
-  | FieldAccess of Lexer.loc * ty * string * ty (** Field access on a record *)
+  { desc : constr_desc
+  ; loc : Lexer.loc
+  }
 [@@deriving sexp_of]
 
 type term_desc =
@@ -119,17 +123,19 @@ let rec subst_ty (sub : substitution) (ty : ty) : ty =
 ;;
 
 let subst_constraints (sub : substitution) (con : constr list) : constr list =
-  List.map con ~f:(function
-    | Eq (loc, l, r) -> Eq (loc, subst_ty sub l, subst_ty sub r)
-    | HasClass (loc, cls, ty) -> HasClass (loc, cls, subst_ty sub ty)
-    | Broadcast (loc, l, r, ret) ->
-      Broadcast (loc, subst_ty sub l, subst_ty sub r, subst_ty sub ret)
-    | MulBroadcast (loc, l, r, ret) ->
-      MulBroadcast (loc, subst_ty sub l, subst_ty sub r, subst_ty sub ret)
-    | IndexAccess (loc, t, i, ret) ->
-      IndexAccess (loc, subst_ty sub t, i, subst_ty sub ret)
-    | FieldAccess (loc, t, f, ret) ->
-      FieldAccess (loc, subst_ty sub t, f, subst_ty sub ret))
+  List.map con ~f:(fun c ->
+    let desc =
+      match c.desc with
+      | Eq (l, r) -> Eq (subst_ty sub l, subst_ty sub r)
+      | HasClass (cls, ty) -> HasClass (cls, subst_ty sub ty)
+      | Broadcast (l, r, ret) ->
+        Broadcast (subst_ty sub l, subst_ty sub r, subst_ty sub ret)
+      | MulBroadcast (l, r, ret) ->
+        MulBroadcast (subst_ty sub l, subst_ty sub r, subst_ty sub ret)
+      | IndexAccess (t, i, ret) -> IndexAccess (subst_ty sub t, i, subst_ty sub ret)
+      | FieldAccess (t, f, ret) -> FieldAccess (subst_ty sub t, f, subst_ty sub ret)
+    in
+    { c with desc })
 ;;
 
 let subst_context (sub : substitution) (ctx : context) : type_scheme String.Map.t =
@@ -168,13 +174,13 @@ let rec ftv_of_ty = function
   | TyArrow (t1, t2) -> Set.union (ftv_of_ty t1) (ftv_of_ty t2)
 ;;
 
-let ftv_of_constraint (con : constr) : String.Set.t =
-  match con with
-  | Eq (_, l, r) -> Set.union (ftv_of_ty l) (ftv_of_ty r)
-  | HasClass (_, _, ty) -> ftv_of_ty ty
-  | Broadcast (_, l, r, ret) | MulBroadcast (_, l, r, ret) ->
+let ftv_of_constraint (c : constr) : String.Set.t =
+  match c.desc with
+  | Eq (l, r) -> Set.union (ftv_of_ty l) (ftv_of_ty r)
+  | HasClass (_, ty) -> ftv_of_ty ty
+  | Broadcast (l, r, ret) | MulBroadcast (l, r, ret) ->
     String.Set.union_list [ ftv_of_ty l; ftv_of_ty r; ftv_of_ty ret ]
-  | IndexAccess (_, t, _, ret) | FieldAccess (_, t, _, ret) ->
+  | IndexAccess (t, _, ret) | FieldAccess (t, _, ret) ->
     Set.union (ftv_of_ty t) (ftv_of_ty ret)
 ;;
 
@@ -254,12 +260,13 @@ let check_class (cls : type_class) (ty : ty) : bool =
 let resolve_constraints structs (constrs : constr list)
   : (constr list * (Lexer.loc * ty * ty) list) Or_error.t
   =
-  let rec aux deferred eqs = function
+  let rec aux deferred eqs (constrs : constr list) =
+    match constrs with
     | [] -> return (List.rev deferred, List.rev eqs)
-    | Eq (loc, l, r) :: rest -> aux deferred ((loc, l, r) :: eqs) rest
-    | HasClass (loc, cls, ty) :: rest ->
+    | { desc = Eq (l, r); loc } :: rest -> aux deferred ((loc, l, r) :: eqs) rest
+    | ({ desc = HasClass (cls, ty); loc } as c) :: rest ->
       (match ty with
-       | TyVar _ -> aux (HasClass (loc, cls, ty) :: deferred) eqs rest
+       | TyVar _ -> aux (c :: deferred) eqs rest
        | _ ->
          if check_class cls ty
          then aux deferred eqs rest
@@ -270,15 +277,13 @@ let resolve_constraints structs (constrs : constr list)
                  (loc : Lexer.loc)
                  (cls : type_class)
                  (ty : ty)])
-    | Broadcast (loc, l, r, ret) :: rest ->
+    | ({ desc = Broadcast (l, r, ret); loc } as c) :: rest ->
       (match l, r with
        | TyVar a, TyVar b when String.equal a b ->
-         aux (Broadcast (loc, l, r, ret) :: deferred) ((loc, ret, l) :: eqs) rest
-       | TyFloat, TyVar _ ->
-         aux (Broadcast (loc, l, r, ret) :: deferred) ((loc, ret, r) :: eqs) rest
-       | TyVar _, TyFloat ->
-         aux (Broadcast (loc, l, r, ret) :: deferred) ((loc, ret, l) :: eqs) rest
-       | TyVar _, _ | _, TyVar _ -> aux (Broadcast (loc, l, r, ret) :: deferred) eqs rest
+         aux (c :: deferred) ((loc, ret, l) :: eqs) rest
+       | TyFloat, TyVar _ -> aux (c :: deferred) ((loc, ret, r) :: eqs) rest
+       | TyVar _, TyFloat -> aux (c :: deferred) ((loc, ret, l) :: eqs) rest
+       | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
        | TyFloat, TyFloat -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
        | TyInt, TyInt -> aux deferred ((loc, ret, TyInt) :: eqs) rest
        | TyVec n, TyVec n' when n = n' -> aux deferred ((loc, ret, TyVec n) :: eqs) rest
@@ -289,16 +294,13 @@ let resolve_constraints structs (constrs : constr list)
        | _ ->
          error_s
            [%message "typecheck: invalid broadcast" (loc : Lexer.loc) (l : ty) (r : ty)])
-    | MulBroadcast (loc, l, r, ret) :: rest ->
+    | ({ desc = MulBroadcast (l, r, ret); loc } as c) :: rest ->
       (match l, r with
        | TyVar a, TyVar b when String.equal a b ->
-         aux (MulBroadcast (loc, l, r, ret) :: deferred) ((loc, ret, l) :: eqs) rest
-       | TyFloat, TyVar _ ->
-         aux (MulBroadcast (loc, l, r, ret) :: deferred) ((loc, ret, r) :: eqs) rest
-       | TyVar _, TyFloat ->
-         aux (MulBroadcast (loc, l, r, ret) :: deferred) ((loc, ret, l) :: eqs) rest
-       | TyVar _, _ | _, TyVar _ ->
-         aux (MulBroadcast (loc, l, r, ret) :: deferred) eqs rest
+         aux (c :: deferred) ((loc, ret, l) :: eqs) rest
+       | TyFloat, TyVar _ -> aux (c :: deferred) ((loc, ret, r) :: eqs) rest
+       | TyVar _, TyFloat -> aux (c :: deferred) ((loc, ret, l) :: eqs) rest
+       | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
        | TyMat (x, y), TyMat (w, z) when x = w && y = z ->
          aux deferred ((loc, ret, TyMat (x, y)) :: eqs) rest
        | TyMat (x, y), TyFloat | TyFloat, TyMat (x, y) ->
@@ -316,7 +318,7 @@ let resolve_constraints structs (constrs : constr list)
          error_s
            [%message
              "typecheck: invalid mul/div broadcast" (loc : Lexer.loc) (l : ty) (r : ty)])
-    | IndexAccess (loc, t, i, ret) :: rest ->
+    | ({ desc = IndexAccess (t, i, ret); loc } as c) :: rest ->
       (match t with
        | TyVec n ->
          if 0 <= i && i < n
@@ -330,11 +332,11 @@ let resolve_constraints structs (constrs : constr list)
          else
            error_s
              [%message "mat index out of bounds" (loc : Lexer.loc) (x : int) (i : int)]
-       | TyVar _ -> aux (IndexAccess (loc, t, i, ret) :: deferred) eqs rest
+       | TyVar _ -> aux (c :: deferred) eqs rest
        | ty -> error_s [%message "expected vec or mat" (loc : Lexer.loc) (ty : ty)])
-    | FieldAccess (loc, ty, f, ret) :: rest ->
+    | ({ desc = FieldAccess (ty, f, ret); loc } as c) :: rest ->
       (match ty with
-       | TyVar _ -> aux (FieldAccess (loc, ty, f, ret) :: deferred) eqs rest
+       | TyVar _ -> aux (c :: deferred) eqs rest
        | TyRecord struct_name ->
          (match Map.find structs struct_name with
           | None -> error_s [%message "unknown struct" (loc : Lexer.loc) struct_name]
@@ -414,10 +416,11 @@ let rec infer_binding
     | Some ty_v -> Map.set ctx ~key:v ~data:([], [], ty_v)
   in
   let%bind bind, constrs_bind = gen_term structs ctx_gen bind_stlc in
+  let constr desc = { desc; loc } in
   let constrs =
     match ty_v_opt with
     | None -> constrs_bind
-    | Some ty_v -> Eq (loc, ty_v, bind.ty) :: constrs_bind
+    | Some ty_v -> constr (Eq (ty_v, bind.ty)) :: constrs_bind
   in
   let%bind sub_bind, deferred = solve structs constrs in
   let ty_bind = subst_ty sub_bind bind.ty in
@@ -437,6 +440,7 @@ let rec infer_binding
 and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
   let loc = t.loc in
   let make desc ty constrs = Ok (({ desc; ty; loc } : term), constrs) in
+  let constr desc = { desc; loc } in
   match t.desc with
   | Float f -> make (Float f) TyFloat []
   | Int i -> make (Int i) TyInt []
@@ -463,7 +467,7 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
     let%bind f, constrs_f = gen_term structs ctx f in
     let%bind x, constrs_x = gen_term structs ctx x in
     let ret_ty = fresh_tyvar () in
-    let constrs = Eq (loc, f.ty, TyArrow (x.ty, ret_ty)) :: (constrs_f @ constrs_x) in
+    let constrs = constr (Eq (f.ty, TyArrow (x.ty, ret_ty))) :: (constrs_f @ constrs_x) in
     make (App (f, x)) ret_ty constrs
   | Let (Nonrec, v, bind, body) ->
     let%bind bind, _, ctx, scheme_constrs, remaining =
@@ -485,7 +489,9 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
     let%bind t, constrs_t = gen_term structs ctx t in
     let%bind e, constrs_e = gen_term structs ctx e in
     let constrs =
-      Eq (loc, c.ty, TyBool) :: Eq (loc, t.ty, e.ty) :: (constrs_c @ constrs_t @ constrs_e)
+      constr (Eq (c.ty, TyBool))
+      :: constr (Eq (t.ty, e.ty))
+      :: (constrs_c @ constrs_t @ constrs_e)
     in
     make (If (c, t, e)) t.ty constrs
   | Bop (op, l, r) ->
@@ -494,31 +500,34 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
     let ret_ty = fresh_tyvar () in
     let op_constrs =
       match op with
-      | Add | Sub -> [ Broadcast (loc, l.ty, r.ty, ret_ty) ]
+      | Add | Sub -> [ constr (Broadcast (l.ty, r.ty, ret_ty)) ]
       | Mod ->
-        [ HasClass (loc, GenType, l.ty)
-        ; HasClass (loc, GenType, r.ty)
-        ; Broadcast (loc, l.ty, r.ty, ret_ty)
+        [ constr (HasClass (GenType, l.ty))
+        ; constr (HasClass (GenType, r.ty))
+        ; constr (Broadcast (l.ty, r.ty, ret_ty))
         ]
-      | Mul | Div -> [ MulBroadcast (loc, l.ty, r.ty, ret_ty) ]
+      | Mul | Div -> [ constr (MulBroadcast (l.ty, r.ty, ret_ty)) ]
       | Eq ->
-        [ HasClass (loc, Equatable, l.ty)
-        ; Eq (loc, l.ty, r.ty)
-        ; Eq (loc, ret_ty, TyBool)
+        [ constr (HasClass (Equatable, l.ty))
+        ; constr (Eq (l.ty, r.ty))
+        ; constr (Eq (ret_ty, TyBool))
         ]
       | Lt | Gt | Leq | Geq ->
-        [ HasClass (loc, Comparable, l.ty)
-        ; Eq (loc, l.ty, r.ty)
-        ; Eq (loc, ret_ty, TyBool)
+        [ constr (HasClass (Comparable, l.ty))
+        ; constr (Eq (l.ty, r.ty))
+        ; constr (Eq (ret_ty, TyBool))
         ]
       | And | Or ->
-        [ Eq (loc, l.ty, TyBool); Eq (loc, r.ty, TyBool); Eq (loc, ret_ty, TyBool) ]
+        [ constr (Eq (l.ty, TyBool))
+        ; constr (Eq (r.ty, TyBool))
+        ; constr (Eq (ret_ty, TyBool))
+        ]
     in
     make (Bop (op, l, r)) ret_ty (op_constrs @ constrs_l @ constrs_r)
   | Index (t, i) ->
     let%bind t, constrs_t = gen_term structs ctx t in
     let ret_ty = fresh_tyvar () in
-    make (Index (t, i)) ret_ty (IndexAccess (loc, t.ty, i, ret_ty) :: constrs_t)
+    make (Index (t, i)) ret_ty (constr (IndexAccess (t.ty, i, ret_ty)) :: constrs_t)
   | Builtin (b, args) ->
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
@@ -545,39 +554,48 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
           | Sign
           | Floor
           | Ceil )
-        , [ t ] ) -> Ok [ HasClass (loc, GenType, t); Eq (loc, ty, t) ]
+        , [ t ] ) -> Ok [ constr (HasClass (GenType, t)); constr (Eq (ty, t)) ]
       | (Min | Max | Pow), [ t; t' ] ->
-        Ok [ HasClass (loc, GenType, ty); Broadcast (loc, t, t', ty) ]
+        Ok [ constr (HasClass (GenType, ty)); constr (Broadcast (t, t', ty)) ]
       | Clamp, [ t; t'; t'' ] ->
         let tmp = fresh_tyvar () in
         Ok
-          [ HasClass (loc, GenType, ty)
-          ; Broadcast (loc, t', t'', tmp)
-          ; Broadcast (loc, t, tmp, ty)
+          [ constr (HasClass (GenType, ty))
+          ; constr (Broadcast (t', t'', tmp))
+          ; constr (Broadcast (t, tmp, ty))
           ]
       | Mix, [ t; t'; t'' ] ->
         let tmp = fresh_tyvar () in
         Ok
-          [ HasClass (loc, GenType, ty)
-          ; Broadcast (loc, t, t', tmp)
-          ; Broadcast (loc, tmp, t'', ty)
+          [ constr (HasClass (GenType, ty))
+          ; constr (Broadcast (t, t', tmp))
+          ; constr (Broadcast (tmp, t'', ty))
           ]
-      | Length, [ t ] -> Ok [ HasClass (loc, GenType, t); Eq (loc, ty, TyFloat) ]
+      | Length, [ t ] -> Ok [ constr (HasClass (GenType, t)); constr (Eq (ty, TyFloat)) ]
       | (Distance | Dot), [ t; t' ] ->
-        Ok [ HasClass (loc, GenType, t); Eq (loc, t, t'); Eq (loc, ty, TyFloat) ]
+        Ok
+          [ constr (HasClass (GenType, t))
+          ; constr (Eq (t, t'))
+          ; constr (Eq (ty, TyFloat))
+          ]
       | Cross, [ t; t' ] ->
-        Ok [ Eq (loc, t, TyVec 3); Eq (loc, t', TyVec 3); Eq (loc, ty, TyVec 3) ]
-      | Normalize, [ t ] -> Ok [ HasClass (loc, GenType, t); Eq (loc, ty, t) ]
-      | Fract, [ t ] -> Ok [ HasClass (loc, GenType, t); Eq (loc, ty, t) ]
-      | Step, [ t; t' ] -> Ok [ HasClass (loc, GenType, ty); Broadcast (loc, t, t', ty) ]
+        Ok
+          [ constr (Eq (t, TyVec 3))
+          ; constr (Eq (t', TyVec 3))
+          ; constr (Eq (ty, TyVec 3))
+          ]
+      | Normalize, [ t ] -> Ok [ constr (HasClass (GenType, t)); constr (Eq (ty, t)) ]
+      | Fract, [ t ] -> Ok [ constr (HasClass (GenType, t)); constr (Eq (ty, t)) ]
+      | Step, [ t; t' ] ->
+        Ok [ constr (HasClass (GenType, ty)); constr (Broadcast (t, t', ty)) ]
       | Reflect, [ t; t' ] ->
-        Ok [ HasClass (loc, GenType, t); Eq (loc, t, t'); Eq (loc, ty, t) ]
+        Ok [ constr (HasClass (GenType, t)); constr (Eq (t, t')); constr (Eq (ty, t)) ]
       | Smoothstep, [ t; t'; t'' ] ->
         let tmp = fresh_tyvar () in
         Ok
-          [ HasClass (loc, GenType, ty)
-          ; Broadcast (loc, t, t', tmp)
-          ; Broadcast (loc, tmp, t'', ty)
+          [ constr (HasClass (GenType, ty))
+          ; constr (Broadcast (t, t', tmp))
+          ; constr (Broadcast (tmp, t'', ty))
           ]
       | _ ->
         error_s
@@ -588,7 +606,7 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
         let%bind arg, constrs = gen_term structs ctx arg in
-        return (arg :: acc_args, (Eq (loc, arg.ty, TyFloat) :: constrs) @ acc_constrs))
+        return (arg :: acc_args, (constr (Eq (arg.ty, TyFloat)) :: constrs) @ acc_constrs))
     in
     let args = List.rev args in
     if List.length args = n
@@ -598,7 +616,7 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
         let%bind arg, constrs = gen_term structs ctx arg in
-        return (arg :: acc_args, (Eq (loc, arg.ty, TyFloat) :: constrs) @ acc_constrs))
+        return (arg :: acc_args, (constr (Eq (arg.ty, TyFloat)) :: constrs) @ acc_constrs))
     in
     let args = List.rev args in
     if List.length args = n * m
@@ -628,7 +646,7 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
              match List.Assoc.find fields ~equal:String.equal name with
              | Some arg ->
                let%bind arg, constrs = gen_term structs ctx arg in
-               return (arg :: acc, (Eq (loc, arg.ty, ty) :: constrs) @ acc_constrs)
+               return (arg :: acc, (constr (Eq (arg.ty, ty)) :: constrs) @ acc_constrs)
              | None ->
                error_s [%message "(unreachable) missing field" (loc : Lexer.loc) name])
        in
@@ -636,7 +654,7 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
   | Field (t, f) ->
     let%bind t, constrs_t = gen_term structs ctx t in
     let ret_ty = fresh_tyvar () in
-    make (Field (t, f)) ret_ty (FieldAccess (loc, t.ty, f, ret_ty) :: constrs_t)
+    make (Field (t, f)) ret_ty (constr (FieldAccess (t.ty, f, ret_ty)) :: constrs_t)
 ;;
 
 let typecheck (Program terms : Stlc.t) : t Or_error.t =

@@ -11,13 +11,19 @@ type type_class =
   | Equatable
 [@@deriving sexp_of]
 
+type constr_desc =
+  | Eq of ty * ty
+  | HasClass of type_class * ty
+  | Broadcast of ty * ty * ty
+  | MulBroadcast of ty * ty * ty
+  | IndexAccess of ty * int * ty
+  | FieldAccess of ty * string * ty
+[@@deriving sexp_of]
+
 type constr =
-  | Eq of Lexer.loc * ty * ty
-  | HasClass of Lexer.loc * type_class * ty
-  | Broadcast of Lexer.loc * ty * ty * ty
-  | MulBroadcast of Lexer.loc * ty * ty * ty
-  | IndexAccess of Lexer.loc * ty * int * ty
-  | FieldAccess of Lexer.loc * ty * string * ty
+  { desc : constr_desc
+  ; loc : Lexer.loc
+  }
 [@@deriving sexp_of]
 
 type term_desc =
