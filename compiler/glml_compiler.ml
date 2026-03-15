@@ -7,7 +7,7 @@ module Passes = struct
     | Stlc : Stlc.t pass
     | Uniquify : Stlc.t pass
     | Typecheck : Typecheck.t pass
-    | Monomorphize : Typecheck.t pass
+    | Monomorphize : Monomorphize.t pass
     | Uncurry : Uncurry.t pass
     | Lambda_lift : Lambda_lift.t pass
     | Anf : Anf.t pass
@@ -19,7 +19,7 @@ module Passes = struct
     | Stlc -> Stlc.sexp_of_t
     | Uniquify -> Stlc.sexp_of_t
     | Typecheck -> Typecheck.sexp_of_t
-    | Monomorphize -> Typecheck.sexp_of_t
+    | Monomorphize -> Monomorphize.sexp_of_t
     | Uncurry -> Uncurry.sexp_of_t
     | Lambda_lift -> Lambda_lift.sexp_of_t
     | Anf -> Anf.sexp_of_t

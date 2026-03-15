@@ -19,7 +19,7 @@ type term_desc =
 
 and term =
   { desc : term_desc
-  ; ty : Stlc.ty
+  ; ty : Monomorphize.ty
   ; loc : Lexer.loc
   }
 [@@deriving sexp_of]
@@ -27,19 +27,19 @@ and term =
 type top_desc =
   | Define of
       { name : string
-      ; recur : Stlc.recur
-      ; args : (string * Stlc.ty) list
+      ; recur : Monomorphize.recur
+      ; args : (string * Monomorphize.ty) list
       ; body : term
-      ; ret_ty : Stlc.ty
+      ; ret_ty : Monomorphize.ty
       }
   | Const of string * term
   | Extern of string
-  | RecordDef of string * (string * Stlc.ty) list
+  | RecordDef of string * (string * Monomorphize.ty) list
 [@@deriving sexp_of]
 
 type top =
   { desc : top_desc
-  ; ty : Stlc.ty
+  ; ty : Monomorphize.ty
   ; loc : Lexer.loc
   }
 [@@deriving sexp_of]

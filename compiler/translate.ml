@@ -2,9 +2,9 @@ open Core
 open Glsl
 open Or_error.Let_syntax
 
-type record_env = (string * Stlc.ty) list String.Map.t
+type record_env = (string * Monomorphize.ty) list String.Map.t
 
-let to_glsl_ty (ty : Stlc.ty) : ty Or_error.t =
+let to_glsl_ty (ty : Monomorphize.ty) : ty Or_error.t =
   match ty with
   | TyFloat -> Ok TyFloat
   | TyInt -> Ok TyInt
@@ -13,9 +13,8 @@ let to_glsl_ty (ty : Stlc.ty) : ty Or_error.t =
   | TyMat (x, y) -> Ok (TyMat (x, y))
   | TyRecord s -> Ok (TyStruct s)
   | TyArrow _ ->
-    error_s [%message "translate: arrow types should not be translated" (ty : Stlc.ty)]
-  | TyVar _ ->
-    error_s [%message "translate: type variables should not be translated" (ty : Stlc.ty)]
+    error_s
+      [%message "translate: arrow types should not be translated" (ty : Monomorphize.ty)]
 ;;
 
 let to_glsl_atom (a : Anf.atom) : term =
@@ -49,7 +48,9 @@ let to_glsl_term (t : Tail_call.term) : term Or_error.t =
       [%message "to_glsl_term: should be handled in [tr_block]" (t : Tail_call.term)]
 ;;
 
-let rec placeholder_value_for_ty (env : record_env) (ty : Stlc.ty) : term Or_error.t =
+let rec placeholder_value_for_ty (env : record_env) (ty : Monomorphize.ty)
+  : term Or_error.t
+  =
   match ty with
   | TyFloat -> Ok (Float 0.0)
   | TyInt -> Ok (Int 0)
@@ -70,9 +71,8 @@ let rec placeholder_value_for_ty (env : record_env) (ty : Stlc.ty) : term Or_err
     in
     Ok (App (s, fields))
   | TyArrow _ ->
-    error_s [%message "translate: arrow types should not be in tail" (ty : Stlc.ty)]
-  | TyVar _ ->
-    error_s [%message "translate: type variables should not be in tail" (ty : Stlc.ty)]
+    error_s
+      [%message "translate: arrow types should not be in tail" (ty : Monomorphize.ty)]
 ;;
 
 let rec translate_set (env : record_env) (var : string) (anf : Tail_call.anf)

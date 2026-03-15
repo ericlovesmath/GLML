@@ -17,7 +17,7 @@ type term_desc =
 
 and term =
   { desc : term_desc
-  ; ty : Stlc.ty
+  ; ty : Monomorphize.ty
   ; loc : Lexer.loc
   }
 
@@ -30,7 +30,7 @@ and anf_desc =
 
 and anf =
   { desc : anf_desc
-  ; ty : Stlc.ty
+  ; ty : Monomorphize.ty
   ; loc : Lexer.loc
   }
 
@@ -68,18 +68,18 @@ and sexp_of_anf t = sexp_of_anf_desc t.desc
 type top_desc =
   | Define of
       { name : string
-      ; args : (string * Stlc.ty) list
+      ; args : (string * Monomorphize.ty) list
       ; body : anf
-      ; ret_ty : Stlc.ty
+      ; ret_ty : Monomorphize.ty
       }
   | Const of string * anf
   | Extern of string
-  | RecordDef of string * (string * Stlc.ty) list
+  | RecordDef of string * (string * Monomorphize.ty) list
 
 let sexp_of_top_desc = function
   | Define { name; args; body; ret_ty = _ } ->
     let args_sexp =
-      List.map args ~f:(fun (v, ty) -> List [ Atom v; Stlc.sexp_of_ty ty ])
+      List.map args ~f:(fun (v, ty) -> List [ Atom v; Monomorphize.sexp_of_ty ty ])
     in
     List
       [ Atom "Define"
@@ -90,22 +90,25 @@ let sexp_of_top_desc = function
   | Const (name, term) -> List [ Atom "Const"; Atom name; sexp_of_anf term ]
   | Extern name -> List [ Atom "Extern"; Atom name ]
   | RecordDef (name, fields) ->
-    List [ Atom "RecordDef"; Atom name; [%sexp (fields : (string * Stlc.ty) list)] ]
+    List
+      [ Atom "RecordDef"; Atom name; [%sexp (fields : (string * Monomorphize.ty) list)] ]
 ;;
 
 type top =
   { desc : top_desc
-  ; ty : Stlc.ty
+  ; ty : Monomorphize.ty
   ; loc : Lexer.loc
   }
 
-let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; Stlc.sexp_of_ty t.ty ]
+let sexp_of_top t =
+  List [ sexp_of_top_desc t.desc; Atom ":"; Monomorphize.sexp_of_ty t.ty ]
+;;
 
 type t = Program of top list
 
 let sexp_of_t (Program tops) = List (Atom "Program" :: List.map tops ~f:sexp_of_top)
 
-type record_env = (string * Stlc.ty) list String.Map.t
+type record_env = (string * Monomorphize.ty) list String.Map.t
 
 let rec of_term (t : Anf.term) : term =
   let pure desc : term = { desc; ty = t.ty; loc = t.loc } in
@@ -129,13 +132,13 @@ and of_anf (anf : Anf.anf) : anf =
 ;;
 
 (** [env] is a map from record names to the type of records *)
-let placeholder_anf_for_ty (env : record_env) (ty : Stlc.ty) (loc : Lexer.loc)
+let placeholder_anf_for_ty (env : record_env) (ty : Monomorphize.ty) (loc : Lexer.loc)
   : anf Or_error.t
   =
   let open Or_error.Let_syntax in
   let make ?(env = []) desc = Ok (({ desc; ty; loc } : term), env) in
-  let rec build (ty : Stlc.ty) : (term * (string * term) list) Or_error.t =
-    match (ty : Stlc.ty) with
+  let rec build (ty : Monomorphize.ty) : (term * (string * term) list) Or_error.t =
+    match ty with
     | TyInt -> make (Atom (Int 0))
     | TyFloat -> make (Atom (Float 0.0))
     | TyBool -> make (Atom (Bool false))
@@ -160,9 +163,8 @@ let placeholder_anf_for_ty (env : record_env) (ty : Stlc.ty) (loc : Lexer.loc)
          in
          make ~env:nested_bindings (Record (s, args))
        | None -> error_s [%message "tail_call: unknown struct type" s])
-    | TyArrow _ -> error_s [%message "tail_call: unexpected arrow in tail" (ty : Stlc.ty)]
-    | TyVar _ ->
-      error_s [%message "tail_call: type variables not supported" (ty : Stlc.ty)]
+    | TyArrow _ ->
+      error_s [%message "tail_call: unexpected arrow in tail" (ty : Monomorphize.ty)]
   in
   let%map term, bindings = build ty in
   List.fold_right
@@ -235,7 +237,7 @@ let remove_rec_top (env : record_env) (top : Anf.top) : top Or_error.t =
   | RecordDef (s, fields) -> pure (RecordDef (s, fields))
   | Define { name; recur = Nonrec; args; body; ret_ty } ->
     pure (Define { name; args; body = of_anf body; ret_ty })
-  | Define { name; recur = Rec (limit, _); args; body; ret_ty } ->
+  | Define { name; recur = Rec limit; args; body; ret_ty } ->
     let loc = body.loc in
     let iter = Utils.fresh "_iter" in
     let while_cond : term = { desc = Bop (Lt, Var iter, Int limit); ty = top.ty; loc } in
@@ -245,7 +247,7 @@ let remove_rec_top (env : record_env) (top : Anf.top) : top Or_error.t =
       { desc = While (while_cond, while_body, while_after); ty = top.ty; loc }
     in
     let body : anf =
-      { desc = Let (iter, { desc = Atom (Int 0); ty = TyInt; loc }, while_anf)
+      { desc = Let (iter, { desc = Atom (Int 0); ty = Monomorphize.TyInt; loc }, while_anf)
       ; ty = top.ty
       ; loc
       }

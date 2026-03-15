@@ -1,5 +1,7 @@
 open Core
+open Sexplib.Sexp
 open Stlc
+open Or_error.Let_syntax
 
 (* TODO: Remove [exn] functions and make this proper [Or_error.t] *)
 
@@ -321,12 +323,199 @@ and rewrite_refs_list (poly_env : poly_env) (env : spec_map) (ts : Typecheck.ter
   spec_map, List.rev ts_rev, defs
 ;;
 
-let monomorphize (Program tops : Typecheck.t) : Typecheck.t Or_error.t =
+type ty =
+  | TyFloat
+  | TyInt
+  | TyBool
+  | TyVec of int
+  | TyMat of int * int
+  | TyArrow of ty * ty
+  | TyRecord of string
+
+let rec sexp_of_ty : ty -> Sexp.t = function
+  | TyFloat -> Atom "float"
+  | TyInt -> Atom "int"
+  | TyBool -> Atom "bool"
+  | TyVec i -> List [ Atom "vec"; Atom (Int.to_string i) ]
+  | TyMat (x, y) -> List [ Atom "mat"; Atom (Int.to_string x); Atom (Int.to_string y) ]
+  | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
+  | TyRecord s -> Atom s
+;;
+
+type recur =
+  | Rec of int
+  | Nonrec
+[@@deriving sexp_of]
+
+type term_desc =
+  | Var of string
+  | Float of float
+  | Int of int
+  | Bool of bool
+  | Vec of int * term list
+  | Mat of int * int * term list
+  | Lam of string * ty * term
+  | App of term * term
+  | Let of recur * string * term * term
+  | If of term * term * term
+  | Bop of Glsl.binary_op * term * term
+  | Index of term * int
+  | Builtin of Glsl.builtin * term list
+  | Record of string * term list
+  | Field of term * string
+
+and term =
+  { desc : term_desc
+  ; ty : ty
+  ; loc : Lexer.loc
+  }
+
+let rec sexp_of_term_desc : term_desc -> Sexp.t = function
+  | Var v -> Atom v
+  | Float f -> Atom (Float.to_string f)
+  | Int i -> Atom (Int.to_string i)
+  | Bool b -> Atom (Bool.to_string b)
+  | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_term)
+  | Mat (x, y, ts) ->
+    List
+      (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
+       :: List.map ts ~f:sexp_of_term)
+  | Lam (v, lam_ty, body) ->
+    List [ Atom "lambda"; List [ Atom v; sexp_of_ty lam_ty ]; sexp_of_term body ]
+  | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
+  | Let (Rec n, v, bind, body) ->
+    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
+    List [ Atom "let"; rec_tag; Atom v; sexp_of_term bind; sexp_of_term body ]
+  | Let (Nonrec, v, bind, body) ->
+    List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
+  | If (c, t, e) -> List [ Atom "if"; sexp_of_term c; sexp_of_term t; sexp_of_term e ]
+  | Bop (op, l, r) ->
+    List [ Atom (Glsl.string_of_binary_op op); sexp_of_term l; sexp_of_term r ]
+  | Index (t, i) -> List [ Atom "index"; sexp_of_term t; Atom (Int.to_string i) ]
+  | Builtin (b, ts) ->
+    List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
+  | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_term)
+  | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
+
+and sexp_of_term t = List [ sexp_of_term_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
+
+type top_desc =
+  | Define of recur * string * term
+  | Extern of string
+  | RecordDef of string * (string * ty) list
+[@@deriving sexp_of]
+
+type top =
+  { desc : top_desc
+  ; ty : ty
+  ; loc : Lexer.loc
+  }
+
+let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
+
+type t = Program of top list [@@deriving sexp_of]
+
+let rec ty_of_stlc (t : Stlc.ty) : ty Or_error.t =
+  match t with
+  | TyVar _ -> error_s [%message "monomorphize: unexpected TyVar after monomorphization"]
+  | TyFloat -> Ok TyFloat
+  | TyInt -> Ok TyInt
+  | TyBool -> Ok TyBool
+  | TyVec n -> Ok (TyVec n)
+  | TyMat (x, y) -> Ok (TyMat (x, y))
+  | TyRecord s -> Ok (TyRecord s)
+  | TyArrow (a, b) ->
+    let%bind a = ty_of_stlc a in
+    let%bind b = ty_of_stlc b in
+    Ok (TyArrow (a, b))
+;;
+
+let recur_of_stlc (r : Stlc.recur) : recur =
+  match r with
+  | Nonrec -> Nonrec
+  | Rec (n, _) -> Rec n
+;;
+
+let rec term_of_tc (t : Typecheck.term) : term Or_error.t =
+  let%bind ty = ty_of_stlc t.ty in
+  let%bind desc = term_desc_of_tc t.desc in
+  Ok ({ desc; ty; loc = t.loc } : term)
+
+and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Or_error.t =
+  match d with
+  | Var v -> Ok (Var v)
+  | Float f -> Ok (Float f)
+  | Int i -> Ok (Int i)
+  | Bool b -> Ok (Bool b)
+  | Vec (n, ts) ->
+    let%map ts = Or_error.all (List.map ts ~f:term_of_tc) in
+    Vec (n, ts)
+  | Mat (n, m, ts) ->
+    let%map ts = Or_error.all (List.map ts ~f:term_of_tc) in
+    Mat (n, m, ts)
+  | Lam (v, lam_ty, body) ->
+    let%bind lam_ty = ty_of_stlc lam_ty in
+    let%bind body = term_of_tc body in
+    Ok (Lam (v, lam_ty, body))
+  | App (f, x) ->
+    let%bind f = term_of_tc f in
+    let%bind x = term_of_tc x in
+    Ok (App (f, x))
+  | Let (r, v, constrs, bind, body) ->
+    let%bind bind = term_of_tc bind in
+    let%bind body = term_of_tc body in
+    if List.is_empty constrs
+    then Ok (Let (recur_of_stlc r, v, bind, body))
+    else error_s [%message "monomorphize: Let has constraints" (d : Typecheck.term_desc)]
+  | If (c, t, e) ->
+    let%bind c = term_of_tc c in
+    let%bind t = term_of_tc t in
+    let%bind e = term_of_tc e in
+    Ok (If (c, t, e))
+  | Bop (op, l, r) ->
+    let%bind l = term_of_tc l in
+    let%bind r = term_of_tc r in
+    Ok (Bop (op, l, r))
+  | Index (t, i) ->
+    let%map t = term_of_tc t in
+    Index (t, i)
+  | Builtin (b, ts) ->
+    let%map ts = Or_error.all (List.map ts ~f:term_of_tc) in
+    Builtin (b, ts)
+  | Record (s, ts) ->
+    let%map ts = Or_error.all (List.map ts ~f:term_of_tc) in
+    Record (s, ts)
+  | Field (t, f) ->
+    let%map t = term_of_tc t in
+    Field (t, f)
+;;
+
+let top_of_tc (t : Typecheck.top) : top Or_error.t =
+  let%bind ty = ty_of_stlc t.ty in
+  let%bind desc =
+    match t.desc with
+    | Define (r, v, bind) ->
+      let%map bind = term_of_tc bind in
+      Define (recur_of_stlc r, v, bind)
+    | Extern v -> Ok (Extern v)
+    | RecordDef (s, fields) ->
+      let%map fields =
+        List.map fields ~f:(fun (name, field_ty) ->
+          let%map field_ty = ty_of_stlc field_ty in
+          name, field_ty)
+        |> Or_error.all
+      in
+      RecordDef (s, fields)
+  in
+  Ok { desc; ty; loc = t.loc }
+;;
+
+let monomorphize (Program tops : Typecheck.t) : t Or_error.t =
   let _, _, tops =
     List.fold
       tops
       ~init:(String.Map.empty, String.Map.empty, [])
-      ~f:(fun (poly_env, env, acc) top ->
+      ~f:(fun (poly_env, env, acc) (top : Typecheck.top) ->
         match top.desc with
         (* Polymorphic case: register in poly_env, emit nothing *)
         | Define (recur, v, bind) when has_tyvars top.ty ->
@@ -349,9 +538,10 @@ let monomorphize (Program tops : Typecheck.t) : Typecheck.t Or_error.t =
               env, defs @ new_defs)
           in
           let env, bind, inner_defs = rewrite_refs poly_env env bind in
-          let top = { top with desc = Define (recur, v, bind) } in
+          let top : Typecheck.top = { top with desc = Define (recur, v, bind) } in
           poly_env, env, acc @ ref_defs @ inner_defs @ [ top ]
         | Extern _ | RecordDef _ -> poly_env, env, acc @ [ top ])
   in
-  Ok (Typecheck.Program tops)
+  let%map tops = Or_error.all (List.map tops ~f:top_of_tc) in
+  Program tops
 ;;

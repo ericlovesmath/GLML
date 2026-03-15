@@ -28,7 +28,7 @@ type term_desc =
 
 and term =
   { desc : term_desc
-  ; ty : Stlc.ty
+  ; ty : Monomorphize.ty
   ; loc : Lexer.loc
   }
 
@@ -38,7 +38,7 @@ and anf_desc =
 
 and anf =
   { desc : anf_desc
-  ; ty : Stlc.ty
+  ; ty : Monomorphize.ty
   ; loc : Lexer.loc
   }
 
@@ -71,23 +71,23 @@ and sexp_of_anf t = sexp_of_anf_desc t.desc
 type top_desc =
   | Define of
       { name : string
-      ; recur : Stlc.recur
-      ; args : (string * Stlc.ty) list
+      ; recur : Monomorphize.recur
+      ; args : (string * Monomorphize.ty) list
       ; body : anf
-      ; ret_ty : Stlc.ty
+      ; ret_ty : Monomorphize.ty
       }
   | Const of string * anf
   | Extern of string
-  | RecordDef of string * (string * Stlc.ty) list
+  | RecordDef of string * (string * Monomorphize.ty) list
 
 let sexp_of_top_desc = function
   | Define { name; recur; args; body; ret_ty = _ } ->
     let args_sexp =
-      List.map args ~f:(fun (v, ty) -> List [ Atom v; Stlc.sexp_of_ty ty ])
+      List.map args ~f:(fun (v, ty) -> List [ Atom v; Monomorphize.sexp_of_ty ty ])
     in
     List
       [ Atom "Define"
-      ; Stlc.sexp_of_recur recur
+      ; Monomorphize.sexp_of_recur recur
       ; List [ Atom "name"; Atom name ]
       ; List [ Atom "args"; List args_sexp ]
       ; List [ Atom "body"; sexp_of_anf body ]
@@ -95,16 +95,19 @@ let sexp_of_top_desc = function
   | Const (name, term) -> List [ Atom "Const"; Atom name; sexp_of_anf term ]
   | Extern name -> List [ Atom "Extern"; Atom name ]
   | RecordDef (name, fields) ->
-    List [ Atom "RecordDef"; Atom name; [%sexp (fields : (string * Stlc.ty) list)] ]
+    List
+      [ Atom "RecordDef"; Atom name; [%sexp (fields : (string * Monomorphize.ty) list)] ]
 ;;
 
 type top =
   { desc : top_desc
-  ; ty : Stlc.ty
+  ; ty : Monomorphize.ty
   ; loc : Lexer.loc
   }
 
-let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; Stlc.sexp_of_ty t.ty ]
+let sexp_of_top t =
+  List [ sexp_of_top_desc t.desc; Atom ":"; Monomorphize.sexp_of_ty t.ty ]
+;;
 
 type t = Program of top list
 

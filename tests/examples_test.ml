@@ -610,7 +610,7 @@ let%expect_test "compile examples" =
     === monomorphize (mandelbrot.glml) ===
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
-      ((Define (Rec 1000 ()) mandel_4
+      ((Define (Rec 1000) mandel_4
         ((lambda (zx_5 float)
           ((lambda (zy_6 float)
             ((lambda (cx_7 float)
@@ -790,7 +790,7 @@ let%expect_test "compile examples" =
     === uncurry (mandelbrot.glml) ===
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
-      ((Define (Rec 1000 ()) mandel_4
+      ((Define (Rec 1000) mandel_4
         (lambda ((zx_5 float) (zy_6 float) (cx_7 float) (cy_8 float) (i_9 float))
          (if (|| (> (length (vec2 zx_5 zy_6)) 2.) (> i_9 150.)) i_9
           (let next_zx_10 (+ (- (* zx_5 zx_5) (* zy_6 zy_6)) cx_7)
@@ -820,7 +820,7 @@ let%expect_test "compile examples" =
 
     === lambda lift (mandelbrot.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
-     ((Define (Rec 1000 ()) (name mandel_4)
+     ((Define (Rec 1000) (name mandel_4)
        (args ((zx_5 float) (zy_6 float) (cx_7 float) (cy_8 float) (i_9 float)))
        (body
         (if (|| (> (length (vec2 zx_5 zy_6)) 2.) (> i_9 150.)) i_9
@@ -851,7 +851,7 @@ let%expect_test "compile examples" =
 
     === anf (mandelbrot.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
-     ((Define (Rec 1000 ()) (name mandel_4)
+     ((Define (Rec 1000) (name mandel_4)
        (args ((zx_5 float) (zy_6 float) (cx_7 float) (cy_8 float) (i_9 float)))
        (body
         (let anf_89 (vec2 zx_5 zy_6)
@@ -2420,7 +2420,7 @@ let%expect_test "compile examples" =
       ((Define Nonrec march_24
         ((lambda (ro_25 (vec 3))
           ((lambda (rd_26 (vec 3))
-            ((let (rec 1000 ()) march_27
+            ((let (rec 1000) march_27
               ((lambda (t_28 float)
                 ((lambda (steps_29 int)
                   ((if ((> (steps_29 : int) (80 : int)) : bool) (t_28 : float)
@@ -2657,7 +2657,7 @@ let%expect_test "compile examples" =
        : ((vec 3) -> float))
       ((Define Nonrec march_24
         (lambda ((ro_25 (vec 3)) (rd_26 (vec 3)))
-         (let (rec 1000 ()) march_27
+         (let (rec 1000) march_27
           (lambda ((t_28 float) (steps_29 int))
            (if (> steps_29 80) t_28
             (let d_30 (app map_17 (+ ro_25 (* rd_26 t_28)))
@@ -2751,7 +2751,7 @@ let%expect_test "compile examples" =
              (app sMin_5 (app sdTorus_13 p_prime_23 (vec2 1. 0.3))
               (app sdTorus_13 p_18 (vec2 2. 0.5))))))))))
       : ((vec 3) -> float))
-     ((Define (Rec 1000 ()) (name march_27_175)
+     ((Define (Rec 1000) (name march_27_175)
        (args ((rd_26 (vec 3)) (ro_25 (vec 3)) (t_28 float) (steps_29 int)))
        (body
         (if (> steps_29 80) t_28
@@ -2881,7 +2881,7 @@ let%expect_test "compile examples" =
                             (let anf_222 (sdTorus_13 p_18 anf_221)
                              (return (sMin_5 anf_220 anf_222)))))))))))))))))))))))))
       : ((vec 3) -> float))
-     ((Define (Rec 1000 ()) (name march_27_175)
+     ((Define (Rec 1000) (name march_27_175)
        (args ((rd_26 (vec 3)) (ro_25 (vec 3)) (t_28 float) (steps_29 int)))
        (body
         (let anf_223 (> steps_29 80)
@@ -3703,7 +3703,7 @@ let%expect_test "compile examples" =
            : (mat 2 2)))
          : (float -> (mat 2 2))))
        : (float -> (mat 2 2)))
-      ((Define (Rec 1000 ()) gcd_8
+      ((Define (Rec 1000) gcd_8
         ((lambda (a_9 float)
           ((lambda (b_10 float)
             ((if ((< (a_9 : float) (0.05 : float)) : bool) (b_10 : float)
@@ -3788,7 +3788,7 @@ let%expect_test "compile examples" =
          (let s_6 (sin angle_5)
           (let c_7 (cos angle_5) (mat2x2 c_7 (* -1. s_6) s_6 c_7)))))
        : (float -> (mat 2 2)))
-      ((Define (Rec 1000 ()) gcd_8
+      ((Define (Rec 1000) gcd_8
         (lambda ((a_9 float) (b_10 float))
          (if (< a_9 0.05) b_10
           (if (< b_10 0.05) a_9
@@ -3818,7 +3818,7 @@ let%expect_test "compile examples" =
         (let s_6 (sin angle_5)
          (let c_7 (cos angle_5) (mat2x2 c_7 (* -1. s_6) s_6 c_7)))))
       : (float -> (mat 2 2)))
-     ((Define (Rec 1000 ()) (name gcd_8) (args ((a_9 float) (b_10 float)))
+     ((Define (Rec 1000) (name gcd_8) (args ((a_9 float) (b_10 float)))
        (body
         (if (< a_9 0.05) b_10
          (if (< b_10 0.05) a_9
@@ -3851,7 +3851,7 @@ let%expect_test "compile examples" =
          (let c_7 (cos angle_5)
           (let anf_60 (* -1. s_6) (return (mat2x2 c_7 anf_60 s_6 c_7)))))))
       : (float -> (mat 2 2)))
-     ((Define (Rec 1000 ()) (name gcd_8) (args ((a_9 float) (b_10 float)))
+     ((Define (Rec 1000) (name gcd_8) (args ((a_9 float) (b_10 float)))
        (body
         (let anf_61 (< a_9 0.05)
          (return
