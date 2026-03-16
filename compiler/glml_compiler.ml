@@ -1,35 +1,7 @@
 open Core
 
-(** Passes in compiler available to be dumped, using GADT witnesses to have
-    generic [sexp_of_pass] function with [trace] *)
+(** Passes in compiler available to be dumped *)
 module Passes = struct
-  type _ pass =
-    | Stlc : Stlc.t pass
-    | Uniquify : Stlc.t pass
-    | Typecheck : Typecheck.t pass
-    | Monomorphize : Monomorphize.t pass
-    | Uncurry : Uncurry.t pass
-    | Lambda_lift : Lambda_lift.t pass
-    | Anf : Anf.t pass
-    | Tail_call : Tail_call.t pass
-    | Translate : Glsl.t pass
-    | Patch_main : Glsl.t pass
-
-  let sexp_of_pass : type a. a pass -> a -> Sexp.t = function
-    | Stlc -> Stlc.sexp_of_t
-    | Uniquify -> Stlc.sexp_of_t
-    | Typecheck -> Typecheck.sexp_of_t
-    | Monomorphize -> Monomorphize.sexp_of_t
-    | Uncurry -> Uncurry.sexp_of_t
-    | Lambda_lift -> Lambda_lift.sexp_of_t
-    | Anf -> Anf.sexp_of_t
-    | Tail_call -> Tail_call.sexp_of_t
-    | Translate -> Glsl.sexp_of_t
-    | Patch_main -> Glsl.sexp_of_t
-  ;;
-
-  (* TODO: Maybe something like [typed_variants] in [ppx_typed_fields] can
-   cut down a lot of the repeated code here? This is basically a [Packed.t] *)
   module T = struct
     type t =
       | Stlc
@@ -47,52 +19,34 @@ module Passes = struct
 
   include T
   include Comparable.Make (T)
-
-  let of_pass : type a. a pass -> t = function
-    | Stlc -> Stlc
-    | Uniquify -> Uniquify
-    | Typecheck -> Typecheck
-    | Monomorphize -> Monomorphize
-    | Uncurry -> Uncurry
-    | Lambda_lift -> Lambda_lift
-    | Anf -> Anf
-    | Tail_call -> Tail_call
-    | Translate -> Translate
-    | Patch_main -> Patch_main
-  ;;
 end
 
 let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : string)
   : string Or_error.t
   =
-  let trace : type a. a Passes.pass -> a -> unit =
-    fun pass value ->
-    Passes.of_pass pass
-    |> Map.find dump
-    |> Option.iter ~f:(fun f -> f (Passes.sexp_of_pass pass value))
-  in
+  let trace pass sexp = Map.find dump pass |> Option.iter ~f:(fun f -> f sexp) in
   let open Or_error.Let_syntax in
   Utils.reset ();
   let%bind tokens = Lexer.lex (Lexer.init s) in
   let%bind t = Chomp.run Parser.glml_p tokens in
-  trace Stlc t;
+  trace Stlc (Stlc.sexp_of_t t);
   let%bind t = Uniquify.uniquify t in
-  trace Uniquify t;
+  trace Uniquify (Stlc.sexp_of_t t);
   let%bind t = Typecheck.typecheck t in
-  trace Typecheck t;
+  trace Typecheck (Typecheck.sexp_of_t t);
   let%bind t = Monomorphize.monomorphize t in
-  trace Monomorphize t;
+  trace Monomorphize (Monomorphize.sexp_of_t t);
   let t = Uncurry.uncurry t in
-  trace Uncurry t;
+  trace Uncurry (Uncurry.sexp_of_t t);
   let%bind t = Lambda_lift.lift t in
-  trace Lambda_lift t;
+  trace Lambda_lift (Lambda_lift.sexp_of_t t);
   let t = Anf.to_anf t in
-  trace Anf t;
+  trace Anf (Anf.sexp_of_t t);
   let%bind t = Tail_call.remove_rec t in
-  trace Tail_call t;
+  trace Tail_call (Tail_call.sexp_of_t t);
   let%bind glsl = Translate.translate t in
-  trace Translate glsl;
+  trace Translate (Glsl.sexp_of_t glsl);
   let%bind glsl = Patch_main.patch glsl in
-  trace Patch_main glsl;
+  trace Patch_main (Glsl.sexp_of_t glsl);
   return (Glsl.to_string glsl)
 ;;
