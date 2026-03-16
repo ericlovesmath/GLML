@@ -10,7 +10,7 @@ type term_desc =
   | Mat of int * int * term list
   | Lam of (string * Monomorphize.ty) list * term
   | App of term * term list
-  | Let of Monomorphize.recur * string * term * term
+  | Let of Stlc.recur * string * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -57,7 +57,7 @@ let rec sexp_of_term_desc = function
 and sexp_of_term t = sexp_of_term_desc t.desc
 
 type top_desc =
-  | Define of Monomorphize.recur * string * term
+  | Define of Stlc.recur * string * term
   | Extern of string
   | RecordDef of string * (string * Monomorphize.ty) list
 [@@deriving sexp_of]

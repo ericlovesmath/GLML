@@ -8,12 +8,6 @@ type ty =
   | TyMat of int * int
   | TyArrow of ty * ty
   | TyRecord of string
-
-val sexp_of_ty : ty -> Sexp.t
-
-type recur =
-  | Rec of int
-  | Nonrec
 [@@deriving sexp_of]
 
 type term_desc =
@@ -25,7 +19,7 @@ type term_desc =
   | Mat of int * int * term list
   | Lam of string * ty * term
   | App of term * term
-  | Let of recur * string * term * term
+  | Let of Stlc.recur * string * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -42,7 +36,7 @@ and term =
 [@@deriving sexp_of]
 
 type top_desc =
-  | Define of recur * string * term
+  | Define of Stlc.recur * string * term
   | Extern of string
   | RecordDef of string * (string * ty) list
 [@@deriving sexp_of]

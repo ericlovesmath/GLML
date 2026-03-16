@@ -70,11 +70,11 @@ let rec sexp_of_term_desc = function
   | Lam (v, ty, body) ->
     List [ Atom "lambda"; List [ Atom v; sexp_of_ty ty ]; sexp_of_term body ]
   | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
-  | Let (Rec (n, ty_opt), v, _constrs, bind, body) ->
-    let ty = Option.sexp_of_t Stlc.sexp_of_ty ty_opt in
-    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n); ty ] in
+  (* TODO: Display the typecheck constraints *)
+  | Let (Rec n, v, _, bind, body) ->
+    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
     List [ Atom "let"; rec_tag; Atom v; sexp_of_term bind; sexp_of_term body ]
-  | Let (Nonrec, v, _constrs, bind, body) ->
+  | Let (Nonrec, v, _, bind, body) ->
     List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
   | If (c, t, e) -> List [ Atom "if"; sexp_of_term c; sexp_of_term t; sexp_of_term e ]
   | Bop (op, l, r) ->
@@ -394,6 +394,14 @@ let rec is_value (t : Stlc.term) : bool =
   | App _ | Let _ | If _ | Bop _ | Builtin _ -> false
 ;;
 
+(** Build a function type from lambda param annotations and a return type. *)
+let rec build_function_type (term : Stlc.term) (ret_ty : ty) : ty =
+  match term.desc with
+  | Lam (_, Some param_ty, body) -> TyArrow (param_ty, build_function_type body ret_ty)
+  | Lam (_, None, body) -> TyArrow (fresh_tyvar (), build_function_type body ret_ty)
+  | _ -> ret_ty
+;;
+
 (** Infer the type of a binding (used between top-level Define and inner Let).
     Returns [substituted term * resolved type * new context * scheme constraints * remaining constraints] *)
 let rec infer_binding
@@ -403,12 +411,17 @@ let rec infer_binding
           (bind_stlc : Stlc.term)
           (recur : recur)
           (v : string)
+          (return_ty : ty option)
   : (term * ty * context * constr list * constr list) Or_error.t
   =
   let ty_v_opt =
     match recur with
     | Nonrec -> None
-    | Rec (_, ty_ann) -> Some (Option.value ty_ann ~default:(fresh_tyvar ()))
+    | Rec _ ->
+      Some
+        (match return_ty with
+         | None -> fresh_tyvar ()
+         | Some ret_ty -> build_function_type bind_stlc ret_ty)
   in
   let ctx_gen =
     match ty_v_opt with
@@ -418,9 +431,15 @@ let rec infer_binding
   let%bind bind, constrs_bind = gen_term structs ctx_gen bind_stlc in
   let constr desc = { desc; loc } in
   let constrs =
-    match ty_v_opt with
-    | None -> constrs_bind
-    | Some ty_v -> constr (Eq (ty_v, bind.ty)) :: constrs_bind
+    let rec_constrs =
+      match ty_v_opt with
+      | None -> constrs_bind
+      | Some ty_v -> constr (Eq (ty_v, bind.ty)) :: constrs_bind
+    in
+    match recur, return_ty with
+    | Nonrec, Some ret_ty ->
+      constr (Eq (build_function_type bind_stlc ret_ty, bind.ty)) :: rec_constrs
+    | _ -> rec_constrs
   in
   let%bind sub_bind, deferred = solve structs constrs in
   let ty_bind = subst_ty sub_bind bind.ty in
@@ -469,21 +488,18 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
     let ret_ty = fresh_tyvar () in
     let constrs = constr (Eq (f.ty, TyArrow (x.ty, ret_ty))) :: (constrs_f @ constrs_x) in
     make (App (f, x)) ret_ty constrs
-  | Let (Nonrec, v, bind, body) ->
+  | Let (Nonrec, v, return_ty, bind, body) ->
     let%bind bind, _, ctx, scheme_constrs, remaining =
-      infer_binding structs ctx loc bind Nonrec v
+      infer_binding structs ctx loc bind Nonrec v return_ty
     in
     let%bind body, constrs_body = gen_term structs ctx body in
     make (Let (Nonrec, v, scheme_constrs, bind, body)) body.ty (remaining @ constrs_body)
-  | Let (Rec (n, ty_ann), v, bind, body) ->
+  | Let (Rec n, v, return_ty, bind, body) ->
     let%bind bind, _, ctx, scheme_constrs, remaining =
-      infer_binding structs ctx loc bind (Rec (n, ty_ann)) v
+      infer_binding structs ctx loc bind (Rec n) v return_ty
     in
     let%bind body, constrs_body = gen_term structs ctx body in
-    make
-      (Let (Rec (n, ty_ann), v, scheme_constrs, bind, body))
-      body.ty
-      (remaining @ constrs_body)
+    make (Let (Rec n, v, scheme_constrs, bind, body)) body.ty (remaining @ constrs_body)
   | If (c, t, e) ->
     let%bind c, constrs_c = gen_term structs ctx c in
     let%bind t, constrs_t = gen_term structs ctx t in
@@ -665,9 +681,9 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
         (* TODO: There has to be a better way than to pass everything like this *)
       ~f:(fun (ctx, structs, acc) top ->
         match top.desc with
-        | Define (Rec (n, ty_ann), v, bind) ->
+        | Define (Rec n, v, return_ty, bind) ->
           let%bind bind, ty, ctx, scheme_constrs, remaining =
-            infer_binding structs ctx top.loc bind (Rec (n, ty_ann)) v
+            infer_binding structs ctx top.loc bind (Rec n) v return_ty
           in
           if not (List.is_empty remaining)
           then
@@ -676,16 +692,12 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
                 "typecheck: unresolved top-level constraints" (remaining : constr list)]
           else (
             let top =
-              { desc = Define (Rec (n, ty_ann), v, bind)
-              ; ty
-              ; loc = top.loc
-              ; scheme_constrs
-              }
+              { desc = Define (Rec n, v, bind); ty; loc = top.loc; scheme_constrs }
             in
             Ok (ctx, structs, top :: acc))
-        | Define (Nonrec, v, bind) ->
+        | Define (Nonrec, v, return_ty, bind) ->
           let%bind bind, ty, ctx, scheme_constrs, remaining =
-            infer_binding structs ctx top.loc bind Nonrec v
+            infer_binding structs ctx top.loc bind Nonrec v return_ty
           in
           if not (List.is_empty remaining)
           then

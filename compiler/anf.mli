@@ -40,7 +40,7 @@ and anf =
 type top_desc =
   | Define of
       { name : string
-      ; recur : Monomorphize.recur
+      ; recur : Stlc.recur
       ; args : (string * Monomorphize.ty) list
       ; body : anf
       ; ret_ty : Monomorphize.ty

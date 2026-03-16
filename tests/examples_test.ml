@@ -369,7 +369,7 @@ let%expect_test "compile examples" =
         (let top (- (* 2. coord) u_resolution)
          (let bot (min (index u_resolution 0) (index u_resolution 1))
           (/ top bot)))))
-      (Define (Rec 1000 ()) mandel
+      (Define (Rec 1000) mandel
        (lambda (zx ())
         (lambda (zy ())
          (lambda (cx ())
@@ -401,7 +401,7 @@ let%expect_test "compile examples" =
         (let top_2 (- (* 2. coord_1) u_resolution)
          (let bot_3 (min (index u_resolution 0) (index u_resolution 1))
           (/ top_2 bot_3)))))
-      (Define (Rec 1000 ()) mandel_4
+      (Define (Rec 1000) mandel_4
        (lambda (zx_5 ())
         (lambda (zy_6 ())
          (lambda (cx_7 ())
@@ -446,7 +446,7 @@ let%expect_test "compile examples" =
            : 'v_24))
          : ('v_22 -> 'v_24)))
        : ('v_22 -> 'v_24))
-      ((Define (Rec 1000 ()) mandel_4
+      ((Define (Rec 1000) mandel_4
         ((lambda (zx_5 float)
           ((lambda (zy_6 float)
             ((lambda (cx_7 float)
@@ -1793,7 +1793,7 @@ let%expect_test "compile examples" =
       (Define Nonrec march
        (lambda (ro ((vec 3)))
         (lambda (rd ((vec 3)))
-         (let (rec 1000 ()) march
+         (let (rec 1000) march
           (lambda (t (float))
            (lambda (steps (int))
             (if (> steps 80) t
@@ -1876,7 +1876,7 @@ let%expect_test "compile examples" =
       (Define Nonrec march_24
        (lambda (ro_25 ((vec 3)))
         (lambda (rd_26 ((vec 3)))
-         (let (rec 1000 ()) march_27
+         (let (rec 1000) march_27
           (lambda (t_28 (float))
            (lambda (steps_29 (int))
             (if (> steps_29 80) t_28
@@ -2078,7 +2078,7 @@ let%expect_test "compile examples" =
       ((Define Nonrec march_24
         ((lambda (ro_25 (vec 3))
           ((lambda (rd_26 (vec 3))
-            ((let (rec 1000 ()) march_27
+            ((let (rec 1000) march_27
               ((lambda (t_28 float)
                 ((lambda (steps_29 int)
                   ((if ((> (steps_29 : int) (80 : int)) : bool) (t_28 : float)
@@ -3532,7 +3532,7 @@ let%expect_test "compile examples" =
       (Define Nonrec rotate
        (lambda (angle (float))
         (let s (sin angle) (let c (cos angle) (mat2x2 c (* -1. s) s c)))))
-      (Define (Rec 1000 ()) gcd
+      (Define (Rec 1000) gcd
        (lambda (a ())
         (lambda (b ())
          (if (< a 0.05) b
@@ -3558,7 +3558,7 @@ let%expect_test "compile examples" =
        (lambda (angle_5 (float))
         (let s_6 (sin angle_5)
          (let c_7 (cos angle_5) (mat2x2 c_7 (* -1. s_6) s_6 c_7)))))
-      (Define (Rec 1000 ()) gcd_8
+      (Define (Rec 1000) gcd_8
        (lambda (a_9 ())
         (lambda (b_10 ())
          (if (< a_9 0.05) b_10
@@ -3603,7 +3603,7 @@ let%expect_test "compile examples" =
            : (mat 2 2)))
          : (float -> (mat 2 2))))
        : (float -> (mat 2 2)))
-      ((Define (Rec 1000 ()) gcd_8
+      ((Define (Rec 1000) gcd_8
         ((lambda (a_9 float)
           ((lambda (b_10 float)
             ((if ((< (a_9 : float) (0.05 : float)) : bool) (b_10 : float)
