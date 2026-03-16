@@ -26,13 +26,11 @@ type constr_desc =
   | MulBroadcast of ty * ty * ty (** Matrix multiplication rules *)
   | IndexAccess of ty * int * ty (** Vector/Matrix indexing *)
   | FieldAccess of ty * string * ty (** Field access on a record *)
-[@@deriving sexp_of]
 
 type constr =
   { desc : constr_desc
   ; loc : Lexer.loc
   }
-[@@deriving sexp_of]
 
 type term_desc =
   | Var of string
@@ -57,6 +55,34 @@ and term =
   ; loc : Lexer.loc
   }
 
+let sexp_of_constr_desc = function
+  | Eq (l, r) -> List [ Stlc.sexp_of_ty l; Atom "~"; Stlc.sexp_of_ty r ]
+  | HasClass (cls, ty) -> List [ sexp_of_type_class cls; Stlc.sexp_of_ty ty ]
+  | Broadcast (l, r, ret) ->
+    List [ Atom "Broadcast"; Stlc.sexp_of_ty l; Stlc.sexp_of_ty r; Stlc.sexp_of_ty ret ]
+  | MulBroadcast (l, r, ret) ->
+    List
+      [ Atom "MulBroadcast"; Stlc.sexp_of_ty l; Stlc.sexp_of_ty r; Stlc.sexp_of_ty ret ]
+  | IndexAccess (t, i, ret) ->
+    List
+      [ Atom "IndexAccess"
+      ; Stlc.sexp_of_ty t
+      ; Atom (Int.to_string i)
+      ; Stlc.sexp_of_ty ret
+      ]
+  | FieldAccess (t, f, ret) ->
+    List [ Atom "FieldAccess"; Stlc.sexp_of_ty t; Atom f; Stlc.sexp_of_ty ret ]
+;;
+
+let sexp_of_constr (c : constr) = sexp_of_constr_desc c.desc
+
+let sexp_of_forall_ty constrs ty =
+  if List.is_empty constrs
+  then Stlc.sexp_of_ty ty
+  else
+    List [ Atom "forall"; List (List.map constrs ~f:sexp_of_constr); Stlc.sexp_of_ty ty ]
+;;
+
 let rec sexp_of_term_desc = function
   | Var v -> Atom v
   | Float f -> Atom (Float.to_string f)
@@ -70,12 +96,17 @@ let rec sexp_of_term_desc = function
   | Lam (v, ty, body) ->
     List [ Atom "lambda"; List [ Atom v; sexp_of_ty ty ]; sexp_of_term body ]
   | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
-  (* TODO: Display the typecheck constraints *)
-  | Let (Rec n, v, _, bind, body) ->
+  | Let (Rec n, v, constrs, bind, body) ->
     let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
-    List [ Atom "let"; rec_tag; Atom v; sexp_of_term bind; sexp_of_term body ]
-  | Let (Nonrec, v, _, bind, body) ->
-    List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
+    let bind_sexp =
+      List [ sexp_of_term_desc bind.desc; Atom ":"; sexp_of_forall_ty constrs bind.ty ]
+    in
+    List [ Atom "let"; rec_tag; Atom v; bind_sexp; sexp_of_term body ]
+  | Let (Nonrec, v, constrs, bind, body) ->
+    let bind_sexp =
+      List [ sexp_of_term_desc bind.desc; Atom ":"; sexp_of_forall_ty constrs bind.ty ]
+    in
+    List [ Atom "let"; Atom v; bind_sexp; sexp_of_term body ]
   | If (c, t, e) -> List [ Atom "if"; sexp_of_term c; sexp_of_term t; sexp_of_term e ]
   | Bop (op, l, r) ->
     List [ Atom (Glsl.string_of_binary_op op); sexp_of_term l; sexp_of_term r ]
@@ -100,7 +131,9 @@ type top =
   ; scheme_constrs : constr list
   }
 
-let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; Stlc.sexp_of_ty t.ty ]
+let sexp_of_top t =
+  List [ sexp_of_top_desc t.desc; Atom ":"; sexp_of_forall_ty t.scheme_constrs t.ty ]
+;;
 
 type t = Program of top list [@@deriving sexp_of]
 

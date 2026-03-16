@@ -79,7 +79,11 @@ let%expect_test "compile examples" =
              : 'v_13))
            : 'v_13))
          : ('v_11 -> 'v_13)))
-       : ('v_11 -> 'v_13))
+       :
+       (forall
+        ((Broadcast 'v_11 (vec 2) 'v_13) (MulBroadcast float 'v_11 'v_11)
+         (MulBroadcast 'v_13 float 'v_13))
+        ('v_11 -> 'v_13)))
       ((Define Nonrec main
         ((lambda (coord_4 (vec 2))
           ((let uv_5
@@ -445,7 +449,11 @@ let%expect_test "compile examples" =
              : 'v_24))
            : 'v_24))
          : ('v_22 -> 'v_24)))
-       : ('v_22 -> 'v_24))
+       :
+       (forall
+        ((Broadcast 'v_22 (vec 2) 'v_24) (MulBroadcast float 'v_22 'v_22)
+         (MulBroadcast 'v_24 float 'v_24))
+        ('v_22 -> 'v_24)))
       ((Define (Rec 1000) mandel_4
         ((lambda (zx_5 float)
           ((lambda (zy_6 float)
@@ -1194,7 +1202,11 @@ let%expect_test "compile examples" =
              : 'v_10))
            : 'v_10))
          : ('v_8 -> 'v_10)))
-       : ('v_8 -> 'v_10))
+       :
+       (forall
+        ((Broadcast 'v_8 (vec 2) 'v_10) (MulBroadcast float 'v_8 'v_8)
+         (MulBroadcast 'v_10 float 'v_10))
+        ('v_8 -> 'v_10)))
       ((Define Nonrec main
         ((lambda (coord_4 (vec 2))
           ((let uv_5
@@ -1487,7 +1499,11 @@ let%expect_test "compile examples" =
              : 'v_12))
            : 'v_12))
          : ('v_10 -> 'v_12)))
-       : ('v_10 -> 'v_12))
+       :
+       (forall
+        ((Broadcast 'v_10 (vec 2) 'v_12) (MulBroadcast float 'v_10 'v_10)
+         (MulBroadcast 'v_12 float 'v_12))
+        ('v_10 -> 'v_12)))
       ((Define Nonrec main
         ((lambda (coord_4 (vec 2))
           ((let uv_5
