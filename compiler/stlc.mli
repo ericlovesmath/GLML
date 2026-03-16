@@ -9,11 +9,9 @@ type ty =
   | TyVar of string
 [@@deriving sexp_of, equal]
 
-(* TODO: The [ty] here is only needed because of the STLC style typechecking,
-   once we do HM or Bidirectional, this should not be needed *)
 type recur =
   (** NOTE: [int] is for the maximum number of recs allowed *)
-  | Rec of int * ty option
+  | Rec of int
   | Nonrec
 [@@deriving sexp_of]
 
@@ -26,7 +24,7 @@ type term_desc =
   | Mat of int * int * term list
   | Lam of string * ty option * term
   | App of term * term
-  | Let of recur * string * term * term
+  | Let of recur * string * ty option * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -42,7 +40,7 @@ and term =
 [@@deriving sexp_of]
 
 type top_desc =
-  | Define of recur * string * term
+  | Define of recur * string * ty option * term
   | Extern of ty * string
   | RecordDef of string * (string * ty) list
 [@@deriving sexp_of]

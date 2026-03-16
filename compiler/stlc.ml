@@ -24,7 +24,7 @@ let rec sexp_of_ty = function
 ;;
 
 type recur =
-  | Rec of int * ty option
+  | Rec of int
   | Nonrec
 [@@deriving sexp_of]
 
@@ -37,7 +37,7 @@ type term_desc =
   | Mat of int * int * term list
   | Lam of string * ty option * term
   | App of term * term
-  | Let of recur * string * term * term
+  | Let of recur * string * ty option * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -64,12 +64,29 @@ let rec sexp_of_term_desc = function
     let ty = Option.sexp_of_t sexp_of_ty ty_opt in
     List [ Atom "lambda"; List [ Atom v; ty ]; sexp_of_term body ]
   | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
-  | Let (Rec (n, ty_opt), v, bind, body) ->
-    let ty = Option.sexp_of_t sexp_of_ty ty_opt in
-    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n); ty ] in
+  | Let (Rec n, v, None, bind, body) ->
+    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
     List [ Atom "let"; rec_tag; Atom v; sexp_of_term bind; sexp_of_term body ]
-  | Let (Nonrec, v, bind, body) ->
+  | Let (Rec n, v, Some ret_ty, bind, body) ->
+    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
+    List
+      [ Atom "let"
+      ; rec_tag
+      ; Atom v
+      ; List [ Atom ":"; sexp_of_ty ret_ty ]
+      ; sexp_of_term bind
+      ; sexp_of_term body
+      ]
+  | Let (Nonrec, v, None, bind, body) ->
     List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
+  | Let (Nonrec, v, Some ret_ty, bind, body) ->
+    List
+      [ Atom "let"
+      ; Atom v
+      ; List [ Atom ":"; sexp_of_ty ret_ty ]
+      ; sexp_of_term bind
+      ; sexp_of_term body
+      ]
   | If (c, t, e) -> List [ Atom "if"; sexp_of_term c; sexp_of_term t; sexp_of_term e ]
   | Bop (op, l, r) ->
     List [ Atom (Glsl.string_of_binary_op op); sexp_of_term l; sexp_of_term r ]
@@ -84,15 +101,30 @@ let rec sexp_of_term_desc = function
 and sexp_of_term t = sexp_of_term_desc t.desc
 
 type top_desc =
-  | Define of recur * string * term
+  | Define of recur * string * ty option * term
   | Extern of ty * string
   | RecordDef of string * (string * ty) list
-[@@deriving sexp_of]
 
 type top =
   { desc : top_desc
   ; loc : Lexer.loc
   }
+
+let sexp_of_top_desc = function
+  | Define (recur, v, ret_ty_opt, term) ->
+    let recur_sexp = sexp_of_recur recur in
+    let parts = [ Atom "Define"; recur_sexp; Atom v ] in
+    let parts =
+      match ret_ty_opt with
+      | None -> parts
+      | Some ret_ty -> parts @ [ List [ Atom ":"; sexp_of_ty ret_ty ] ]
+    in
+    List (parts @ [ sexp_of_term term ])
+  | Extern (ty, v) -> List [ Atom "Extern"; sexp_of_ty ty; Atom v ]
+  | RecordDef (name, fields) ->
+    let sexp_of_field (f, ty) = List [ Atom f; sexp_of_ty ty ] in
+    List [ Atom "RecordDef"; Atom name; List (List.map fields ~f:sexp_of_field) ]
+;;
 
 let sexp_of_top t = sexp_of_top_desc t.desc
 

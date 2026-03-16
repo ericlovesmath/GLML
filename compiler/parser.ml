@@ -195,30 +195,22 @@ let make_lambdas params (body : term) =
 ;;
 
 (* TODO: Hardcoded to maximum 1000 loops for now *)
-(* TODO: Maybe just annotating the return type is fine, since
-   we can extract the other types from the function arguments *)
-let recur_tag_t =
-  between
-    `Paren
-    (let%map ty = tok REC *> tok COLON *> ty_p in
-     Rec (1000, Some ty))
-  <|> tok REC *> return (Rec (1000, None))
-  <|> return Nonrec
-  <??> "recur_tag"
-;;
+let recur_p = tok REC *> return (Rec 1000) <|> return Nonrec <??> "recur"
 
 let rec term_let_p =
   fun st ->
   (with_term_loc
      (tok LET
       *> commit
-           (let%bind recur = recur_tag_t in
+           (let%bind recur = recur_p in
             let%bind id = ident_p in
             let%bind params = many param_p in
+            let%bind return_ty = optional (tok COLON *> ty_p) in
             let%bind rhs = tok EQ *> term_p in
             let rhs_desc = make_lambdas params rhs in
             let%bind body = tok IN *> term_p in
-            return (Let (recur, id, { desc = rhs_desc; loc = rhs.loc }, body))))
+            return (Let (recur, id, return_ty, { desc = rhs_desc; loc = rhs.loc }, body)))
+     )
    <??> "term_let")
     st
 
@@ -377,7 +369,7 @@ let%expect_test "term parse tests" =
   test "fun (x : bool) -> x";
   test "f x y";
   test "let bind = true in bind";
-  test "let (rec : bool) f (x : float) = f x in f";
+  test "let rec f (x : float) : bool = f x in f";
   test "if true then x else y";
   test "1 * 2 + true && 44 % 10";
   test "v.0";
@@ -394,7 +386,7 @@ let%expect_test "term parse tests" =
     (Ok (lambda (x (bool)) x))
     (Ok (app (app f x) y))
     (Ok (let bind true bind))
-    (Ok (let (rec 1000 (bool)) f (lambda (x (float)) (app f x)) f))
+    (Ok (let (rec 1000) f (: bool) (lambda (x (float)) (app f x)) f))
     (Ok (if true x y))
     (Ok (&& (+ (* 1 2) true) (% 44 10)))
     (Ok (index v 0))
@@ -428,14 +420,16 @@ let%expect_test "term parse tests" =
   test "let f = fun (x : bool) (y : bool) -> x && y in f";
   test "let f x y = x && y in f";
   test "let rec f x = f x in f";
-  test "let (rec: 'a) f (x: 'b) = f x in f";
+  test "let rec f (x : 'b) : 'a = f x in f";
+  test "let f (x : float) : float = x in f";
   [%expect
     {|
     (Ok (let f (lambda (x (bool)) (lambda (y (bool)) (&& x y))) f))
     (Ok (let f (lambda (x (bool)) (lambda (y (bool)) (&& x y))) f))
     (Ok (let f (lambda (x ()) (lambda (y ()) (&& x y))) f))
-    (Ok (let (rec 1000 ()) f (lambda (x ()) (app f x)) f))
-    (Ok (let (rec 1000 ('a)) f (lambda (x ('b)) (app f x)) f))
+    (Ok (let (rec 1000) f (lambda (x ()) (app f x)) f))
+    (Ok (let (rec 1000) f (: 'a) (lambda (x ('b)) (app f x)) f))
+    (Ok (let f (: float) (lambda (x (float)) x) f))
     |}]
 ;;
 
@@ -465,12 +459,13 @@ let top_let_p =
   with_top_loc
     (tok LET
      *> commit
-          (let%bind recur = recur_tag_t in
+          (let%bind recur = recur_p in
            let%bind id = ident_p in
            let%bind params = many param_p in
+           let%bind return_ty = optional (tok COLON *> ty_p) in
            let%bind rhs = tok EQ *> term_p in
            let rhs_desc = make_lambdas params rhs in
-           return (Define (recur, id, { desc = rhs_desc; loc = rhs.loc })))
+           return (Define (recur, id, return_ty, { desc = rhs_desc; loc = rhs.loc })))
      <??> "top_let")
 ;;
 
@@ -531,7 +526,7 @@ let%expect_test "glml parse tests" =
     let main = 1 + 2
     let f = fun (x : bool) (y : bool) -> x && y
     let main (u : vec2) = f [1, 2] + u
-    let (rec : float -> float) g (x : float) = g x
+    let rec g (x : float) : float = g x
     |};
   [%expect
     {|
@@ -542,7 +537,7 @@ let%expect_test "glml parse tests" =
        (Define Nonrec toplevel (+ 1 2)) (Define Nonrec main (+ 1 2))
        (Define Nonrec f (lambda (x (bool)) (lambda (y (bool)) (&& x y))))
        (Define Nonrec main (lambda (u ((vec 2))) (+ (app f (vec2 1 2)) u)))
-       (Define (Rec 1000 ((float -> float))) g (lambda (x (float)) (app g x))))))
+       (Define (Rec 1000) g (: float) (lambda (x (float)) (app g x))))))
     |}]
 ;;
 

@@ -51,7 +51,7 @@ and sexp_of_term t = sexp_of_term_desc t.desc
 type top_desc =
   | Define of
       { name : string
-      ; recur : Monomorphize.recur
+      ; recur : Stlc.recur
       ; args : (string * Monomorphize.ty) list
       ; body : term
       ; ret_ty : Monomorphize.ty
@@ -67,7 +67,7 @@ let sexp_of_top_desc = function
     in
     List
       [ Atom "Define"
-      ; Monomorphize.sexp_of_recur recur
+      ; Stlc.sexp_of_recur recur
       ; List [ Atom "name"; Atom name ]
       ; List [ Atom "args"; List args_sexp ]
       ; List [ Atom "body"; sexp_of_term body ]

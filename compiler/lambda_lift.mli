@@ -27,7 +27,7 @@ and term =
 type top_desc =
   | Define of
       { name : string
-      ; recur : Monomorphize.recur
+      ; recur : Stlc.recur
       ; args : (string * Monomorphize.ty) list
       ; body : term
       ; ret_ty : Monomorphize.ty

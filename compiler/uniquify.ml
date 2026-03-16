@@ -28,7 +28,7 @@ let rec uniquify_term (ctx : env) (t : term) : term Or_error.t =
     let%bind f = aux f in
     let%bind x = aux x in
     pure (App (f, x))
-  | Let (recur, v, bind, body) ->
+  | Let (recur, v, return_ty, bind, body) ->
     let v' = Utils.fresh v in
     let ctx' = Map.set ctx ~key:v ~data:v' in
     let%bind bind =
@@ -37,7 +37,7 @@ let rec uniquify_term (ctx : env) (t : term) : term Or_error.t =
       | Rec _ -> uniquify_term ctx' bind
     in
     let%bind body = uniquify_term ctx' body in
-    pure (Let (recur, v', bind, body))
+    pure (Let (recur, v', return_ty, bind, body))
   | If (c, t, f) ->
     let%bind c = aux c in
     let%bind t = aux t in
@@ -75,7 +75,7 @@ let rec uniquify_term (ctx : env) (t : term) : term Or_error.t =
 
 let uniquify_top (ctx : env) (t : top) : (env * top) Or_error.t =
   match t.desc with
-  | Define (recur, v, bind) ->
+  | Define (recur, v, return_ty, bind) ->
     let v' = Utils.fresh v in
     let ctx' = Map.set ctx ~key:v ~data:v' in
     let%map bind =
@@ -83,7 +83,7 @@ let uniquify_top (ctx : env) (t : top) : (env * top) Or_error.t =
       | Nonrec -> uniquify_term ctx bind
       | Rec _ -> uniquify_term ctx' bind
     in
-    ctx', { desc = Define (recur, v', bind); loc = t.loc }
+    ctx', { desc = Define (recur, v', return_ty, bind); loc = t.loc }
   | Extern (_, v) -> Ok (Map.set ctx ~key:v ~data:v, t)
   | RecordDef _ -> Ok (ctx, t)
 ;;

@@ -197,13 +197,8 @@ let rec resolve_spec
     in
     (* Rewrite references in the body *)
     let env, body, inner_defs = rewrite_refs poly_env env body in
-    let recur =
-      match entry.poly_recur with
-      | Rec (n, _) -> Rec (n, Some concrete_ty)
-      | Nonrec -> Nonrec
-    in
     let top : Typecheck.top =
-      { desc = Define (recur, spec_name, body)
+      { desc = Define (entry.poly_recur, spec_name, body)
       ; ty = concrete_ty
       ; loc = entry.poly_loc
       ; scheme_constrs = []
@@ -269,20 +264,12 @@ and rewrite_refs (poly_env : poly_env) (env : spec_map) (t : Typecheck.term)
         in
         let env, body', defs2 = rewrite_refs poly_env env body' in
         (* Wrap in nested lets *)
-        ( (List.fold_right
-             specs
-             ~init:body'
-             ~f:(fun (spec_name, spec_bind, concrete_ty) acc ->
-               let recur =
-                 match recur with
-                 | Rec (n, _) -> Rec (n, Some concrete_ty)
-                 | Nonrec -> Nonrec
-               in
-               ({ desc = Let (recur, spec_name, [], spec_bind, acc)
-                ; ty = acc.ty
-                ; loc = t.loc
-                }
-                : Typecheck.term)))
+        ( (List.fold_right specs ~init:body' ~f:(fun (spec_name, spec_bind, _) acc ->
+             ({ desc = Let (recur, spec_name, [], spec_bind, acc)
+              ; ty = acc.ty
+              ; loc = t.loc
+              }
+              : Typecheck.term)))
             .desc
         , env
         , defs1 @ defs2 ))
@@ -332,7 +319,7 @@ type ty =
   | TyArrow of ty * ty
   | TyRecord of string
 
-let rec sexp_of_ty : ty -> Sexp.t = function
+let rec sexp_of_ty = function
   | TyFloat -> Atom "float"
   | TyInt -> Atom "int"
   | TyBool -> Atom "bool"
@@ -341,11 +328,6 @@ let rec sexp_of_ty : ty -> Sexp.t = function
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
   | TyRecord s -> Atom s
 ;;
-
-type recur =
-  | Rec of int
-  | Nonrec
-[@@deriving sexp_of]
 
 type term_desc =
   | Var of string
@@ -430,12 +412,6 @@ let rec ty_of_stlc (t : Stlc.ty) : ty Or_error.t =
     Ok (TyArrow (a, b))
 ;;
 
-let recur_of_stlc (r : Stlc.recur) : recur =
-  match r with
-  | Nonrec -> Nonrec
-  | Rec (n, _) -> Rec n
-;;
-
 let rec term_of_tc (t : Typecheck.term) : term Or_error.t =
   let%bind ty = ty_of_stlc t.ty in
   let%bind desc = term_desc_of_tc t.desc in
@@ -465,7 +441,7 @@ and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Or_error.t =
     let%bind bind = term_of_tc bind in
     let%bind body = term_of_tc body in
     if List.is_empty constrs
-    then Ok (Let (recur_of_stlc r, v, bind, body))
+    then Ok (Let (r, v, bind, body))
     else error_s [%message "monomorphize: Let has constraints" (d : Typecheck.term_desc)]
   | If (c, t, e) ->
     let%bind c = term_of_tc c in
@@ -496,7 +472,7 @@ let top_of_tc (t : Typecheck.top) : top Or_error.t =
     match t.desc with
     | Define (r, v, bind) ->
       let%map bind = term_of_tc bind in
-      Define (recur_of_stlc r, v, bind)
+      Define (r, v, bind)
     | Extern v -> Ok (Extern v)
     | RecordDef (s, fields) ->
       let%map fields =
