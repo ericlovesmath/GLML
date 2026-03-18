@@ -31,7 +31,7 @@ Currently a mess, will organize later (if ever)
 
 - `let%glsl` ppx to embed DSL?
 - `wasm_of_ocaml` build? `Core` seems to cause `Error: Base_am_testing not implemented`
-- Local renderer without web
+- Local renderer without web / tests with [glslViewer](https://github.com/patriciogonzalezvivo/glslViewer)
 - Do I separate camera and make it specific like a 3D ShaderToy for Raymarching in the web playground?
 - Write Nix derivation for Javascript and OCaml bindings
 - Emit on compilation what data needs to be passed from host
