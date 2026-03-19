@@ -6,6 +6,7 @@ type ty =
   | TyMat of int * int
   | TyArrow of ty * ty
   | TyRecord of string
+  | TyVariant of string
   | TyVar of string
 [@@deriving sexp_of, equal]
 
@@ -31,6 +32,8 @@ type term_desc =
   | Builtin of Glsl.builtin * term list
   | Record of (string * term) list
   | Field of term * string
+  | Variant of string * term list
+  | Match of term * (string * string list * term) list
 [@@deriving sexp_of]
 
 and term =
@@ -43,6 +46,7 @@ type top_desc =
   | Define of recur * string * ty option * term
   | Extern of ty * string
   | RecordDef of string * (string * ty) list
+  | VariantDef of string * (string * ty list) list
 [@@deriving sexp_of]
 
 type top =

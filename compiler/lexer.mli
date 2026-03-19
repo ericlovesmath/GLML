@@ -46,6 +46,8 @@ type token =
   | LOR
   | EXTERN
   | TYPE
+  | OF
+  | CONSTRUCTOR of string
   | NUMERIC of int
   | FLOAT_LIT of float
   | ID of string

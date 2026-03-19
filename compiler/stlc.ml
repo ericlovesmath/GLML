@@ -9,6 +9,7 @@ type ty =
   | TyMat of int * int
   | TyArrow of ty * ty
   | TyRecord of string
+  | TyVariant of string
   | TyVar of string
 [@@deriving equal]
 
@@ -20,6 +21,7 @@ let rec sexp_of_ty = function
   | TyMat (x, y) -> List [ Atom "mat"; Atom (Int.to_string x); Atom (Int.to_string y) ]
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
   | TyRecord s -> Atom s
+  | TyVariant s -> Atom s
   | TyVar v -> Atom ("'" ^ v)
 ;;
 
@@ -44,6 +46,8 @@ type term_desc =
   | Builtin of Glsl.builtin * term list
   | Record of (string * term) list
   | Field of term * string
+  | Variant of string * term list
+  | Match of term * (string * string list * term) list
 
 and term =
   { desc : term_desc
@@ -97,6 +101,13 @@ let rec sexp_of_term_desc = function
     let sexp_of_field (f, t) = List [ Atom f; sexp_of_term t ] in
     List (Atom "record" :: List.map fields ~f:sexp_of_field)
   | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
+  | Variant (ctor, args) ->
+    List (Atom "Variant" :: Atom ctor :: List.map args ~f:sexp_of_term)
+  | Match (scrutinee, cases) ->
+    let sexp_of_case (ctor, vars, body) =
+      List [ Atom ctor; List (List.map vars ~f:(fun v -> Atom v)); sexp_of_term body ]
+    in
+    List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
 
@@ -104,6 +115,7 @@ type top_desc =
   | Define of recur * string * ty option * term
   | Extern of ty * string
   | RecordDef of string * (string * ty) list
+  | VariantDef of string * (string * ty list) list
 
 type top =
   { desc : top_desc
@@ -124,6 +136,9 @@ let sexp_of_top_desc = function
   | RecordDef (name, fields) ->
     let sexp_of_field (f, ty) = List [ Atom f; sexp_of_ty ty ] in
     List [ Atom "RecordDef"; Atom name; List (List.map fields ~f:sexp_of_field) ]
+  | VariantDef (name, ctors) ->
+    let sexp_of_ctor (ctor, tys) = List (Atom ctor :: List.map tys ~f:sexp_of_ty) in
+    List [ Atom "VariantDef"; Atom name; List (List.map ctors ~f:sexp_of_ctor) ]
 ;;
 
 let sexp_of_top t = sexp_of_top_desc t.desc

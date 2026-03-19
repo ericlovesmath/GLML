@@ -47,6 +47,8 @@ type token =
   | LOR
   | EXTERN
   | TYPE
+  | OF
+  | CONSTRUCTOR of string
   | NUMERIC of int
   | FLOAT_LIT of float
   | ID of string
@@ -229,8 +231,10 @@ let read_lexeme (t : t) : token Or_error.t =
         | "float" -> Ok FLOAT
         | "extern" -> Ok EXTERN
         | "type" -> Ok TYPE
+        | "of" -> Ok OF
         | s when Map.mem vecs s -> Map.find_or_error vecs s
         | s when Map.mem mats s -> Map.find_or_error mats s
+        | s when Char.is_uppercase (String.get s 0) -> Ok (CONSTRUCTOR s)
         | _ -> Ok (ID s))
      | char -> error_s [%message "lexer: invalid char" (char : char) (t.pos : pos)])
 ;;
@@ -262,17 +266,19 @@ let%expect_test "lexer" =
   test "true false = -> ( ) . < >";
   test "{ } ; : , if then else let";
   test "in fun | match with { }";
-  test "bool int float ' 'a 10 s_var let type";
-  test "+ - / * # <= >= % && || extern  vec2 mat3x3";
+  test "bool int float ' 'a 10 s_var let type of";
+  test "+ - / * # <= >= % && || extern vec2 mat3x3";
   test "1.23 0.45 6. -1.";
+  test "Constructor";
   [%expect
     {|
     (Ok (TRUE FALSE EQ ARROW LPAREN RPAREN DOT LANGLE RANGLE))
     (Ok (LCURLY RCURLY SEMI COLON COMMA IF THEN ELSE LET))
     (Ok (IN FUN BAR MATCH WITH LCURLY RCURLY))
-    (Ok (BOOL INT FLOAT TICK (TYVAR a) (NUMERIC 10) (ID s_var) LET TYPE))
+    (Ok (BOOL INT FLOAT TICK (TYVAR a) (NUMERIC 10) (ID s_var) LET TYPE OF))
     (Ok (ADD SUB DIV MUL HASH LEQ GEQ PERCENT LAND LOR EXTERN (VEC 2) (MAT 3 3)))
     (Ok ((FLOAT_LIT 1.23) (FLOAT_LIT 0.45) (FLOAT_LIT 6) SUB (FLOAT_LIT 1)))
+    (Ok ((CONSTRUCTOR Constructor)))
     |}];
   test "let{x:int}=match|a->fun->(f<x>*2)";
   [%expect
