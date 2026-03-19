@@ -24,6 +24,13 @@ let num_p =
 
 let commas p = sep_by1 (tok COMMA) p
 
+let constructor_p =
+  satisfy_map (function
+    | CONSTRUCTOR s -> Some s
+    | _ -> None)
+  <??> "constructor"
+;;
+
 let between brace_type p =
   let l, r =
     match brace_type with
@@ -58,6 +65,9 @@ let ty_singles_p =
     | BOOL -> Some TyBool
     | INT -> Some TyInt
     | FLOAT -> Some TyFloat
+    (* TODO: Right now [typecheck] reinterprets TyRecords into TyVariant once it checks
+       this, but there should probably some type that [Typecheck] generates while the
+       [Stlc] type just has some a generic [TyName]. This is kind of hacky. *)
     | ID s -> Some (TyRecord s)
     | TYVAR v -> Some (TyVar v)
     | _ -> None)
@@ -97,6 +107,8 @@ let%expect_test "ty parse tests" =
   test "mat3x2";
   test "mat3";
   test "float -> int";
+  test "'a";
+  test "record_or_variant";
   [%expect
     {|
     (Ok float)
@@ -106,6 +118,8 @@ let%expect_test "ty parse tests" =
     (Ok (mat 3 2))
     (Ok (mat 3 3))
     (Ok (float -> int))
+    (Ok 'a)
+    (Ok record_or_variant)
     |}];
   test "(vec4)";
   test "(mat3x2->vec2)->(vec2->int)";
@@ -236,6 +250,32 @@ and term_lam_p =
             return (make_lambdas params t))))
     st
 
+(* TODO: All branches of math must be a constructor right now, which is limiting *)
+and term_match_p =
+  fun st ->
+  (with_term_loc
+     (tok MATCH
+      *> commit
+           (let%bind scrutinee = term_p in
+            let%bind _ = tok WITH in
+            let%bind cases =
+              many1
+                (let%bind _ = tok BAR in
+                 let%bind ctor = constructor_p in
+                 let%bind vars =
+                   (* [Const (x, y)] or [Const x] or [Const] *)
+                   between `Paren (commas ident_p)
+                   <|> (ident_p >>| fun v -> [ v ])
+                   <|> return []
+                 in
+                 let%bind _ = tok ARROW in
+                 let%bind body = term_p in
+                 return (ctor, vars, body))
+            in
+            return (Match (scrutinee, cases))))
+   <??> "term_match")
+    st
+
 and term_mat_p =
   fun st ->
   (with_term_loc
@@ -285,6 +325,19 @@ and term_builtin_p =
       return (Builtin (builtin, args)) <??> "term_builtin"))
     st
 
+and term_variant_p =
+  fun st ->
+  (with_term_loc
+     (let%bind ctor = constructor_p in
+      let%bind args =
+        between `Paren (commas term_p)
+        <|> (term_atom_p <|> term_unsigned_number_p >>| fun t -> [ t ])
+        <|> return []
+      in
+      return (Variant (ctor, args)))
+   <??> "term_variant")
+    st
+
 and term_atom_p =
   fun st ->
   let term_singles_p =
@@ -292,6 +345,7 @@ and term_atom_p =
       (satisfy_map (function
          | TRUE -> Some (Bool true)
          | FALSE -> Some (Bool false)
+         | CONSTRUCTOR v -> Some (Variant (v, []))
          | ID v -> Some (Var v)
          | _ -> None)
        <??> "term_single")
@@ -305,7 +359,13 @@ and term_atom_p =
     st
 
 and term_head_p =
-  fun st -> (term_atom_p <|> term_number_p <|> between `Paren term_p <??> "term_head") st
+  fun st ->
+  (term_variant_p
+   <|> term_atom_p
+   <|> term_number_p
+   <|> between `Paren term_p
+   <??> "term_head")
+    st
 
 and term_postfix_p =
   fun st ->
@@ -344,6 +404,7 @@ and term_p =
   (term_let_p
    <|> term_if_p
    <|> term_lam_p
+   <|> term_match_p
    <|> List.fold_left bop_levels ~init:term_postfix_p ~f:chainl1
    <??> "term")
     st
@@ -375,6 +436,10 @@ let%expect_test "term parse tests" =
   test "v.0";
   test "#min(1, 2)";
   test "#exp2(1.)";
+  test "Constr";
+  test "Constr x";
+  test "Constr (x, 2.0)";
+  test "match x with | Constr x -> a | Alt b -> b";
   [%expect
     {|
     (Ok variable_name)
@@ -392,6 +457,10 @@ let%expect_test "term parse tests" =
     (Ok (index v 0))
     (Ok (min 1 2))
     (Ok (exp2 1.))
+    (Ok (Variant Constr))
+    (Ok (Variant Constr x))
+    (Ok (Variant Constr x 2.))
+    (Ok (match x (Constr (x) a) (Alt (b) b)))
     |}];
   test "-113.0";
   test "-113.";
@@ -500,8 +569,27 @@ let top_record_p =
     st
 ;;
 
+(* TODO: Lexer ignoring whitespace naturally means it is requierd to put
+   a leader [|] for all variant type defs, which seems bad *)
+let top_variant_p =
+  with_top_loc
+    (let%bind _ = tok TYPE in
+     let%bind id = ident_p in
+     let%bind _ = tok EQ in
+     let%bind ctors =
+       many1
+         (let%bind _ = tok BAR in
+          let%bind ctor = constructor_p in
+          let%bind args = tok OF *> sep_by1 (tok MUL) ty_p <|> return [] in
+          return (ctor, args))
+     in
+     return (VariantDef (id, ctors)))
+  <??> "top_variant"
+;;
+
 let glml_p =
-  many1 (top_let_p <|> top_extern_p <|> top_record_p) >>| fun tops -> Program tops
+  many1 (top_let_p <|> top_extern_p <|> top_record_p <|> top_variant_p)
+  >>| fun tops -> Program tops
 ;;
 
 let test s =
@@ -521,6 +609,10 @@ let%expect_test "glml parse tests" =
 
     type point = { x : float, y : int }
 
+    type shape =
+      | Circle of int * floa
+      | Triangle
+
     let a_struct = { x = 0.0, y = 0 }
     let toplevel = 1 + 2
     let main = 1 + 2
@@ -533,6 +625,7 @@ let%expect_test "glml parse tests" =
     (Ok
      (Program
       ((Extern float u_time) (RecordDef point ((x float) (y int)))
+       (VariantDef shape ((Circle int floa) (Triangle)))
        (Define Nonrec a_struct (record (x 0.) (y 0)))
        (Define Nonrec toplevel (+ 1 2)) (Define Nonrec main (+ 1 2))
        (Define Nonrec f (lambda (x (bool)) (lambda (y (bool)) (&& x y))))
