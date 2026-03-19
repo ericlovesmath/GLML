@@ -564,7 +564,7 @@ let top_record_p =
               let%bind f_ty = ty_p in
               return (f_id, f_ty)))
       in
-      return (RecordDef (id, fields)))
+      return (TypeDef (id, RecordDecl fields)))
    <??> "top_record")
     st
 ;;
@@ -577,13 +577,14 @@ let top_variant_p =
      let%bind id = ident_p in
      let%bind _ = tok EQ in
      let%bind ctors =
+       (* TODO: Have first bar be optional *)
        many1
          (let%bind _ = tok BAR in
           let%bind ctor = constructor_p in
           let%bind args = tok OF *> sep_by1 (tok MUL) ty_p <|> return [] in
           return (ctor, args))
      in
-     return (VariantDef (id, ctors)))
+     return (TypeDef (id, VariantDecl ctors)))
   <??> "top_variant"
 ;;
 
@@ -610,7 +611,7 @@ let%expect_test "glml parse tests" =
     type point = { x : float, y : int }
 
     type shape =
-      | Circle of int * floa
+      | Circle of int * float
       | Triangle
 
     let a_struct = { x = 0.0, y = 0 }
@@ -624,8 +625,8 @@ let%expect_test "glml parse tests" =
     {|
     (Ok
      (Program
-      ((Extern float u_time) (RecordDef point ((x float) (y int)))
-       (VariantDef shape ((Circle int floa) (Triangle)))
+      ((Extern float u_time) (TypeDef point (RecordDecl ((x float) (y int))))
+       (TypeDef shape (VariantDecl ((Circle (int float)) (Triangle ()))))
        (Define Nonrec a_struct (record (x 0.) (y 0)))
        (Define Nonrec toplevel (+ 1 2)) (Define Nonrec main (+ 1 2))
        (Define Nonrec f (lambda (x (bool)) (lambda (y (bool)) (&& x y))))

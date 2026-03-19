@@ -25,6 +25,11 @@ let rec sexp_of_ty = function
   | TyVar v -> Atom ("'" ^ v)
 ;;
 
+type type_decl =
+  | RecordDecl of (string * ty) list
+  | VariantDecl of (string * ty list) list
+[@@deriving sexp_of]
+
 type recur =
   | Rec of int
   | Nonrec
@@ -114,8 +119,7 @@ and sexp_of_term t = sexp_of_term_desc t.desc
 type top_desc =
   | Define of recur * string * ty option * term
   | Extern of ty * string
-  | RecordDef of string * (string * ty) list
-  | VariantDef of string * (string * ty list) list
+  | TypeDef of string * type_decl
 
 type top =
   { desc : top_desc
@@ -133,12 +137,7 @@ let sexp_of_top_desc = function
     in
     List (parts @ [ sexp_of_term term ])
   | Extern (ty, v) -> List [ Atom "Extern"; sexp_of_ty ty; Atom v ]
-  | RecordDef (name, fields) ->
-    let sexp_of_field (f, ty) = List [ Atom f; sexp_of_ty ty ] in
-    List [ Atom "RecordDef"; Atom name; List (List.map fields ~f:sexp_of_field) ]
-  | VariantDef (name, ctors) ->
-    let sexp_of_ctor (ctor, tys) = List (Atom ctor :: List.map tys ~f:sexp_of_ty) in
-    List [ Atom "VariantDef"; Atom name; List (List.map ctors ~f:sexp_of_ctor) ]
+  | TypeDef (name, decl) -> List [ Atom "TypeDef"; Atom name; sexp_of_type_decl decl ]
 ;;
 
 let sexp_of_top t = sexp_of_top_desc t.desc

@@ -10,6 +10,11 @@ type ty =
   | TyVar of string
 [@@deriving sexp_of, equal]
 
+type type_decl =
+  | RecordDecl of (string * ty) list
+  | VariantDecl of (string * ty list) list
+[@@deriving sexp_of]
+
 type recur =
   (** NOTE: [int] is for the maximum number of recs allowed *)
   | Rec of int
@@ -45,8 +50,7 @@ and term =
 type top_desc =
   | Define of recur * string * ty option * term
   | Extern of ty * string
-  | RecordDef of string * (string * ty) list
-  | VariantDef of string * (string * ty list) list
+  | TypeDef of string * type_decl
 [@@deriving sexp_of]
 
 type top =
