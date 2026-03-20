@@ -16,6 +16,7 @@
    lambda_lift
    anf
    tail_call
+   lower_variants
    translate
    patch_main
    glsl)

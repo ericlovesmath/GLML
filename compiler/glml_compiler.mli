@@ -11,6 +11,7 @@ module Passes : sig
     | Lambda_lift
     | Anf
     | Tail_call
+    | Lower_variants
     | Translate
     | Patch_main
   [@@deriving sexp_of, enumerate, string]

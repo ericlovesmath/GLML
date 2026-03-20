@@ -12,6 +12,7 @@ module Passes = struct
       | Lambda_lift
       | Anf
       | Tail_call
+      | Lower_variants
       | Translate
       | Patch_main
     [@@deriving compare, sexp, enumerate, string ~capitalize:"lower sentence case"]
@@ -44,6 +45,8 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   trace Anf (Anf.sexp_of_t t);
   let%bind t = Tail_call.remove_rec t in
   trace Tail_call (Tail_call.sexp_of_t t);
+  let%bind t = Lower_variants.lower t in
+  trace Lower_variants (Tail_call.sexp_of_t t);
   let%bind glsl = Translate.translate t in
   trace Translate (Glsl.sexp_of_t glsl);
   let%bind glsl = Patch_main.patch glsl in

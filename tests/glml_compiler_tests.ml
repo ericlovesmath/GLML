@@ -775,3 +775,145 @@ let%expect_test "constrained polymorphism tests" =
     }
     |}]
 ;;
+
+let%expect_test "variants and matching" =
+  test
+    {|
+    type shape =
+      | Circle of float
+      | Rect of float * float
+      | Empty
+
+    let area (s : shape) =
+      match s with
+      | Circle r -> 3.14159 * r * r
+      | Rect (w, h) -> w * h
+      | Empty -> 0.0
+
+    let main (coord : vec2) =
+      let a = area (Circle 2.0) in
+      let b = area (Rect (3.0, 4.0)) in
+      let c = area Empty in
+      [a, b, c]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct shape {
+        int tag;
+        float Circle_0;
+        float Rect_0;
+        float Rect_1;
+    };
+    float area_0(shape s_1) {
+        int _lv_tag_20 = s_1.tag;
+        bool _lv_cond_22 = (_lv_tag_20 == 0);
+        if (_lv_cond_22) {
+            float r_2 = s_1.Circle_0;
+            float anf_16 = (3.14159 * r_2);
+            return (anf_16 * r_2);
+        } else {
+            bool _lv_cond_21 = (_lv_tag_20 == 1);
+            if (_lv_cond_21) {
+                float w_3 = s_1.Rect_0;
+                float h_4 = s_1.Rect_1;
+                return (w_3 * h_4);
+            } else {
+                return 0.;
+            }
+        }
+    }
+    vec3 main_pure(vec2 coord_5) {
+        shape anf_17 = shape(0, 2., 0., 0.);
+        float a_6 = area_0(anf_17);
+        shape anf_18 = shape(1, 0., 3., 4.);
+        float b_7 = area_0(anf_18);
+        shape anf_19 = shape(2, 0., 0., 0.);
+        float c_8 = area_0(anf_19);
+        return vec3(a_6, b_7, c_8);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "variant match in let binding" =
+  test
+    {|
+    type opt =
+      | Some of float
+      | None
+
+    let main (coord : vec2) =
+      let x = Some 5.0 in
+      let v = match x with
+        | Some f -> f
+        | None -> 0.0
+      in
+      [v, v, v]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct opt {
+        int tag;
+        float Some_0;
+    };
+    vec3 main_pure(vec2 coord_0) {
+        opt x_1 = opt(0, 5.);
+        int _lv_tag_5 = x_1.tag;
+        bool _lv_cond_6 = (_lv_tag_5 == 0);
+        float v_2 = 0.;
+        if (_lv_cond_6) {
+            float f_3 = x_1.Some_0;
+            v_2 = f_3;
+        } else {
+            v_2 = 0.;
+        }
+        return vec3(v_2, v_2, v_2);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "variant exhaustive checking and incorrect maching" =
+  test
+    {|
+    type color = | Red | Green | Blue
+
+    let main (coord : vec2) =
+      let v = match Red with
+        | Red -> 1.0
+      in
+      [v, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    ("typecheck: non-exhaustive match" (loc (5:15 - 6:21))
+     (missing (Blue Green)))
+  |}];
+  test
+    {|
+    type shape =
+      | Circle of float
+      | Empty
+
+    let main (coord : vec2) =
+      let s = Circle (1.0, 2.0) in
+      [0.0, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    ("typecheck: wrong number of args to constructor" (loc (7:15 - 7:32))
+     (ctor Circle))
+    |}]
+;;

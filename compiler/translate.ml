@@ -12,6 +12,8 @@ let to_glsl_ty (ty : Monomorphize.ty) : ty Or_error.t =
   | TyVec n -> Ok (TyVec n)
   | TyMat (x, y) -> Ok (TyMat (x, y))
   | TyRecord s -> Ok (TyStruct s)
+  | TyVariant _ ->
+    error_s [%message "translate: variant types shouldn't exist" (ty : Monomorphize.ty)]
   | TyArrow _ ->
     error_s
       [%message "translate: arrow types should not be translated" (ty : Monomorphize.ty)]
@@ -46,6 +48,8 @@ let to_glsl_term (t : Tail_call.term) : term Or_error.t =
   | If _ ->
     error_s
       [%message "to_glsl_term: should be handled in [tr_block]" (t : Tail_call.term)]
+  | Variant _ | Match _ ->
+    error_s [%message "to_glsl_term: variant/match should not exist" (t : Tail_call.term)]
 ;;
 
 let rec placeholder_value_for_ty (env : record_env) (ty : Monomorphize.ty)
@@ -70,6 +74,8 @@ let rec placeholder_value_for_ty (env : record_env) (ty : Monomorphize.ty)
       |> Or_error.all
     in
     Ok (App (s, fields))
+  | TyVariant _ ->
+    error_s [%message "translate: variant types should not exist" (ty : Monomorphize.ty)]
   | TyArrow _ ->
     error_s
       [%message "translate: arrow types should not be in tail" (ty : Monomorphize.ty)]
@@ -145,7 +151,8 @@ let translate (Program tops : Tail_call.t) : t Or_error.t =
     tops
     |> List.filter_map ~f:(fun top ->
       match top.desc with
-      | RecordDef (s, fields) -> Some (s, fields)
+      | TypeDef (s, RecordDecl fields) -> Some (s, fields)
+      | TypeDef (_, VariantDecl _) -> None
       | Define _ | Extern _ | Const _ -> None)
     |> String.Map.of_alist_or_error
   in
@@ -169,7 +176,7 @@ let translate (Program tops : Tail_call.t) : t Or_error.t =
       | Extern v ->
         let%map ty = to_glsl_ty top.ty in
         Global (Uniform, ty, v)
-      | RecordDef (s, fields) ->
+      | TypeDef (s, RecordDecl fields) ->
         let%map fields =
           fields
           |> List.map ~f:(fun (arg, arg_ty) ->
@@ -177,7 +184,9 @@ let translate (Program tops : Tail_call.t) : t Or_error.t =
             arg_ty, arg)
           |> Or_error.all
         in
-        Struct (s, fields))
+        Struct (s, fields)
+      | TypeDef (_, VariantDecl _) ->
+        error_s [%message "translate: VariantDecl should have been lowered"])
     |> Or_error.all
   in
   Ok (Program tops)
