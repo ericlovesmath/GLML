@@ -25,6 +25,8 @@ type term_desc =
   | If of atom * anf * anf
   | Record of string * atom list
   | Field of atom * string
+  | Variant of string * string * atom list
+  | Match of atom * (string * string list * anf) list
 
 and term =
   { desc : term_desc
@@ -58,6 +60,13 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | If (c, t, e) -> List [ Atom "if"; sexp_of_atom c; sexp_of_anf t; sexp_of_anf e ]
   | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_atom)
   | Field (t, f) -> List [ Atom "."; sexp_of_atom t; Atom f ]
+  | Variant (ty_name, ctor, args) ->
+    List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_atom)
+  | Match (scrutinee, cases) ->
+    let sexp_of_case (ctor, vars, body) =
+      List [ Atom ctor; List (List.map vars ~f:(fun v -> Sexp.Atom v)); sexp_of_anf body ]
+    in
+    List (Atom "match" :: sexp_of_atom scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
 
@@ -78,7 +87,7 @@ type top_desc =
       }
   | Const of string * anf
   | Extern of string
-  | RecordDef of string * (string * Monomorphize.ty) list
+  | TypeDef of string * Monomorphize.type_decl
 
 let sexp_of_top_desc = function
   | Define { name; recur; args; body; ret_ty = _ } ->
@@ -94,9 +103,8 @@ let sexp_of_top_desc = function
       ]
   | Const (name, term) -> List [ Atom "Const"; Atom name; sexp_of_anf term ]
   | Extern name -> List [ Atom "Extern"; Atom name ]
-  | RecordDef (name, fields) ->
-    List
-      [ Atom "RecordDef"; Atom name; [%sexp (fields : (string * Monomorphize.ty) list)] ]
+  | TypeDef (name, decl) ->
+    List [ Atom "TypeDef"; Atom name; Monomorphize.sexp_of_type_decl decl ]
 ;;
 
 type top =
@@ -151,6 +159,14 @@ let rec normalize (expr : Lambda_lift.term) : anf =
       pure (If (c_atom, t_anf, e_anf)))
   | Record (s, ts) -> atomize_list ts (fun args -> pure (Record (s, args)))
   | Field (t, f) -> atomize t (fun a -> pure (Field (a, f)))
+  | Variant (ty_name, ctor, args) ->
+    atomize_list args (fun args -> pure (Variant (ty_name, ctor, args)))
+  | Match (scrutinee, cases) ->
+    atomize scrutinee (fun s ->
+      let cases =
+        List.map cases ~f:(fun (ctor, vars, body) -> ctor, vars, normalize body)
+      in
+      pure (Match (s, cases)))
 
 and atomize (expr : Lambda_lift.term) (k : atom -> anf) : anf =
   match expr.desc with
@@ -183,7 +199,7 @@ let normalize_top (t : Lambda_lift.top) : top =
     pure (Define { name; recur; args; body = normalize body; ret_ty })
   | Const (name, body) -> pure (Const (name, normalize body))
   | Extern v -> pure (Extern v)
-  | RecordDef (s, fields) -> pure (RecordDef (s, fields))
+  | TypeDef (name, decl) -> pure (TypeDef (name, decl))
 ;;
 
 let to_anf (Program terms : Lambda_lift.t) : t = Program (List.map terms ~f:normalize_top)

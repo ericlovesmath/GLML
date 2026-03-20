@@ -42,6 +42,8 @@ type term_desc =
   | Builtin of Glsl.builtin * term list
   | Record of string * term list
   | Field of term * string
+  | Variant of string * string * term list
+  | Match of term * (string * string list * term) list
 [@@deriving sexp_of]
 
 and term =
@@ -52,10 +54,9 @@ and term =
 [@@deriving sexp_of]
 
 type top_desc =
-  (** TODO: This recur doesn't need to be here anymore, or at least doesn't need ty *)
   | Define of recur * string * term
   | Extern of string
-  | RecordDef of string * (string * ty) list
+  | TypeDef of string * type_decl
 [@@deriving sexp_of]
 
 type top =
@@ -67,7 +68,6 @@ type top =
 [@@deriving sexp_of]
 
 type t = Program of top list [@@deriving sexp_of]
-
 type substitution = (string * Stlc.ty) list
 
 (** Applies a [substitution] to all type annotations in a typed [term].

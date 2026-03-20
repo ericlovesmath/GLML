@@ -14,6 +14,8 @@ type term_desc =
   | If of atom * anf * anf
   | Record of string * atom list
   | Field of atom * string
+  | Variant of string * string * atom list
+  | Match of atom * (string * string list * anf) list
 
 and term =
   { desc : term_desc
@@ -50,6 +52,17 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | If (c, t, e) -> List [ Atom "if"; sexp_of_atom c; sexp_of_anf t; sexp_of_anf e ]
   | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_atom)
   | Field (t, f) -> List [ Atom "."; sexp_of_atom t; Atom f ]
+  | Variant (ty_name, ctor, args) ->
+    List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_atom)
+  | Match (scrutinee, cases) ->
+    let sexp_of_case (ctor, vars, body) =
+      List
+        [ Atom ctor
+        ; List (List.map vars ~f:(fun v -> Sexplib.Sexp.Atom v))
+        ; sexp_of_anf body
+        ]
+    in
+    List (Atom "match" :: sexp_of_atom scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
 
@@ -74,7 +87,7 @@ type top_desc =
       }
   | Const of string * anf
   | Extern of string
-  | RecordDef of string * (string * Monomorphize.ty) list
+  | TypeDef of string * Monomorphize.type_decl
 
 let sexp_of_top_desc = function
   | Define { name; args; body; ret_ty = _ } ->
@@ -89,9 +102,8 @@ let sexp_of_top_desc = function
       ]
   | Const (name, term) -> List [ Atom "Const"; Atom name; sexp_of_anf term ]
   | Extern name -> List [ Atom "Extern"; Atom name ]
-  | RecordDef (name, fields) ->
-    List
-      [ Atom "RecordDef"; Atom name; [%sexp (fields : (string * Monomorphize.ty) list)] ]
+  | TypeDef (name, decl) ->
+    List [ Atom "TypeDef"; Atom name; Monomorphize.sexp_of_type_decl decl ]
 ;;
 
 type top =
@@ -108,7 +120,7 @@ type t = Program of top list
 
 let sexp_of_t (Program tops) = List (Atom "Program" :: List.map tops ~f:sexp_of_top)
 
-type record_env = (string * Monomorphize.ty) list String.Map.t
+type type_env = Monomorphize.type_decl String.Map.t
 
 let rec of_term (t : Anf.term) : term =
   let pure desc : term = { desc; ty = t.ty; loc = t.loc } in
@@ -123,6 +135,11 @@ let rec of_term (t : Anf.term) : term =
   | Field (a, f) -> pure (Field (a, f))
   | App (f, xs) -> pure (App (f, xs))
   | If (c, t, f) -> pure (If (c, of_anf t, of_anf f))
+  | Variant (ty_name, ctor, args) -> pure (Variant (ty_name, ctor, args))
+  | Match (scrutinee, cases) ->
+    pure
+      (Match
+         (scrutinee, List.map cases ~f:(fun (ctor, vars, body) -> ctor, vars, of_anf body)))
 
 and of_anf (anf : Anf.anf) : anf =
   let pure desc : anf = { desc; ty = anf.ty; loc = anf.loc } in
@@ -131,8 +148,7 @@ and of_anf (anf : Anf.anf) : anf =
   | Return tail -> pure (Return (of_term tail))
 ;;
 
-(** [env] is a map from record names to the type of records *)
-let placeholder_anf_for_ty (env : record_env) (ty : Monomorphize.ty) (loc : Lexer.loc)
+let placeholder_anf_for_ty (tenv : type_env) (ty : Monomorphize.ty) (loc : Lexer.loc)
   : anf Or_error.t
   =
   let open Or_error.Let_syntax in
@@ -145,8 +161,8 @@ let placeholder_anf_for_ty (env : record_env) (ty : Monomorphize.ty) (loc : Lexe
     | TyVec n -> make (Vec (n, List.init n ~f:(Fn.const (Float 0.0))))
     | TyMat (n, m) -> make (Mat (n, m, List.init (n * m) ~f:(Fn.const (Float 0.0))))
     | TyRecord s ->
-      (match Map.find env s with
-       | Some fields ->
+      (match Map.find tenv s with
+       | Some (RecordDecl fields) ->
          let%bind fields =
            Or_error.all (List.map fields ~f:(fun (_, f_ty) -> build f_ty))
          in
@@ -162,7 +178,28 @@ let placeholder_anf_for_ty (env : record_env) (ty : Monomorphize.ty) (loc : Lexe
                  Var name :: args, bindings @ [ name, t ] @ all_bindings)
          in
          make ~env:nested_bindings (Record (s, args))
-       | None -> error_s [%message "tail_call: unknown struct type" s])
+       | Some (VariantDecl _) | None ->
+         error_s [%message "tail_call: unknown struct type" s])
+    | TyVariant s ->
+      (match Map.find tenv s with
+       | Some (VariantDecl ((first_ctor, first_arg_tys) :: _)) ->
+         let%bind arg_terms =
+           Or_error.all (List.map first_arg_tys ~f:(fun arg_ty -> build arg_ty))
+         in
+         let args, nested_bindings =
+           List.fold_right
+             arg_terms
+             ~init:([], [])
+             ~f:(fun (t, bindings) (args, all_bindings) ->
+               match t.desc with
+               | Atom a -> a :: args, bindings @ all_bindings
+               | _ ->
+                 let name = Utils.fresh "_tco_variant" in
+                 Var name :: args, bindings @ [ name, t ] @ all_bindings)
+         in
+         make ~env:nested_bindings (Variant (s, first_ctor, args))
+       | Some (VariantDecl []) | Some (RecordDecl _) | None ->
+         error_s [%message "tail_call: unknown variant type" s])
     | TyArrow _ ->
       error_s [%message "tail_call: unexpected arrow in tail" (ty : Monomorphize.ty)]
   in
@@ -178,6 +215,8 @@ let contains_call (t : Anf.term) (v : string) : bool =
     match t.desc with
     | App (f, _) -> String.equal f v
     | If (_, t, f) -> contains_call_anf t || contains_call_anf f
+    | Match (_, cases) ->
+      List.exists cases ~f:(fun (_, _, body) -> contains_call_anf body)
     | _ -> false
   and contains_call_anf (a : Anf.anf) : bool =
     match a.desc with
@@ -206,6 +245,15 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : strin
       let%bind t = patch t in
       let%bind f = patch f in
       pure (Return { desc = If (c, t, f); ty; loc })
+    | Return { desc = Match (scrutinee, cases); ty; loc } ->
+      let%bind cases =
+        cases
+        |> List.map ~f:(fun (ctor, vars, body) ->
+          let%map body = patch body in
+          ctor, vars, body)
+        |> Or_error.all
+      in
+      pure (Return { desc = Match (scrutinee, cases); ty; loc })
     | Return { desc = App (f, xs); ty = _; loc } when String.equal f name ->
       let tmp = Utils.fresh "_iter_inc" in
       let inc_iter_continue =
@@ -228,13 +276,12 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : strin
   patch anf
 ;;
 
-(** [env] is a map from record names to the type of records *)
-let remove_rec_top (env : record_env) (top : Anf.top) : top Or_error.t =
+let remove_rec_top (tenv : type_env) (top : Anf.top) : top Or_error.t =
   let pure desc = Ok { desc; ty = top.ty; loc = top.loc } in
   match top.desc with
   | Const (v, anf) -> pure (Const (v, of_anf anf))
   | Extern v -> pure (Extern v)
-  | RecordDef (s, fields) -> pure (RecordDef (s, fields))
+  | TypeDef (name, decl) -> pure (TypeDef (name, decl))
   | Define { name; recur = Nonrec; args; body; ret_ty } ->
     pure (Define { name; args; body = of_anf body; ret_ty })
   | Define { name; recur = Rec limit; args; body; ret_ty } ->
@@ -242,7 +289,7 @@ let remove_rec_top (env : record_env) (top : Anf.top) : top Or_error.t =
     let iter = Utils.fresh "_iter" in
     let while_cond : term = { desc = Bop (Lt, Var iter, Int limit); ty = top.ty; loc } in
     let%bind while_body = patch_tail_anf body name iter (List.map ~f:fst args) in
-    let%bind while_after = placeholder_anf_for_ty env ret_ty body.loc in
+    let%bind while_after = placeholder_anf_for_ty tenv ret_ty body.loc in
     let while_anf : anf =
       { desc = While (while_cond, while_body, while_after); ty = top.ty; loc }
     in
@@ -256,14 +303,14 @@ let remove_rec_top (env : record_env) (top : Anf.top) : top Or_error.t =
 ;;
 
 let remove_rec (Program t : Anf.t) : t Or_error.t =
-  let%bind env =
+  let%bind tenv =
     t
     |> List.filter_map ~f:(fun top ->
       match top.desc with
-      | RecordDef (s, fields) -> Some (s, fields)
+      | TypeDef (s, decl) -> Some (s, decl)
       | Define _ | Extern _ | Const _ -> None)
     |> String.Map.of_alist_or_error
   in
-  let%map tops = Or_error.all (List.map ~f:(remove_rec_top env) t) in
+  let%map tops = Or_error.all (List.map ~f:(remove_rec_top tenv) t) in
   Program tops
 ;;

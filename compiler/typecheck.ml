@@ -48,6 +48,8 @@ type term_desc =
   | Builtin of Glsl.builtin * term list
   | Record of string * term list
   | Field of term * string
+  | Variant of string * string * term list
+  | Match of term * (string * string list * term) list
 
 and term =
   { desc : term_desc
@@ -115,13 +117,20 @@ let rec sexp_of_term_desc = function
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
   | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_term)
   | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
+  | Variant (ty_name, ctor, args) ->
+    List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_term)
+  | Match (scrutinee, cases) ->
+    let sexp_of_case (ctor, vars, body) =
+      List [ Atom ctor; List (List.map vars ~f:(fun v -> Atom v)); sexp_of_term body ]
+    in
+    List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = List [ sexp_of_term_desc t.desc; Atom ":"; Stlc.sexp_of_ty t.ty ]
 
 type top_desc =
   | Define of recur * string * term
   | Extern of string
-  | RecordDef of string * (string * ty) list
+  | TypeDef of string * type_decl
 [@@deriving sexp_of]
 
 type top =
@@ -151,7 +160,7 @@ let fresh_tyvar () = TyVar (Utils.fresh "v")
 let rec subst_ty (sub : substitution) (ty : ty) : ty =
   match ty with
   | TyVar v -> List.Assoc.find ~equal:String.equal sub v |> Option.value ~default:ty
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ -> ty
+  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ | TyVariant _ -> ty
   | TyArrow (f, x) -> TyArrow (subst_ty sub f, subst_ty sub x)
 ;;
 
@@ -197,13 +206,19 @@ let rec subst_term (sub : substitution) (t : term) : term =
     | Builtin (b, args) -> Builtin (b, List.map args ~f:subst)
     | Record (name, args) -> Record (name, List.map args ~f:subst)
     | Field (t, f) -> Field (subst t, f)
+    | Variant (ty_name, ctor, args) -> Variant (ty_name, ctor, List.map args ~f:subst)
+    | Match (scrutinee, cases) ->
+      Match
+        ( subst scrutinee
+        , List.map cases ~f:(fun (ctor, vars, body) -> ctor, vars, subst body) )
   in
   { t with desc; ty = subst_ty sub t.ty }
 ;;
 
 let rec ftv_of_ty = function
   | TyVar v -> String.Set.singleton v
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ -> String.Set.empty
+  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ | TyVariant _ ->
+    String.Set.empty
   | TyArrow (t1, t2) -> Set.union (ftv_of_ty t1) (ftv_of_ty t2)
 ;;
 
@@ -250,7 +265,7 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Or_error.t =
   | (loc, TyVar v, ty) :: con | (loc, ty, TyVar v) :: con ->
     let rec occurs_in = function
       | TyVar v' -> String.equal v v'
-      | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ -> false
+      | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ | TyVariant _ -> false
       | TyArrow (ty, ty') -> occurs_in ty || occurs_in ty'
     in
     if equal_ty (TyVar v) ty
@@ -423,8 +438,9 @@ let rec is_value (t : Stlc.term) : bool =
   | Vec (_, ts) -> List.for_all ts ~f:is_value
   | Mat (_, _, ts) -> List.for_all ts ~f:is_value
   | Record fields -> List.for_all fields ~f:(fun (_, t) -> is_value t)
+  | Variant (_, args) -> List.for_all args ~f:is_value
   | Field (t, _) | Index (t, _) -> is_value t
-  | App _ | Let _ | If _ | Bop _ | Builtin _ -> false
+  | App _ | Let _ | If _ | Bop _ | Builtin _ | Match _ -> false
 ;;
 
 (** Build a function type from lambda param annotations and a return type. *)
@@ -435,10 +451,22 @@ let rec build_function_type (term : Stlc.term) (ret_ty : ty) : ty =
   | _ -> ret_ty
 ;;
 
+(** Replaces [TyRecord x] with [TyVariant x] when [x] is a variant.
+    The parser can't distinguish records from variants so we fix it here.
+    TODO: Definitely remove this behavior in parser *)
+let rec resolve_ty variants ty =
+  match ty with
+  | TyRecord s when Map.mem variants s -> TyVariant s
+  | TyArrow (l, r) -> TyArrow (resolve_ty variants l, resolve_ty variants r)
+  | _ -> ty
+;;
+
+(* TODO; There has to be a way that doesn't involving passing 4 million params *)
 (** Infer the type of a binding (used between top-level Define and inner Let).
     Returns [substituted term * resolved type * new context * scheme constraints * remaining constraints] *)
 let rec infer_binding
           (structs : substitution String.Map.t)
+          (variants : (string * ty list) list String.Map.t)
           (ctx : context)
           (loc : Lexer.loc)
           (bind_stlc : Stlc.term)
@@ -447,6 +475,7 @@ let rec infer_binding
           (return_ty : ty option)
   : (term * ty * context * constr list * constr list) Or_error.t
   =
+  let return_ty = Option.map return_ty ~f:(resolve_ty variants) in
   let ty_v_opt =
     match recur with
     | Nonrec -> None
@@ -461,7 +490,7 @@ let rec infer_binding
     | None -> ctx
     | Some ty_v -> Map.set ctx ~key:v ~data:([], [], ty_v)
   in
-  let%bind bind, constrs_bind = gen_term structs ctx_gen bind_stlc in
+  let%bind bind, constrs_bind = gen_term structs variants ctx_gen bind_stlc in
   let constr desc = { desc; loc } in
   let constrs =
     let rec_constrs =
@@ -489,7 +518,7 @@ let rec infer_binding
   Ok (bind, ty_bind, ctx, scheme_constrs, remaining)
 
 (** Generate typed term and constraints from STLC term. *)
-and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
+and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Or_error.t =
   let loc = t.loc in
   let make desc ty constrs = Ok (({ desc; ty; loc } : term), constrs) in
   let constr desc = { desc; loc } in
@@ -509,34 +538,34 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
   | Lam (v, ty_ann, body) ->
     let ty_v =
       match ty_ann with
-      | Some t -> t
+      | Some t -> resolve_ty variants t
       | None -> fresh_tyvar ()
     in
     let ctx = Map.set ctx ~key:v ~data:([], [], ty_v) in
-    let%bind body, constrs = gen_term structs ctx body in
+    let%bind body, constrs = gen_term structs variants ctx body in
     make (Lam (v, ty_v, body)) (TyArrow (ty_v, body.ty)) constrs
   | App (f, x) ->
-    let%bind f, constrs_f = gen_term structs ctx f in
-    let%bind x, constrs_x = gen_term structs ctx x in
+    let%bind f, constrs_f = gen_term structs variants ctx f in
+    let%bind x, constrs_x = gen_term structs variants ctx x in
     let ret_ty = fresh_tyvar () in
     let constrs = constr (Eq (f.ty, TyArrow (x.ty, ret_ty))) :: (constrs_f @ constrs_x) in
     make (App (f, x)) ret_ty constrs
   | Let (Nonrec, v, return_ty, bind, body) ->
     let%bind bind, _, ctx, scheme_constrs, remaining =
-      infer_binding structs ctx loc bind Nonrec v return_ty
+      infer_binding structs variants ctx loc bind Nonrec v return_ty
     in
-    let%bind body, constrs_body = gen_term structs ctx body in
+    let%bind body, constrs_body = gen_term structs variants ctx body in
     make (Let (Nonrec, v, scheme_constrs, bind, body)) body.ty (remaining @ constrs_body)
   | Let (Rec n, v, return_ty, bind, body) ->
     let%bind bind, _, ctx, scheme_constrs, remaining =
-      infer_binding structs ctx loc bind (Rec n) v return_ty
+      infer_binding structs variants ctx loc bind (Rec n) v return_ty
     in
-    let%bind body, constrs_body = gen_term structs ctx body in
+    let%bind body, constrs_body = gen_term structs variants ctx body in
     make (Let (Rec n, v, scheme_constrs, bind, body)) body.ty (remaining @ constrs_body)
   | If (c, t, e) ->
-    let%bind c, constrs_c = gen_term structs ctx c in
-    let%bind t, constrs_t = gen_term structs ctx t in
-    let%bind e, constrs_e = gen_term structs ctx e in
+    let%bind c, constrs_c = gen_term structs variants ctx c in
+    let%bind t, constrs_t = gen_term structs variants ctx t in
+    let%bind e, constrs_e = gen_term structs variants ctx e in
     let constrs =
       constr (Eq (c.ty, TyBool))
       :: constr (Eq (t.ty, e.ty))
@@ -544,8 +573,8 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
     in
     make (If (c, t, e)) t.ty constrs
   | Bop (op, l, r) ->
-    let%bind l, constrs_l = gen_term structs ctx l in
-    let%bind r, constrs_r = gen_term structs ctx r in
+    let%bind l, constrs_l = gen_term structs variants ctx l in
+    let%bind r, constrs_r = gen_term structs variants ctx r in
     let ret_ty = fresh_tyvar () in
     let op_constrs =
       match op with
@@ -574,13 +603,13 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
     in
     make (Bop (op, l, r)) ret_ty (op_constrs @ constrs_l @ constrs_r)
   | Index (t, i) ->
-    let%bind t, constrs_t = gen_term structs ctx t in
+    let%bind t, constrs_t = gen_term structs variants ctx t in
     let ret_ty = fresh_tyvar () in
     make (Index (t, i)) ret_ty (constr (IndexAccess (t.ty, i, ret_ty)) :: constrs_t)
   | Builtin (b, args) ->
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
-        let%bind arg', constrs = gen_term structs ctx arg in
+        let%bind arg', constrs = gen_term structs variants ctx arg in
         return (arg' :: acc_args, constrs @ acc_constrs))
     in
     let args = List.rev args in
@@ -654,7 +683,7 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
   | Vec (n, args) ->
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
-        let%bind arg, constrs = gen_term structs ctx arg in
+        let%bind arg, constrs = gen_term structs variants ctx arg in
         return (arg :: acc_args, (constr (Eq (arg.ty, TyFloat)) :: constrs) @ acc_constrs))
     in
     let args = List.rev args in
@@ -664,7 +693,7 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
   | Mat (n, m, args) ->
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
-        let%bind arg, constrs = gen_term structs ctx arg in
+        let%bind arg, constrs = gen_term structs variants ctx arg in
         return (arg :: acc_args, (constr (Eq (arg.ty, TyFloat)) :: constrs) @ acc_constrs))
     in
     let args = List.rev args in
@@ -694,29 +723,152 @@ and gen_term structs ctx (t : Stlc.term) : (term * constr list) Or_error.t =
            ~f:(fun (acc, acc_constrs) (name, ty) ->
              match List.Assoc.find fields ~equal:String.equal name with
              | Some arg ->
-               let%bind arg, constrs = gen_term structs ctx arg in
+               let%bind arg, constrs = gen_term structs variants ctx arg in
                return (arg :: acc, (constr (Eq (arg.ty, ty)) :: constrs) @ acc_constrs)
              | None ->
                error_s [%message "(unreachable) missing field" (loc : Lexer.loc) name])
        in
        make (Record (struct_name, List.rev args)) (TyRecord struct_name) constrs_args)
   | Field (t, f) ->
-    let%bind t, constrs_t = gen_term structs ctx t in
+    let%bind t, constrs_t = gen_term structs variants ctx t in
     let ret_ty = fresh_tyvar () in
     make (Field (t, f)) ret_ty (constr (FieldAccess (t.ty, f, ret_ty)) :: constrs_t)
+  | Variant (ctor, args) ->
+    let%bind variant_name, expected_arg_tys =
+      let found =
+        Map.fold variants ~init:[] ~f:(fun ~key:vname ~data:ctors acc ->
+          match List.find ctors ~f:(fun (c, _) -> String.equal c ctor) with
+          | Some (_, arg_tys) -> (vname, arg_tys) :: acc
+          | None -> acc)
+      in
+      match found with
+      | [ x ] -> Ok x
+      | [] ->
+        error_s
+          [%message "typecheck: unknown constructor" (loc : Lexer.loc) (ctor : string)]
+      | _ ->
+        error_s
+          [%message "typecheck: ambiguous constructor" (loc : Lexer.loc) (ctor : string)]
+    in
+    if List.length args <> List.length expected_arg_tys
+    then
+      error_s
+        [%message
+          "typecheck: wrong number of args to constructor"
+            (loc : Lexer.loc)
+            (ctor : string)]
+    else (
+      let%bind args, constrs_args =
+        List.fold2_exn
+          args
+          expected_arg_tys
+          ~init:(Ok ([], []))
+          ~f:(fun acc arg expected_ty ->
+            let%bind acc_args, acc_constrs = acc in
+            let%bind arg, constrs = gen_term structs variants ctx arg in
+            return
+              ( arg :: acc_args
+              , (constr (Eq (arg.ty, expected_ty)) :: constrs) @ acc_constrs ))
+      in
+      make
+        (Variant (variant_name, ctor, List.rev args))
+        (TyVariant variant_name)
+        constrs_args)
+  | Match (scrutinee, cases) ->
+    let%bind scrutinee, constrs_s = gen_term structs variants ctx scrutinee in
+    let ret_ty = fresh_tyvar () in
+    let%bind variant_name, variant_ctors =
+      let find_from_ty ty =
+        match ty with
+        | TyVariant name ->
+          (match Map.find variants name with
+           | Some ctors -> Some (name, ctors)
+           | None -> None)
+        | _ -> None
+      in
+      match find_from_ty scrutinee.ty with
+      | Some x -> Ok x
+      | None ->
+        let case_ctors = List.map cases ~f:(fun (ctor, _, _) -> ctor) in
+        let candidates =
+          Map.filter variants ~f:(fun ctors ->
+            let ctor_names = List.map ctors ~f:fst in
+            List.for_all case_ctors ~f:(fun c ->
+              List.mem ctor_names c ~equal:String.equal))
+        in
+        (match Map.to_alist candidates with
+         | [ (name, ctors) ] -> Ok (name, ctors)
+         | [] ->
+           error_s
+             [%message
+               "typecheck: match cases don't match any variant type" (loc : Lexer.loc)]
+         | _ ->
+           error_s [%message "typecheck: ambiguous match variant type" (loc : Lexer.loc)])
+    in
+    (* [Exhaustive Checking] *)
+    let case_ctors = List.map cases ~f:(fun (c, _, _) -> c) |> String.Set.of_list in
+    let all_ctors = List.map variant_ctors ~f:fst |> String.Set.of_list in
+    let missing = Set.diff all_ctors case_ctors in
+    let%bind () =
+      if Set.is_empty missing
+      then Ok ()
+      else
+        error_s
+          [%message
+            "typecheck: non-exhaustive match" (loc : Lexer.loc) (missing : String.Set.t)]
+    in
+    (* Type-check each case *)
+    let%bind cases, constrs_cases =
+      List.fold_result
+        cases
+        ~init:([], [])
+        ~f:(fun (acc_cases, acc_constrs) (ctor, vars, body) ->
+          let%bind _, expected_arg_tys =
+            match List.find variant_ctors ~f:(fun (c, _) -> String.equal c ctor) with
+            | Some x -> Ok x
+            | None ->
+              error_s
+                [%message
+                  "typecheck: unknown constructor in match"
+                    (loc : Lexer.loc)
+                    (ctor : string)]
+          in
+          if List.length vars <> List.length expected_arg_tys
+          then
+            error_s
+              [%message
+                "typecheck: wrong number of bindings in match case"
+                  (loc : Lexer.loc)
+                  (ctor : string)
+                  ~expected:(List.length expected_arg_tys : int)
+                  ~got:(List.length vars : int)]
+          else (
+            let ctx =
+              List.fold2_exn vars expected_arg_tys ~init:ctx ~f:(fun ctx v ty ->
+                Map.set ctx ~key:v ~data:([], [], ty))
+            in
+            let%bind body, constrs_body = gen_term structs variants ctx body in
+            return
+              ( (ctor, vars, body) :: acc_cases
+              , (constr (Eq (body.ty, ret_ty)) :: constrs_body) @ acc_constrs )))
+    in
+    let scrutinee_constr = constr (Eq (scrutinee.ty, TyVariant variant_name)) in
+    make
+      (Match (scrutinee, List.rev cases))
+      ret_ty
+      (scrutinee_constr :: (constrs_s @ constrs_cases))
 ;;
 
 let typecheck (Program terms : Stlc.t) : t Or_error.t =
-  let%map _, _, tops =
+  let%map _, _, _, tops =
     List.fold_result
       terms
-      ~init:(String.Map.empty, String.Map.empty, [])
-        (* TODO: There has to be a better way than to pass everything like this *)
-      ~f:(fun (ctx, structs, acc) top ->
+      ~init:(String.Map.empty, String.Map.empty, String.Map.empty, [])
+      ~f:(fun (ctx, structs, variants, acc) top ->
         match top.desc with
         | Define (Rec n, v, return_ty, bind) ->
           let%bind bind, ty, ctx, scheme_constrs, remaining =
-            infer_binding structs ctx top.loc bind (Rec n) v return_ty
+            infer_binding structs variants ctx top.loc bind (Rec n) v return_ty
           in
           if not (List.is_empty remaining)
           then
@@ -727,10 +879,10 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
             let top =
               { desc = Define (Rec n, v, bind); ty; loc = top.loc; scheme_constrs }
             in
-            Ok (ctx, structs, top :: acc))
+            Ok (ctx, structs, variants, top :: acc))
         | Define (Nonrec, v, return_ty, bind) ->
           let%bind bind, ty, ctx, scheme_constrs, remaining =
-            infer_binding structs ctx top.loc bind Nonrec v return_ty
+            infer_binding structs variants ctx top.loc bind Nonrec v return_ty
           in
           if not (List.is_empty remaining)
           then
@@ -741,21 +893,31 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
             let top =
               { desc = Define (Nonrec, v, bind); ty; loc = top.loc; scheme_constrs }
             in
-            Ok (ctx, structs, top :: acc))
+            Ok (ctx, structs, variants, top :: acc))
         | Extern (ty, v) ->
           let ctx = Map.set ctx ~key:v ~data:([], [], ty) in
           let top = { desc = Extern v; ty; loc = top.loc; scheme_constrs = [] } in
-          Ok (ctx, structs, top :: acc)
-        | RecordDef (name, fields) ->
+          Ok (ctx, structs, variants, top :: acc)
+        | TypeDef (name, RecordDecl fields) ->
           let structs = Map.set structs ~key:name ~data:fields in
           let top =
-            { desc = RecordDef (name, fields)
+            { desc = TypeDef (name, RecordDecl fields)
             ; ty = TyRecord name
             ; loc = top.loc
             ; scheme_constrs = []
             }
           in
-          Ok (ctx, structs, top :: acc))
+          Ok (ctx, structs, variants, top :: acc)
+        | TypeDef (name, VariantDecl ctors) ->
+          let variants = Map.set variants ~key:name ~data:ctors in
+          let top =
+            { desc = TypeDef (name, VariantDecl ctors)
+            ; ty = TyVariant name
+            ; loc = top.loc
+            ; scheme_constrs = []
+            }
+          in
+          Ok (ctx, structs, variants, top :: acc))
   in
   Program (List.rev tops)
 ;;

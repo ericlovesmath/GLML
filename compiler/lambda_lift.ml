@@ -17,6 +17,8 @@ type term_desc =
   | Builtin of Glsl.builtin * term list
   | Record of string * term list
   | Field of term * string
+  | Variant of string * string * term list
+  | Match of term * (string * string list * term) list
 
 and term =
   { desc : term_desc
@@ -45,6 +47,13 @@ let rec sexp_of_term_desc = function
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
   | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_term)
   | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
+  | Variant (ty_name, ctor, args) ->
+    List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_term)
+  | Match (scrutinee, cases) ->
+    let sexp_of_case (ctor, vars, body) =
+      List [ Atom ctor; List (List.map vars ~f:(fun v -> Atom v)); sexp_of_term body ]
+    in
+    List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
 
@@ -58,7 +67,7 @@ type top_desc =
       }
   | Const of string * term
   | Extern of string
-  | RecordDef of string * (string * Monomorphize.ty) list
+  | TypeDef of string * Monomorphize.type_decl
 
 let sexp_of_top_desc = function
   | Define { name; recur; args; body; ret_ty = _ } ->
@@ -74,9 +83,8 @@ let sexp_of_top_desc = function
       ]
   | Const (name, term) -> List [ Atom "Const"; Atom name; sexp_of_term term ]
   | Extern name -> List [ Atom "Extern"; Atom name ]
-  | RecordDef (name, fields) ->
-    List
-      [ Atom "RecordDef"; Atom name; [%sexp (fields : (string * Monomorphize.ty) list)] ]
+  | TypeDef (name, decl) ->
+    List [ Atom "TypeDef"; Atom name; Monomorphize.sexp_of_type_decl decl ]
 ;;
 
 type top =
@@ -120,6 +128,13 @@ let free_vars (env : env) (t : Uncurry.term) : Monomorphize.ty String.Map.t =
     | Index (t, _) -> fv t
     | Record (_, ts) -> union_list (List.map ts ~f:fv)
     | Field (t, _) -> fv t
+    | Variant (_, _, args) -> union_list (List.map args ~f:fv)
+    | Match (scrutinee, cases) ->
+      let fv_cases =
+        List.map cases ~f:(fun (_, vars, body) ->
+          List.fold vars ~init:(fv body) ~f:Map.remove)
+      in
+      union_list (fv scrutinee :: fv_cases)
   in
   fv t
 ;;
@@ -219,6 +234,20 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
   | Field (t, f) ->
     let%bind t, tops = lift t in
     make (Field (t, f)) tops
+  | Variant (ty_name, ctor, args) ->
+    let%bind args, tops = lift_list args in
+    make (Variant (ty_name, ctor, args)) tops
+  | Match (scrutinee, cases) ->
+    let%bind scrutinee, s_tops = lift scrutinee in
+    let%bind cases, c_tops =
+      List.fold_result
+        cases
+        ~init:([], [])
+        ~f:(fun (acc_cases, acc_tops) (ctor, vars, body) ->
+          let%map body, body_tops = lift body in
+          (ctor, vars, body) :: acc_cases, acc_tops @ body_tops)
+    in
+    make (Match (scrutinee, List.rev cases)) (s_tops @ c_tops)
   | Lam _ ->
     error_s [%message "first-class anon functions are unsupported" (t.loc : Lexer.loc)]
 ;;
@@ -234,7 +263,7 @@ let lift_top (globals : String.Set.t) (top : Uncurry.top) : top list Or_error.t 
     let%map term, term_tops = lift term in
     term_tops @ [ make (Const (name, term)) ]
   | Extern v -> return [ make (Extern v) ]
-  | RecordDef (s, fields) -> return [ make (RecordDef (s, fields)) ]
+  | TypeDef (name, decl) -> return [ make (TypeDef (name, decl)) ]
 ;;
 
 let lift (Program tops : Uncurry.t) : t Or_error.t =
@@ -244,7 +273,7 @@ let lift (Program tops : Uncurry.t) : t Or_error.t =
       match top.desc with
       | Define (_, v, _) -> Some v
       | Extern v -> Some v
-      | RecordDef _ -> None)
+      | TypeDef _ -> None)
     |> String.Set.of_list
   in
   let%bind top_blocks = Or_error.all (List.map tops ~f:(lift_top globals)) in

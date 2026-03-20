@@ -12,6 +12,8 @@ type term_desc =
   | If of atom * anf * anf
   | Record of string * atom list
   | Field of atom * string
+  | Variant of string * string * atom list
+  | Match of atom * (string * string list * anf) list
 [@@deriving sexp_of]
 
 and term =
@@ -45,7 +47,7 @@ type top_desc =
       }
   | Const of string * anf
   | Extern of string
-  | RecordDef of string * (string * Monomorphize.ty) list
+  | TypeDef of string * Monomorphize.type_decl
 [@@deriving sexp_of]
 
 type top =

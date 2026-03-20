@@ -8,7 +8,7 @@ open Or_error.Let_syntax
 let rec has_tyvars (ty : ty) : bool =
   match ty with
   | TyVar _ -> true
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ -> false
+  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ | TyVariant _ -> false
   | TyArrow (a, b) -> has_tyvars a || has_tyvars b
 ;;
 
@@ -29,6 +29,7 @@ let rec mangle_ty (ty : ty) : string =
   | TyVec n -> "vec" ^ Int.to_string n
   | TyMat (x, y) -> "mat" ^ Int.to_string x ^ "x" ^ Int.to_string y
   | TyRecord s -> s
+  | TyVariant s -> s
   | TyVar v -> "tv" ^ v
   | TyArrow (a, b) -> mangle_ty a ^ "_to_" ^ mangle_ty b
 ;;
@@ -51,6 +52,10 @@ let collect_var_usages (name : string) (t : Typecheck.term) : ty list =
     | If (c, t, e) -> walk (walk (walk acc c) t) e
     | Bop (_, l, r) -> walk (walk acc l) r
     | Index (t, _) | Field (t, _) -> walk acc t
+    | Variant (_, _, args) -> List.fold args ~init:acc ~f:walk
+    | Match (scrutinee, cases) ->
+      let acc = walk acc scrutinee in
+      List.fold cases ~init:acc ~f:(fun acc (_, _, body) -> walk acc body)
   in
   let usages = walk [] t in
   List.stable_dedup usages ~compare:(fun a b -> if equal_ty a b then 0 else 1)
@@ -77,6 +82,14 @@ let rec rename_var (src : string) (dst : string) (t : Typecheck.term) : Typechec
     | Builtin (b, ts) -> Builtin (b, List.map ts ~f:rename)
     | Record (s, ts) -> Record (s, List.map ts ~f:rename)
     | Field (t, f) -> Field (rename t, f)
+    | Variant (ty_name, ctor, args) -> Variant (ty_name, ctor, List.map args ~f:rename)
+    | Match (scrutinee, cases) ->
+      Match
+        ( rename scrutinee
+        , List.map cases ~f:(fun (ctor, vars, body) ->
+            if List.mem vars src ~equal:String.equal
+            then ctor, vars, body
+            else ctor, vars, rename body) )
   in
   { t with desc }
 ;;
@@ -109,6 +122,15 @@ let rec rewrite_var_at_type
     | Builtin (b, ts) -> Builtin (b, List.map ts ~f:rewrite)
     | Record (s, ts) -> Record (s, List.map ts ~f:rewrite)
     | Field (t, f) -> Field (rewrite t, f)
+    | Variant (ty_name, ctor, args) -> Variant (ty_name, ctor, List.map args ~f:rewrite)
+    | Match (scrutinee, cases) ->
+      (* TODO: This pattern on matches seems pretty common *)
+      Match
+        ( rewrite scrutinee
+        , List.map cases ~f:(fun (ctor, vars, body) ->
+            if List.mem vars name ~equal:String.equal
+            then ctor, vars, body
+            else ctor, vars, rewrite body) )
   in
   { t with desc }
 ;;
@@ -145,6 +167,10 @@ let collect_poly_refs (poly_env : poly_env) (t : Typecheck.term) : (string * ty)
     | If (c, t, e) -> walk (walk (walk acc c) t) e
     | Bop (_, l, r) -> walk (walk acc l) r
     | Index (t, _) | Field (t, _) -> walk acc t
+    | Variant (_, _, args) -> List.fold args ~init:acc ~f:walk
+    | Match (scrutinee, cases) ->
+      let acc = walk acc scrutinee in
+      List.fold cases ~init:acc ~f:(fun acc (_, _, body) -> walk acc body)
   in
   let refs = walk [] t in
   List.stable_dedup refs ~compare:(fun (n1, t1) (n2, t2) ->
@@ -298,6 +324,17 @@ and rewrite_refs (poly_env : poly_env) (env : spec_map) (t : Typecheck.term)
     | Field (t, f) ->
       let env, t, defs = rewrite_refs poly_env env t in
       Field (t, f), env, defs
+    | Variant (ty_name, ctor, args) ->
+      let env, args, defs = rewrite_refs_list poly_env env args in
+      Variant (ty_name, ctor, args), env, defs
+    | Match (scrutinee, cases) ->
+      let env, scrutinee, defs1 = rewrite_refs poly_env env scrutinee in
+      let env, cases_rev, defs2 =
+        List.fold cases ~init:(env, [], []) ~f:(fun (env, acc, defs) (ctor, vars, body) ->
+          let env, body, new_defs = rewrite_refs poly_env env body in
+          env, (ctor, vars, body) :: acc, defs @ new_defs)
+      in
+      Match (scrutinee, List.rev cases_rev), env, defs1 @ defs2
   in
   env, { t with desc }, defs
 
@@ -318,6 +355,7 @@ type ty =
   | TyMat of int * int
   | TyArrow of ty * ty
   | TyRecord of string
+  | TyVariant of string
 
 let rec sexp_of_ty = function
   | TyFloat -> Atom "float"
@@ -327,7 +365,13 @@ let rec sexp_of_ty = function
   | TyMat (x, y) -> List [ Atom "mat"; Atom (Int.to_string x); Atom (Int.to_string y) ]
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
   | TyRecord s -> Atom s
+  | TyVariant s -> Atom s
 ;;
+
+type type_decl =
+  | RecordDecl of (string * ty) list
+  | VariantDecl of (string * ty list) list
+[@@deriving sexp_of]
 
 type term_desc =
   | Var of string
@@ -345,6 +389,8 @@ type term_desc =
   | Builtin of Glsl.builtin * term list
   | Record of string * term list
   | Field of term * string
+  | Variant of string * string * term list
+  | Match of term * (string * string list * term) list
 
 and term =
   { desc : term_desc
@@ -378,13 +424,20 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
   | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_term)
   | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
+  | Variant (ty_name, ctor, args) ->
+    List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_term)
+  | Match (scrutinee, cases) ->
+    let sexp_of_case (ctor, vars, body) =
+      List [ Atom ctor; List (List.map vars ~f:(fun v -> Atom v)); sexp_of_term body ]
+    in
+    List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = List [ sexp_of_term_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
 
 type top_desc =
   | Define of recur * string * term
   | Extern of string
-  | RecordDef of string * (string * ty) list
+  | TypeDef of string * type_decl
 [@@deriving sexp_of]
 
 type top =
@@ -406,6 +459,7 @@ let rec ty_of_stlc (t : Stlc.ty) : ty Or_error.t =
   | TyVec n -> Ok (TyVec n)
   | TyMat (x, y) -> Ok (TyMat (x, y))
   | TyRecord s -> Ok (TyRecord s)
+  | TyVariant s -> Ok (TyVariant s)
   | TyArrow (a, b) ->
     let%bind a = ty_of_stlc a in
     let%bind b = ty_of_stlc b in
@@ -464,6 +518,19 @@ and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Or_error.t =
   | Field (t, f) ->
     let%map t = term_of_tc t in
     Field (t, f)
+  | Variant (ty_name, ctor, args) ->
+    let%map args = Or_error.all (List.map args ~f:term_of_tc) in
+    Variant (ty_name, ctor, args)
+  | Match (scrutinee, cases) ->
+    let%bind scrutinee = term_of_tc scrutinee in
+    let%bind cases =
+      cases
+      |> List.map ~f:(fun (ctor, vars, body) ->
+        let%map body = term_of_tc body in
+        ctor, vars, body)
+      |> Or_error.all
+    in
+    Ok (Match (scrutinee, cases))
 ;;
 
 let top_of_tc (t : Typecheck.top) : top Or_error.t =
@@ -474,14 +541,23 @@ let top_of_tc (t : Typecheck.top) : top Or_error.t =
       let%map bind = term_of_tc bind in
       Define (r, v, bind)
     | Extern v -> Ok (Extern v)
-    | RecordDef (s, fields) ->
+    | TypeDef (name, RecordDecl fields) ->
       let%map fields =
-        List.map fields ~f:(fun (name, field_ty) ->
+        List.map fields ~f:(fun (field_name, field_ty) ->
           let%map field_ty = ty_of_stlc field_ty in
-          name, field_ty)
+          field_name, field_ty)
         |> Or_error.all
       in
-      RecordDef (s, fields)
+      TypeDef (name, RecordDecl fields)
+    | TypeDef (name, VariantDecl ctors) ->
+      let%map ctors =
+        ctors
+        |> List.map ~f:(fun (ctor_name, tys) ->
+          let%map tys = Or_error.all (List.map tys ~f:ty_of_stlc) in
+          ctor_name, tys)
+        |> Or_error.all
+      in
+      TypeDef (name, VariantDecl ctors)
   in
   Ok { desc; ty; loc = t.loc }
 ;;
@@ -516,7 +592,7 @@ let monomorphize (Program tops : Typecheck.t) : t Or_error.t =
           let env, bind, inner_defs = rewrite_refs poly_env env bind in
           let top : Typecheck.top = { top with desc = Define (recur, v, bind) } in
           poly_env, env, acc @ ref_defs @ inner_defs @ [ top ]
-        | Extern _ | RecordDef _ -> poly_env, env, acc @ [ top ])
+        | Extern _ | TypeDef _ -> poly_env, env, acc @ [ top ])
   in
   let%map tops = Or_error.all (List.map tops ~f:top_of_tc) in
   Program tops

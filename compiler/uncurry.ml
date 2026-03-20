@@ -17,6 +17,8 @@ type term_desc =
   | Builtin of Glsl.builtin * term list
   | Record of string * term list
   | Field of term * string
+  | Variant of string * string * term list
+  | Match of term * (string * string list * term) list
 
 and term =
   { desc : term_desc
@@ -53,13 +55,20 @@ let rec sexp_of_term_desc = function
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
   | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_term)
   | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
+  | Variant (ty_name, ctor, args) ->
+    List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_term)
+  | Match (scrutinee, cases) ->
+    let sexp_of_case (ctor, vars, body) =
+      List [ Atom ctor; List (List.map vars ~f:(fun v -> Atom v)); sexp_of_term body ]
+    in
+    List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
 
 type top_desc =
   | Define of Stlc.recur * string * term
   | Extern of string
-  | RecordDef of string * (string * Monomorphize.ty) list
+  | TypeDef of string * Monomorphize.type_decl
 [@@deriving sexp_of]
 
 type top =
@@ -109,6 +118,11 @@ and uncurry_term_desc (t : Monomorphize.term_desc) : term_desc =
   | Builtin (b, ts) -> Builtin (b, List.map ts ~f:uncurry_term)
   | Record (s, ts) -> Record (s, List.map ts ~f:uncurry_term)
   | Field (t, f) -> Field (uncurry_term t, f)
+  | Variant (ty_name, ctor, args) -> Variant (ty_name, ctor, List.map args ~f:uncurry_term)
+  | Match (scrutinee, cases) ->
+    Match
+      ( uncurry_term scrutinee
+      , List.map cases ~f:(fun (ctor, vars, body) -> ctor, vars, uncurry_term body) )
 
 and uncurry_term (t : Monomorphize.term) : term =
   { desc = uncurry_term_desc t.desc; ty = t.ty; loc = t.loc }
@@ -119,7 +133,7 @@ let uncurry_top (t : Monomorphize.top) : top =
     match t.desc with
     | Define (recur, v, term) -> Define (recur, v, uncurry_term term)
     | Extern v -> Extern v
-    | RecordDef (s, fields) -> RecordDef (s, fields)
+    | TypeDef (name, decl) -> TypeDef (name, decl)
   in
   { desc; ty = t.ty; loc = t.loc }
 ;;

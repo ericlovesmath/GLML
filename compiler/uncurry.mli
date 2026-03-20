@@ -14,6 +14,8 @@ type term_desc =
   | Builtin of Glsl.builtin * term list
   | Record of string * term list
   | Field of term * string
+  | Variant of string * string * term list
+  | Match of term * (string * string list * term) list
 [@@deriving sexp_of]
 
 and term =
@@ -26,7 +28,7 @@ and term =
 type top_desc =
   | Define of Stlc.recur * string * term
   | Extern of string
-  | RecordDef of string * (string * Monomorphize.ty) list
+  | TypeDef of string * Monomorphize.type_decl
 [@@deriving sexp_of]
 
 type top =

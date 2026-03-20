@@ -71,6 +71,29 @@ let rec uniquify_term (ctx : env) (t : term) : term Or_error.t =
   | Field (t, f) ->
     let%bind t = aux t in
     pure (Field (t, f))
+  | Variant (ctor, args) ->
+    let%bind args = aux_list args in
+    pure (Variant (ctor, args))
+  | Match (scrutinee, cases) ->
+    let%bind scrutinee = aux scrutinee in
+    let%bind cases =
+      cases
+      |> List.map ~f:(fun (ctor, vs, body) ->
+        let vs' = List.map vs ~f:Utils.fresh in
+        let ctx =
+          List.fold2 vs vs' ~init:ctx ~f:(fun ctx v v' -> Map.set ctx ~key:v ~data:v')
+        in
+        let%bind ctx =
+          match ctx with
+          | Ok ctx -> Ok ctx
+          | Unequal_lengths ->
+            Or_error.error_string "uniquify: unequal lengths, unreachable"
+        in
+        let%map body = uniquify_term ctx body in
+        ctor, vs', body)
+      |> Or_error.all
+    in
+    pure (Match (scrutinee, cases))
 ;;
 
 let uniquify_top (ctx : env) (t : top) : (env * top) Or_error.t =
@@ -85,7 +108,7 @@ let uniquify_top (ctx : env) (t : top) : (env * top) Or_error.t =
     in
     ctx', { desc = Define (recur, v', return_ty, bind); loc = t.loc }
   | Extern (_, v) -> Ok (Map.set ctx ~key:v ~data:v, t)
-  | RecordDef _ -> Ok (ctx, t)
+  | TypeDef _ -> Ok (ctx, t)
 ;;
 
 let uniquify (Program tops) =
