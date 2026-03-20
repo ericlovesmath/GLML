@@ -23,6 +23,966 @@ let%expect_test "compile examples" =
     | Error err -> print_s [%message "ERROR" (file : string) (err : Error.t)]);
   [%expect
     {|
+    ====== COMPILING EXAMPLE 2d_sdf_variants.glml ======
+
+    === stlc (2d_sdf_variants.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Extern (vec 2) u_mouse)
+      (Extern float u_time)
+      (TypeDef shape
+       (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
+      (Define Nonrec sdf
+       (lambda (s (shape))
+        (lambda (p ((vec 2)))
+         (match s (Circle (r) (- (length p) r))
+          (Rect (w h)
+           (let d (vec2 (- (abs (index p 0)) w) (- (abs (index p 1)) h))
+            (+ (length (max d (vec2 0. 0.)))
+             (min (max (index d 0) (index d 1)) 0.))))
+          (Empty () 1.)))))
+      (Define Nonrec scene
+       (lambda (p ((vec 2)))
+        (let circle (app (app sdf (Variant Circle 0.3)) p)
+         (let rect (app (app sdf (Variant Rect 0.7 0.1)) p) (min circle rect)))))
+      (Define Nonrec get_uv
+       (lambda (coord ())
+        (let top (- (* 2. coord) u_resolution)
+         (let bot (min (index u_resolution 0) (index u_resolution 1))
+          (/ top bot)))))
+      (Define Nonrec main
+       (lambda (coord ((vec 2)))
+        (let p (app get_uv coord)
+         (let m (app get_uv u_mouse)
+          (let d (app scene p)
+           (let col (if (> d 0.) (vec3 0.9 0.6 0.3) (vec3 0.65 0.85 1.))
+            (let col
+             (let darken (- 1. (exp (* -6. (abs d))))
+              (let rings (+ 0.8 (* 0.2 (cos (* 150. d))))
+               (* (* col darken) rings)))
+             (let col
+              (mix col (vec3 1. 1. 1.) (- 1. (smoothstep 0. 0.01 (abs d))))
+              (let col
+               (let d (abs (app scene m))
+                (let dm (length (- p m))
+                 (let d (min (- (abs (- dm d)) 0.0025) (- dm 0.015))
+                  (mix col (vec3 1. 1. 0.) (- 1. (smoothstep 0. 0.005 d))))))
+               col)))))))))))
+
+    === uniquify (2d_sdf_variants.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Extern (vec 2) u_mouse)
+      (Extern float u_time)
+      (TypeDef shape
+       (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
+      (Define Nonrec sdf_0
+       (lambda (s_1 (shape))
+        (lambda (p_2 ((vec 2)))
+         (match s_1 (Circle (r_3) (- (length p_2) r_3))
+          (Rect (w_4 h_5)
+           (let d_6
+            (vec2 (- (abs (index p_2 0)) w_4) (- (abs (index p_2 1)) h_5))
+            (+ (length (max d_6 (vec2 0. 0.)))
+             (min (max (index d_6 0) (index d_6 1)) 0.))))
+          (Empty () 1.)))))
+      (Define Nonrec scene_7
+       (lambda (p_8 ((vec 2)))
+        (let circle_9 (app (app sdf_0 (Variant Circle 0.3)) p_8)
+         (let rect_10 (app (app sdf_0 (Variant Rect 0.7 0.1)) p_8)
+          (min circle_9 rect_10)))))
+      (Define Nonrec get_uv_11
+       (lambda (coord_12 ())
+        (let top_13 (- (* 2. coord_12) u_resolution)
+         (let bot_14 (min (index u_resolution 0) (index u_resolution 1))
+          (/ top_13 bot_14)))))
+      (Define Nonrec main
+       (lambda (coord_15 ((vec 2)))
+        (let p_16 (app get_uv_11 coord_15)
+         (let m_17 (app get_uv_11 u_mouse)
+          (let d_18 (app scene_7 p_16)
+           (let col_19 (if (> d_18 0.) (vec3 0.9 0.6 0.3) (vec3 0.65 0.85 1.))
+            (let col_20
+             (let darken_21 (- 1. (exp (* -6. (abs d_18))))
+              (let rings_22 (+ 0.8 (* 0.2 (cos (* 150. d_18))))
+               (* (* col_19 darken_21) rings_22)))
+             (let col_23
+              (mix col_20 (vec3 1. 1. 1.) (- 1. (smoothstep 0. 0.01 (abs d_18))))
+              (let col_24
+               (let d_25 (abs (app scene_7 m_17))
+                (let dm_26 (length (- p_16 m_17))
+                 (let d_27 (min (- (abs (- dm_26 d_25)) 0.0025) (- dm_26 0.015))
+                  (mix col_23 (vec3 1. 1. 0.) (- 1. (smoothstep 0. 0.005 d_27))))))
+               col_24)))))))))))
+
+    === typecheck (2d_sdf_variants.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+      ((Extern u_time) : float)
+      ((TypeDef shape
+        (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
+       : shape)
+      ((Define Nonrec sdf_0
+        ((lambda (s_1 shape)
+          ((lambda (p_2 (vec 2))
+            ((match (s_1 : shape)
+              (Circle (r_3)
+               ((- ((length (p_2 : (vec 2))) : float) (r_3 : float)) : float))
+              (Rect (w_4 h_5)
+               ((let d_6
+                 ((vec2
+                   ((- ((abs ((index (p_2 : (vec 2)) 0) : float)) : float)
+                     (w_4 : float))
+                    : float)
+                   ((- ((abs ((index (p_2 : (vec 2)) 1) : float)) : float)
+                     (h_5 : float))
+                    : float))
+                  : (vec 2))
+                 ((+
+                   ((length
+                     ((max (d_6 : (vec 2))
+                       ((vec2 (0. : float) (0. : float)) : (vec 2)))
+                      : (vec 2)))
+                    : float)
+                   ((min
+                     ((max ((index (d_6 : (vec 2)) 0) : float)
+                       ((index (d_6 : (vec 2)) 1) : float))
+                      : float)
+                     (0. : float))
+                    : float))
+                  : float))
+                : float))
+              (Empty () (1. : float)))
+             : float))
+           : ((vec 2) -> float)))
+         : (shape -> ((vec 2) -> float))))
+       : (shape -> ((vec 2) -> float)))
+      ((Define Nonrec scene_7
+        ((lambda (p_8 (vec 2))
+          ((let circle_9
+            ((app
+              ((app (sdf_0 : (shape -> ((vec 2) -> float)))
+                ((Variant shape Circle (0.3 : float)) : shape))
+               : ((vec 2) -> float))
+              (p_8 : (vec 2)))
+             : float)
+            ((let rect_10
+              ((app
+                ((app (sdf_0 : (shape -> ((vec 2) -> float)))
+                  ((Variant shape Rect (0.7 : float) (0.1 : float)) : shape))
+                 : ((vec 2) -> float))
+                (p_8 : (vec 2)))
+               : float)
+              ((min (circle_9 : float) (rect_10 : float)) : float))
+             : float))
+           : float))
+         : ((vec 2) -> float)))
+       : ((vec 2) -> float))
+      ((Define Nonrec get_uv_11
+        ((lambda (coord_12 'v_49)
+          ((let top_13
+            ((- ((* (2. : float) (coord_12 : 'v_49)) : 'v_49)
+              (u_resolution : (vec 2)))
+             : 'v_51)
+            ((let bot_14
+              ((min ((index (u_resolution : (vec 2)) 0) : float)
+                ((index (u_resolution : (vec 2)) 1) : float))
+               : float)
+              ((/ (top_13 : 'v_51) (bot_14 : float)) : 'v_51))
+             : 'v_51))
+           : 'v_51))
+         : ('v_49 -> 'v_51)))
+       :
+       (forall
+        ((Broadcast 'v_49 (vec 2) 'v_51) (MulBroadcast float 'v_49 'v_49)
+         (MulBroadcast 'v_51 float 'v_51))
+        ('v_49 -> 'v_51)))
+      ((Define Nonrec main
+        ((lambda (coord_15 (vec 2))
+          ((let p_16
+            ((app (get_uv_11 : ((vec 2) -> (vec 2))) (coord_15 : (vec 2))) :
+             (vec 2))
+            ((let m_17
+              ((app (get_uv_11 : ((vec 2) -> (vec 2))) (u_mouse : (vec 2))) :
+               (vec 2))
+              ((let d_18
+                ((app (scene_7 : ((vec 2) -> float)) (p_16 : (vec 2))) : float)
+                ((let col_19
+                  ((if ((> (d_18 : float) (0. : float)) : bool)
+                    ((vec3 (0.9 : float) (0.6 : float) (0.3 : float)) : (vec 3))
+                    ((vec3 (0.65 : float) (0.85 : float) (1. : float)) : (vec 3)))
+                   : (vec 3))
+                  ((let col_20
+                    ((let darken_21
+                      ((- (1. : float)
+                        ((exp
+                          ((* (-6. : float) ((abs (d_18 : float)) : float)) :
+                           float))
+                         : float))
+                       : float)
+                      ((let rings_22
+                        ((+ (0.8 : float)
+                          ((* (0.2 : float)
+                            ((cos ((* (150. : float) (d_18 : float)) : float)) :
+                             float))
+                           : float))
+                         : float)
+                        ((*
+                          ((* (col_19 : (vec 3)) (darken_21 : float)) : (vec 3))
+                          (rings_22 : float))
+                         : (vec 3)))
+                       : (vec 3)))
+                     : (vec 3))
+                    ((let col_23
+                      ((mix (col_20 : (vec 3))
+                        ((vec3 (1. : float) (1. : float) (1. : float)) : (vec 3))
+                        ((- (1. : float)
+                          ((smoothstep (0. : float) (0.01 : float)
+                            ((abs (d_18 : float)) : float))
+                           : float))
+                         : float))
+                       : (vec 3))
+                      ((let col_24
+                        ((let d_25
+                          ((abs
+                            ((app (scene_7 : ((vec 2) -> float))
+                              (m_17 : (vec 2)))
+                             : float))
+                           : float)
+                          ((let dm_26
+                            ((length
+                              ((- (p_16 : (vec 2)) (m_17 : (vec 2))) : (vec 2)))
+                             : float)
+                            ((let d_27
+                              ((min
+                                ((-
+                                  ((abs
+                                    ((- (dm_26 : float) (d_25 : float)) : float))
+                                   : float)
+                                  (0.0025 : float))
+                                 : float)
+                                ((- (dm_26 : float) (0.015 : float)) : float))
+                               : float)
+                              ((mix (col_23 : (vec 3))
+                                ((vec3 (1. : float) (1. : float) (0. : float)) :
+                                 (vec 3))
+                                ((- (1. : float)
+                                  ((smoothstep (0. : float) (0.005 : float)
+                                    (d_27 : float))
+                                   : float))
+                                 : float))
+                               : (vec 3)))
+                             : (vec 3)))
+                           : (vec 3)))
+                         : (vec 3))
+                        (col_24 : (vec 3)))
+                       : (vec 3)))
+                     : (vec 3)))
+                   : (vec 3)))
+                 : (vec 3)))
+               : (vec 3)))
+             : (vec 3)))
+           : (vec 3)))
+         : ((vec 2) -> (vec 3))))
+       : ((vec 2) -> (vec 3)))))
+
+    === monomorphize (2d_sdf_variants.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+      ((Extern u_time) : float)
+      ((TypeDef shape
+        (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
+       : shape)
+      ((Define Nonrec sdf_0
+        ((lambda (s_1 shape)
+          ((lambda (p_2 (vec 2))
+            ((match (s_1 : shape)
+              (Circle (r_3)
+               ((- ((length (p_2 : (vec 2))) : float) (r_3 : float)) : float))
+              (Rect (w_4 h_5)
+               ((let d_6
+                 ((vec2
+                   ((- ((abs ((index (p_2 : (vec 2)) 0) : float)) : float)
+                     (w_4 : float))
+                    : float)
+                   ((- ((abs ((index (p_2 : (vec 2)) 1) : float)) : float)
+                     (h_5 : float))
+                    : float))
+                  : (vec 2))
+                 ((+
+                   ((length
+                     ((max (d_6 : (vec 2))
+                       ((vec2 (0. : float) (0. : float)) : (vec 2)))
+                      : (vec 2)))
+                    : float)
+                   ((min
+                     ((max ((index (d_6 : (vec 2)) 0) : float)
+                       ((index (d_6 : (vec 2)) 1) : float))
+                      : float)
+                     (0. : float))
+                    : float))
+                  : float))
+                : float))
+              (Empty () (1. : float)))
+             : float))
+           : ((vec 2) -> float)))
+         : (shape -> ((vec 2) -> float))))
+       : (shape -> ((vec 2) -> float)))
+      ((Define Nonrec scene_7
+        ((lambda (p_8 (vec 2))
+          ((let circle_9
+            ((app
+              ((app (sdf_0 : (shape -> ((vec 2) -> float)))
+                ((Variant shape Circle (0.3 : float)) : shape))
+               : ((vec 2) -> float))
+              (p_8 : (vec 2)))
+             : float)
+            ((let rect_10
+              ((app
+                ((app (sdf_0 : (shape -> ((vec 2) -> float)))
+                  ((Variant shape Rect (0.7 : float) (0.1 : float)) : shape))
+                 : ((vec 2) -> float))
+                (p_8 : (vec 2)))
+               : float)
+              ((min (circle_9 : float) (rect_10 : float)) : float))
+             : float))
+           : float))
+         : ((vec 2) -> float)))
+       : ((vec 2) -> float))
+      ((Define Nonrec get_uv_11_vec2_to_vec2_94
+        ((lambda (coord_12 (vec 2))
+          ((let top_13
+            ((- ((* (2. : float) (coord_12 : (vec 2))) : (vec 2))
+              (u_resolution : (vec 2)))
+             : (vec 2))
+            ((let bot_14
+              ((min ((index (u_resolution : (vec 2)) 0) : float)
+                ((index (u_resolution : (vec 2)) 1) : float))
+               : float)
+              ((/ (top_13 : (vec 2)) (bot_14 : float)) : (vec 2)))
+             : (vec 2)))
+           : (vec 2)))
+         : ((vec 2) -> (vec 2))))
+       : ((vec 2) -> (vec 2)))
+      ((Define Nonrec main
+        ((lambda (coord_15 (vec 2))
+          ((let p_16
+            ((app (get_uv_11_vec2_to_vec2_94 : ((vec 2) -> (vec 2)))
+              (coord_15 : (vec 2)))
+             : (vec 2))
+            ((let m_17
+              ((app (get_uv_11_vec2_to_vec2_94 : ((vec 2) -> (vec 2)))
+                (u_mouse : (vec 2)))
+               : (vec 2))
+              ((let d_18
+                ((app (scene_7 : ((vec 2) -> float)) (p_16 : (vec 2))) : float)
+                ((let col_19
+                  ((if ((> (d_18 : float) (0. : float)) : bool)
+                    ((vec3 (0.9 : float) (0.6 : float) (0.3 : float)) : (vec 3))
+                    ((vec3 (0.65 : float) (0.85 : float) (1. : float)) : (vec 3)))
+                   : (vec 3))
+                  ((let col_20
+                    ((let darken_21
+                      ((- (1. : float)
+                        ((exp
+                          ((* (-6. : float) ((abs (d_18 : float)) : float)) :
+                           float))
+                         : float))
+                       : float)
+                      ((let rings_22
+                        ((+ (0.8 : float)
+                          ((* (0.2 : float)
+                            ((cos ((* (150. : float) (d_18 : float)) : float)) :
+                             float))
+                           : float))
+                         : float)
+                        ((*
+                          ((* (col_19 : (vec 3)) (darken_21 : float)) : (vec 3))
+                          (rings_22 : float))
+                         : (vec 3)))
+                       : (vec 3)))
+                     : (vec 3))
+                    ((let col_23
+                      ((mix (col_20 : (vec 3))
+                        ((vec3 (1. : float) (1. : float) (1. : float)) : (vec 3))
+                        ((- (1. : float)
+                          ((smoothstep (0. : float) (0.01 : float)
+                            ((abs (d_18 : float)) : float))
+                           : float))
+                         : float))
+                       : (vec 3))
+                      ((let col_24
+                        ((let d_25
+                          ((abs
+                            ((app (scene_7 : ((vec 2) -> float))
+                              (m_17 : (vec 2)))
+                             : float))
+                           : float)
+                          ((let dm_26
+                            ((length
+                              ((- (p_16 : (vec 2)) (m_17 : (vec 2))) : (vec 2)))
+                             : float)
+                            ((let d_27
+                              ((min
+                                ((-
+                                  ((abs
+                                    ((- (dm_26 : float) (d_25 : float)) : float))
+                                   : float)
+                                  (0.0025 : float))
+                                 : float)
+                                ((- (dm_26 : float) (0.015 : float)) : float))
+                               : float)
+                              ((mix (col_23 : (vec 3))
+                                ((vec3 (1. : float) (1. : float) (0. : float)) :
+                                 (vec 3))
+                                ((- (1. : float)
+                                  ((smoothstep (0. : float) (0.005 : float)
+                                    (d_27 : float))
+                                   : float))
+                                 : float))
+                               : (vec 3)))
+                             : (vec 3)))
+                           : (vec 3)))
+                         : (vec 3))
+                        (col_24 : (vec 3)))
+                       : (vec 3)))
+                     : (vec 3)))
+                   : (vec 3)))
+                 : (vec 3)))
+               : (vec 3)))
+             : (vec 3)))
+           : (vec 3)))
+         : ((vec 2) -> (vec 3))))
+       : ((vec 2) -> (vec 3)))))
+
+    === uncurry (2d_sdf_variants.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+      ((Extern u_time) : float)
+      ((TypeDef shape
+        (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
+       : shape)
+      ((Define Nonrec sdf_0
+        (lambda ((s_1 shape) (p_2 (vec 2)))
+         (match s_1 (Circle (r_3) (- (length p_2) r_3))
+          (Rect (w_4 h_5)
+           (let d_6
+            (vec2 (- (abs (index p_2 0)) w_4) (- (abs (index p_2 1)) h_5))
+            (+ (length (max d_6 (vec2 0. 0.)))
+             (min (max (index d_6 0) (index d_6 1)) 0.))))
+          (Empty () 1.))))
+       : (shape -> ((vec 2) -> float)))
+      ((Define Nonrec scene_7
+        (lambda ((p_8 (vec 2)))
+         (let circle_9 (app sdf_0 (Variant shape Circle 0.3) p_8)
+          (let rect_10 (app sdf_0 (Variant shape Rect 0.7 0.1) p_8)
+           (min circle_9 rect_10)))))
+       : ((vec 2) -> float))
+      ((Define Nonrec get_uv_11_vec2_to_vec2_94
+        (lambda ((coord_12 (vec 2)))
+         (let top_13 (- (* 2. coord_12) u_resolution)
+          (let bot_14 (min (index u_resolution 0) (index u_resolution 1))
+           (/ top_13 bot_14)))))
+       : ((vec 2) -> (vec 2)))
+      ((Define Nonrec main
+        (lambda ((coord_15 (vec 2)))
+         (let p_16 (app get_uv_11_vec2_to_vec2_94 coord_15)
+          (let m_17 (app get_uv_11_vec2_to_vec2_94 u_mouse)
+           (let d_18 (app scene_7 p_16)
+            (let col_19 (if (> d_18 0.) (vec3 0.9 0.6 0.3) (vec3 0.65 0.85 1.))
+             (let col_20
+              (let darken_21 (- 1. (exp (* -6. (abs d_18))))
+               (let rings_22 (+ 0.8 (* 0.2 (cos (* 150. d_18))))
+                (* (* col_19 darken_21) rings_22)))
+              (let col_23
+               (mix col_20 (vec3 1. 1. 1.)
+                (- 1. (smoothstep 0. 0.01 (abs d_18))))
+               (let col_24
+                (let d_25 (abs (app scene_7 m_17))
+                 (let dm_26 (length (- p_16 m_17))
+                  (let d_27 (min (- (abs (- dm_26 d_25)) 0.0025) (- dm_26 0.015))
+                   (mix col_23 (vec3 1. 1. 0.) (- 1. (smoothstep 0. 0.005 d_27))))))
+                col_24)))))))))
+       : ((vec 2) -> (vec 3)))))
+
+    === lambda lift (2d_sdf_variants.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
+     ((TypeDef shape
+       (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
+      : shape)
+     ((Define Nonrec (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
+       (body
+        (match s_1 (Circle (r_3) (- (length p_2) r_3))
+         (Rect (w_4 h_5)
+          (let d_6 (vec2 (- (abs (index p_2 0)) w_4) (- (abs (index p_2 1)) h_5))
+           (+ (length (max d_6 (vec2 0. 0.)))
+            (min (max (index d_6 0) (index d_6 1)) 0.))))
+         (Empty () 1.))))
+      : (shape -> ((vec 2) -> float)))
+     ((Define Nonrec (name scene_7) (args ((p_8 (vec 2))))
+       (body
+        (let circle_9 (app sdf_0 (Variant shape Circle 0.3) p_8)
+         (let rect_10 (app sdf_0 (Variant shape Rect 0.7 0.1) p_8)
+          (min circle_9 rect_10)))))
+      : ((vec 2) -> float))
+     ((Define Nonrec (name get_uv_11_vec2_to_vec2_94) (args ((coord_12 (vec 2))))
+       (body
+        (let top_13 (- (* 2. coord_12) u_resolution)
+         (let bot_14 (min (index u_resolution 0) (index u_resolution 1))
+          (/ top_13 bot_14)))))
+      : ((vec 2) -> (vec 2)))
+     ((Define Nonrec (name main) (args ((coord_15 (vec 2))))
+       (body
+        (let p_16 (app get_uv_11_vec2_to_vec2_94 coord_15)
+         (let m_17 (app get_uv_11_vec2_to_vec2_94 u_mouse)
+          (let d_18 (app scene_7 p_16)
+           (let col_19 (if (> d_18 0.) (vec3 0.9 0.6 0.3) (vec3 0.65 0.85 1.))
+            (let col_20
+             (let darken_21 (- 1. (exp (* -6. (abs d_18))))
+              (let rings_22 (+ 0.8 (* 0.2 (cos (* 150. d_18))))
+               (* (* col_19 darken_21) rings_22)))
+             (let col_23
+              (mix col_20 (vec3 1. 1. 1.) (- 1. (smoothstep 0. 0.01 (abs d_18))))
+              (let col_24
+               (let d_25 (abs (app scene_7 m_17))
+                (let dm_26 (length (- p_16 m_17))
+                 (let d_27 (min (- (abs (- dm_26 d_25)) 0.0025) (- dm_26 0.015))
+                  (mix col_23 (vec3 1. 1. 0.) (- 1. (smoothstep 0. 0.005 d_27))))))
+               col_24)))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === anf (2d_sdf_variants.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
+     ((TypeDef shape
+       (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
+      : shape)
+     ((Define Nonrec (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
+       (body
+        (return
+         (match s_1
+          (Circle (r_3) (let anf_95 (length p_2) (return (- anf_95 r_3))))
+          (Rect (w_4 h_5)
+           (let anf_96 (index p_2 0)
+            (let anf_97 (abs anf_96)
+             (let anf_98 (- anf_97 w_4)
+              (let anf_99 (index p_2 1)
+               (let anf_100 (abs anf_99)
+                (let anf_101 (- anf_100 h_5)
+                 (let d_6 (vec2 anf_98 anf_101)
+                  (let anf_102 (vec2 0. 0.)
+                   (let anf_103 (max d_6 anf_102)
+                    (let anf_104 (length anf_103)
+                     (let anf_105 (index d_6 0)
+                      (let anf_106 (index d_6 1)
+                       (let anf_107 (max anf_105 anf_106)
+                        (let anf_108 (min anf_107 0.)
+                         (return (+ anf_104 anf_108)))))))))))))))))
+          (Empty () (return 1.))))))
+      : (shape -> ((vec 2) -> float)))
+     ((Define Nonrec (name scene_7) (args ((p_8 (vec 2))))
+       (body
+        (let anf_109 (Variant shape Circle 0.3)
+         (let circle_9 (sdf_0 anf_109 p_8)
+          (let anf_110 (Variant shape Rect 0.7 0.1)
+           (let rect_10 (sdf_0 anf_110 p_8) (return (min circle_9 rect_10))))))))
+      : ((vec 2) -> float))
+     ((Define Nonrec (name get_uv_11_vec2_to_vec2_94) (args ((coord_12 (vec 2))))
+       (body
+        (let anf_111 (* 2. coord_12)
+         (let top_13 (- anf_111 u_resolution)
+          (let anf_112 (index u_resolution 0)
+           (let anf_113 (index u_resolution 1)
+            (let bot_14 (min anf_112 anf_113) (return (/ top_13 bot_14)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Define Nonrec (name main) (args ((coord_15 (vec 2))))
+       (body
+        (let p_16 (get_uv_11_vec2_to_vec2_94 coord_15)
+         (let m_17 (get_uv_11_vec2_to_vec2_94 u_mouse)
+          (let d_18 (scene_7 p_16)
+           (let anf_114 (> d_18 0.)
+            (let col_19
+             (if anf_114 (return (vec3 0.9 0.6 0.3))
+              (return (vec3 0.65 0.85 1.)))
+             (let anf_115 (abs d_18)
+              (let anf_116 (* -6. anf_115)
+               (let anf_117 (exp anf_116)
+                (let darken_21 (- 1. anf_117)
+                 (let anf_118 (* 150. d_18)
+                  (let anf_119 (cos anf_118)
+                   (let anf_120 (* 0.2 anf_119)
+                    (let rings_22 (+ 0.8 anf_120)
+                     (let anf_121 (* col_19 darken_21)
+                      (let col_20 (* anf_121 rings_22)
+                       (let anf_122 (vec3 1. 1. 1.)
+                        (let anf_123 (abs d_18)
+                         (let anf_124 (smoothstep 0. 0.01 anf_123)
+                          (let anf_125 (- 1. anf_124)
+                           (let col_23 (mix col_20 anf_122 anf_125)
+                            (let anf_126 (scene_7 m_17)
+                             (let d_25 (abs anf_126)
+                              (let anf_127 (- p_16 m_17)
+                               (let dm_26 (length anf_127)
+                                (let anf_128 (- dm_26 d_25)
+                                 (let anf_129 (abs anf_128)
+                                  (let anf_130 (- anf_129 0.0025)
+                                   (let anf_131 (- dm_26 0.015)
+                                    (let d_27 (min anf_130 anf_131)
+                                     (let anf_132 (vec3 1. 1. 0.)
+                                      (let anf_133 (smoothstep 0. 0.005 d_27)
+                                       (let anf_134 (- 1. anf_133)
+                                        (let col_24 (mix col_23 anf_132 anf_134)
+                                         (return col_24))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === tail call (2d_sdf_variants.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
+     ((TypeDef shape
+       (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
+      : shape)
+     ((Define (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
+       (body
+        (return
+         (match s_1
+          (Circle (r_3) (let anf_95 (length p_2) (return (- anf_95 r_3))))
+          (Rect (w_4 h_5)
+           (let anf_96 (index p_2 0)
+            (let anf_97 (abs anf_96)
+             (let anf_98 (- anf_97 w_4)
+              (let anf_99 (index p_2 1)
+               (let anf_100 (abs anf_99)
+                (let anf_101 (- anf_100 h_5)
+                 (let d_6 (vec2 anf_98 anf_101)
+                  (let anf_102 (vec2 0. 0.)
+                   (let anf_103 (max d_6 anf_102)
+                    (let anf_104 (length anf_103)
+                     (let anf_105 (index d_6 0)
+                      (let anf_106 (index d_6 1)
+                       (let anf_107 (max anf_105 anf_106)
+                        (let anf_108 (min anf_107 0.)
+                         (return (+ anf_104 anf_108)))))))))))))))))
+          (Empty () (return 1.))))))
+      : (shape -> ((vec 2) -> float)))
+     ((Define (name scene_7) (args ((p_8 (vec 2))))
+       (body
+        (let anf_109 (Variant shape Circle 0.3)
+         (let circle_9 (sdf_0 anf_109 p_8)
+          (let anf_110 (Variant shape Rect 0.7 0.1)
+           (let rect_10 (sdf_0 anf_110 p_8) (return (min circle_9 rect_10))))))))
+      : ((vec 2) -> float))
+     ((Define (name get_uv_11_vec2_to_vec2_94) (args ((coord_12 (vec 2))))
+       (body
+        (let anf_111 (* 2. coord_12)
+         (let top_13 (- anf_111 u_resolution)
+          (let anf_112 (index u_resolution 0)
+           (let anf_113 (index u_resolution 1)
+            (let bot_14 (min anf_112 anf_113) (return (/ top_13 bot_14)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Define (name main) (args ((coord_15 (vec 2))))
+       (body
+        (let p_16 (get_uv_11_vec2_to_vec2_94 coord_15)
+         (let m_17 (get_uv_11_vec2_to_vec2_94 u_mouse)
+          (let d_18 (scene_7 p_16)
+           (let anf_114 (> d_18 0.)
+            (let col_19
+             (if anf_114 (return (vec3 0.9 0.6 0.3))
+              (return (vec3 0.65 0.85 1.)))
+             (let anf_115 (abs d_18)
+              (let anf_116 (* -6. anf_115)
+               (let anf_117 (exp anf_116)
+                (let darken_21 (- 1. anf_117)
+                 (let anf_118 (* 150. d_18)
+                  (let anf_119 (cos anf_118)
+                   (let anf_120 (* 0.2 anf_119)
+                    (let rings_22 (+ 0.8 anf_120)
+                     (let anf_121 (* col_19 darken_21)
+                      (let col_20 (* anf_121 rings_22)
+                       (let anf_122 (vec3 1. 1. 1.)
+                        (let anf_123 (abs d_18)
+                         (let anf_124 (smoothstep 0. 0.01 anf_123)
+                          (let anf_125 (- 1. anf_124)
+                           (let col_23 (mix col_20 anf_122 anf_125)
+                            (let anf_126 (scene_7 m_17)
+                             (let d_25 (abs anf_126)
+                              (let anf_127 (- p_16 m_17)
+                               (let dm_26 (length anf_127)
+                                (let anf_128 (- dm_26 d_25)
+                                 (let anf_129 (abs anf_128)
+                                  (let anf_130 (- anf_129 0.0025)
+                                   (let anf_131 (- dm_26 0.015)
+                                    (let d_27 (min anf_130 anf_131)
+                                     (let anf_132 (vec3 1. 1. 0.)
+                                      (let anf_133 (smoothstep 0. 0.005 d_27)
+                                       (let anf_134 (- 1. anf_133)
+                                        (let col_24 (mix col_23 anf_132 anf_134)
+                                         (return col_24))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === lower variants (2d_sdf_variants.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
+     ((TypeDef shape
+       (RecordDecl ((tag int) (Circle_0 float) (Rect_0 float) (Rect_1 float))))
+      : shape)
+     ((Define (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
+       (body
+        (let _lv_tag_135 (. s_1 tag)
+         (let _lv_cond_137 (== _lv_tag_135 0)
+          (return
+           (if _lv_cond_137
+            (let r_3 (. s_1 Circle_0)
+             (let anf_95 (length p_2) (return (- anf_95 r_3))))
+            (let _lv_cond_136 (== _lv_tag_135 1)
+             (return
+              (if _lv_cond_136
+               (let w_4 (. s_1 Rect_0)
+                (let h_5 (. s_1 Rect_1)
+                 (let anf_96 (index p_2 0)
+                  (let anf_97 (abs anf_96)
+                   (let anf_98 (- anf_97 w_4)
+                    (let anf_99 (index p_2 1)
+                     (let anf_100 (abs anf_99)
+                      (let anf_101 (- anf_100 h_5)
+                       (let d_6 (vec2 anf_98 anf_101)
+                        (let anf_102 (vec2 0. 0.)
+                         (let anf_103 (max d_6 anf_102)
+                          (let anf_104 (length anf_103)
+                           (let anf_105 (index d_6 0)
+                            (let anf_106 (index d_6 1)
+                             (let anf_107 (max anf_105 anf_106)
+                              (let anf_108 (min anf_107 0.)
+                               (return (+ anf_104 anf_108))))))))))))))))))
+               (return 1.))))))))))
+      : (shape -> ((vec 2) -> float)))
+     ((Define (name scene_7) (args ((p_8 (vec 2))))
+       (body
+        (let anf_109 (shape 0 0.3 0. 0.)
+         (let circle_9 (sdf_0 anf_109 p_8)
+          (let anf_110 (shape 1 0. 0.7 0.1)
+           (let rect_10 (sdf_0 anf_110 p_8) (return (min circle_9 rect_10))))))))
+      : ((vec 2) -> float))
+     ((Define (name get_uv_11_vec2_to_vec2_94) (args ((coord_12 (vec 2))))
+       (body
+        (let anf_111 (* 2. coord_12)
+         (let top_13 (- anf_111 u_resolution)
+          (let anf_112 (index u_resolution 0)
+           (let anf_113 (index u_resolution 1)
+            (let bot_14 (min anf_112 anf_113) (return (/ top_13 bot_14)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Define (name main) (args ((coord_15 (vec 2))))
+       (body
+        (let p_16 (get_uv_11_vec2_to_vec2_94 coord_15)
+         (let m_17 (get_uv_11_vec2_to_vec2_94 u_mouse)
+          (let d_18 (scene_7 p_16)
+           (let anf_114 (> d_18 0.)
+            (let col_19
+             (if anf_114 (return (vec3 0.9 0.6 0.3))
+              (return (vec3 0.65 0.85 1.)))
+             (let anf_115 (abs d_18)
+              (let anf_116 (* -6. anf_115)
+               (let anf_117 (exp anf_116)
+                (let darken_21 (- 1. anf_117)
+                 (let anf_118 (* 150. d_18)
+                  (let anf_119 (cos anf_118)
+                   (let anf_120 (* 0.2 anf_119)
+                    (let rings_22 (+ 0.8 anf_120)
+                     (let anf_121 (* col_19 darken_21)
+                      (let col_20 (* anf_121 rings_22)
+                       (let anf_122 (vec3 1. 1. 1.)
+                        (let anf_123 (abs d_18)
+                         (let anf_124 (smoothstep 0. 0.01 anf_123)
+                          (let anf_125 (- 1. anf_124)
+                           (let col_23 (mix col_20 anf_122 anf_125)
+                            (let anf_126 (scene_7 m_17)
+                             (let d_25 (abs anf_126)
+                              (let anf_127 (- p_16 m_17)
+                               (let dm_26 (length anf_127)
+                                (let anf_128 (- dm_26 d_25)
+                                 (let anf_129 (abs anf_128)
+                                  (let anf_130 (- anf_129 0.0025)
+                                   (let anf_131 (- dm_26 0.015)
+                                    (let d_27 (min anf_130 anf_131)
+                                     (let anf_132 (vec3 1. 1. 0.)
+                                      (let anf_133 (smoothstep 0. 0.005 d_27)
+                                       (let anf_134 (- 1. anf_133)
+                                        (let col_24 (mix col_23 anf_132 anf_134)
+                                         (return col_24))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === translate (2d_sdf_variants.glml) ===
+    (Program
+     ((Global Uniform (TyVec 2) u_resolution) (Global Uniform (TyVec 2) u_mouse)
+      (Global Uniform TyFloat u_time)
+      (Struct shape
+       ((TyInt tag) (TyFloat Circle_0) (TyFloat Rect_0) (TyFloat Rect_1)))
+      (Function (name sdf_0) (desc ())
+       (params (((TyStruct shape) s_1) ((TyVec 2) p_2))) (ret_type TyFloat)
+       (body
+        ((set () int _lv_tag_135 (. s_1 tag))
+         (set () bool _lv_cond_137 (== _lv_tag_135 0))
+         (if _lv_cond_137
+          (Block (set () float r_3 (. s_1 Circle_0))
+           (set () float anf_95 (length p_2)) (return (- anf_95 r_3)))
+          (Block (set () bool _lv_cond_136 (== _lv_tag_135 1))
+           (if _lv_cond_136
+            (Block (set () float w_4 (. s_1 Rect_0))
+             (set () float h_5 (. s_1 Rect_1))
+             (set () float anf_96 (index p_2 0))
+             (set () float anf_97 (abs anf_96))
+             (set () float anf_98 (- anf_97 w_4))
+             (set () float anf_99 (index p_2 1))
+             (set () float anf_100 (abs anf_99))
+             (set () float anf_101 (- anf_100 h_5))
+             (set () vec2 d_6 (vec2 anf_98 anf_101))
+             (set () vec2 anf_102 (vec2 0. 0.))
+             (set () vec2 anf_103 (max d_6 anf_102))
+             (set () float anf_104 (length anf_103))
+             (set () float anf_105 (index d_6 0))
+             (set () float anf_106 (index d_6 1))
+             (set () float anf_107 (max anf_105 anf_106))
+             (set () float anf_108 (min anf_107 0.))
+             (return (+ anf_104 anf_108)))
+            (Block (return 1.))))))))
+      (Function (name scene_7) (desc ()) (params (((TyVec 2) p_8)))
+       (ret_type TyFloat)
+       (body
+        ((set () shape anf_109 (shape 0 0.3 0. 0.))
+         (set () float circle_9 (sdf_0 anf_109 p_8))
+         (set () shape anf_110 (shape 1 0. 0.7 0.1))
+         (set () float rect_10 (sdf_0 anf_110 p_8))
+         (return (min circle_9 rect_10)))))
+      (Function (name get_uv_11_vec2_to_vec2_94) (desc ())
+       (params (((TyVec 2) coord_12))) (ret_type (TyVec 2))
+       (body
+        ((set () vec2 anf_111 (* 2. coord_12))
+         (set () vec2 top_13 (- anf_111 u_resolution))
+         (set () float anf_112 (index u_resolution 0))
+         (set () float anf_113 (index u_resolution 1))
+         (set () float bot_14 (min anf_112 anf_113)) (return (/ top_13 bot_14)))))
+      (Function (name main) (desc ()) (params (((TyVec 2) coord_15)))
+       (ret_type (TyVec 3))
+       (body
+        ((set () vec2 p_16 (get_uv_11_vec2_to_vec2_94 coord_15))
+         (set () vec2 m_17 (get_uv_11_vec2_to_vec2_94 u_mouse))
+         (set () float d_18 (scene_7 p_16)) (set () bool anf_114 (> d_18 0.))
+         (set () vec3 col_19 (vec3 0.))
+         (if anf_114 (Block (set col_19 (vec3 0.9 0.6 0.3)))
+          (Block (set col_19 (vec3 0.65 0.85 1.))))
+         (set () float anf_115 (abs d_18)) (set () float anf_116 (* -6. anf_115))
+         (set () float anf_117 (exp anf_116))
+         (set () float darken_21 (- 1. anf_117))
+         (set () float anf_118 (* 150. d_18))
+         (set () float anf_119 (cos anf_118))
+         (set () float anf_120 (* 0.2 anf_119))
+         (set () float rings_22 (+ 0.8 anf_120))
+         (set () vec3 anf_121 (* col_19 darken_21))
+         (set () vec3 col_20 (* anf_121 rings_22))
+         (set () vec3 anf_122 (vec3 1. 1. 1.)) (set () float anf_123 (abs d_18))
+         (set () float anf_124 (smoothstep 0. 0.01 anf_123))
+         (set () float anf_125 (- 1. anf_124))
+         (set () vec3 col_23 (mix col_20 anf_122 anf_125))
+         (set () float anf_126 (scene_7 m_17)) (set () float d_25 (abs anf_126))
+         (set () vec2 anf_127 (- p_16 m_17))
+         (set () float dm_26 (length anf_127))
+         (set () float anf_128 (- dm_26 d_25))
+         (set () float anf_129 (abs anf_128))
+         (set () float anf_130 (- anf_129 0.0025))
+         (set () float anf_131 (- dm_26 0.015))
+         (set () float d_27 (min anf_130 anf_131))
+         (set () vec3 anf_132 (vec3 1. 1. 0.))
+         (set () float anf_133 (smoothstep 0. 0.005 d_27))
+         (set () float anf_134 (- 1. anf_133))
+         (set () vec3 col_24 (mix col_23 anf_132 anf_134)) (return col_24))))))
+
+    === patch main (2d_sdf_variants.glml) ===
+    (Program
+     ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
+      (Global Uniform (TyVec 2) u_mouse) (Global Uniform TyFloat u_time)
+      (Struct shape
+       ((TyInt tag) (TyFloat Circle_0) (TyFloat Rect_0) (TyFloat Rect_1)))
+      (Function (name sdf_0) (desc ())
+       (params (((TyStruct shape) s_1) ((TyVec 2) p_2))) (ret_type TyFloat)
+       (body
+        ((set () int _lv_tag_135 (. s_1 tag))
+         (set () bool _lv_cond_137 (== _lv_tag_135 0))
+         (if _lv_cond_137
+          (Block (set () float r_3 (. s_1 Circle_0))
+           (set () float anf_95 (length p_2)) (return (- anf_95 r_3)))
+          (Block (set () bool _lv_cond_136 (== _lv_tag_135 1))
+           (if _lv_cond_136
+            (Block (set () float w_4 (. s_1 Rect_0))
+             (set () float h_5 (. s_1 Rect_1))
+             (set () float anf_96 (index p_2 0))
+             (set () float anf_97 (abs anf_96))
+             (set () float anf_98 (- anf_97 w_4))
+             (set () float anf_99 (index p_2 1))
+             (set () float anf_100 (abs anf_99))
+             (set () float anf_101 (- anf_100 h_5))
+             (set () vec2 d_6 (vec2 anf_98 anf_101))
+             (set () vec2 anf_102 (vec2 0. 0.))
+             (set () vec2 anf_103 (max d_6 anf_102))
+             (set () float anf_104 (length anf_103))
+             (set () float anf_105 (index d_6 0))
+             (set () float anf_106 (index d_6 1))
+             (set () float anf_107 (max anf_105 anf_106))
+             (set () float anf_108 (min anf_107 0.))
+             (return (+ anf_104 anf_108)))
+            (Block (return 1.))))))))
+      (Function (name scene_7) (desc ()) (params (((TyVec 2) p_8)))
+       (ret_type TyFloat)
+       (body
+        ((set () shape anf_109 (shape 0 0.3 0. 0.))
+         (set () float circle_9 (sdf_0 anf_109 p_8))
+         (set () shape anf_110 (shape 1 0. 0.7 0.1))
+         (set () float rect_10 (sdf_0 anf_110 p_8))
+         (return (min circle_9 rect_10)))))
+      (Function (name get_uv_11_vec2_to_vec2_94) (desc ())
+       (params (((TyVec 2) coord_12))) (ret_type (TyVec 2))
+       (body
+        ((set () vec2 anf_111 (* 2. coord_12))
+         (set () vec2 top_13 (- anf_111 u_resolution))
+         (set () float anf_112 (index u_resolution 0))
+         (set () float anf_113 (index u_resolution 1))
+         (set () float bot_14 (min anf_112 anf_113)) (return (/ top_13 bot_14)))))
+      (Function (name main_pure) (desc ()) (params (((TyVec 2) coord_15)))
+       (ret_type (TyVec 3))
+       (body
+        ((set () vec2 p_16 (get_uv_11_vec2_to_vec2_94 coord_15))
+         (set () vec2 m_17 (get_uv_11_vec2_to_vec2_94 u_mouse))
+         (set () float d_18 (scene_7 p_16)) (set () bool anf_114 (> d_18 0.))
+         (set () vec3 col_19 (vec3 0.))
+         (if anf_114 (Block (set col_19 (vec3 0.9 0.6 0.3)))
+          (Block (set col_19 (vec3 0.65 0.85 1.))))
+         (set () float anf_115 (abs d_18)) (set () float anf_116 (* -6. anf_115))
+         (set () float anf_117 (exp anf_116))
+         (set () float darken_21 (- 1. anf_117))
+         (set () float anf_118 (* 150. d_18))
+         (set () float anf_119 (cos anf_118))
+         (set () float anf_120 (* 0.2 anf_119))
+         (set () float rings_22 (+ 0.8 anf_120))
+         (set () vec3 anf_121 (* col_19 darken_21))
+         (set () vec3 col_20 (* anf_121 rings_22))
+         (set () vec3 anf_122 (vec3 1. 1. 1.)) (set () float anf_123 (abs d_18))
+         (set () float anf_124 (smoothstep 0. 0.01 anf_123))
+         (set () float anf_125 (- 1. anf_124))
+         (set () vec3 col_23 (mix col_20 anf_122 anf_125))
+         (set () float anf_126 (scene_7 m_17)) (set () float d_25 (abs anf_126))
+         (set () vec2 anf_127 (- p_16 m_17))
+         (set () float dm_26 (length anf_127))
+         (set () float anf_128 (- dm_26 d_25))
+         (set () float anf_129 (abs anf_128))
+         (set () float anf_130 (- anf_129 0.0025))
+         (set () float anf_131 (- dm_26 0.015))
+         (set () float d_27 (min anf_130 anf_131))
+         (set () vec3 anf_132 (vec3 1. 1. 0.))
+         (set () float anf_133 (smoothstep 0. 0.005 d_27))
+         (set () float anf_134 (- 1. anf_133))
+         (set () vec3 col_24 (mix col_23 anf_132 anf_134)) (return col_24))))
+      (Function (name main) (desc ()) (params ()) (ret_type TyVoid)
+       (body
+        ((set () vec3 color (main_pure (. gl_FragCoord xy)))
+         (set fragColor (clamp (vec4 (. color xyz) 1.) 0. 1.)))))))
+
     ====== COMPILING EXAMPLE checkerboard.glml ======
 
     === stlc (checkerboard.glml) ===

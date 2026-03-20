@@ -12,6 +12,10 @@ Currently a mess, will organize later (if ever)
 - Add builtin GLSL function callers or GLSL extern libraries
 - Add user definable constrained functions?
 - Add support for LSP hover or something like an [inspect]
+- Add mdbook and split off [play.glml-lang.com
+- Syntax highlighting for variants
+- Copy pasting doesn't seem to work in vim mode, maybe its the ctrl+enter runner?
+- Vim mode some keys are wrong, like enter
 
 # Remaining Tasks
 
