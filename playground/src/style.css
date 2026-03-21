@@ -27,11 +27,19 @@ header a {
   color: #aaa;
   text-decoration: none;
   font-size: 0.9rem;
+  display: flex;
+  align-items: center;
 }
 
 header a:hover {
   color: #e0e0e0;
   text-decoration: underline;
+}
+
+.header-links {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .main-layout {
