@@ -1,4 +1,4 @@
-.PHONY: clean bin js playground serve test benchmark
+.PHONY: clean bin js playground serve test benchmark website
 
 PROFILE := dev
 ifdef RELEASE
@@ -28,6 +28,11 @@ playground: js
 
 serve: playground
 	cd playground && npm run dev
+
+website: clean playground
+	cd docs && mdbook build;
+	cp -r docs/book dist
+	cp -r playground/dist dist/playground
 
 test:
 	dune runtest
