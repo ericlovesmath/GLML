@@ -2,8 +2,6 @@
 
 GLML (OpenGL Meta Language) is a functional DSL that compiles to GLSL fragment shaders. It brings ML-style programming to GPU shaders with HM-style type inference, first-class functions, algebraic data types, and pattern matching.
 
-Home Page: [www.glml-lang.com](https://www.glml-lang.com/playground)
-
 **Try GLML Playground:** [www.glml-lang.com/playground](https://www.glml-lang.com/playground/)
 
 ![Playground](playground.png)
