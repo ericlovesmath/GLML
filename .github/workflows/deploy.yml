@@ -22,10 +22,10 @@ jobs:
           restore-prefixes-first-match: nix-${{ runner.os }}-
 
       - name: Build Website
-        run: nix develop --command make playground RELEASE=1
+        run: nix develop --command make website RELEASE=1
 
       - name: Vercel Build and Deploy
         run: |
           npm install -g vercel
           vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-          vercel deploy playground/dist --yes --prod --token=${{ secrets.VERCEL_TOKEN }}
+          vercel deploy dist --yes --prod --token=${{ secrets.VERCEL_TOKEN }}
