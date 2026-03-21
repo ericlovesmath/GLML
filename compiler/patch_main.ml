@@ -44,5 +44,5 @@ let patch (Program funcs : t) : t Or_error.t =
       in
       Function { name = "main"; desc = None; params = []; ret_type = TyVoid; body }
     in
-    Program ([ Global (Out, TyVec 4, "fragColor") ] @ funcs @ [ patched_main ]))
+    Program ([ Global (Out, TyVec 4, "fragColor", None) ] @ funcs @ [ patched_main ]))
 ;;

@@ -222,11 +222,15 @@ let translate (Program tops : Lower_variants.t) : t Or_error.t =
         in
         let%bind body = translate_block env body in
         Ok (Function { name; desc = None; params; ret_type; body })
-      (* TODO: We need to have constant folding and inlining before this works *)
-      | Const _ -> error_s [%message "translate: toplevel const is unsupported"]
+      | Const (name, body) ->
+        (match body.desc with
+         | Return { desc = Atom a; _ } ->
+           let%map ty = to_glsl_ty top.ty in
+           Global (Const, ty, name, Some (to_glsl_atom a))
+         | _ -> error_s [%message "translate: top-level constant must be atomic"])
       | Extern v ->
         let%map ty = to_glsl_ty top.ty in
-        Global (Uniform, ty, v)
+        Global (Uniform, ty, v, None)
       | TypeDef (s, RecordDecl fields) ->
         let%map fields =
           fields

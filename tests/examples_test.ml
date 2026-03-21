@@ -809,8 +809,8 @@ let%expect_test "compile examples" =
 
     === translate (2d_sdf_variants.glml) ===
     (Program
-     ((Global Uniform (TyVec 2) u_resolution) (Global Uniform (TyVec 2) u_mouse)
-      (Global Uniform TyFloat u_time)
+     ((Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform (TyVec 2) u_mouse ()) (Global Uniform TyFloat u_time ())
       (Struct shape
        ((TyInt tag) (TyFloat Circle_0) (TyFloat Rect_0) (TyFloat Rect_1)))
       (Function (name sdf_0) (desc ())
@@ -889,8 +889,9 @@ let%expect_test "compile examples" =
 
     === patch main (2d_sdf_variants.glml) ===
     (Program
-     ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
-      (Global Uniform (TyVec 2) u_mouse) (Global Uniform TyFloat u_time)
+     ((Global Out (TyVec 4) fragColor ())
+      (Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform (TyVec 2) u_mouse ()) (Global Uniform TyFloat u_time ())
       (Struct shape
        ((TyInt tag) (TyFloat Circle_0) (TyFloat Rect_0) (TyFloat Rect_1)))
       (Function (name sdf_0) (desc ())
@@ -1281,7 +1282,8 @@ let%expect_test "compile examples" =
 
     === translate (checkerboard.glml) ===
     (Program
-     ((Global Uniform (TyVec 2) u_resolution) (Global Uniform TyFloat u_time)
+     ((Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform TyFloat u_time ())
       (Function (name get_uv_0_vec2_to_vec2_35) (desc ())
        (params (((TyVec 2) coord_1))) (ret_type (TyVec 2))
        (body
@@ -1311,8 +1313,9 @@ let%expect_test "compile examples" =
 
     === patch main (checkerboard.glml) ===
     (Program
-     ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
-      (Global Uniform TyFloat u_time)
+     ((Global Out (TyVec 4) fragColor ())
+      (Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform TyFloat u_time ())
       (Function (name get_uv_0_vec2_to_vec2_35) (desc ())
        (params (((TyVec 2) coord_1))) (ret_type (TyVec 2))
        (body
@@ -1964,7 +1967,8 @@ let%expect_test "compile examples" =
 
     === translate (mandelbrot.glml) ===
     (Program
-     ((Global Uniform (TyVec 2) u_resolution) (Global Uniform TyFloat u_time)
+     ((Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform TyFloat u_time ())
       (Function (name mandel_4) (desc ())
        (params
         ((TyFloat zx_5) (TyFloat zy_6) (TyFloat cx_7) (TyFloat cy_8)
@@ -2023,8 +2027,9 @@ let%expect_test "compile examples" =
 
     === patch main (mandelbrot.glml) ===
     (Program
-     ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
-      (Global Uniform TyFloat u_time)
+     ((Global Out (TyVec 4) fragColor ())
+      (Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform TyFloat u_time ())
       (Function (name mandel_4) (desc ())
        (params
         ((TyFloat zx_5) (TyFloat zy_6) (TyFloat cx_7) (TyFloat cy_8)
@@ -2357,8 +2362,8 @@ let%expect_test "compile examples" =
 
     === translate (mouse_circle.glml) ===
     (Program
-     ((Global Uniform (TyVec 2) u_resolution) (Global Uniform (TyVec 2) u_mouse)
-      (Global Uniform TyFloat u_time)
+     ((Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform (TyVec 2) u_mouse ()) (Global Uniform TyFloat u_time ())
       (Function (name get_uv_0_vec2_to_vec2_28) (desc ())
        (params (((TyVec 2) coord_1))) (ret_type (TyVec 2))
        (body
@@ -2385,8 +2390,9 @@ let%expect_test "compile examples" =
 
     === patch main (mouse_circle.glml) ===
     (Program
-     ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
-      (Global Uniform (TyVec 2) u_mouse) (Global Uniform TyFloat u_time)
+     ((Global Out (TyVec 4) fragColor ())
+      (Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform (TyVec 2) u_mouse ()) (Global Uniform TyFloat u_time ())
       (Function (name get_uv_0_vec2_to_vec2_28) (desc ())
        (params (((TyVec 2) coord_1))) (ret_type (TyVec 2))
        (body
@@ -2708,7 +2714,8 @@ let%expect_test "compile examples" =
 
     === translate (rainbow.glml) ===
     (Program
-     ((Global Uniform (TyVec 2) u_resolution) (Global Uniform TyFloat u_time)
+     ((Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform TyFloat u_time ())
       (Function (name get_uv_0_vec2_to_vec2_36) (desc ())
        (params (((TyVec 2) coord_1))) (ret_type (TyVec 2))
        (body
@@ -2735,8 +2742,9 @@ let%expect_test "compile examples" =
 
     === patch main (rainbow.glml) ===
     (Program
-     ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
-      (Global Uniform TyFloat u_time)
+     ((Global Out (TyVec 4) fragColor ())
+      (Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform TyFloat u_time ())
       (Function (name get_uv_0_vec2_to_vec2_36) (desc ())
        (params (((TyVec 2) coord_1))) (ret_type (TyVec 2))
        (body
@@ -4402,8 +4410,8 @@ let%expect_test "compile examples" =
 
     === translate (raymarch.glml) ===
     (Program
-     ((Global Uniform (TyVec 2) u_resolution) (Global Uniform TyFloat u_time)
-      (Global Uniform (TyVec 2) u_mouse)
+     ((Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform TyFloat u_time ()) (Global Uniform (TyVec 2) u_mouse ())
       (Function (name rotate_0) (desc ())
        (params (((TyVec 2) p_1) (TyFloat angle_2))) (ret_type (TyVec 2))
        (body
@@ -4565,8 +4573,9 @@ let%expect_test "compile examples" =
 
     === patch main (raymarch.glml) ===
     (Program
-     ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
-      (Global Uniform TyFloat u_time) (Global Uniform (TyVec 2) u_mouse)
+     ((Global Out (TyVec 4) fragColor ())
+      (Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform TyFloat u_time ()) (Global Uniform (TyVec 2) u_mouse ())
       (Function (name rotate_0) (desc ())
        (params (((TyVec 2) p_1) (TyFloat angle_2))) (ret_type (TyVec 2))
        (body
@@ -5228,7 +5237,8 @@ let%expect_test "compile examples" =
 
     === translate (recursion.glml) ===
     (Program
-     ((Global Uniform (TyVec 2) u_resolution) (Global Uniform TyFloat u_time)
+     ((Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform TyFloat u_time ())
       (Function (name get_uv_0) (desc ()) (params (((TyVec 2) coord_1)))
        (ret_type (TyVec 2))
        (body
@@ -5280,8 +5290,9 @@ let%expect_test "compile examples" =
 
     === patch main (recursion.glml) ===
     (Program
-     ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
-      (Global Uniform TyFloat u_time)
+     ((Global Out (TyVec 4) fragColor ())
+      (Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform TyFloat u_time ())
       (Function (name get_uv_0) (desc ()) (params (((TyVec 2) coord_1)))
        (ret_type (TyVec 2))
        (body
@@ -6684,7 +6695,8 @@ let%expect_test "compile examples" =
 
     === translate (warped_noise.glml) ===
     (Program
-     ((Global Uniform (TyVec 2) u_resolution) (Global Uniform TyFloat u_time)
+     ((Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform TyFloat u_time ())
       (Function (name smoothNoise_0) (desc ()) (params (((TyVec 2) p_1)))
        (ret_type TyFloat)
        (body
@@ -6822,8 +6834,9 @@ let%expect_test "compile examples" =
 
     === patch main (warped_noise.glml) ===
     (Program
-     ((Global Out (TyVec 4) fragColor) (Global Uniform (TyVec 2) u_resolution)
-      (Global Uniform TyFloat u_time)
+     ((Global Out (TyVec 4) fragColor ())
+      (Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform TyFloat u_time ())
       (Function (name smoothNoise_0) (desc ()) (params (((TyVec 2) p_1)))
        (ret_type TyFloat)
        (body
