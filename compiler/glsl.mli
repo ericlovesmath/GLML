@@ -91,7 +91,7 @@ type stmt =
 [@@deriving sexp_of]
 
 type decl =
-  | Global of qualifier * ty * string
+  | Global of qualifier * ty * string * term option
   | Function of
       { name : string
       ; desc : string option

@@ -924,3 +924,33 @@ let%expect_test "variant exhaustive checking and incorrect maching" =
      (ctor Circle))
     |}]
 ;;
+
+let%expect_test "toplevel constant (atomic only)" =
+  test
+    {|
+    let pi = 3.14159
+
+    let main (u : vec2) = [pi, pi, pi]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    const float pi_0 = 3.14159;
+    vec3 main_pure(vec2 u_1) {
+        return vec3(pi_0, pi_0, pi_0);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    let x = #sin(1.0) + #cos(2.0)
+
+    let main (u : vec2) = [x, x, x]
+    |};
+  [%expect {| "translate: top-level constant must be atomic" |}]
+;;

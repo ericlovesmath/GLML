@@ -279,7 +279,7 @@ let rec string_of_stmt = function
 ;;
 
 type decl =
-  | Global of qualifier * ty * string
+  | Global of qualifier * ty * string * term option
   | Function of
       { name : string
       ; desc : string option
@@ -294,10 +294,12 @@ type t = Program of decl list [@@deriving sexp_of]
 
 let to_string (Program decls : t) : string =
   let string_of_decl = function
-    | Global (qualifier, ty, name) ->
+    | Global (qualifier, ty, name, init) ->
       let qualifier = string_of_qualifier qualifier in
       let ty = string_of_ty ty in
-      [%string "%{qualifier} %{ty} %{name};"]
+      (match init with
+       | None -> [%string "%{qualifier} %{ty} %{name};"]
+       | Some t -> [%string "%{qualifier} %{ty} %{name} = %{string_of_term t};"])
     | Function { name; desc = _; params; ret_type; body } ->
       let ret_type = string_of_ty ret_type in
       let params =
