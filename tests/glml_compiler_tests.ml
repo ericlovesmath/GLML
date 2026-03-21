@@ -822,7 +822,7 @@ let%expect_test "variants and matching" =
                 return (w_3 * h_4);
                 break;
             }
-            case 2: {
+            default: {
                 return 0.;
                 break;
             }
@@ -878,7 +878,7 @@ let%expect_test "variant match in let binding" =
                 v_2 = f_3;
                 break;
             }
-            case 1: {
+            default: {
                 v_2 = 0.;
                 break;
             }

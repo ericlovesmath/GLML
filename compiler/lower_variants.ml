@@ -73,6 +73,15 @@ let prepend_var_decls
       ({ desc = let_bind; ty = acc.ty; loc } : anf))
 ;;
 
+let rec map_last_return (k : term -> anf) (anf : anf) : anf =
+  match anf.desc with
+  | Return term -> k term
+  | Let (v, b, t) -> { anf with desc = Let (v, b, map_last_return k t) }
+  | While (c, b, t) -> { anf with desc = While (c, b, map_last_return k t) }
+  | Set (v, a, t) -> { anf with desc = Set (v, a, map_last_return k t) }
+  | Continue -> anf
+;;
+
 let rec lower_term (tenv : type_env) (term : term) : term Or_error.t =
   let pure desc = Ok ({ desc; ty = lower_ty term.ty; loc = term.loc } : term) in
   match term.desc with
@@ -140,7 +149,7 @@ and lower_match
       (cases : (string * string list * anf) list)
       (result_ty : ty)
       (loc : Lexer.loc)
-      (cont : term -> anf)
+      (k : term -> anf)
   : anf Or_error.t
   =
   let result_ty = lower_ty result_ty in
@@ -155,13 +164,9 @@ and lower_match
   match cases with
   | [] -> error_s [%message "lower_variants: empty cases"]
   | [ (ctor, vars, body) ] ->
-    (* TODO: This is an artifact of our stupid [lower_match] impl,
-       have this so it just flattens out the vars like normal *)
-    (* Single constructor uses if instead of switch/case *)
     let%bind branch = lower_case ctor vars body in
-    Ok (cont { desc = If (Anf.Bool true, branch, branch); ty = result_ty; loc })
+    Ok (map_last_return k branch)
   | _ ->
-    (* TODO: Have last case be [default] because some GLSL versions require exhaustive *)
     let%bind switch_cases =
       cases
       |> List.map ~f:(fun (ctor, vars, body) ->
@@ -175,7 +180,7 @@ and lower_match
     let switch_term : term =
       { desc = Switch (Var tag_v, switch_cases); ty = result_ty; loc }
     in
-    Ok ({ desc = Let (tag_v, tag_term, cont switch_term); ty = result_ty; loc } : anf)
+    Ok ({ desc = Let (tag_v, tag_term, k switch_term); ty = result_ty; loc } : anf)
 ;;
 
 let lower_top (tenv : type_env) (top : top) : top Or_error.t =
