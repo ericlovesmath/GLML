@@ -87,6 +87,7 @@ type stmt =
   | For of stmt * term * stmt * stmt
   | Block of stmt list
   | Break
+  | SwitchStmt of term * (int * stmt list) list
 [@@deriving sexp_of]
 
 type decl =

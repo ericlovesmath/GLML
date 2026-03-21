@@ -809,19 +809,22 @@ let%expect_test "variants and matching" =
     };
     float area_0(shape s_1) {
         int _lv_tag_20 = s_1.tag;
-        bool _lv_cond_22 = (_lv_tag_20 == 0);
-        if (_lv_cond_22) {
-            float r_2 = s_1.Circle_0;
-            float anf_16 = (3.14159 * r_2);
-            return (anf_16 * r_2);
-        } else {
-            bool _lv_cond_21 = (_lv_tag_20 == 1);
-            if (_lv_cond_21) {
+        switch (_lv_tag_20) {
+            case 0: {
+                float r_2 = s_1.Circle_0;
+                float anf_16 = (3.14159 * r_2);
+                return (anf_16 * r_2);
+                break;
+            }
+            case 1: {
                 float w_3 = s_1.Rect_0;
                 float h_4 = s_1.Rect_1;
                 return (w_3 * h_4);
-            } else {
+                break;
+            }
+            case 2: {
                 return 0.;
+                break;
             }
         }
     }
@@ -868,13 +871,17 @@ let%expect_test "variant match in let binding" =
     vec3 main_pure(vec2 coord_0) {
         opt x_1 = opt(0, 5.);
         int _lv_tag_5 = x_1.tag;
-        bool _lv_cond_6 = (_lv_tag_5 == 0);
         float v_2 = 0.;
-        if (_lv_cond_6) {
-            float f_3 = x_1.Some_0;
-            v_2 = f_3;
-        } else {
-            v_2 = 0.;
+        switch (_lv_tag_5) {
+            case 0: {
+                float f_3 = x_1.Some_0;
+                v_2 = f_3;
+                break;
+            }
+            case 1: {
+                v_2 = 0.;
+                break;
+            }
         }
         return vec3(v_2, v_2, v_2);
     }

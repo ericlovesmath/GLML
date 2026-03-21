@@ -16,6 +16,7 @@ type term_desc =
   | Field of atom * string
   | Variant of string * string * atom list
   | Match of atom * (string * string list * anf) list
+  | Switch of atom * (int * anf) list
 
 and term =
   { desc : term_desc
@@ -63,6 +64,9 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
         ]
     in
     List (Atom "match" :: sexp_of_atom scrutinee :: List.map cases ~f:sexp_of_case)
+  | Switch (tag, cases) ->
+    let sexp_of_case (i, body) = List [ Atom (Int.to_string i); sexp_of_anf body ] in
+    List (Atom "switch" :: sexp_of_atom tag :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
 
