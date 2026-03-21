@@ -105,6 +105,8 @@ let rec lower_term (tenv : type_env) (term : term) : term Or_error.t =
      | Some (RecordDecl _) | None ->
        error_s [%message "lower_variants: unknown variant type" ty_name])
   | Match _ -> error_s [%message "lower_variants: match should be handled in lower_anf"]
+  | Switch _ ->
+    error_s [%message "lower_variants: switch should not exist before lowering"]
 
 and lower_anf (tenv : type_env) (anf : anf) : anf Or_error.t =
   let make desc : anf = { desc; ty = lower_ty anf.ty; loc = anf.loc } in
@@ -153,42 +155,27 @@ and lower_match
   match cases with
   | [] -> error_s [%message "lower_variants: empty cases"]
   | [ (ctor, vars, body) ] ->
-    (* Single constructor *)
+    (* TODO: This is an artifact of our stupid [lower_match] impl,
+       have this so it just flattens out the vars like normal *)
+    (* Single constructor uses if instead of switch/case *)
     let%bind branch = lower_case ctor vars body in
     Ok (cont { desc = If (Anf.Bool true, branch, branch); ty = result_ty; loc })
   | _ ->
+    (* TODO: Have last case be [default] because some GLSL versions require exhaustive *)
+    let%bind switch_cases =
+      cases
+      |> List.map ~f:(fun (ctor, vars, body) ->
+        let%bind tag = find_tag ctors ctor in
+        let%map branch = lower_case ctor vars body in
+        tag, branch)
+      |> Or_error.all
+    in
     let tag_v = Utils.fresh "_lv_tag" in
-    let tag_atom = Anf.Var tag_v in
     let tag_term : term = { desc = Field (scrut, "tag"); ty = TyInt; loc } in
-    let build_case wrap ctor vars body else_anf =
-      let%bind tag_i = find_tag ctors ctor in
-      let%bind branch = lower_case ctor vars body in
-      let cond_v = Utils.fresh "_lv_cond" in
-      let cond_term : term =
-        { desc = Bop (Glsl.Eq, tag_atom, Anf.Int tag_i); ty = TyBool; loc }
-      in
-      let if_term : term =
-        { desc = If (Anf.Var cond_v, branch, else_anf); ty = result_ty; loc }
-      in
-      Ok ({ desc = Let (cond_v, cond_term, wrap if_term); ty = result_ty; loc } : anf)
+    let switch_term : term =
+      { desc = Switch (Var tag_v, switch_cases); ty = result_ty; loc }
     in
-    (* if/else chain building *)
-    let rec build_else = function
-      | [] -> error_s [%message "lower_variants: empty remaining cases"]
-      | [ (ctor, vars, body) ] -> lower_case ctor vars body
-      | (ctor, vars, body) :: rest ->
-        let%bind else_anf = build_else rest in
-        build_case
-          (fun t -> ({ desc = Return t; ty = result_ty; loc } : anf))
-          ctor
-          vars
-          body
-          else_anf
-    in
-    let first_ctor, first_vars, first_body = List.hd_exn cases in
-    let%bind else_anf = build_else (List.tl_exn cases) in
-    let%bind guarded = build_case cont first_ctor first_vars first_body else_anf in
-    Ok ({ desc = Let (tag_v, tag_term, guarded); ty = result_ty; loc } : anf)
+    Ok ({ desc = Let (tag_v, tag_term, cont switch_term); ty = result_ty; loc } : anf)
 ;;
 
 let lower_top (tenv : type_env) (top : top) : top Or_error.t =

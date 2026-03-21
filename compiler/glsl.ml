@@ -163,6 +163,7 @@ type stmt =
   | For of stmt * term * stmt * stmt
   | Block of stmt list
   | Break
+  | SwitchStmt of term * (int * stmt list) list
 
 let rec sexp_of_stmt (s : stmt) : Sexp.t =
   match s with
@@ -192,6 +193,11 @@ let rec sexp_of_stmt (s : stmt) : Sexp.t =
       ]
   | Block stmts -> List (Atom "Block" :: List.map stmts ~f:sexp_of_stmt)
   | Break -> Atom "break"
+  | SwitchStmt (scrut, cases) ->
+    let sexp_of_case (i, stmts) =
+      List (Atom (Int.to_string i) :: List.map stmts ~f:sexp_of_stmt)
+    in
+    List (Atom "switch" :: sexp_of_term scrut :: List.map cases ~f:sexp_of_case)
 ;;
 
 let indent s =
@@ -248,6 +254,21 @@ let rec string_of_stmt = function
     |> String.concat ~sep:"\n"
     |> fun body -> [%string "{\n%{body}\n}"]
   | Break -> "break;"
+  | SwitchStmt (scrut, cases) ->
+    let scrut = string_of_term scrut in
+    let cases =
+      List.map cases ~f:(fun (i, stmts) ->
+        let body =
+          stmts
+          |> List.map ~f:string_of_stmt
+          |> List.map ~f:indent
+          |> String.concat ~sep:"\n"
+        in
+        [%string "case %{i#Int}: {\n%{body}\n}"])
+      |> List.map ~f:indent
+      |> String.concat ~sep:"\n"
+    in
+    [%string "switch (%{scrut}) {\n%{cases}\n}"]
 ;;
 
 type decl =

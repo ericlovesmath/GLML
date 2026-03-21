@@ -48,6 +48,10 @@ let to_glsl_term (t : Tail_call.term) : term Or_error.t =
   | If _ ->
     error_s
       [%message "to_glsl_term: should be handled in [tr_block]" (t : Tail_call.term)]
+  | Switch _ ->
+    error_s
+      [%message
+        "to_glsl_term: should be handled in [translate_block]" (t : Tail_call.term)]
   | Variant _ | Match _ ->
     error_s [%message "to_glsl_term: variant/match should not exist" (t : Tail_call.term)]
 ;;
@@ -81,21 +85,48 @@ let rec placeholder_value_for_ty (env : record_env) (ty : Monomorphize.ty)
       [%message "translate: arrow types should not be in tail" (ty : Monomorphize.ty)]
 ;;
 
+(* TODO: Factor out [translate_effect] or something like that for [if/switch] *)
+
 let rec translate_set (env : record_env) (var : string) (anf : Tail_call.anf)
   : stmt list Or_error.t
   =
   match anf.desc with
   | Let (v, term, body) ->
     let%bind ty = to_glsl_ty term.ty in
-    let%bind term = to_glsl_term term in
-    let%bind tail = translate_set env var body in
-    Ok (Decl (None, ty, v, term) :: tail)
+    (match term.desc with
+     | Switch (tag, switch_cases) ->
+       let%bind placeholder = placeholder_value_for_ty env term.ty in
+       let%bind glsl_cases =
+         switch_cases
+         |> List.map ~f:(fun (i, case_anf) ->
+           let%map stmts = translate_set env v case_anf in
+           i, stmts @ [ Break ])
+         |> Or_error.all
+       in
+       let%bind tail = translate_set env var body in
+       Ok
+         (Decl (None, ty, v, placeholder)
+          :: SwitchStmt (to_glsl_atom tag, glsl_cases)
+          :: tail)
+     | _ ->
+       let%bind term = to_glsl_term term in
+       let%bind tail = translate_set env var body in
+       Ok (Decl (None, ty, v, term) :: tail))
   | Return t ->
     (match t.desc with
      | If (c, t, e) ->
        let%bind t = translate_set env var t in
        let%bind e = translate_set env var e in
        Ok [ IfStmt (to_glsl_atom c, Block t, Some (Block e)) ]
+     | Switch (tag, switch_cases) ->
+       let%map glsl_cases =
+         switch_cases
+         |> List.map ~f:(fun (i, case_anf) ->
+           let%map stmts = translate_set env var case_anf in
+           i, stmts @ [ Break ])
+         |> Or_error.all
+       in
+       [ SwitchStmt (to_glsl_atom tag, glsl_cases) ]
      | _ ->
        let%map t = to_glsl_term t in
        [ Set (Var var, t) ])
@@ -123,6 +154,19 @@ and translate_block (env : record_env) (anf : Tail_call.anf) : stmt list Or_erro
          (Decl (None, ty, v, placeholder)
           :: IfStmt (to_glsl_atom c, Block t, Some (Block e))
           :: body)
+     | Switch (tag, switch_cases) ->
+       let%bind placeholder = placeholder_value_for_ty env term.ty in
+       let%bind glsl_cases =
+         switch_cases
+         |> List.map ~f:(fun (i, case_anf) ->
+           let%map stmts = translate_set env v case_anf in
+           i, stmts @ [ Break ])
+         |> Or_error.all
+       in
+       Ok
+         (Decl (None, ty, v, placeholder)
+          :: SwitchStmt (to_glsl_atom tag, glsl_cases)
+          :: body)
      | _ ->
        let%map term = to_glsl_term term in
        Decl (None, ty, v, term) :: body)
@@ -132,6 +176,15 @@ and translate_block (env : record_env) (anf : Tail_call.anf) : stmt list Or_erro
        let%bind t = translate_block env t in
        let%bind e = translate_block env e in
        Ok [ IfStmt (to_glsl_atom c, Block t, Some (Block e)) ]
+     | Switch (tag, switch_cases) ->
+       let%map glsl_cases =
+         switch_cases
+         |> List.map ~f:(fun (i, case_anf) ->
+           let%map stmts = translate_block env case_anf in
+           i, stmts @ [ Break ])
+         |> Or_error.all
+       in
+       [ SwitchStmt (to_glsl_atom tag, glsl_cases) ]
      | _ ->
        let%map t = to_glsl_term t in
        [ Return (Some t) ])
