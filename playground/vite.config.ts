@@ -7,7 +7,7 @@ const monacoEditorPlugin =
   monacoEditorPluginModule;
 
 export default defineConfig({
-  base: "",
+  base: "/playground",
   publicDir: "public",
   build: {
     outDir: "dist",
