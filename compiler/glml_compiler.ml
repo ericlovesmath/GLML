@@ -46,7 +46,7 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   let%bind t = Tail_call.remove_rec t in
   trace Tail_call (Tail_call.sexp_of_t t);
   let%bind t = Lower_variants.lower t in
-  trace Lower_variants (Tail_call.sexp_of_t t);
+  trace Lower_variants (Lower_variants.sexp_of_t t);
   let%bind glsl = Translate.translate t in
   trace Translate (Glsl.sexp_of_t glsl);
   let%bind glsl = Patch_main.patch glsl in

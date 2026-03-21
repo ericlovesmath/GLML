@@ -27,7 +27,7 @@ let to_glsl_atom (a : Anf.atom) : term =
   | Bool b -> Bool b
 ;;
 
-let to_glsl_term (t : Tail_call.term) : term Or_error.t =
+let to_glsl_term (t : Lower_variants.term) : term Or_error.t =
   match t.desc with
   | Atom a -> Ok (to_glsl_atom a)
   | Bop (op, l, r) -> Ok (Bop (op, to_glsl_atom l, to_glsl_atom r))
@@ -47,13 +47,11 @@ let to_glsl_term (t : Tail_call.term) : term Or_error.t =
   | App (f, args) -> Ok (App (f, List.map args ~f:to_glsl_atom))
   | If _ ->
     error_s
-      [%message "to_glsl_term: should be handled in [tr_block]" (t : Tail_call.term)]
+      [%message "to_glsl_term: should be handled in [tr_block]" (t : Lower_variants.term)]
   | Switch _ ->
     error_s
       [%message
-        "to_glsl_term: should be handled in [translate_block]" (t : Tail_call.term)]
-  | Variant _ | Match _ ->
-    error_s [%message "to_glsl_term: variant/match should not exist" (t : Tail_call.term)]
+        "to_glsl_term: should be handled in [translate_block]" (t : Lower_variants.term)]
 ;;
 
 let rec placeholder_value_for_ty (env : record_env) (ty : Monomorphize.ty)
@@ -87,7 +85,7 @@ let rec placeholder_value_for_ty (env : record_env) (ty : Monomorphize.ty)
 
 (* TODO: Factor out [translate_effect] or something like that for [if/switch] *)
 
-let rec translate_set (env : record_env) (var : string) (anf : Tail_call.anf)
+let rec translate_set (env : record_env) (var : string) (anf : Lower_variants.anf)
   : stmt list Or_error.t
   =
   match anf.desc with
@@ -140,7 +138,7 @@ let rec translate_set (env : record_env) (var : string) (anf : Tail_call.anf)
     Set (Var v, to_glsl_atom a) :: tail
   | Continue -> Ok [ Continue ]
 
-and translate_block (env : record_env) (anf : Tail_call.anf) : stmt list Or_error.t =
+and translate_block (env : record_env) (anf : Lower_variants.anf) : stmt list Or_error.t =
   match anf.desc with
   | Let (v, term, body) ->
     let%bind ty = to_glsl_ty term.ty in
@@ -199,7 +197,7 @@ and translate_block (env : record_env) (anf : Tail_call.anf) : stmt list Or_erro
   | Continue -> Ok [ Continue ]
 ;;
 
-let translate (Program tops : Tail_call.t) : t Or_error.t =
+let translate (Program tops : Lower_variants.t) : t Or_error.t =
   let%bind env =
     tops
     |> List.filter_map ~f:(fun top ->
@@ -211,7 +209,7 @@ let translate (Program tops : Tail_call.t) : t Or_error.t =
   in
   let%bind tops =
     tops
-    |> List.map ~f:(fun (top : Tail_call.top) ->
+    |> List.map ~f:(fun (top : Lower_variants.top) ->
       match top.desc with
       | Define { name; args; body; ret_ty } ->
         let%bind ret_type = to_glsl_ty ret_ty in

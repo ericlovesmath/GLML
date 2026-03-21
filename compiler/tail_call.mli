@@ -14,7 +14,6 @@ type term_desc =
   | Field of atom * string
   | Variant of string * string * atom list
   | Match of atom * (string * string list * anf) list
-  | Switch of atom * (int * anf) list
 [@@deriving sexp_of]
 
 and term =

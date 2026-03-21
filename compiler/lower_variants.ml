@@ -1,7 +1,114 @@
 open Core
 open Or_error.Let_syntax
+open Anf
+open Sexplib.Sexp
 open Monomorphize
 open Tail_call
+
+type term_desc =
+  | Atom of atom
+  | Bop of Glsl.binary_op * atom * atom
+  | Vec of int * atom list
+  | Mat of int * int * atom list
+  | Index of atom * int
+  | Builtin of Glsl.builtin * atom list
+  | App of string * atom list
+  | If of atom * anf * anf
+  | Record of string * atom list
+  | Field of atom * string
+  | Switch of atom * (int * anf) list
+
+and term =
+  { desc : term_desc
+  ; ty : ty
+  ; loc : Lexer.loc
+  }
+
+and anf_desc =
+  | Let of string * term * anf
+  | Return of term
+  | While of term * anf * anf
+  | Set of string * atom * anf
+  | Continue
+
+and anf =
+  { desc : anf_desc
+  ; ty : ty
+  ; loc : Lexer.loc
+  }
+
+let rec sexp_of_term_desc : term_desc -> Sexp.t = function
+  | Atom a -> sexp_of_atom a
+  | Bop (op, l, r) ->
+    List [ Atom (Glsl.string_of_binary_op op); sexp_of_atom l; sexp_of_atom r ]
+  | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_atom)
+  | Mat (x, y, ts) ->
+    List
+      (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
+       :: List.map ts ~f:sexp_of_atom)
+  | Index (t, i) -> List [ Atom "index"; sexp_of_atom t; Atom (Int.to_string i) ]
+  | Builtin (b, ts) ->
+    List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_atom)
+  | App (f, args) -> List (Atom f :: List.map args ~f:sexp_of_atom)
+  | If (c, t, e) -> List [ Atom "if"; sexp_of_atom c; sexp_of_anf t; sexp_of_anf e ]
+  | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_atom)
+  | Field (t, f) -> List [ Atom "."; sexp_of_atom t; Atom f ]
+  | Switch (tag, cases) ->
+    let sexp_of_case (i, body) = List [ Atom (Int.to_string i); sexp_of_anf body ] in
+    List (Atom "switch" :: sexp_of_atom tag :: List.map cases ~f:sexp_of_case)
+
+and sexp_of_term t = sexp_of_term_desc t.desc
+
+and sexp_of_anf_desc = function
+  | Let (v, bind, body) ->
+    List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_anf body ]
+  | Return t -> List [ Atom "return"; sexp_of_term t ]
+  | While (cond, body, after) ->
+    List [ Atom "while"; sexp_of_term cond; sexp_of_anf body; sexp_of_anf after ]
+  | Set (v, bind, body) ->
+    List [ Atom "set"; Atom v; sexp_of_atom bind; sexp_of_anf body ]
+  | Continue -> Atom "continue"
+
+and sexp_of_anf t = sexp_of_anf_desc t.desc
+
+type top_desc =
+  | Define of
+      { name : string
+      ; args : (string * ty) list
+      ; body : anf
+      ; ret_ty : Monomorphize.ty
+      }
+  | Const of string * anf
+  | Extern of string
+  | TypeDef of string * type_decl
+
+let sexp_of_top_desc = function
+  | Define { name; args; body; ret_ty = _ } ->
+    let args_sexp = List.map args ~f:(fun (v, ty) -> List [ Atom v; sexp_of_ty ty ]) in
+    List
+      [ Atom "Define"
+      ; List [ Atom "name"; Atom name ]
+      ; List [ Atom "args"; List args_sexp ]
+      ; List [ Atom "body"; sexp_of_anf body ]
+      ]
+  | Const (name, term) -> List [ Atom "Const"; Atom name; sexp_of_anf term ]
+  | Extern name -> List [ Atom "Extern"; Atom name ]
+  | TypeDef (name, decl) -> List [ Atom "TypeDef"; Atom name; sexp_of_type_decl decl ]
+;;
+
+type top =
+  { desc : top_desc
+  ; ty : Monomorphize.ty
+  ; loc : Lexer.loc
+  }
+
+let sexp_of_top t =
+  List [ sexp_of_top_desc t.desc; Atom ":"; Monomorphize.sexp_of_ty t.ty ]
+;;
+
+type t = Program of top list
+
+let sexp_of_t (Program tops) = List (Atom "Program" :: List.map tops ~f:sexp_of_top)
 
 (* TODO: Create type excluding variants? *)
 
@@ -82,11 +189,18 @@ let rec map_last_return (k : term -> anf) (anf : anf) : anf =
   | Continue -> anf
 ;;
 
-let rec lower_term (tenv : type_env) (term : term) : term Or_error.t =
+let rec lower_term (tenv : type_env) (term : Tail_call.term) : term Or_error.t =
   let pure desc = Ok ({ desc; ty = lower_ty term.ty; loc = term.loc } : term) in
   match term.desc with
-  | Atom _ | Bop _ | Vec _ | Mat _ | Index _ | Builtin _ | App _ | Record _ | Field _ ->
-    pure term.desc
+  | Atom a -> pure (Atom a)
+  | Bop (op, l, r) -> pure (Bop (op, l, r))
+  | Vec (n, ts) -> pure (Vec (n, ts))
+  | Mat (x, y, ts) -> pure (Mat (x, y, ts))
+  | Index (t, i) -> pure (Index (t, i))
+  | Builtin (b, ts) -> pure (Builtin (b, ts))
+  | App (f, args) -> pure (App (f, args))
+  | Record (s, args) -> pure (Record (s, args))
+  | Field (a, f) -> pure (Field (a, f))
   | If (c, t, e) ->
     let%bind t = lower_anf tenv t in
     let%bind e = lower_anf tenv e in
@@ -114,10 +228,8 @@ let rec lower_term (tenv : type_env) (term : term) : term Or_error.t =
      | Some (RecordDecl _) | None ->
        error_s [%message "lower_variants: unknown variant type" ty_name])
   | Match _ -> error_s [%message "lower_variants: match should be handled in lower_anf"]
-  | Switch _ ->
-    error_s [%message "lower_variants: switch should not exist before lowering"]
 
-and lower_anf (tenv : type_env) (anf : anf) : anf Or_error.t =
+and lower_anf (tenv : type_env) (anf : Tail_call.anf) : anf Or_error.t =
   let make desc : anf = { desc; ty = lower_ty anf.ty; loc = anf.loc } in
   let pure desc = Ok (make desc) in
   match anf.desc with
@@ -141,12 +253,12 @@ and lower_anf (tenv : type_env) (anf : anf) : anf Or_error.t =
   | Set (v, a, tail) ->
     let%bind tail = lower_anf tenv tail in
     pure (Set (v, a, tail))
-  | Continue -> Ok anf
+  | Continue -> pure Continue
 
 and lower_match
       (tenv : type_env)
       (scrut : Anf.atom)
-      (cases : (string * string list * anf) list)
+      (cases : (string * string list * Tail_call.anf) list)
       (result_ty : ty)
       (loc : Lexer.loc)
       (k : term -> anf)
@@ -183,7 +295,7 @@ and lower_match
     Ok ({ desc = Let (tag_v, tag_term, k switch_term); ty = result_ty; loc } : anf)
 ;;
 
-let lower_top (tenv : type_env) (top : top) : top Or_error.t =
+let lower_top (tenv : type_env) (top : Tail_call.top) : top Or_error.t =
   let pure desc = Ok ({ desc; ty = lower_ty top.ty; loc = top.loc } : top) in
   match top.desc with
   | TypeDef (name, VariantDecl ctors) ->
@@ -206,7 +318,7 @@ let lower_top (tenv : type_env) (top : top) : top Or_error.t =
     pure (Const (name, body))
 ;;
 
-let lower (Program tops : t) : t Or_error.t =
+let lower (Program tops : Tail_call.t) : t Or_error.t =
   let%bind tenv =
     tops
     |> List.filter_map ~f:(fun top ->
