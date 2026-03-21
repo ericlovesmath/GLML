@@ -66,6 +66,7 @@
               ++ (with pkgs; [
                 glsl_analyzer
                 nodejs
+                mdbook
               ]);
           };
         };

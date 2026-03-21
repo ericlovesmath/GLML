@@ -1,24 +1,29 @@
-Currently a mess, will organize later (if ever)
+# Information Dump
 
-# Tasks (Currently Working On)
+This page contains a dump of current TODO items and unorganized thoughts and tasks. This will likely stay a mess.
+
+## Tasks (Currently Working On)
 
 - Button to show GLSL output on mobile
 - Allow clicking through all passes in GLSL output window
-- Vim/Emacs syntax file
 - Defunctionalization?
 - Implicit error field added to every function to propagate error color back
 - Move mod to nonbinop version as that is a gentype, add more builtins
 - BUG: main is mangled so make sure that doesn't happen, must be fixed to coord vec2
 - Add builtin GLSL function callers or GLSL extern libraries
 - Add user definable constrained functions?
-- Add support for LSP hover or something like an [inspect]
-- Add mdbook and split off [play.glml-lang.com
+- Add mdbook and split off [play.glml-lang.com]
 - Syntax highlighting for variants
 - Copy pasting doesn't seem to work in vim mode, maybe its the ctrl+enter runner?
 - Vim mode some keys are wrong, like enter
+- Syntax highlighting for mdbook
+- uintBitsToFloat instead of fat structs to represent variants, instead storing as uvec4 in raw bits
+- Use switch/case for variants
+- Add match support for non variants, as well as fallthrough cases and `when` clauses
 
-# Remaining Tasks
+## Remaining Tasks
 
+- Add support for LSP hover or something like an [inspect]
 - Typechecking (Church-typed LC -> HM -> Size dependent)
 - Closure Conversion (turn closures into explicit struct passing)
 - Lowering (ADTs/matches into tagged unions/switches)
@@ -30,17 +35,24 @@ Currently a mess, will organize later (if ever)
 - Read Futhark's monomorphization and defunctionalization code for partial application
 - Better benchmarking tests
 - Better pipeline tests
+- Buffer passing (e.g. for Game of Life)
+- Example of rendering clouds
+- Add sliders in playground to change values
+- Update blog posts
+- Set up vim/treesitter plugsin
+- Set up Github org more
+- Vim/Emacs syntax file
+- Add language reference and examples to mdbook
 
-# Potentially Interesting Thoughts
+## Potentially Interesting Thoughts
 
-- `let%glsl` ppx to embed DSL?
 - `wasm_of_ocaml` build? `Core` seems to cause `Error: Base_am_testing not implemented`
 - Local renderer without web / tests with [glslViewer](https://github.com/patriciogonzalezvivo/glslViewer)
 - Do I separate camera and make it specific like a 3D ShaderToy for Raymarching in the web playground?
 - Write Nix derivation for Javascript and OCaml bindings
 - Emit on compilation what data needs to be passed from host
 
-# Resources
+## Resources
 
 - Janet to GLSL Compiler: https://ianthehenry.com/posts/bauble/building-bauble/
 - Articles on SDFs: https://iquilezles.org/articles/

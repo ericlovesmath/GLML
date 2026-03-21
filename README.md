@@ -5,7 +5,7 @@ GLML is an early stage functional domain-specific language for writing fragment 
 **[Try GLML Playground](https://www.glml-lang.com)**
 
 <p align="center">
-    <img src="./docs/playground.png" width="60%">
+    <img src="./docs/src/playground.png" width="60%">
 </p>
 
 ## Build

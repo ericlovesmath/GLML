@@ -35,10 +35,4 @@ let main (coord : vec2) =
     [ 0.0, 0.0, 0.0 ]
   else
     let n = iter / 150.0 in
-
-    let r = #sin(n * 10.0 + u_time) * 0.5 + 0.5 in
-    let g = #sin(n * 20.0 + u_time) * 0.5 + 0.5 in
-    let b = #sin(n * 30.0 + u_time) * 0.5 + 0.5 in
-
-    [ r, g, b ]
-
+    #sin(n * [10.0, 20.0, 30.0] + u_time) * 0.5 + 0.5
