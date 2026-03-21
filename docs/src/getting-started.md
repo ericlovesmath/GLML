@@ -2,7 +2,7 @@
 
 ## Web Playground
 
-The fastest way to try GLML is the online playground at [glml-lang.com](https://www.glml-lang.com). Paste any GLML program or select one of the examples and see the compiled GLSL output immediately. Programs can be run with `ctrl-enter`.
+The fastest way to try GLML is the online playground at [glml-lang.com/playground](https://www.glml-lang.com/playground). Paste any GLML program or select one of the examples and see the compiled GLSL output immediately. Programs can be run with `ctrl-enter`.
 
 ## Building from Source
 

@@ -16,6 +16,7 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - Syntax highlighting for mdbook
 - uintBitsToFloat instead of fat structs to represent variants, instead storing as uvec4 in raw bits
 - Add match support for non variants, as well as fallthrough cases and `when` clauses
+- Add website link to playground
 
 ## Remaining Tasks
 
@@ -23,7 +24,6 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - Add support for LSP hover or something like an [inspect]
 - Typechecking (Church-typed LC -> HM -> Size dependent)
 - Closure Conversion (turn closures into explicit struct passing)
-- Lowering (ADTs/matches into tagged unions/switches)
 - Swizzle syntax or some kind of rank polymorphism
 - Function `inlining` / `specialize` (but likely everything is specialized)
 - Dead code elimination
