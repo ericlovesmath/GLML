@@ -7,22 +7,19 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - Button to show GLSL output on mobile
 - Allow clicking through all passes in GLSL output window
 - Defunctionalization?
-- Implicit error field added to every function to propagate error color back
-- Move mod to nonbinop version as that is a gentype, add more builtins
 - BUG: main is mangled so make sure that doesn't happen, must be fixed to coord vec2
 - Add builtin GLSL function callers or GLSL extern libraries
 - Add user definable constrained functions?
 - Add mdbook and split off [play.glml-lang.com]
-- Syntax highlighting for variants
 - Copy pasting doesn't seem to work in vim mode, maybe its the ctrl+enter runner?
 - Vim mode some keys are wrong, like enter
 - Syntax highlighting for mdbook
 - uintBitsToFloat instead of fat structs to represent variants, instead storing as uvec4 in raw bits
-- Use switch/case for variants
 - Add match support for non variants, as well as fallthrough cases and `when` clauses
 
 ## Remaining Tasks
 
+- Implicit error field added to every function to propagate error color back
 - Add support for LSP hover or something like an [inspect]
 - Typechecking (Church-typed LC -> HM -> Size dependent)
 - Closure Conversion (turn closures into explicit struct passing)

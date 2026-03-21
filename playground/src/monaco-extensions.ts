@@ -138,6 +138,7 @@ export function registerGLML(): void {
       "match",
       "with",
       "type",
+      "of",
     ],
     constants: ["true", "false"],
     types: [
@@ -166,9 +167,9 @@ export function registerGLML(): void {
         [/#extern\b/, "keyword"],
         [/#[a-z]\w*/, "builtin"],
         [/'[a-zA-Z]\w*/, "typevar"],
-
+        [/[A-Z]\w*/, "constant"], // Variants
         [
-          /[a-zA-Z_]\w*/,
+          /[a-z_]\w*/,
           {
             cases: {
               "@keywords": "keyword",
@@ -181,7 +182,8 @@ export function registerGLML(): void {
 
         [/\d+\.?\d*/, "number"],
         [/->|<=|>=|==|&&|\|\|/, "operator"],
-        [/[+\-*/%<>=|]/, "operator"],
+        [/\|/, "operator"],
+        [/[+\-*/%<>=]/, "operator"],
         [/[(){}[\].,;:']/, "delimiter"],
       ],
     },
