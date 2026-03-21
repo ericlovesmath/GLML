@@ -10,13 +10,11 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - BUG: main is mangled so make sure that doesn't happen, must be fixed to coord vec2
 - Add builtin GLSL function callers or GLSL extern libraries
 - Add user definable constrained functions?
-- Add mdbook and split off [play.glml-lang.com]
 - Copy pasting doesn't seem to work in vim mode, maybe its the ctrl+enter runner?
 - Vim mode some keys are wrong, like enter
-- Syntax highlighting for mdbook
 - uintBitsToFloat instead of fat structs to represent variants, instead storing as uvec4 in raw bits
 - Add match support for non variants, as well as fallthrough cases and `when` clauses
-- Add website link to playground
+- Validate if extern variables are in a constant term on output, which might not be possible?
 
 ## Remaining Tasks
 

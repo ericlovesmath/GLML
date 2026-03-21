@@ -3,3 +3,6 @@ authors = []
 language = "en"
 src = "src"
 title = "GLML"
+
+[output.html]
+additional-js = ["theme/glml.js"]
