@@ -256,15 +256,22 @@ let rec string_of_stmt = function
   | Break -> "break;"
   | SwitchStmt (scrut, cases) ->
     let scrut = string_of_term scrut in
+    let n = List.length cases in
+    (* TODO: It's a little weird to hardcode switch statements to
+       only label by ints in order, but this is just because we
+       only use this to lower tagged structs. Once we need switches
+       for something else, we need to change it. Until then... *)
     let cases =
-      List.map cases ~f:(fun (i, stmts) ->
+      List.mapi cases ~f:(fun idx (i, stmts) ->
         let body =
           stmts
           |> List.map ~f:string_of_stmt
           |> List.map ~f:indent
           |> String.concat ~sep:"\n"
         in
-        [%string "case %{i#Int}: {\n%{body}\n}"])
+        if idx = n - 1
+        then [%string "default: {\n%{body}\n}"]
+        else [%string "case %{i#Int}: {\n%{body}\n}"])
       |> List.map ~f:indent
       |> String.concat ~sep:"\n"
     in
