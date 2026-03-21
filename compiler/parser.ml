@@ -569,20 +569,19 @@ let top_record_p =
     st
 ;;
 
-(* TODO: Lexer ignoring whitespace naturally means it is requierd to put
-   a leader [|] for all variant type defs, which seems bad *)
 let top_variant_p =
   with_top_loc
     (let%bind _ = tok TYPE in
      let%bind id = ident_p in
      let%bind _ = tok EQ in
      let%bind ctors =
-       (* TODO: Have first bar be optional *)
-       many1
-         (let%bind _ = tok BAR in
-          let%bind ctor = constructor_p in
-          let%bind args = tok OF *> sep_by1 (tok MUL) ty_p <|> return [] in
-          return (ctor, args))
+       let ctor_p =
+         let%bind ctor = constructor_p in
+         let%bind args = tok OF *> sep_by1 (tok MUL) ty_p <|> return [] in
+         return (ctor, args)
+       in
+       let%bind _ = optional (tok BAR) in
+       sep_by1 (tok BAR) ctor_p
      in
      return (TypeDef (id, VariantDecl ctors)))
   <??> "top_variant"
@@ -610,9 +609,7 @@ let%expect_test "glml parse tests" =
 
     type point = { x : float, y : int }
 
-    type shape =
-      | Circle of int * float
-      | Triangle
+    type shape = Circle of int * float | Triangle
 
     let a_struct = { x = 0.0, y = 0 }
     let toplevel = 1 + 2
