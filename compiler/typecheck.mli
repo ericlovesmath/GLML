@@ -1,6 +1,23 @@
 open Core
 open Stlc
 
+type ty =
+  | TyFloat
+  | TyInt
+  | TyBool
+  | TyVec of int
+  | TyMat of int * int
+  | TyArrow of ty * ty
+  | TyRecord of string
+  | TyVariant of string
+  | TyVar of string
+[@@deriving sexp_of, equal]
+
+type type_decl =
+  | RecordDecl of (string * ty) list
+  | VariantDecl of (string * ty list) list
+[@@deriving sexp_of]
+
 type type_class =
   | GenType
   | GenBType
@@ -68,7 +85,7 @@ type top =
 [@@deriving sexp_of]
 
 type t = Program of top list [@@deriving sexp_of]
-type substitution = (string * Stlc.ty) list
+type substitution = (string * ty) list
 
 (** Applies a [substitution] to all type annotations in a typed [term].
     Used by [Monomorphize] to instantiate polymorphic bindings at concrete types. *)

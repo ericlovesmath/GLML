@@ -8,8 +8,7 @@ type ty =
   | TyVec of int
   | TyMat of int * int
   | TyArrow of ty * ty
-  | TyRecord of string
-  | TyVariant of string
+  | TyName of string
   | TyVar of string
 [@@deriving equal]
 
@@ -20,8 +19,7 @@ let rec sexp_of_ty = function
   | TyVec i -> List [ Atom "vec"; Atom (Int.to_string i) ]
   | TyMat (x, y) -> List [ Atom "mat"; Atom (Int.to_string x); Atom (Int.to_string y) ]
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
-  | TyRecord s -> Atom s
-  | TyVariant s -> Atom s
+  | TyName s -> Atom s
   | TyVar v -> Atom ("'" ^ v)
 ;;
 

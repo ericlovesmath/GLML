@@ -5,8 +5,7 @@ type ty =
   | TyVec of int
   | TyMat of int * int
   | TyArrow of ty * ty
-  | TyRecord of string
-  | TyVariant of string
+  | TyName of string
   | TyVar of string
 [@@deriving sexp_of, equal]
 

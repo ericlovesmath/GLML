@@ -6,6 +6,35 @@ open Sexplib.Sexp
 open Stlc
 open Or_error.Let_syntax
 
+type ty =
+  | TyFloat
+  | TyInt
+  | TyBool
+  | TyVec of int
+  | TyMat of int * int
+  | TyArrow of ty * ty
+  | TyRecord of string
+  | TyVariant of string
+  | TyVar of string
+[@@deriving equal]
+
+let rec sexp_of_ty = function
+  | TyFloat -> Atom "float"
+  | TyInt -> Atom "int"
+  | TyBool -> Atom "bool"
+  | TyVec i -> List [ Atom "vec"; Atom (Int.to_string i) ]
+  | TyMat (x, y) -> List [ Atom "mat"; Atom (Int.to_string x); Atom (Int.to_string y) ]
+  | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
+  | TyRecord s -> Atom s
+  | TyVariant s -> Atom s
+  | TyVar v -> Atom ("'" ^ v)
+;;
+
+type type_decl =
+  | RecordDecl of (string * ty) list
+  | VariantDecl of (string * ty list) list
+[@@deriving sexp_of]
+
 (** Internal typeclasses grouping GLSL types by their supported operations
     Most of the typeclasses are borrowed directly from GLSL *)
 type type_class =
@@ -58,31 +87,24 @@ and term =
   }
 
 let sexp_of_constr_desc = function
-  | Eq (l, r) -> List [ Stlc.sexp_of_ty l; Atom "~"; Stlc.sexp_of_ty r ]
-  | HasClass (cls, ty) -> List [ sexp_of_type_class cls; Stlc.sexp_of_ty ty ]
+  | Eq (l, r) -> List [ sexp_of_ty l; Atom "~"; sexp_of_ty r ]
+  | HasClass (cls, ty) -> List [ sexp_of_type_class cls; sexp_of_ty ty ]
   | Broadcast (l, r, ret) ->
-    List [ Atom "Broadcast"; Stlc.sexp_of_ty l; Stlc.sexp_of_ty r; Stlc.sexp_of_ty ret ]
+    List [ Atom "Broadcast"; sexp_of_ty l; sexp_of_ty r; sexp_of_ty ret ]
   | MulBroadcast (l, r, ret) ->
-    List
-      [ Atom "MulBroadcast"; Stlc.sexp_of_ty l; Stlc.sexp_of_ty r; Stlc.sexp_of_ty ret ]
+    List [ Atom "MulBroadcast"; sexp_of_ty l; sexp_of_ty r; sexp_of_ty ret ]
   | IndexAccess (t, i, ret) ->
-    List
-      [ Atom "IndexAccess"
-      ; Stlc.sexp_of_ty t
-      ; Atom (Int.to_string i)
-      ; Stlc.sexp_of_ty ret
-      ]
+    List [ Atom "IndexAccess"; sexp_of_ty t; Atom (Int.to_string i); sexp_of_ty ret ]
   | FieldAccess (t, f, ret) ->
-    List [ Atom "FieldAccess"; Stlc.sexp_of_ty t; Atom f; Stlc.sexp_of_ty ret ]
+    List [ Atom "FieldAccess"; sexp_of_ty t; Atom f; sexp_of_ty ret ]
 ;;
 
 let sexp_of_constr (c : constr) = sexp_of_constr_desc c.desc
 
 let sexp_of_forall_ty constrs ty =
   if List.is_empty constrs
-  then Stlc.sexp_of_ty ty
-  else
-    List [ Atom "forall"; List (List.map constrs ~f:sexp_of_constr); Stlc.sexp_of_ty ty ]
+  then sexp_of_ty ty
+  else List [ Atom "forall"; List (List.map constrs ~f:sexp_of_constr); sexp_of_ty ty ]
 ;;
 
 let rec sexp_of_term_desc = function
@@ -125,7 +147,7 @@ let rec sexp_of_term_desc = function
     in
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
 
-and sexp_of_term t = List [ sexp_of_term_desc t.desc; Atom ":"; Stlc.sexp_of_ty t.ty ]
+and sexp_of_term t = List [ sexp_of_term_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
 
 type top_desc =
   | Define of recur * string * term
@@ -443,22 +465,27 @@ let rec is_value (t : Stlc.term) : bool =
   | App _ | Let _ | If _ | Bop _ | Builtin _ | Match _ -> false
 ;;
 
-(** Build a function type from lambda param annotations and a return type. *)
-let rec build_function_type (term : Stlc.term) (ret_ty : ty) : ty =
-  match term.desc with
-  | Lam (_, Some param_ty, body) -> TyArrow (param_ty, build_function_type body ret_ty)
-  | Lam (_, None, body) -> TyArrow (fresh_tyvar (), build_function_type body ret_ty)
-  | _ -> ret_ty
+let rec resolve_stlc_ty (variants : 'a String.Map.t) (t : Stlc.ty) : ty =
+  match t with
+  | TyName s when Map.mem variants s -> TyVariant s
+  | TyName s -> TyRecord s
+  | TyArrow (l, r) -> TyArrow (resolve_stlc_ty variants l, resolve_stlc_ty variants r)
+  | TyFloat -> TyFloat
+  | TyInt -> TyInt
+  | TyBool -> TyBool
+  | TyVec n -> TyVec n
+  | TyMat (n, m) -> TyMat (n, m)
+  | TyVar v -> TyVar v
 ;;
 
-(** Replaces [TyRecord x] with [TyVariant x] when [x] is a variant.
-    The parser can't distinguish records from variants so we fix it here.
-    TODO: Definitely remove this behavior in parser *)
-let rec resolve_ty variants ty =
-  match ty with
-  | TyRecord s when Map.mem variants s -> TyVariant s
-  | TyArrow (l, r) -> TyArrow (resolve_ty variants l, resolve_ty variants r)
-  | _ -> ty
+(** Build a function type from lambda param annotations and a return type. *)
+let rec build_function_type variants (term : Stlc.term) (ret_ty : ty) : ty =
+  match term.desc with
+  | Lam (_, Some param_ty, body) ->
+    TyArrow (resolve_stlc_ty variants param_ty, build_function_type variants body ret_ty)
+  | Lam (_, None, body) ->
+    TyArrow (fresh_tyvar (), build_function_type variants body ret_ty)
+  | _ -> ret_ty
 ;;
 
 (* TODO; There has to be a way that doesn't involving passing 4 million params *)
@@ -472,10 +499,10 @@ let rec infer_binding
           (bind_stlc : Stlc.term)
           (recur : recur)
           (v : string)
-          (return_ty : ty option)
+          (return_ty : Stlc.ty option)
   : (term * ty * context * constr list * constr list) Or_error.t
   =
-  let return_ty = Option.map return_ty ~f:(resolve_ty variants) in
+  let return_ty = Option.map return_ty ~f:(resolve_stlc_ty variants) in
   let ty_v_opt =
     match recur with
     | Nonrec -> None
@@ -483,7 +510,7 @@ let rec infer_binding
       Some
         (match return_ty with
          | None -> fresh_tyvar ()
-         | Some ret_ty -> build_function_type bind_stlc ret_ty)
+         | Some ret_ty -> build_function_type variants bind_stlc ret_ty)
   in
   let ctx_gen =
     match ty_v_opt with
@@ -500,7 +527,7 @@ let rec infer_binding
     in
     match recur, return_ty with
     | Nonrec, Some ret_ty ->
-      constr (Eq (build_function_type bind_stlc ret_ty, bind.ty)) :: rec_constrs
+      constr (Eq (build_function_type variants bind_stlc ret_ty, bind.ty)) :: rec_constrs
     | _ -> rec_constrs
   in
   let%bind sub_bind, deferred = solve structs constrs in
@@ -538,7 +565,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Or_erro
   | Lam (v, ty_ann, body) ->
     let ty_v =
       match ty_ann with
-      | Some t -> resolve_ty variants t
+      | Some t -> resolve_stlc_ty variants t
       | None -> fresh_tyvar ()
     in
     let ctx = Map.set ctx ~key:v ~data:([], [], ty_v) in
@@ -895,10 +922,14 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
             in
             Ok (ctx, structs, variants, top :: acc))
         | Extern (ty, v) ->
+          let ty = resolve_stlc_ty variants ty in
           let ctx = Map.set ctx ~key:v ~data:([], [], ty) in
           let top = { desc = Extern v; ty; loc = top.loc; scheme_constrs = [] } in
           Ok (ctx, structs, variants, top :: acc)
-        | TypeDef (name, RecordDecl fields) ->
+        | TypeDef (name, Stlc.RecordDecl fields) ->
+          let fields =
+            List.map fields ~f:(fun (f, ty) -> f, resolve_stlc_ty variants ty)
+          in
           let structs = Map.set structs ~key:name ~data:fields in
           let top =
             { desc = TypeDef (name, RecordDecl fields)
@@ -908,7 +939,11 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
             }
           in
           Ok (ctx, structs, variants, top :: acc)
-        | TypeDef (name, VariantDecl ctors) ->
+        | TypeDef (name, Stlc.VariantDecl ctors) ->
+          let ctors =
+            List.map ctors ~f:(fun (c, tys) ->
+              c, List.map tys ~f:(resolve_stlc_ty variants))
+          in
           let variants = Map.set variants ~key:name ~data:ctors in
           let top =
             { desc = TypeDef (name, VariantDecl ctors)
