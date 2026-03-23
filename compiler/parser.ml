@@ -65,10 +65,7 @@ let ty_singles_p =
     | BOOL -> Some TyBool
     | INT -> Some TyInt
     | FLOAT -> Some TyFloat
-    (* TODO: Right now [typecheck] reinterprets TyRecords into TyVariant once it checks
-       this, but there should probably some type that [Typecheck] generates while the
-       [Stlc] type just has some a generic [TyName]. This is kind of hacky. *)
-    | ID s -> Some (TyRecord s)
+    | ID s -> Some (TyName s)
     | TYVAR v -> Some (TyVar v)
     | _ -> None)
   <??> "ty_single"

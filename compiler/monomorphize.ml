@@ -5,14 +5,16 @@ open Or_error.Let_syntax
 
 (* TODO: Remove [exn] functions and make this proper [Or_error.t] *)
 
-let rec has_tyvars (ty : ty) : bool =
+let rec has_tyvars (ty : Typecheck.ty) : bool =
   match ty with
   | TyVar _ -> true
   | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ | TyVariant _ -> false
   | TyArrow (a, b) -> has_tyvars a || has_tyvars b
 ;;
 
-let rec subst ~(poly : ty) ~(concrete : ty) : (string * ty) list =
+let rec subst ~(poly : Typecheck.ty) ~(concrete : Typecheck.ty)
+  : (string * Typecheck.ty) list
+  =
   match poly, concrete with
   | TyVar v, _ -> [ v, concrete ]
   | TyArrow (l, r), TyArrow (l', r') ->
@@ -21,7 +23,7 @@ let rec subst ~(poly : ty) ~(concrete : ty) : (string * ty) list =
 ;;
 
 (** String suffix to add to generated functions *)
-let rec mangle_ty (ty : ty) : string =
+let rec mangle_ty (ty : Typecheck.ty) : string =
   match ty with
   | TyFloat -> "float"
   | TyInt -> "int"
@@ -35,8 +37,8 @@ let rec mangle_ty (ty : ty) : string =
 ;;
 
 (** Collect all concrete types a variable is used at in a term *)
-let collect_var_usages (name : string) (t : Typecheck.term) : ty list =
-  let rec walk (acc : ty list) (t : Typecheck.term) : ty list =
+let collect_var_usages (name : string) (t : Typecheck.term) : Typecheck.ty list =
+  let rec walk (acc : Typecheck.ty list) (t : Typecheck.term) : Typecheck.ty list =
     let acc =
       match t.desc with
       | Var v when String.equal v name -> t.ty :: acc
@@ -58,7 +60,7 @@ let collect_var_usages (name : string) (t : Typecheck.term) : ty list =
       List.fold cases ~init:acc ~f:(fun acc (_, _, body) -> walk acc body)
   in
   let usages = walk [] t in
-  List.stable_dedup usages ~compare:(fun a b -> if equal_ty a b then 0 else 1)
+  List.stable_dedup usages ~compare:(fun a b -> if Typecheck.equal_ty a b then 0 else 1)
 ;;
 
 (** Rename variable references from old_name to new_name *)
@@ -98,14 +100,14 @@ let rec rename_var (src : string) (dst : string) (t : Typecheck.term) : Typechec
 let rec rewrite_var_at_type
           (name : string)
           (new_name : string)
-          (target_ty : ty)
+          (target_ty : Typecheck.ty)
           (t : Typecheck.term)
   : Typecheck.term
   =
   let rewrite = rewrite_var_at_type name new_name target_ty in
   let desc : Typecheck.term_desc =
     match t.desc with
-    | Var v when String.equal v name && equal_ty t.ty target_ty -> Var new_name
+    | Var v when String.equal v name && Typecheck.equal_ty t.ty target_ty -> Var new_name
     | Var _ | Float _ | Int _ | Bool _ -> t.desc
     | Vec (n, ts) -> Vec (n, List.map ts ~f:rewrite)
     | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:rewrite)
@@ -137,7 +139,7 @@ let rec rewrite_var_at_type
 
 (** Read-only info about a polymorphic definition *)
 type poly_def =
-  { poly_type : ty
+  { poly_type : Typecheck.ty
   ; poly_bind : Typecheck.term
   ; poly_recur : recur
   ; poly_loc : Lexer.loc
@@ -147,10 +149,12 @@ type poly_def =
 type poly_env = poly_def String.Map.t
 
 (** Tracks which specializations have been generated: poly_name -> [(concrete_ty, spec_name)] *)
-type spec_map = (ty * string) list String.Map.t
+type spec_map = (Typecheck.ty * string) list String.Map.t
 
 (** Collect all (poly_name, concrete_ty) pairs where name is in poly_env and ty has no tyvars *)
-let collect_poly_refs (poly_env : poly_env) (t : Typecheck.term) : (string * ty) list =
+let collect_poly_refs (poly_env : poly_env) (t : Typecheck.term)
+  : (string * Typecheck.ty) list
+  =
   let rec walk acc (t : Typecheck.term) =
     let acc =
       match t.desc with
@@ -175,16 +179,20 @@ let collect_poly_refs (poly_env : poly_env) (t : Typecheck.term) : (string * ty)
   let refs = walk [] t in
   List.stable_dedup refs ~compare:(fun (n1, t1) (n2, t2) ->
     let c = String.compare n1 n2 in
-    if c <> 0 then c else if equal_ty t1 t2 then 0 else 1)
+    if c <> 0 then c else if Typecheck.equal_ty t1 t2 then 0 else 1)
 ;;
 
-let find_spec (env : spec_map) (name : string) (ty : ty) : string option =
+let find_spec (env : spec_map) (name : string) (ty : Typecheck.ty) : string option =
   Map.find env name
   |> Option.bind
-       ~f:(List.find_map ~f:(fun (t, n) -> if equal_ty t ty then Some n else None))
+       ~f:
+         (List.find_map ~f:(fun (t, n) ->
+            if Typecheck.equal_ty t ty then Some n else None))
 ;;
 
-let add_spec (env : spec_map) (name : string) (ty : ty) (spec_name : string) : spec_map =
+let add_spec (env : spec_map) (name : string) (ty : Typecheck.ty) (spec_name : string)
+  : spec_map
+  =
   let specs = Option.value (Map.find env name) ~default:[] in
   Map.set env ~key:name ~data:((ty, spec_name) :: specs)
 ;;
@@ -196,7 +204,7 @@ let rec resolve_spec
           (poly_env : poly_env)
           (env : spec_map)
           (name : string)
-          (concrete_ty : ty)
+          (concrete_ty : Typecheck.ty)
   : spec_map * string * Typecheck.top list
   =
   match find_spec env name concrete_ty with
@@ -450,7 +458,7 @@ let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
 
 type t = Program of top list [@@deriving sexp_of]
 
-let rec ty_of_stlc (t : Stlc.ty) : ty Or_error.t =
+let rec ty_of (t : Typecheck.ty) : ty Or_error.t =
   match t with
   | TyVar _ -> error_s [%message "monomorphize: unexpected TyVar after monomorphization"]
   | TyFloat -> Ok TyFloat
@@ -461,13 +469,13 @@ let rec ty_of_stlc (t : Stlc.ty) : ty Or_error.t =
   | TyRecord s -> Ok (TyRecord s)
   | TyVariant s -> Ok (TyVariant s)
   | TyArrow (a, b) ->
-    let%bind a = ty_of_stlc a in
-    let%bind b = ty_of_stlc b in
+    let%bind a = ty_of a in
+    let%bind b = ty_of b in
     Ok (TyArrow (a, b))
 ;;
 
 let rec term_of_tc (t : Typecheck.term) : term Or_error.t =
-  let%bind ty = ty_of_stlc t.ty in
+  let%bind ty = ty_of t.ty in
   let%bind desc = term_desc_of_tc t.desc in
   Ok ({ desc; ty; loc = t.loc } : term)
 
@@ -484,7 +492,7 @@ and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Or_error.t =
     let%map ts = Or_error.all (List.map ts ~f:term_of_tc) in
     Mat (n, m, ts)
   | Lam (v, lam_ty, body) ->
-    let%bind lam_ty = ty_of_stlc lam_ty in
+    let%bind lam_ty = ty_of lam_ty in
     let%bind body = term_of_tc body in
     Ok (Lam (v, lam_ty, body))
   | App (f, x) ->
@@ -534,7 +542,7 @@ and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Or_error.t =
 ;;
 
 let top_of_tc (t : Typecheck.top) : top Or_error.t =
-  let%bind ty = ty_of_stlc t.ty in
+  let%bind ty = ty_of t.ty in
   let%bind desc =
     match t.desc with
     | Define (r, v, bind) ->
@@ -544,7 +552,7 @@ let top_of_tc (t : Typecheck.top) : top Or_error.t =
     | TypeDef (name, RecordDecl fields) ->
       let%map fields =
         List.map fields ~f:(fun (field_name, field_ty) ->
-          let%map field_ty = ty_of_stlc field_ty in
+          let%map field_ty = ty_of field_ty in
           field_name, field_ty)
         |> Or_error.all
       in
@@ -553,7 +561,7 @@ let top_of_tc (t : Typecheck.top) : top Or_error.t =
       let%map ctors =
         ctors
         |> List.map ~f:(fun (ctor_name, tys) ->
-          let%map tys = Or_error.all (List.map tys ~f:ty_of_stlc) in
+          let%map tys = Or_error.all (List.map tys ~f:ty_of) in
           ctor_name, tys)
         |> Or_error.all
       in
