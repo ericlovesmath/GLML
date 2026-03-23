@@ -83,51 +83,71 @@ let rec placeholder_value_for_ty (env : record_env) (ty : Monomorphize.ty)
       [%message "translate: arrow types should not be in tail" (ty : Monomorphize.ty)]
 ;;
 
-(* TODO: Factor out [translate_effect] or something like that for [if/switch] *)
+let translate_return
+      (translate_sub : Lower_variants.anf -> stmt list Or_error.t)
+      (k : term -> stmt)
+      (t : Lower_variants.term)
+  : stmt list Or_error.t
+  =
+  match t.desc with
+  | If (c, t, e) ->
+    let%bind t = translate_sub t in
+    let%bind e = translate_sub e in
+    Ok [ IfStmt (to_glsl_atom c, Block t, Some (Block e)) ]
+  | Switch (tag, cases) ->
+    let%map cases =
+      cases
+      |> List.map ~f:(fun (i, case_anf) ->
+        let%map stmts = translate_sub case_anf in
+        i, stmts @ [ Break ])
+      |> Or_error.all
+    in
+    [ SwitchStmt (to_glsl_atom tag, cases) ]
+  | _ ->
+    let%map t = to_glsl_term t in
+    [ k t ]
+;;
 
-let rec translate_set (env : record_env) (var : string) (anf : Lower_variants.anf)
+let rec translate_let
+          (env : record_env)
+          (v : string)
+          (bind : Lower_variants.term)
+          (ty : ty)
+          (tail : stmt list)
+  : stmt list Or_error.t
+  =
+  match bind.desc with
+  | If (c, t, e) ->
+    let%bind placeholder = placeholder_value_for_ty env bind.ty in
+    let%bind t = translate_set env v t in
+    let%bind e = translate_set env v e in
+    Ok
+      (Decl (None, ty, v, placeholder)
+       :: IfStmt (to_glsl_atom c, Block t, Some (Block e))
+       :: tail)
+  | Switch (tag, cases) ->
+    let%bind placeholder = placeholder_value_for_ty env bind.ty in
+    let%bind cases =
+      cases
+      |> List.map ~f:(fun (i, case) ->
+        let%map stmts = translate_set env v case in
+        i, stmts @ [ Break ])
+      |> Or_error.all
+    in
+    Ok (Decl (None, ty, v, placeholder) :: SwitchStmt (to_glsl_atom tag, cases) :: tail)
+  | _ ->
+    let%map bind = to_glsl_term bind in
+    Decl (None, ty, v, bind) :: tail
+
+and translate_set (env : record_env) (var : string) (anf : Lower_variants.anf)
   : stmt list Or_error.t
   =
   match anf.desc with
   | Let (v, term, body) ->
     let%bind ty = to_glsl_ty term.ty in
-    (match term.desc with
-     | Switch (tag, switch_cases) ->
-       let%bind placeholder = placeholder_value_for_ty env term.ty in
-       let%bind glsl_cases =
-         switch_cases
-         |> List.map ~f:(fun (i, case_anf) ->
-           let%map stmts = translate_set env v case_anf in
-           i, stmts @ [ Break ])
-         |> Or_error.all
-       in
-       let%bind tail = translate_set env var body in
-       Ok
-         (Decl (None, ty, v, placeholder)
-          :: SwitchStmt (to_glsl_atom tag, glsl_cases)
-          :: tail)
-     | _ ->
-       let%bind term = to_glsl_term term in
-       let%bind tail = translate_set env var body in
-       Ok (Decl (None, ty, v, term) :: tail))
-  | Return t ->
-    (match t.desc with
-     | If (c, t, e) ->
-       let%bind t = translate_set env var t in
-       let%bind e = translate_set env var e in
-       Ok [ IfStmt (to_glsl_atom c, Block t, Some (Block e)) ]
-     | Switch (tag, switch_cases) ->
-       let%map glsl_cases =
-         switch_cases
-         |> List.map ~f:(fun (i, case_anf) ->
-           let%map stmts = translate_set env var case_anf in
-           i, stmts @ [ Break ])
-         |> Or_error.all
-       in
-       [ SwitchStmt (to_glsl_atom tag, glsl_cases) ]
-     | _ ->
-       let%map t = to_glsl_term t in
-       [ Set (Var var, t) ])
+    let%bind tail = translate_set env var body in
+    translate_let env v term ty tail
+  | Return t -> translate_return (translate_set env var) (fun t -> Set (Var var, t)) t
   | While (cond, body, tail) ->
     let%bind cond = to_glsl_term cond in
     let%bind body = translate_block env body in
@@ -140,52 +160,11 @@ let rec translate_set (env : record_env) (var : string) (anf : Lower_variants.an
 
 and translate_block (env : record_env) (anf : Lower_variants.anf) : stmt list Or_error.t =
   match anf.desc with
-  | Let (v, term, body) ->
-    let%bind ty = to_glsl_ty term.ty in
-    let%bind body = translate_block env body in
-    (match term.desc with
-     | If (c, t, e) ->
-       let%bind placeholder = placeholder_value_for_ty env term.ty in
-       let%bind t = translate_set env v t in
-       let%bind e = translate_set env v e in
-       Ok
-         (Decl (None, ty, v, placeholder)
-          :: IfStmt (to_glsl_atom c, Block t, Some (Block e))
-          :: body)
-     | Switch (tag, switch_cases) ->
-       let%bind placeholder = placeholder_value_for_ty env term.ty in
-       let%bind glsl_cases =
-         switch_cases
-         |> List.map ~f:(fun (i, case_anf) ->
-           let%map stmts = translate_set env v case_anf in
-           i, stmts @ [ Break ])
-         |> Or_error.all
-       in
-       Ok
-         (Decl (None, ty, v, placeholder)
-          :: SwitchStmt (to_glsl_atom tag, glsl_cases)
-          :: body)
-     | _ ->
-       let%map term = to_glsl_term term in
-       Decl (None, ty, v, term) :: body)
-  | Return t ->
-    (match t.desc with
-     | If (c, t, e) ->
-       let%bind t = translate_block env t in
-       let%bind e = translate_block env e in
-       Ok [ IfStmt (to_glsl_atom c, Block t, Some (Block e)) ]
-     | Switch (tag, switch_cases) ->
-       let%map glsl_cases =
-         switch_cases
-         |> List.map ~f:(fun (i, case_anf) ->
-           let%map stmts = translate_block env case_anf in
-           i, stmts @ [ Break ])
-         |> Or_error.all
-       in
-       [ SwitchStmt (to_glsl_atom tag, glsl_cases) ]
-     | _ ->
-       let%map t = to_glsl_term t in
-       [ Return (Some t) ])
+  | Let (v, bind, body) ->
+    let%bind ty = to_glsl_ty bind.ty in
+    let%bind tail = translate_block env body in
+    translate_let env v bind ty tail
+  | Return t -> translate_return (translate_block env) (fun t -> Return (Some t)) t
   | While (cond, body, tail) ->
     let%bind cond = to_glsl_term cond in
     let%bind body = translate_block env body in
