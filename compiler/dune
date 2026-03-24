@@ -17,6 +17,7 @@
    anf
    tail_call
    lower_variants
+   promote_ints
    translate
    patch_main
    glsl)

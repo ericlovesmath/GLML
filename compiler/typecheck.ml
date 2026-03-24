@@ -356,6 +356,7 @@ let resolve_constraints structs (constrs : constr list)
        | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
        | TyFloat, TyFloat -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
        | TyInt, TyInt -> aux deferred ((loc, ret, TyInt) :: eqs) rest
+       | TyInt, TyFloat | TyFloat, TyInt -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
        | TyVec n, TyVec n' when n = n' -> aux deferred ((loc, ret, TyVec n) :: eqs) rest
        | TyFloat, TyVec n | TyVec n, TyFloat ->
          aux deferred ((loc, ret, TyVec n) :: eqs) rest
@@ -381,6 +382,7 @@ let resolve_constraints structs (constrs : constr list)
          aux deferred ((loc, ret, TyVec y) :: eqs) rest
        | TyFloat, TyFloat -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
        | TyInt, TyInt -> aux deferred ((loc, ret, TyInt) :: eqs) rest
+       | TyInt, TyFloat | TyFloat, TyInt -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
        | TyVec n, TyVec n' when n = n' -> aux deferred ((loc, ret, TyVec n) :: eqs) rest
        | TyFloat, TyVec n | TyVec n, TyFloat ->
          aux deferred ((loc, ret, TyVec n) :: eqs) rest
@@ -711,7 +713,9 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Or_erro
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
         let%bind arg, constrs = gen_term structs variants ctx arg in
-        return (arg :: acc_args, (constr (Eq (arg.ty, TyFloat)) :: constrs) @ acc_constrs))
+        return
+          ( arg :: acc_args
+          , (constr (HasClass (Comparable, arg.ty)) :: constrs) @ acc_constrs ))
     in
     let args = List.rev args in
     if List.length args = n
@@ -721,7 +725,9 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Or_erro
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
         let%bind arg, constrs = gen_term structs variants ctx arg in
-        return (arg :: acc_args, (constr (Eq (arg.ty, TyFloat)) :: constrs) @ acc_constrs))
+        return
+          ( arg :: acc_args
+          , (constr (HasClass (Comparable, arg.ty)) :: constrs) @ acc_constrs ))
     in
     let args = List.rev args in
     if List.length args = n * m

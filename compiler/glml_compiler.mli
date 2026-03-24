@@ -12,6 +12,7 @@ module Passes : sig
     | Anf
     | Tail_call
     | Lower_variants
+    | Promote_ints
     | Translate
     | Patch_main
   [@@deriving sexp_of, enumerate, string]
