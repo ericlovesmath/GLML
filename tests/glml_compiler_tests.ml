@@ -954,3 +954,30 @@ let%expect_test "toplevel constant (atomic only)" =
     |};
   [%expect {| "translate: top-level constant must be atomic" |}]
 ;;
+
+let%expect_test "promotion of ints to floats" =
+  test
+    {|
+    let main (u : vec2) =
+      let b = 1 + 2 in
+      let a = b + 2. in
+      [b, a, 3]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 main_pure(vec2 u_0) {
+        int b_1 = (1 + 2);
+        float pf_5 = float(b_1);
+        float a_2 = (pf_5 + 2.);
+        float pf_6 = float(b_1);
+        return vec3(pf_6, a_2, 3.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;

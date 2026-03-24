@@ -364,6 +364,7 @@ type ty =
   | TyArrow of ty * ty
   | TyRecord of string
   | TyVariant of string
+[@@deriving equal]
 
 let rec sexp_of_ty = function
   | TyFloat -> Atom "float"

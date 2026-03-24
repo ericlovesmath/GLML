@@ -9,7 +9,7 @@ type ty =
   | TyArrow of ty * ty
   | TyRecord of string
   | TyVariant of string
-[@@deriving sexp_of]
+[@@deriving sexp_of, equal]
 
 type term_desc =
   | Var of string
