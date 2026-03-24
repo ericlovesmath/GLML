@@ -15,6 +15,8 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - uintBitsToFloat instead of fat structs to represent variants, instead storing as uvec4 in raw bits
 - Add match support for non variants, as well as fallthrough cases and `when` clauses
 - Validate if extern variables are in a constant term on output, which might not be possible?
+- Pairs and static arrays
+- Vectors can't be toplevel constants right now
 
 ## Remaining Tasks
 
@@ -38,6 +40,7 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - Set up Github org more
 - Vim/Emacs syntax file
 - Add language reference and examples to mdbook
+- TUI pass explorer with minttea (bug with conflicting minttea and Core naming preventing this)
 
 ## Potentially Interesting Thoughts
 
