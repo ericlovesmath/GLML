@@ -143,7 +143,6 @@ let float_p =
   <??> "float"
 ;;
 
-(* TODO: Maybe something like [-a] should convert to [-1 * a] *)
 let term_number_p =
   with_term_loc
     (let%bind sign = tok SUB *> return (-1) <|> tok ADD *> return 1 <|> return 1 in
@@ -355,11 +354,23 @@ and term_atom_p =
    <??> "term_atom")
     st
 
+and term_unary_neg_p =
+  fun st ->
+  (let%bind _, loc = with_loc (tok SUB) in
+   commit
+     (let%map (e : term) = term_postfix_p in
+      let neg_one : term = { desc = Int (-1); loc } in
+      let loc = Lexer.merge_loc loc e.loc in
+      ({ desc = Bop (Mul, neg_one, e); loc } : term))
+   <??> "term_unary_neg")
+    st
+
 and term_head_p =
   fun st ->
   (term_variant_p
    <|> term_atom_p
    <|> term_number_p
+   <|> term_unary_neg_p
    <|> between `Paren term_p
    <??> "term_head")
     st
@@ -469,6 +480,10 @@ let%expect_test "term parse tests" =
   test "fun (u : vec2) -> [ f 10.0 a , 0.0, 0.0 ]";
   test "f - 5";
   test "f (-5)";
+  test "-var";
+  test "- -x";
+  test "-5";
+  test "1 - -x";
   [%expect
     {|
     (Ok -113.)
@@ -481,6 +496,10 @@ let%expect_test "term parse tests" =
     (Ok (lambda (u ((vec 2))) (vec3 (app (app f 10.) a) 0. 0.)))
     (Ok (- f 5))
     (Ok (app f -5))
+    (Ok (* -1 var))
+    (Ok (* -1 (* -1 x)))
+    (Ok -5)
+    (Ok (- 1 (* -1 x)))
     |}];
   test "let f (x : bool) (y : bool) = x && y in f";
   test "let f = fun (x : bool) (y : bool) -> x && y in f";
