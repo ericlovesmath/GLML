@@ -110,8 +110,6 @@ type t = Program of top list
 
 let sexp_of_t (Program tops) = List (Atom "Program" :: List.map tops ~f:sexp_of_top)
 
-(* TODO: Create type excluding variants? *)
-
 type type_env = type_decl String.Map.t
 
 let rec lower_ty (ty : ty) : ty =
