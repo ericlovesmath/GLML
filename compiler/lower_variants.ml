@@ -1,9 +1,13 @@
 open Core
-open Or_error.Let_syntax
+open Compiler_error.Let_syntax
 open Anf
 open Sexplib.Sexp
 open Monomorphize
 open Tail_call
+
+module Err = Compiler_error.Pass (struct
+    let name = "lower_variants"
+  end)
 
 type term_desc =
   | Atom of atom
@@ -121,16 +125,16 @@ let rec lower_ty (ty : ty) : ty =
 
 (* TODO: Some fundamental changes might be needed to support
    higher ordered functions in structs/variants *)
-let placeholder_atom_for_ty (ty : ty) : Anf.atom Or_error.t =
+let placeholder_atom_for_ty (ty : ty) : Anf.atom Compiler_error.t =
   match ty with
   | TyFloat -> Ok (Float 0.0)
   | TyInt -> Ok (Int 0)
   | TyBool -> Ok (Bool false)
-  | _ -> error_s [%message "lower_variants: cannot create atom placeholder" (ty : ty)]
+  | _ -> Err.fail "cannot create atom placeholder" ~d:[%message (ty : ty)]
 ;;
 
 let find_ctor_info (tenv : type_env) (ctor : string)
-  : (int * (string * ty list) list) Or_error.t
+  : (int * (string * ty list) list) Compiler_error.t
   =
   Map.data tenv
   |> List.find_map ~f:(function
@@ -139,16 +143,14 @@ let find_ctor_info (tenv : type_env) (ctor : string)
       ctors
       |> List.findi ~f:(fun _ (c, _) -> String.equal c ctor)
       |> Option.map ~f:(fun (i, _) -> i, ctors))
-  |> Or_error.of_option
-       ~error:(Error.of_lazy_sexp (lazy [%message "lower_variants: unknown ctor" ctor]))
+  |> Err.of_option "unknown ctor" ~d:[%message (ctor : string)]
 ;;
 
-let find_tag (ctors : (string * ty list) list) (ctor : string) : int Or_error.t =
+let find_tag (ctors : (string * ty list) list) (ctor : string) : int Compiler_error.t =
   ctors
   |> List.findi ~f:(fun _ (c, _) -> String.equal c ctor)
   |> Option.map ~f:fst
-  |> Or_error.of_option
-       ~error:(Error.of_lazy_sexp (lazy [%message "lower_variants: unknown ctor" ctor]))
+  |> Err.of_option "unknown ctor" ~d:[%message (ctor : string)]
 ;;
 
 let prepend_var_decls
@@ -158,19 +160,19 @@ let prepend_var_decls
       (ctor : string)
       (vars : string list)
       (body : anf)
-  : anf Or_error.t
+  : anf Compiler_error.t
   =
   let%bind ctor_tys =
     match List.Assoc.find ctors ~equal:String.equal ctor with
     | Some tys -> Ok tys
-    | None -> error_s [%message "lower_variants: ctor not in ctors" ctor]
+    | None -> Err.fail "ctor not in ctors" ~loc ~d:[%message (ctor : string)]
   in
   let fields_with_tys =
     List.mapi ctor_tys ~f:(fun i ty -> [%string "%{ctor}_%{i#Int}"], lower_ty ty)
   in
   match List.zip vars fields_with_tys with
   | Unequal_lengths ->
-    error_s [%message "lower_variants: vars/ctor_tys length mismatch" ctor]
+    Err.fail "vars/ctor_tys length mismatch" ~loc ~d:[%message (ctor : string)]
   | Ok var_field_tys ->
     List.fold_right var_field_tys ~init:(Ok body) ~f:(fun (var, (name, ty)) acc ->
       let%map acc = acc in
@@ -187,7 +189,7 @@ let rec map_last_return (k : term -> anf) (anf : anf) : anf =
   | Continue -> anf
 ;;
 
-let rec lower_term (tenv : type_env) (term : Tail_call.term) : term Or_error.t =
+let rec lower_term (tenv : type_env) (term : Tail_call.term) : term Compiler_error.t =
   let pure desc = Ok ({ desc; ty = lower_ty term.ty; loc = term.loc } : term) in
   match term.desc with
   | Atom a -> pure (Atom a)
@@ -207,27 +209,26 @@ let rec lower_term (tenv : type_env) (term : Tail_call.term) : term Or_error.t =
     (match Map.find tenv ty_name with
      | Some (VariantDecl ctors) ->
        let%bind tag, _ =
-         let err =
-           lazy [%message "lower_variants: unknown constructor" ctor (ty_name : string)]
-         in
          ctors
          |> List.findi ~f:(fun _ (c, _) -> String.equal c ctor)
-         |> Or_error.of_option ~error:(Error.of_lazy_sexp err)
+         |> Err.of_option
+              "unknown constructor"
+              ~d:[%message (ctor : string) (ty_name : string)]
        in
        let%bind flat_atoms =
          ctors
          |> List.concat_map ~f:(fun (c, arg_tys) ->
            if String.equal c ctor
-           then List.map args ~f:return
+           then List.map args ~f:Compiler_error.return
            else List.map arg_tys ~f:placeholder_atom_for_ty)
-         |> Or_error.all
+         |> Compiler_error.all
        in
        pure (Record (ty_name, Anf.Int tag :: flat_atoms))
      | Some (RecordDecl _) | None ->
-       error_s [%message "lower_variants: unknown variant type" ty_name])
-  | Match _ -> error_s [%message "lower_variants: match should be handled in lower_anf"]
+       Err.fail "unknown variant type" ~d:[%message (ty_name : string)])
+  | Match _ -> Err.fail "match should be handled in lower_anf"
 
-and lower_anf (tenv : type_env) (anf : Tail_call.anf) : anf Or_error.t =
+and lower_anf (tenv : type_env) (anf : Tail_call.anf) : anf Compiler_error.t =
   let make desc : anf = { desc; ty = lower_ty anf.ty; loc = anf.loc } in
   let pure desc = Ok (make desc) in
   match anf.desc with
@@ -260,19 +261,17 @@ and lower_match
       (result_ty : ty)
       (loc : Lexer.loc)
       (k : term -> anf)
-  : anf Or_error.t
+  : anf Compiler_error.t
   =
   let result_ty = lower_ty result_ty in
-  let%bind first_ctor, _, _ =
-    List.hd cases |> Or_error.of_option ~error:(Error.of_string "lower_variants: hd exn")
-  in
+  let%bind first_ctor, _, _ = List.hd cases |> Err.of_option "empty cases" in
   let%bind _, ctors = find_ctor_info tenv first_ctor in
   let lower_case ctor vars body =
     let%bind lowered = lower_anf tenv body in
     prepend_var_decls ~scrut ~loc ~ctors ctor vars lowered
   in
   match cases with
-  | [] -> error_s [%message "lower_variants: empty cases"]
+  | [] -> Err.fail "empty cases"
   | [ (ctor, vars, body) ] ->
     let%bind branch = lower_case ctor vars body in
     Ok (map_last_return k branch)
@@ -283,7 +282,7 @@ and lower_match
         let%bind tag = find_tag ctors ctor in
         let%map branch = lower_case ctor vars body in
         tag, branch)
-      |> Or_error.all
+      |> Compiler_error.all
     in
     let tag_v = Utils.fresh "_lv_tag" in
     let tag_term : term = { desc = Field (scrut, "tag"); ty = TyInt; loc } in
@@ -293,7 +292,7 @@ and lower_match
     Ok ({ desc = Let (tag_v, tag_term, k switch_term); ty = result_ty; loc } : anf)
 ;;
 
-let lower_top (tenv : type_env) (top : Tail_call.top) : top Or_error.t =
+let lower_top (tenv : type_env) (top : Tail_call.top) : top Compiler_error.t =
   let pure desc = Ok ({ desc; ty = lower_ty top.ty; loc = top.loc } : top) in
   match top.desc with
   | TypeDef (name, VariantDecl ctors) ->
@@ -316,7 +315,7 @@ let lower_top (tenv : type_env) (top : Tail_call.top) : top Or_error.t =
     pure (Const (name, body))
 ;;
 
-let lower (Program tops : Tail_call.t) : t Or_error.t =
+let lower (Program tops : Tail_call.t) : t Compiler_error.t =
   let%bind tenv =
     tops
     |> List.filter_map ~f:(fun top ->
@@ -324,7 +323,8 @@ let lower (Program tops : Tail_call.t) : t Or_error.t =
       | TypeDef (s, decl) -> Some (s, decl)
       | Define _ | Extern _ | Const _ -> None)
     |> String.Map.of_alist_or_error
+    |> Err.of_or_error
   in
-  let%map tops = Or_error.all (List.map tops ~f:(lower_top tenv)) in
+  let%map tops = Compiler_error.all (List.map tops ~f:(lower_top tenv)) in
   Program tops
 ;;

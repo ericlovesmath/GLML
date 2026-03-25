@@ -1,4 +1,5 @@
 open Core
+module Compiler_error = Compiler_error
 
 (** Passes in compiler available to be dumped *)
 module Passes = struct
@@ -24,13 +25,17 @@ module Passes = struct
 end
 
 let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : string)
-  : string Or_error.t
+  : string Compiler_error.t
   =
   let trace pass sexp = Map.find dump pass |> Option.iter ~f:(fun f -> f sexp) in
-  let open Or_error.Let_syntax in
+  let open Compiler_error.Let_syntax in
   Utils.reset ();
-  let%bind tokens = Lexer.lex (Lexer.init s) in
-  let%bind t = Chomp.run Parser.glml_p tokens in
+  let%bind tokens =
+    Lexer.lex (Lexer.init s) |> Compiler_error.of_or_error ~pass:"lexer"
+  in
+  let%bind t =
+    Chomp.run Parser.glml_p tokens |> Compiler_error.of_or_error ~pass:"parser"
+  in
   trace Stlc (Stlc.sexp_of_t t);
   let%bind t = Uniquify.uniquify t in
   trace Uniquify (Stlc.sexp_of_t t);

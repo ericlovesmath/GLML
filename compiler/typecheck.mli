@@ -1,4 +1,3 @@
-open Core
 open Stlc
 
 type ty =
@@ -94,7 +93,7 @@ val subst_term : substitution -> term -> term
 (** Given a scheme's deferred constraints and a substitution mapping its tyvars
     to concrete types, applies [substitution], then solves the remaining constraints.
     Used by [Monomorphize] after instantiate polymorphic bindings. *)
-val solve_scheme_constrs : constr list -> substitution -> substitution Or_error.t
+val solve_scheme_constrs : constr list -> substitution -> substitution Compiler_error.t
 
 (** Typechecker using Hindley-Milner extended with GLSL-specific constraints.
 
@@ -114,4 +113,4 @@ val solve_scheme_constrs : constr list -> substitution -> substitution Or_error.
     - Type Inference with Constrained Types: [https://www.cs.tufts.edu/~nr/cs257/archive/martin-odersky/hmx.pdf]
     - Demystifying Typeclasses: [https://okmij.org/ftp/Computation/typeclass.html]
     *)
-val typecheck : Stlc.t -> t Or_error.t
+val typecheck : Stlc.t -> t Compiler_error.t

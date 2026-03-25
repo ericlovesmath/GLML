@@ -1,15 +1,19 @@
 open Core
 open Glsl
 
-let patch (Program funcs : t) : t Or_error.t =
-  let open Or_error.Let_syntax in
+module Err = Compiler_error.Pass (struct
+    let name = "patch_main"
+  end)
+
+let patch (Program funcs : t) : t Compiler_error.t =
+  let open Compiler_error.Let_syntax in
   let main_count =
     List.count funcs ~f:(function
       | Function { name = "main"; _ } -> true
       | _ -> false)
   in
   if main_count <> 1
-  then Or_error.error_string "patch_main: expected exactly one main function"
+  then Err.fail "expected exactly one main function"
   else (
     let%map funcs =
       List.map funcs ~f:(function
@@ -21,9 +25,9 @@ let patch (Program funcs : t) : t Or_error.t =
              ; body = _
              } as func) -> Ok (Function { func with name = "main_pure" })
         | Function { name = "main"; _ } as t ->
-          error_s [%message "patch_main: unexpected type of main" (t : decl)]
+          Err.fail "unexpected type of main" ~d:[%message (t : decl)]
         | decl -> Ok decl)
-      |> Or_error.all
+      |> Compiler_error.all
     in
     let patched_main =
       let body =

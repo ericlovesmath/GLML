@@ -1,4 +1,3 @@
-open Core
 open Anf
 
 type term_desc =
@@ -103,4 +102,4 @@ type t = Program of top list [@@deriving sexp_of]
   NOTE: The actual conversion occurs in [translate], but this step provides
   the information where relevant to do this
 *)
-val remove_rec : Anf.t -> t Or_error.t
+val remove_rec : Anf.t -> t Compiler_error.t

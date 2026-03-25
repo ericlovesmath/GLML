@@ -1,22 +1,23 @@
 open Core
 open Stlc
-open Or_error.Let_syntax
+open Compiler_error.Let_syntax
+
+module Err = Compiler_error.Pass (struct
+    let name = "uniquify"
+  end)
 
 type env = string String.Map.t
 
-let unbound_var_error v loc =
-  Error.of_lazy_sexp (lazy [%message "uniquify: unbound variable" v (loc : Lexer.loc)])
-;;
-
-let rec uniquify_term (ctx : env) (t : term) : term Or_error.t =
-  let pure desc : term Or_error.t = Ok { desc; loc = t.loc } in
+let rec uniquify_term (ctx : env) (t : term) : term Compiler_error.t =
+  let pure desc : term Compiler_error.t = Ok { desc; loc = t.loc } in
   let aux = uniquify_term ctx in
-  let aux_list ts = Or_error.all (List.map ~f:aux ts) in
+  let aux_list ts = Compiler_error.all (List.map ~f:aux ts) in
   match t.desc with
   | Float _ | Int _ | Bool _ -> pure t.desc
   | Var v ->
     let%bind v =
-      Map.find ctx v |> Or_error.of_option ~error:(unbound_var_error v t.loc)
+      Map.find ctx v
+      |> Err.of_option "unbound variable" ~loc:t.loc ~d:[%message (v : string)]
     in
     pure (Var v)
   | Lam (v, ty, body) ->
@@ -65,7 +66,7 @@ let rec uniquify_term (ctx : env) (t : term) : term Or_error.t =
       |> List.map ~f:(fun (f, t) ->
         let%map t = aux t in
         f, t)
-      |> Or_error.all
+      |> Compiler_error.all
     in
     pure (Record fields)
   | Field (t, f) ->
@@ -86,17 +87,16 @@ let rec uniquify_term (ctx : env) (t : term) : term Or_error.t =
         let%bind ctx =
           match ctx with
           | Ok ctx -> Ok ctx
-          | Unequal_lengths ->
-            Or_error.error_string "uniquify: unequal lengths, unreachable"
+          | Unequal_lengths -> Err.fail "unequal lengths, unreachable"
         in
         let%map body = uniquify_term ctx body in
         ctor, vs', body)
-      |> Or_error.all
+      |> Compiler_error.all
     in
     pure (Match (scrutinee, cases))
 ;;
 
-let uniquify_top (ctx : env) (t : top) : (env * top) Or_error.t =
+let uniquify_top (ctx : env) (t : top) : (env * top) Compiler_error.t =
   match t.desc with
   | Define (recur, v, return_ty, bind) ->
     let v' = Utils.fresh v in

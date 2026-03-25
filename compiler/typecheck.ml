@@ -4,7 +4,11 @@
 open Core
 open Sexplib.Sexp
 open Stlc
-open Or_error.Let_syntax
+open Compiler_error.Let_syntax
+
+module Err = Compiler_error.Pass (struct
+    let name = "typecheck"
+  end)
 
 type ty =
   | TyFloat
@@ -281,7 +285,7 @@ let generalize (ctx : context) (deferred : constr list) (ty : ty)
 ;;
 
 (** Unify two types into a substitution *)
-let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Or_error.t =
+let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t =
   match con with
   | [] -> return []
   | (loc, TyVar v, ty) :: con | (loc, ty, TyVar v) :: con ->
@@ -293,10 +297,7 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Or_error.t =
     if equal_ty (TyVar v) ty
     then unify con
     else if occurs_in ty
-    then
-      error_s
-        [%message
-          "typecheck: recursive unification" (loc : Lexer.loc) (v : string) (ty : ty)]
+    then Err.fail "recursive unification" ~loc ~d:[%message (v : string) (ty : ty)]
     else (
       let%bind sub =
         unify
@@ -309,8 +310,7 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Or_error.t =
   | (loc, ty, ty') :: con ->
     if equal_ty ty ty'
     then unify con
-    else
-      error_s [%message "typecheck: type mismatch" (loc : Lexer.loc) (ty : ty) (ty' : ty)]
+    else Err.fail "type mismatch" ~loc ~d:[%message (ty : ty) (ty' : ty)]
 ;;
 
 (** Validate if a concrete type belongs to a GLSL typeclass. *)
@@ -328,7 +328,7 @@ let check_class (cls : type_class) (ty : ty) : bool =
 
 (** Resolve GLSL overloading constraints using concrete types. *)
 let resolve_constraints structs (constrs : constr list)
-  : (constr list * (Lexer.loc * ty * ty) list) Or_error.t
+  : (constr list * (Lexer.loc * ty * ty) list) Compiler_error.t
   =
   let rec aux deferred eqs (constrs : constr list) =
     match constrs with
@@ -341,12 +341,10 @@ let resolve_constraints structs (constrs : constr list)
          if check_class cls ty
          then aux deferred eqs rest
          else
-           error_s
-             [%message
-               "typecheck: class constraint failed"
-                 (loc : Lexer.loc)
-                 (cls : type_class)
-                 (ty : ty)])
+           Err.fail
+             "class constraint failed"
+             ~loc
+             ~d:[%message (cls : type_class) (ty : ty)])
     | ({ desc = Broadcast (l, r, ret); loc } as c) :: rest ->
       (match l, r with
        | TyVar a, TyVar b when String.equal a b ->
@@ -362,9 +360,7 @@ let resolve_constraints structs (constrs : constr list)
          aux deferred ((loc, ret, TyVec n) :: eqs) rest
        | TyMat (x, y), TyMat (w, z) when x = w && y = z ->
          aux deferred ((loc, ret, TyMat (x, y)) :: eqs) rest
-       | _ ->
-         error_s
-           [%message "typecheck: invalid broadcast" (loc : Lexer.loc) (l : ty) (r : ty)])
+       | _ -> Err.fail "invalid broadcast" ~loc ~d:[%message (l : ty) (r : ty)])
     | ({ desc = MulBroadcast (l, r, ret); loc } as c) :: rest ->
       (match l, r with
        | TyVar a, TyVar b when String.equal a b ->
@@ -386,46 +382,40 @@ let resolve_constraints structs (constrs : constr list)
        | TyVec n, TyVec n' when n = n' -> aux deferred ((loc, ret, TyVec n) :: eqs) rest
        | TyFloat, TyVec n | TyVec n, TyFloat ->
          aux deferred ((loc, ret, TyVec n) :: eqs) rest
-       | _ ->
-         error_s
-           [%message
-             "typecheck: invalid mul/div broadcast" (loc : Lexer.loc) (l : ty) (r : ty)])
+       | _ -> Err.fail "invalid mul/div broadcast" ~loc ~d:[%message (l : ty) (r : ty)])
     | ({ desc = IndexAccess (t, i, ret); loc } as c) :: rest ->
       (match t with
        | TyVec n ->
          if 0 <= i && i < n
          then aux deferred ((loc, ret, TyFloat) :: eqs) rest
-         else
-           error_s
-             [%message "vec index out of bounds" (loc : Lexer.loc) (n : int) (i : int)]
+         else Err.fail "vec index out of bounds" ~loc ~d:[%message (n : int) (i : int)]
        | TyMat (x, y) ->
          if 0 <= i && i < x
          then aux deferred ((loc, ret, TyVec y) :: eqs) rest
-         else
-           error_s
-             [%message "mat index out of bounds" (loc : Lexer.loc) (x : int) (i : int)]
+         else Err.fail "mat index out of bounds" ~loc ~d:[%message (x : int) (i : int)]
        | TyVar _ -> aux (c :: deferred) eqs rest
-       | ty -> error_s [%message "expected vec or mat" (loc : Lexer.loc) (ty : ty)])
+       | ty -> Err.fail "expected vec or mat" ~loc ~d:[%message (ty : ty)])
     | ({ desc = FieldAccess (ty, f, ret); loc } as c) :: rest ->
       (match ty with
        | TyVar _ -> aux (c :: deferred) eqs rest
        | TyRecord struct_name ->
          (match Map.find structs struct_name with
-          | None -> error_s [%message "unknown struct" (loc : Lexer.loc) struct_name]
+          | None -> Err.fail "unknown struct" ~loc ~d:[%message (struct_name : string)]
           | Some fields ->
             (match List.Assoc.find fields ~equal:String.equal f with
              | None ->
-               error_s
-                 [%message "field not found in struct" (loc : Lexer.loc) f struct_name]
+               Err.fail
+                 "field not found in struct"
+                 ~loc
+                 ~d:[%message (f : string) (struct_name : string)]
              | Some field_ty -> aux deferred ((loc, ret, field_ty) :: eqs) rest))
-       | ty ->
-         error_s [%message "field access on non-record type" (loc : Lexer.loc) (ty : ty)])
+       | ty -> Err.fail "field access on non-record type" ~loc ~d:[%message (ty : ty)])
   in
   aux [] [] constrs
 ;;
 
 (** Solve a set of constraints to produce a substitution and deferred constraints. *)
-let solve structs (constrs : constr list) : (substitution * constr list) Or_error.t =
+let solve structs (constrs : constr list) : (substitution * constr list) Compiler_error.t =
   let rec go sub constrs =
     let%bind deferred, eqs = resolve_constraints structs constrs in
     if List.is_empty eqs
@@ -445,7 +435,7 @@ let solve structs (constrs : constr list) : (substitution * constr list) Or_erro
 (** Solve scheme constraints given an initial substitution from monomorphization.
     Applies the sub to constraints, solves, and combines substitutions. *)
 let solve_scheme_constrs (constrs : constr list) (sub : substitution)
-  : substitution Or_error.t
+  : substitution Compiler_error.t
   =
   if List.is_empty constrs
   then return sub
@@ -502,7 +492,7 @@ let rec infer_binding
           (recur : recur)
           (v : string)
           (return_ty : Stlc.ty option)
-  : (term * ty * context * constr list * constr list) Or_error.t
+  : (term * ty * context * constr list * constr list) Compiler_error.t
   =
   let return_ty = Option.map return_ty ~f:(resolve_stlc_ty variants) in
   let ty_v_opt =
@@ -547,7 +537,7 @@ let rec infer_binding
   Ok (bind, ty_bind, ctx, scheme_constrs, remaining)
 
 (** Generate typed term and constraints from STLC term. *)
-and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Or_error.t =
+and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compiler_error.t =
   let loc = t.loc in
   let make desc ty constrs = Ok (({ desc; ty; loc } : term), constrs) in
   let constr desc = { desc; loc } in
@@ -559,8 +549,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Or_erro
     let%bind vs, scheme_constrs, ty_scheme =
       match Map.find ctx v with
       | Some s -> Ok s
-      | None ->
-        error_s [%message "var not found in type map" (loc : Lexer.loc) (v : string)]
+      | None -> Err.fail "var not found in type map" ~loc ~d:[%message (v : string)]
     in
     let sub = List.map vs ~f:(fun v -> v, fresh_tyvar ()) in
     make (Var v) (subst_ty sub ty_scheme) (subst_constraints sub scheme_constrs)
@@ -704,9 +693,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Or_erro
           ; constr (Broadcast (t, t', tmp))
           ; constr (Broadcast (tmp, t'', ty))
           ]
-      | _ ->
-        error_s
-          [%message "invalid builtin arguments" (loc : Lexer.loc) (b : Glsl.builtin)]
+      | _ -> Err.fail "invalid builtin arguments" ~loc ~d:[%message (b : Glsl.builtin)]
     in
     make (Builtin (b, args)) ty (builtin_constrs @ constrs_args)
   | Vec (n, args) ->
@@ -720,7 +707,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Or_erro
     let args = List.rev args in
     if List.length args = n
     then make (Vec (n, args)) (TyVec n) constrs_args
-    else error_s [%message "vec size mismatch" (loc : Lexer.loc) (n : int)]
+    else Err.fail "vec size mismatch" ~loc ~d:[%message (n : int)]
   | Mat (n, m, args) ->
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
@@ -732,7 +719,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Or_erro
     let args = List.rev args in
     if List.length args = n * m
     then make (Mat (n, m, args)) (TyMat (n, m)) constrs_args
-    else error_s [%message "mat size mismatch" (loc : Lexer.loc) (n : int) (m : int)]
+    else Err.fail "mat size mismatch" ~loc ~d:[%message (n : int) (m : int)]
   | Record fields ->
     let provided_fields = String.Set.of_list (List.map fields ~f:fst) in
     let candidates =
@@ -742,12 +729,17 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Or_erro
         |> String.Set.of_list
         |> Set.equal provided_fields)
     in
-    let error_record msg =
-      error_s [%message msg (loc : Lexer.loc) (provided_fields : String.Set.t)]
-    in
     (match Map.to_alist candidates with
-     | [] -> error_record "record does not match any known struct"
-     | _ :: _ :: _ -> error_record "record is ambiguous, matches multiple structs"
+     | [] ->
+       Err.fail
+         "record does not match any known struct"
+         ~loc
+         ~d:[%message (provided_fields : String.Set.t)]
+     | _ :: _ :: _ ->
+       Err.fail
+         "record is ambiguous, matches multiple structs"
+         ~loc
+         ~d:[%message (provided_fields : String.Set.t)]
      | [ (struct_name, struct_fields) ] ->
        let%bind args, constrs_args =
          List.fold_result
@@ -759,7 +751,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Or_erro
                let%bind arg, constrs = gen_term structs variants ctx arg in
                return (arg :: acc, (constr (Eq (arg.ty, ty)) :: constrs) @ acc_constrs)
              | None ->
-               error_s [%message "(unreachable) missing field" (loc : Lexer.loc) name])
+               Err.fail "(unreachable) missing field" ~loc ~d:[%message (name : string)])
        in
        make (Record (struct_name, List.rev args)) (TyRecord struct_name) constrs_args)
   | Field (t, f) ->
@@ -776,20 +768,11 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Or_erro
       in
       match found with
       | [ x ] -> Ok x
-      | [] ->
-        error_s
-          [%message "typecheck: unknown constructor" (loc : Lexer.loc) (ctor : string)]
-      | _ ->
-        error_s
-          [%message "typecheck: ambiguous constructor" (loc : Lexer.loc) (ctor : string)]
+      | [] -> Err.fail "unknown constructor" ~loc ~d:[%message (ctor : string)]
+      | _ -> Err.fail "ambiguous constructor" ~loc ~d:[%message (ctor : string)]
     in
     if List.length args <> List.length expected_arg_tys
-    then
-      error_s
-        [%message
-          "typecheck: wrong number of args to constructor"
-            (loc : Lexer.loc)
-            (ctor : string)]
+    then Err.fail "wrong number of args to constructor" ~loc ~d:[%message (ctor : string)]
     else (
       let%bind args, constrs_args =
         List.fold2_exn
@@ -831,12 +814,8 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Or_erro
         in
         (match Map.to_alist candidates with
          | [ (name, ctors) ] -> Ok (name, ctors)
-         | [] ->
-           error_s
-             [%message
-               "typecheck: match cases don't match any variant type" (loc : Lexer.loc)]
-         | _ ->
-           error_s [%message "typecheck: ambiguous match variant type" (loc : Lexer.loc)])
+         | [] -> Err.fail "match cases don't match any variant type" ~loc
+         | _ -> Err.fail "ambiguous match variant type" ~loc)
     in
     (* [Exhaustive Checking] *)
     let case_ctors = List.map cases ~f:(fun (c, _, _) -> c) |> String.Set.of_list in
@@ -845,10 +824,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Or_erro
     let%bind () =
       if Set.is_empty missing
       then Ok ()
-      else
-        error_s
-          [%message
-            "typecheck: non-exhaustive match" (loc : Lexer.loc) (missing : String.Set.t)]
+      else Err.fail "non-exhaustive match" ~loc ~d:[%message (missing : String.Set.t)]
     in
     (* Type-check each case *)
     let%bind cases, constrs_cases =
@@ -860,21 +836,16 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Or_erro
             match List.find variant_ctors ~f:(fun (c, _) -> String.equal c ctor) with
             | Some x -> Ok x
             | None ->
-              error_s
-                [%message
-                  "typecheck: unknown constructor in match"
-                    (loc : Lexer.loc)
-                    (ctor : string)]
+              Err.fail "unknown constructor in match" ~loc ~d:[%message (ctor : string)]
           in
           if List.length vars <> List.length expected_arg_tys
-          then
-            error_s
-              [%message
-                "typecheck: wrong number of bindings in match case"
-                  (loc : Lexer.loc)
-                  (ctor : string)
-                  ~expected:(List.length expected_arg_tys : int)
-                  ~got:(List.length vars : int)]
+          then (
+            let expected = List.length expected_arg_tys in
+            let got = List.length vars in
+            Err.fail
+              "wrong number of bindings in match case"
+              ~loc
+              ~d:[%message (ctor : string) (expected : int) (got : int)])
           else (
             let ctx =
               List.fold2_exn vars expected_arg_tys ~init:ctx ~f:(fun ctx v ty ->
@@ -892,7 +863,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Or_erro
       (scrutinee_constr :: (constrs_s @ constrs_cases))
 ;;
 
-let typecheck (Program terms : Stlc.t) : t Or_error.t =
+let typecheck (Program terms : Stlc.t) : t Compiler_error.t =
   let%map _, _, _, tops =
     List.fold_result
       terms
@@ -905,9 +876,10 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
           in
           if not (List.is_empty remaining)
           then
-            error_s
-              [%message
-                "typecheck: unresolved top-level constraints" (remaining : constr list)]
+            Err.fail
+              "unresolved top-level constraints"
+              ~loc:top.loc
+              ~d:[%message (remaining : constr list)]
           else (
             let top =
               { desc = Define (Rec n, v, bind); ty; loc = top.loc; scheme_constrs }
@@ -919,9 +891,10 @@ let typecheck (Program terms : Stlc.t) : t Or_error.t =
           in
           if not (List.is_empty remaining)
           then
-            error_s
-              [%message
-                "typecheck: unresolved top-level constraints" (remaining : constr list)]
+            Err.fail
+              "unresolved top-level constraints"
+              ~loc:top.loc
+              ~d:[%message (remaining : constr list)]
           else (
             let top =
               { desc = Define (Nonrec, v, bind); ty; loc = top.loc; scheme_constrs }

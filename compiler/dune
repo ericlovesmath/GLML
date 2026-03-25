@@ -2,6 +2,7 @@
  (name glml_compiler)
  (modules
    utils
+   compiler_error
    glml_compiler
 
    ; Compiler Passes

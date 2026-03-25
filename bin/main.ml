@@ -38,7 +38,10 @@ let compile_command =
          |> Glml.Passes.Map.of_alist_exn
        in
        let result =
-         input_file |> In_channel.read_all |> Glml.compile ~dump |> Or_error.ok_exn
+         input_file
+         |> In_channel.read_all
+         |> Glml.compile ~dump
+         |> Glml.Compiler_error.ok_exn
        in
        match output_file with
        | Some path -> Out_channel.write_all path ~data:result
