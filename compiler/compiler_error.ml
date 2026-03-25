@@ -27,11 +27,12 @@ type error =
 [@@deriving sexp_of]
 
 let format_details (sexp : Sexp.t) : string =
+  (* TODO: Assumes data is key/value pairs mostly... assumes ppx_message *)
   match sexp with
+  | List [ Atom key; value ] -> "  " ^ key ^ ": " ^ Sexp.to_string_hum value
   | List pairs ->
     pairs
     |> List.map ~f:(function
-      (* TODO: Assumes data is key/value pairs mostly... assumes ppx_message *)
       | List [ Atom key; value ] -> "  " ^ key ^ ": " ^ Sexp.to_string_hum value
       | s -> "  " ^ Sexp.to_string_hum s)
     |> String.concat ~sep:"\n"

@@ -214,7 +214,7 @@ let run p s =
             s ^ " " ^ loc
         in
         let contexts = List.rev_map ~f:string_of_context info.contexts in
-        Some (Sexp.List [ [%message (contexts : string list)] ]))
+        Some [%message (contexts : string list)])
     in
     Compiler_error.fail ~pass:"parser" ?loc ?d msg
 ;;
