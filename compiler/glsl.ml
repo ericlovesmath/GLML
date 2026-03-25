@@ -152,6 +152,10 @@ type qualifier =
   | Const
 [@@deriving sexp_of, string ~capitalize:"lower sentence case"]
 
+type switch_case =
+  | Case of int
+  | Default
+
 type stmt =
   | Decl of qualifier option * ty * string * term
   | Set of term * term
@@ -163,7 +167,7 @@ type stmt =
   | For of stmt * term * stmt * stmt
   | Block of stmt list
   | Break
-  | SwitchStmt of term * (int * stmt list) list
+  | SwitchStmt of term * (switch_case * stmt list) list
 
 let rec sexp_of_stmt (s : stmt) : Sexp.t =
   match s with
@@ -194,8 +198,13 @@ let rec sexp_of_stmt (s : stmt) : Sexp.t =
   | Block stmts -> List (Atom "Block" :: List.map stmts ~f:sexp_of_stmt)
   | Break -> Atom "break"
   | SwitchStmt (scrut, cases) ->
-    let sexp_of_case (i, stmts) =
-      List (Atom (Int.to_string i) :: List.map stmts ~f:sexp_of_stmt)
+    let sexp_of_case (label, stmts) =
+      let lbl =
+        match label with
+        | Case i -> Int.to_string i
+        | Default -> "default"
+      in
+      List (Atom lbl :: List.map stmts ~f:sexp_of_stmt)
     in
     List (Atom "switch" :: sexp_of_term scrut :: List.map cases ~f:sexp_of_case)
 ;;
@@ -256,22 +265,17 @@ let rec string_of_stmt = function
   | Break -> "break;"
   | SwitchStmt (scrut, cases) ->
     let scrut = string_of_term scrut in
-    let n = List.length cases in
-    (* TODO: It's a little weird to hardcode switch statements to
-       only label by ints in order, but this is just because we
-       only use this to lower tagged structs. Once we need switches
-       for something else, we need to change it. Until then... *)
     let cases =
-      List.mapi cases ~f:(fun idx (i, stmts) ->
+      List.map cases ~f:(fun (label, stmts) ->
         let body =
           stmts
           |> List.map ~f:string_of_stmt
           |> List.map ~f:indent
           |> String.concat ~sep:"\n"
         in
-        if idx = n - 1
-        then [%string "default: {\n%{body}\n}"]
-        else [%string "case %{i#Int}: {\n%{body}\n}"])
+        match label with
+        | Case i -> [%string "case %{i#Int}: {\n%{body}\n}"]
+        | Default -> [%string "default: {\n%{body}\n}"])
       |> List.map ~f:indent
       |> String.concat ~sep:"\n"
     in

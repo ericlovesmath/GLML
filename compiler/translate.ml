@@ -98,9 +98,9 @@ let translate_return
   | Switch (tag, cases) ->
     let%map cases =
       cases
-      |> List.map ~f:(fun (i, case_anf) ->
+      |> List.map ~f:(fun (label, case_anf) ->
         let%map stmts = translate_sub case_anf in
-        i, stmts @ [ Break ])
+        label, stmts @ [ Break ])
       |> Compiler_error.all
     in
     [ SwitchStmt (to_glsl_atom tag, cases) ]
@@ -130,9 +130,9 @@ let rec translate_let
     let%bind placeholder = placeholder_value_for_ty env bind.ty in
     let%bind cases =
       cases
-      |> List.map ~f:(fun (i, case) ->
+      |> List.map ~f:(fun (label, case) ->
         let%map stmts = translate_set env v case in
-        i, stmts @ [ Break ])
+        label, stmts @ [ Break ])
       |> Compiler_error.all
     in
     Ok (Decl (None, ty, v, placeholder) :: SwitchStmt (to_glsl_atom tag, cases) :: tail)
