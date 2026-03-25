@@ -30,12 +30,8 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   let trace pass sexp = Map.find dump pass |> Option.iter ~f:(fun f -> f sexp) in
   let open Compiler_error.Let_syntax in
   Utils.reset ();
-  let%bind tokens =
-    Lexer.lex (Lexer.init s) |> Compiler_error.of_or_error ~pass:"lexer"
-  in
-  let%bind t =
-    Chomp.run Parser.glml_p tokens |> Compiler_error.of_or_error ~pass:"parser"
-  in
+  let%bind tokens = Lexer.lex (Lexer.init s) in
+  let%bind t = Parser.parse tokens in
   trace Stlc (Stlc.sexp_of_t t);
   let%bind t = Uniquify.uniquify t in
   trace Uniquify (Stlc.sexp_of_t t);

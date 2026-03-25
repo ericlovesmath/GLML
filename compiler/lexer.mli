@@ -1,5 +1,3 @@
-open Core
-
 type token =
   | TRUE
   | FALSE
@@ -54,10 +52,14 @@ type token =
 [@@deriving sexp, equal]
 
 type t
-type loc [@@deriving sexp_of]
+type pos = Compiler_error.pos [@@deriving sexp_of]
+type loc = Compiler_error.loc [@@deriving sexp_of]
 
 val init_loc : loc
 val merge_loc : loc -> loc -> loc
 val loc_end : loc -> loc
+
+(** Initialize imperative lexer implementation *)
 val init : string -> t
-val lex : t -> (token * loc) list Or_error.t
+
+val lex : t -> (token * loc) list Compiler_error.t

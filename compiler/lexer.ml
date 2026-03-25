@@ -1,5 +1,5 @@
 open Core
-open Sexplib.Sexp
+open Compiler_error
 
 type token =
   | TRUE
@@ -54,17 +54,8 @@ type token =
   | ID of string
 [@@deriving sexp, equal]
 
-type pos =
-  { i : int
-  ; line : int
-  ; col : int
-  }
-
-let sexp_of_pos { i = _; line; col } = Atom [%string "%{line#Int}:%{col#Int}"]
-
-type loc = pos * pos
-
-let sexp_of_loc (l, r) = List [ sexp_of_pos l; Atom "-"; sexp_of_pos r ]
+type pos = Compiler_error.pos [@@deriving sexp_of]
+type loc = Compiler_error.loc [@@deriving sexp_of]
 
 let init_loc =
   let p = { i = 0; line = 0; col = 0 } in
@@ -239,15 +230,18 @@ let read_lexeme (t : t) : token Or_error.t =
      | char -> error_s [%message "lexer: invalid char" (char : char) (t.pos : pos)])
 ;;
 
-let lex (t : t) : (token * loc) list Or_error.t =
-  let open Or_error.Let_syntax in
+let lex (t : t) : (token * loc) list Compiler_error.t =
+  let open Compiler_error.Let_syntax in
   let rec loop acc =
     strip t;
     if eof t
-    then Ok (List.rev acc)
+    then return (List.rev acc)
     else (
       let start_pos = t.pos in
-      let%bind lexeme = read_lexeme t in
+      let%bind lexeme =
+        read_lexeme t
+        |> Compiler_error.of_or_error ~pass:"lexer" ~loc:(start_pos, start_pos)
+      in
       let end_pos = t.pos in
       loop ((lexeme, (start_pos, end_pos)) :: acc))
   in
@@ -259,6 +253,7 @@ let%expect_test "lexer" =
     s
     |> init
     |> lex
+    |> Compiler_error.to_or_error
     |> Or_error.map ~f:(List.map ~f:fst)
     |> Or_error.sexp_of_t (List.sexp_of_t sexp_of_token)
     |> print_s
