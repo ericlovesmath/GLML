@@ -6,7 +6,7 @@ let examples_dir = "../examples"
 let%expect_test "compile examples" =
   let glml_files = Stdlib.Sys.readdir examples_dir in
   Array.iter glml_files ~f:(fun file ->
-    let content = In_channel.read_all (Filename.concat examples_dir file) in
+    let source = In_channel.read_all (Filename.concat examples_dir file) in
     Printf.printf "====== COMPILING EXAMPLE %s ======\n\n" file;
     let dump =
       let handler pass sexp =
@@ -18,9 +18,9 @@ let%expect_test "compile examples" =
       |> List.map ~f:(fun pass -> pass, handler pass)
       |> Passes.Map.of_alist_exn
     in
-    match compile ~dump content with
+    match compile ~dump source with
     | Ok _ -> ()
-    | Error err -> print_endline (Compiler_error.to_string_hum err));
+    | Error err -> print_endline (Compiler_error.to_string_hum ~source err));
   [%expect
     {|
     ====== COMPILING EXAMPLE 2d_sdf_variants.glml ======

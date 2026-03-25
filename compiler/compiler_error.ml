@@ -39,16 +39,60 @@ let format_details (sexp : Sexp.t) : string =
   | Atom _ -> "  " ^ Sexp.to_string_hum sexp
 ;;
 
-let to_string_hum { pass; loc; msg; details } =
-  let loc_str =
-    match loc with
-    | Some l -> " at " ^ string_of_loc l
-    | None -> ""
+let to_string_hum ?source { pass; loc; msg; details } =
+  let header_and_details =
+    let loc_str =
+      match loc with
+      | Some l -> " at " ^ string_of_loc l
+      | None -> ""
+    in
+    let base = Printf.sprintf "[%s]%s: %s" pass loc_str msg in
+    match details with
+    | None -> base
+    | Some d -> base ^ "\n" ^ format_details d
   in
-  let base = Printf.sprintf "[%s]%s: %s" pass loc_str msg in
-  match details with
-  | None -> base
-  | Some d -> base ^ "\n" ^ format_details d
+  match Option.both source loc with
+  | None -> header_and_details
+  | Some (source, (l, r)) ->
+    let lines = String.split_lines source in
+    let num_lines = List.length lines in
+    let get_line n =
+      if n >= 1 && n <= num_lines
+      then Option.value (List.nth lines (n - 1)) ~default:""
+      else ""
+    in
+    let line_num_width = String.length (Int.to_string r.line) in
+    let pad_num n =
+      let s = Int.to_string n in
+      String.make (line_num_width - String.length s) ' ' ^ s
+    in
+    let gutter_blank = String.make line_num_width ' ' ^ " | " in
+    let show_line n = pad_num n ^ " | " ^ get_line n in
+    let context =
+      if l.line = r.line
+      then (
+        (* Single-line span *)
+        let underline =
+          gutter_blank
+          ^ String.make (l.col - 1) ' '
+          ^ String.make (max 1 (r.col - l.col)) '^'
+        in
+        [ show_line l.line; underline ])
+      else (
+        (* Multi-line span, collapse if too tall *)
+        let all_lines = List.range l.line (r.line + 1) |> List.map ~f:show_line in
+        let n = List.length all_lines in
+        let lines =
+          if n <= 6
+          then all_lines
+          else (
+            let head = List.take all_lines 3 in
+            let tail = List.drop all_lines (n - 2) in
+            head @ [ gutter_blank ^ "..." ] @ tail)
+        in
+        lines @ [ gutter_blank ])
+    in
+    String.concat ~sep:"\n" (header_and_details :: gutter_blank :: context)
 ;;
 
 type 'a t = ('a, error) Result.t
