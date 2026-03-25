@@ -9,34 +9,10 @@ module Maybe = struct
     ; contexts : (string * loc option) list
     }
 
-  let sexp_of_error_info { message; found; contexts } =
-    let chomp_error =
-      match found with
-      | None -> message
-      | Some (token, loc) ->
-        let token = Sexplib.Sexp.to_string_hum (sexp_of_token token) in
-        let loc = Sexplib.Sexp.to_string_hum (sexp_of_loc loc) in
-        [%string "%{message} on <%{token}> %{loc}"]
-    in
-    let string_of_context = function
-      | s, None -> s
-      | s, Some loc ->
-        let loc = Sexp.to_string_hum (sexp_of_loc (loc : loc)) in
-        [%string "%{s} %{loc}"]
-    in
-    let contexts = List.rev (List.map ~f:string_of_context contexts) in
-    [%message (chomp_error : string) (contexts : string list)]
-  ;;
-
   type 'a t =
     | Success of 'a
     | Fail of error_info
     | Fatal of error_info
-
-  let to_or_error = function
-    | Fail e | Fatal e -> Error (Error.of_lazy_sexp (lazy (sexp_of_error_info e)))
-    | Success x -> Ok x
-  ;;
 
   include Applicative.Make (struct
       type nonrec 'a t = 'a t
@@ -207,7 +183,7 @@ let chainl1 (p : 'a t) (op : ('a -> 'a -> 'a) t) : 'a t =
 
 let optional (p : 'a t) : 'a option t = p >>| Option.some <|> return None
 
-let run ~pass p s =
+let run p s =
   let maybe =
     let last_loc = Lexer.init_loc in
     let%bind.Maybe x, st = p { seq = Sequence.of_list s; last_loc } in
@@ -219,7 +195,28 @@ let run ~pass p s =
   | Success x -> Ok x
   | Fail info | Fatal info ->
     let loc = Option.map info.found ~f:snd in
-    Compiler_error.of_or_error ~pass ?loc (Maybe.to_or_error maybe)
+    let msg =
+      match info.found with
+      | None -> info.message
+      | Some (token, _) ->
+        let token = Sexp.to_string_hum (sexp_of_token token) in
+        Printf.sprintf "%s on <%s>" info.message token
+    in
+    let d =
+      (* TODO: Refactor this *)
+      if List.is_empty info.contexts
+      then None
+      else (
+        let string_of_context = function
+          | s, None -> s
+          | s, Some loc ->
+            let loc = Sexp.to_string_hum (sexp_of_loc loc) in
+            s ^ " " ^ loc
+        in
+        let contexts = List.rev_map ~f:string_of_context info.contexts in
+        Some (Sexp.List [ [%message (contexts : string list)] ]))
+    in
+    Compiler_error.fail ~pass:"parser" ?loc ?d msg
 ;;
 
 let tok t = satisfy (equal_token t)

@@ -1,7 +1,6 @@
 open Core
 open Sexplib.Sexp
 
-(* TODO: [to_string_hum[? *)
 (* TODO: Refactor this whole file :P *)
 (* TODO: Function to take in raw glml string and underline [loc] *)
 
@@ -16,6 +15,8 @@ let sexp_of_pos { i = _; line; col } = Sexp.Atom [%string "%{line#Int}:%{col#Int
 type loc = pos * pos
 
 let sexp_of_loc (l, r) = List [ sexp_of_pos l; Atom "-"; sexp_of_pos r ]
+let string_of_pos { line; col; _ } = Int.to_string line ^ ":" ^ Int.to_string col
+let string_of_loc (l, r) = string_of_pos l ^ "-" ^ string_of_pos r
 
 type error =
   { pass : string
@@ -24,6 +25,30 @@ type error =
   ; details : Sexp.t option
   }
 [@@deriving sexp_of]
+
+let format_details (sexp : Sexp.t) : string =
+  match sexp with
+  | List pairs ->
+    pairs
+    |> List.map ~f:(function
+      (* TODO: Assumes data is key/value pairs mostly... assumes ppx_message *)
+      | List [ Atom key; value ] -> "  " ^ key ^ ": " ^ Sexp.to_string_hum value
+      | s -> "  " ^ Sexp.to_string_hum s)
+    |> String.concat ~sep:"\n"
+  | Atom _ -> "  " ^ Sexp.to_string_hum sexp
+;;
+
+let to_string_hum { pass; loc; msg; details } =
+  let loc_str =
+    match loc with
+    | Some l -> " at " ^ string_of_loc l
+    | None -> ""
+  in
+  let base = Printf.sprintf "[%s]%s: %s" pass loc_str msg in
+  match details with
+  | None -> base
+  | Some d -> base ^ "\n" ^ format_details d
+;;
 
 type 'a t = ('a, error) Result.t
 
@@ -41,19 +66,10 @@ let of_or_error ~pass ?loc (r : 'a Or_error.t) : 'a t =
   | Error err -> Error { pass; loc; msg = Error.to_string_hum err; details = None }
 ;;
 
-(* TODO: This is so bad *)
 let to_or_error (r : 'a t) : 'a Or_error.t =
   match r with
   | Ok x -> Ok x
-  | Error { pass; loc; msg; details } ->
-    let parts =
-      [ Sexp.Atom (pass ^ ": " ^ msg) ]
-      @ (match loc with
-         | Some loc -> [ [%message (loc : loc)] ]
-         | None -> [])
-      @ [ Option.sexp_of_t Fn.id details ]
-    in
-    Or_error.error_s (Sexp.List parts)
+  | Error err -> Or_error.error_string (to_string_hum err)
 ;;
 
 let ok_exn (r : 'a t) : 'a =

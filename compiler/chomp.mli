@@ -7,9 +7,8 @@ type stream
 type 'a maybe
 type 'a t = stream -> ('a * stream) maybe
 
-(** Run parser [p] on token stream, ensuring the entire input is consumed.
-    Attaches [pass] and the error-token location to any failure. *)
-val run : pass:string -> 'a t -> (token * loc) list -> 'a Compiler_error.t
+(** Run parser [p] on token stream, ensuring the entire input is consumed *)
+val run : 'a t -> (token * loc) list -> 'a Compiler_error.t
 
 include Applicative.S with type 'a t := 'a t
 include Monad.S with type 'a t := 'a t

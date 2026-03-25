@@ -87,16 +87,14 @@ and ty_p =
   (ty_p <|> between `Paren ty_p <??> "ty") st
 ;;
 
+let test sexp_of parser s =
+  match s |> Lexer.init |> Lexer.lex |> Compiler_error.bind ~f:(Chomp.run parser) with
+  | Ok x -> print_s (sexp_of x)
+  | Error err -> print_endline (Compiler_error.to_string_hum err)
+;;
+
 let%expect_test "ty parse tests" =
-  let test s =
-    s
-    |> Lexer.init
-    |> Lexer.lex
-    |> Compiler_error.bind ~f:(Chomp.run ~pass:"parser" ty_p)
-    |> Compiler_error.to_or_error
-    |> Or_error.sexp_of_t sexp_of_ty
-    |> print_s
-  in
+  let test = test sexp_of_ty ty_p in
   test "float";
   test "int";
   test "bool";
@@ -108,31 +106,31 @@ let%expect_test "ty parse tests" =
   test "record_or_variant";
   [%expect
     {|
-    (Ok float)
-    (Ok int)
-    (Ok bool)
-    (Ok (vec 2))
-    (Ok (mat 3 2))
-    (Ok (mat 3 3))
-    (Ok (float -> int))
-    (Ok 'a)
-    (Ok record_or_variant)
+    float
+    int
+    bool
+    (vec 2)
+    (mat 3 2)
+    (mat 3 3)
+    (float -> int)
+    'a
+    record_or_variant
     |}];
   test "(vec4)";
   test "(mat3x2->vec2)->(vec2->int)";
   [%expect
     {|
-    (Ok (vec 4))
-    (Ok (((mat 3 2) -> (vec 2)) -> ((vec 2) -> int)))
+    (vec 4)
+    (((mat 3 2) -> (vec 2)) -> ((vec 2) -> int))
     |}];
   test "";
   test "()";
   [%expect
     {|
-    (Error ("parser: ((chomp_error satisfy_eof) (contexts (between ty)))" ()))
-    (Error
-     ( "parser: ((chomp_error satisfy_map_fail)\
-      \n (contexts (\"between (1:1 - 1:2)\" \"ty (1:1 - 1:2)\")))" ()))
+    [parser]: satisfy_eof
+      contexts: (between ty)
+    [parser]: satisfy_map_fail
+      contexts: ("between (1:1 - 1:2)" "ty (1:1 - 1:2)")
     |}]
 ;;
 
@@ -418,17 +416,8 @@ and term_p =
     st
 ;;
 
-let test s =
-  s
-  |> Lexer.init
-  |> Lexer.lex
-  |> Compiler_error.bind ~f:(Chomp.run ~pass:"parser" term_p)
-  |> Compiler_error.to_or_error
-  |> Or_error.sexp_of_t sexp_of_term
-  |> print_s
-;;
-
 let%expect_test "term parse tests" =
+  let test = test sexp_of_term term_p in
   test "variable_name";
   test "-13.4";
   test "33";
@@ -450,25 +439,25 @@ let%expect_test "term parse tests" =
   test "match x with | Constr x -> a | Alt b -> b";
   [%expect
     {|
-    (Ok variable_name)
-    (Ok -13.4)
-    (Ok 33)
-    (Ok false)
-    (Ok (vec3 1 2 3))
-    (Ok (mat3x2 1 2 3 4 5 6))
-    (Ok (lambda (x (bool)) x))
-    (Ok (app (app f x) y))
-    (Ok (let bind true bind))
-    (Ok (let (rec 1000) f (: bool) (lambda (x (float)) (app f x)) f))
-    (Ok (if true x y))
-    (Ok (&& (+ (* 1 2) true) (% 44 10)))
-    (Ok (index v 0))
-    (Ok (min 1 2))
-    (Ok (exp2 1.))
-    (Ok (Variant Constr))
-    (Ok (Variant Constr x))
-    (Ok (Variant Constr x 2.))
-    (Ok (match x (Constr (x) a) (Alt (b) b)))
+    variable_name
+    -13.4
+    33
+    false
+    (vec3 1 2 3)
+    (mat3x2 1 2 3 4 5 6)
+    (lambda (x (bool)) x)
+    (app (app f x) y)
+    (let bind true bind)
+    (let (rec 1000) f (: bool) (lambda (x (float)) (app f x)) f)
+    (if true x y)
+    (&& (+ (* 1 2) true) (% 44 10))
+    (index v 0)
+    (min 1 2)
+    (exp2 1.)
+    (Variant Constr)
+    (Variant Constr x)
+    (Variant Constr x 2.)
+    (match x (Constr (x) a) (Alt (b) b))
     |}];
   test "-113.0";
   test "-113.";
@@ -486,20 +475,20 @@ let%expect_test "term parse tests" =
   test "1 - -x";
   [%expect
     {|
-    (Ok -113.)
-    (Ok -113.)
-    (Ok -113)
-    (Ok (app (app (app f x) y) z))
-    (Ok (app (app f (app x y)) z))
-    (Ok (- (* 2 -13) 10))
-    (Ok (app f 5))
-    (Ok (lambda (u ((vec 2))) (vec3 (app (app f 10.) a) 0. 0.)))
-    (Ok (- f 5))
-    (Ok (app f -5))
-    (Ok (* -1 var))
-    (Ok (* -1 (* -1 x)))
-    (Ok -5)
-    (Ok (- 1 (* -1 x)))
+    -113.
+    -113.
+    -113
+    (app (app (app f x) y) z)
+    (app (app f (app x y)) z)
+    (- (* 2 -13) 10)
+    (app f 5)
+    (lambda (u ((vec 2))) (vec3 (app (app f 10.) a) 0. 0.))
+    (- f 5)
+    (app f -5)
+    (* -1 var)
+    (* -1 (* -1 x))
+    -5
+    (- 1 (* -1 x))
     |}];
   test "let f (x : bool) (y : bool) = x && y in f";
   test "let f = fun (x : bool) (y : bool) -> x && y in f";
@@ -509,16 +498,17 @@ let%expect_test "term parse tests" =
   test "let f (x : float) : float = x in f";
   [%expect
     {|
-    (Ok (let f (lambda (x (bool)) (lambda (y (bool)) (&& x y))) f))
-    (Ok (let f (lambda (x (bool)) (lambda (y (bool)) (&& x y))) f))
-    (Ok (let f (lambda (x ()) (lambda (y ()) (&& x y))) f))
-    (Ok (let (rec 1000) f (lambda (x ()) (app f x)) f))
-    (Ok (let (rec 1000) f (: 'a) (lambda (x ('b)) (app f x)) f))
-    (Ok (let f (: float) (lambda (x (float)) x) f))
+    (let f (lambda (x (bool)) (lambda (y (bool)) (&& x y))) f)
+    (let f (lambda (x (bool)) (lambda (y (bool)) (&& x y))) f)
+    (let f (lambda (x ()) (lambda (y ()) (&& x y))) f)
+    (let (rec 1000) f (lambda (x ()) (app f x)) f)
+    (let (rec 1000) f (: 'a) (lambda (x ('b)) (app f x)) f)
+    (let f (: float) (lambda (x (float)) x) f)
     |}]
 ;;
 
 let%expect_test "regression test, sequential non-parenthesized terms" =
+  let test = test sexp_of_term term_p in
   test "let x = 1.0 in x + 1.0";
   test "1.0 + let x = 1.0 in x";
   test "1.0 + (let x = 1.0 in x)";
@@ -529,17 +519,14 @@ let%expect_test "regression test, sequential non-parenthesized terms" =
   test "if true then 1.0 else 2.0 + 3.0";
   [%expect
     {|
-    (Ok (let x 1. (+ x 1.)))
-    (Error
-     ("parser: ((chomp_error run_stream_not_fully_consumed) (contexts ()))" ()))
-    (Ok (+ 1. (let x 1. x)))
-    (Error
-     ("parser: ((chomp_error run_stream_not_fully_consumed) (contexts ()))" ()))
-    (Ok (app f (let x 1. x)))
-    (Error
-     ("parser: ((chomp_error run_stream_not_fully_consumed) (contexts ()))" ()))
-    (Ok (vec2 1. (let x 2. x)))
-    (Ok (if true 1. (+ 2. 3.)))
+    (let x 1. (+ x 1.))
+    [parser]: run_stream_not_fully_consumed
+    (+ 1. (let x 1. x))
+    [parser]: run_stream_not_fully_consumed
+    (app f (let x 1. x))
+    [parser]: run_stream_not_fully_consumed
+    (vec2 1. (let x 2. x))
+    (if true 1. (+ 2. 3.))
     |}]
 ;;
 
@@ -611,19 +598,8 @@ let glml_p =
   >>| fun tops -> Program tops
 ;;
 
-let parse tokens = Chomp.run ~pass:"parser" glml_p tokens
-
-let test s =
-  s
-  |> Lexer.init
-  |> Lexer.lex
-  |> Compiler_error.bind ~f:parse
-  |> Compiler_error.to_or_error
-  |> Or_error.sexp_of_t sexp_of_t
-  |> print_s
-;;
-
 let%expect_test "glml parse tests" =
+  let test = test sexp_of_t glml_p in
   test
     {|
     #extern float u_time
@@ -641,19 +617,19 @@ let%expect_test "glml parse tests" =
     |};
   [%expect
     {|
-    (Ok
-     (Program
-      ((Extern float u_time) (TypeDef point (RecordDecl ((x float) (y int))))
-       (TypeDef shape (VariantDecl ((Circle (int float)) (Triangle ()))))
-       (Define Nonrec a_struct (record (x 0.) (y 0)))
-       (Define Nonrec toplevel (+ 1 2)) (Define Nonrec main (+ 1 2))
-       (Define Nonrec f (lambda (x (bool)) (lambda (y (bool)) (&& x y))))
-       (Define Nonrec main (lambda (u ((vec 2))) (+ (app f (vec2 1 2)) u)))
-       (Define (Rec 1000) g (: float) (lambda (x (float)) (app g x))))))
+    (Program
+     ((Extern float u_time) (TypeDef point (RecordDecl ((x float) (y int))))
+      (TypeDef shape (VariantDecl ((Circle (int float)) (Triangle ()))))
+      (Define Nonrec a_struct (record (x 0.) (y 0)))
+      (Define Nonrec toplevel (+ 1 2)) (Define Nonrec main (+ 1 2))
+      (Define Nonrec f (lambda (x (bool)) (lambda (y (bool)) (&& x y))))
+      (Define Nonrec main (lambda (u ((vec 2))) (+ (app f (vec2 1 2)) u)))
+      (Define (Rec 1000) g (: float) (lambda (x (float)) (app g x)))))
     |}]
 ;;
 
 let%expect_test "regression test, toplevel let parsing after record" =
+  let test = test sexp_of_t glml_p in
   test
     {|
     let f (x : float) =
@@ -664,11 +640,10 @@ let%expect_test "regression test, toplevel let parsing after record" =
     |};
   [%expect
     {|
-    (Ok
-     (Program
-      ((Define Nonrec f
-        (lambda (x (float))
-         (let g (lambda (y (float)) (+ x y)) (vec3 (app g 1.) 0. 0.))))
-       (Define Nonrec main (lambda (u ((vec 2))) (app f 10.))))))
+    (Program
+     ((Define Nonrec f
+       (lambda (x (float))
+        (let g (lambda (y (float)) (+ x y)) (vec3 (app g 1.) 0. 0.))))
+      (Define Nonrec main (lambda (u ((vec 2))) (app f 10.)))))
     |}]
 ;;
