@@ -20,7 +20,7 @@ type term_desc =
   | If of atom * anf * anf
   | Record of string * atom list
   | Field of atom * string
-  | Switch of atom * (int * anf) list
+  | Switch of atom * (Glsl.switch_case * anf) list
 
 and term =
   { desc : term_desc
@@ -58,7 +58,14 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_atom)
   | Field (t, f) -> List [ Atom "."; sexp_of_atom t; Atom f ]
   | Switch (tag, cases) ->
-    let sexp_of_case (i, body) = List [ Atom (Int.to_string i); sexp_of_anf body ] in
+    let sexp_of_case (label, body) =
+      let lbl =
+        match label with
+        | Glsl.Case i -> Int.to_string i
+        | Glsl.Default -> "default"
+      in
+      List [ Atom lbl; sexp_of_anf body ]
+    in
     List (Atom "switch" :: sexp_of_atom tag :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
@@ -276,12 +283,14 @@ and lower_match
     let%bind branch = lower_case ctor vars body in
     Ok (map_last_return k branch)
   | _ ->
+    let n = List.length cases in
     let%bind switch_cases =
       cases
-      |> List.map ~f:(fun (ctor, vars, body) ->
+      |> List.mapi ~f:(fun idx (ctor, vars, body) ->
         let%bind tag = find_tag ctors ctor in
-        let%map branch = lower_case ctor vars body in
-        tag, branch)
+        let%bind branch = lower_case ctor vars body in
+        let label : Glsl.switch_case = if idx = n - 1 then Default else Case tag in
+        Ok (label, branch))
       |> Compiler_error.all
     in
     let tag_v = Utils.fresh "_lv_tag" in

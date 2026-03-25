@@ -73,7 +73,7 @@ and promote_term (env : ty String.Map.t) (term : term) : term * bindings =
   | If (c, t, e), _ ->
     { term with desc = If (c, promote_anf env t, promote_anf env e) }, []
   | Switch (tag, cases), _ ->
-    let desc = Switch (tag, List.map cases ~f:(fun (i, b) -> i, promote_anf env b)) in
+    let desc = Switch (tag, List.map cases ~f:(fun (l, b) -> l, promote_anf env b)) in
     { term with desc }, []
   | _, _ -> term, []
 ;;

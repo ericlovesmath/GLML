@@ -11,7 +11,7 @@ type term_desc =
   | If of atom * anf * anf
   | Record of string * atom list
   | Field of atom * string
-  | Switch of atom * (int * anf) list
+  | Switch of atom * (Glsl.switch_case * anf) list
 [@@deriving sexp_of]
 
 and term =

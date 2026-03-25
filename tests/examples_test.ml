@@ -750,7 +750,7 @@ let%expect_test "compile examples" =
                           (let anf_107 (max anf_105 anf_106)
                            (let anf_108 (min anf_107 0.)
                             (return (+ anf_104 anf_108)))))))))))))))))))
-           (2 (return 1.)))))))
+           (default (return 1.)))))))
       : (shape -> ((vec 2) -> float)))
      ((Define (name scene_7) (args ((p_8 (vec 2))))
        (body
@@ -839,7 +839,7 @@ let%expect_test "compile examples" =
                           (let anf_107 (max anf_105 anf_106)
                            (let anf_108 (min anf_107 0.)
                             (return (+ anf_104 anf_108)))))))))))))))))))
-           (2 (return 1.)))))))
+           (default (return 1.)))))))
       : (shape -> ((vec 2) -> float)))
      ((Define (name scene_7) (args ((p_8 (vec 2))))
        (body
@@ -924,7 +924,7 @@ let%expect_test "compile examples" =
            (set () float anf_107 (max anf_105 anf_106))
            (set () float anf_108 (min anf_107 0.)) (return (+ anf_104 anf_108))
            break)
-          (2 (return 1.) break)))))
+          (default (return 1.) break)))))
       (Function (name scene_7) (desc ()) (params (((TyVec 2) p_8)))
        (ret_type TyFloat)
        (body
@@ -1005,7 +1005,7 @@ let%expect_test "compile examples" =
            (set () float anf_107 (max anf_105 anf_106))
            (set () float anf_108 (min anf_107 0.)) (return (+ anf_104 anf_108))
            break)
-          (2 (return 1.) break)))))
+          (default (return 1.) break)))))
       (Function (name scene_7) (desc ()) (params (((TyVec 2) p_8)))
        (ret_type TyFloat)
        (body

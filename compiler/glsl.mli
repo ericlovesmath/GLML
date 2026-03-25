@@ -76,6 +76,10 @@ type qualifier =
   | Const
 [@@deriving sexp_of]
 
+type switch_case =
+  | Case of int
+  | Default
+
 type stmt =
   | Decl of qualifier option * ty * string * term
   | Set of term * term
@@ -87,7 +91,7 @@ type stmt =
   | For of stmt * term * stmt * stmt
   | Block of stmt list
   | Break
-  | SwitchStmt of term * (int * stmt list) list
+  | SwitchStmt of term * (switch_case * stmt list) list
 [@@deriving sexp_of]
 
 type decl =
