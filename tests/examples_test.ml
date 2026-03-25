@@ -20,7 +20,7 @@ let%expect_test "compile examples" =
     in
     match compile ~dump content with
     | Ok _ -> ()
-    | Error err -> print_s [%message "ERROR" (file : string) (err : Compiler_error.error)]);
+    | Error err -> print_endline (Compiler_error.to_string_hum err));
   [%expect
     {|
     ====== COMPILING EXAMPLE 2d_sdf_variants.glml ======
