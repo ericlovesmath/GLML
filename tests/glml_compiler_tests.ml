@@ -477,8 +477,7 @@ let%expect_test "structs" =
   [%expect
     {|
     [typecheck] at 5:15-5:35: record does not match any known struct
-      provided_fields
-      x: z
+      provided_fields: (x z)
     |}]
 ;;
 
@@ -916,8 +915,7 @@ let%expect_test "variant exhaustive checking and incorrect maching" =
   [%expect
     {|
     [typecheck] at 5:15-6:21: non-exhaustive match
-      missing
-      Blue: Green
+      missing: (Blue Green)
     |}];
   test
     {|
@@ -932,8 +930,7 @@ let%expect_test "variant exhaustive checking and incorrect maching" =
   [%expect
     {|
     [typecheck] at 7:15-7:32: wrong number of args to constructor
-      ctor
-      Circle
+      ctor: Circle
     |}]
 ;;
 
@@ -967,8 +964,7 @@ let%expect_test "toplevel constant (atomic only)" =
   [%expect
     {|
     [translate] at 2:5-2:34: top-level constant must be atomic
-      name
-      x_0
+      name: x_0
     |}]
 ;;
 
