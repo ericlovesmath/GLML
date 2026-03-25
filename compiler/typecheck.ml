@@ -817,14 +817,24 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
          | [] -> Err.fail "match cases don't match any variant type" ~loc
          | _ -> Err.fail "ambiguous match variant type" ~loc)
     in
-    (* [Exhaustive Checking] *)
-    let case_ctors = List.map cases ~f:(fun (c, _, _) -> c) |> String.Set.of_list in
-    let all_ctors = List.map variant_ctors ~f:fst |> String.Set.of_list in
-    let missing = Set.diff all_ctors case_ctors in
+    let case_ctors_list = List.map cases ~f:(fun (c, _, _) -> c) in
+    (* Exhaustive Checking *)
     let%bind () =
+      let case_ctors = String.Set.of_list case_ctors_list in
+      let all_ctors = List.map variant_ctors ~f:fst |> String.Set.of_list in
+      let missing = Set.diff all_ctors case_ctors in
       if Set.is_empty missing
       then Ok ()
       else Err.fail "non-exhaustive match" ~loc ~d:[%message (missing : String.Set.t)]
+    in
+    (* Duplicate Case Checking *)
+    let%bind () =
+      let init = String.Set.of_list [] in
+      List.fold_result case_ctors_list ~init ~f:(fun seen ctor ->
+        if Set.mem seen ctor
+        then Err.fail "duplicate match case" ~loc ~d:[%message (ctor : string)]
+        else Ok (Set.add seen ctor))
+      |> Result.ignore_m
     in
     (* Type-check each case *)
     let%bind cases, constrs_cases =
