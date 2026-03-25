@@ -3,7 +3,7 @@ open Glml_compiler
 
 let test s =
   match compile s with
-  | Error err -> print_s (Error.sexp_of_t err)
+  | Error err -> print_s (Compiler_error.sexp_of_error err)
   | Ok glsl -> print_endline glsl
 ;;
 
@@ -165,7 +165,10 @@ let%expect_test "indexing" =
     }
     |}];
   test_term "[0.0, 0.0, 0.0].4";
-  [%expect {| ("vec index out of bounds" (loc (1:27 - 1:44)) (n 3) (i 4)) |}]
+  [%expect {|
+    ((pass typecheck) (loc ((1:27 - 1:44))) (msg "vec index out of bounds")
+     (details (((n 3) (i 4)))))
+    |}]
 ;;
 
 let%expect_test "builtins" =
@@ -205,7 +208,10 @@ let%expect_test "builtins" =
     |}];
   test_term "#cross([ 1.0, 1.0 ], [ 0.0, 0.0 ])";
   [%expect
-    {| ("typecheck: type mismatch" (loc (1:27 - 1:61)) (ty (vec 2)) (ty' (vec 3))) |}]
+    {|
+    ((pass typecheck) (loc ((1:27 - 1:61))) (msg "type mismatch")
+     (details (((ty (vec 2)) (ty' (vec 3))))))
+    |}]
 ;;
 
 let%expect_test "multi argument functions / lambdas" =
@@ -302,14 +308,20 @@ let%expect_test "lambda lifting" =
       let f = fun (x : float) -> x + 1.0 in
       f
     |};
-  [%expect {| ("first-class functions are not supported" (t.loc (4:7 - 4:8))) |}];
+  [%expect {|
+    ((pass lambda_lift) (loc ((4:7 - 4:8)))
+     (msg "first-class functions are not supported") (details ()))
+    |}];
   test
     {|
     let apply_f (f : float -> float) (x : float) = f x
     let main (u : vec2) =
       [ apply_f (fun (x : float) -> x + 1.0) 10.0, 0.0, 0.0 ]
     |};
-  [%expect {| ("first-class anon functions are unsupported" (t.loc (4:18 - 4:44))) |}]
+  [%expect {|
+    ((pass lambda_lift) (loc ((4:18 - 4:44)))
+     (msg "first-class anon functions are unsupported") (details ()))
+    |}]
 ;;
 
 let%expect_test "recursive functions" =
@@ -467,8 +479,9 @@ let%expect_test "structs" =
     |};
   [%expect
     {|
-    ("record does not match any known struct" (loc (5:15 - 5:35))
-     (provided_fields (x z)))
+    ((pass typecheck) (loc ((5:15 - 5:35)))
+     (msg "record does not match any known struct")
+     (details ((provided_fields (x z)))))
     |}]
 ;;
 
@@ -905,9 +918,9 @@ let%expect_test "variant exhaustive checking and incorrect maching" =
     |};
   [%expect
     {|
-    ("typecheck: non-exhaustive match" (loc (5:15 - 6:21))
-     (missing (Blue Green)))
-  |}];
+    ((pass typecheck) (loc ((5:15 - 6:21))) (msg "non-exhaustive match")
+     (details ((missing (Blue Green)))))
+    |}];
   test
     {|
     type shape =
@@ -920,8 +933,8 @@ let%expect_test "variant exhaustive checking and incorrect maching" =
     |};
   [%expect
     {|
-    ("typecheck: wrong number of args to constructor" (loc (7:15 - 7:32))
-     (ctor Circle))
+    ((pass typecheck) (loc ((7:15 - 7:32)))
+     (msg "wrong number of args to constructor") (details ((ctor Circle))))
     |}]
 ;;
 
@@ -952,7 +965,10 @@ let%expect_test "toplevel constant (atomic only)" =
 
     let main (u : vec2) = [x, x, x]
     |};
-  [%expect {| "translate: top-level constant must be atomic" |}]
+  [%expect {|
+    ((pass translate) (loc ((2:5 - 2:34)))
+     (msg "top-level constant must be atomic") (details ((name x_0))))
+    |}]
 ;;
 
 let%expect_test "promotion of ints to floats" =

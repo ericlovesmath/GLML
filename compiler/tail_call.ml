@@ -1,7 +1,11 @@
 open Core
 open Anf
 open Sexplib.Sexp
-open Or_error.Let_syntax
+open Compiler_error.Let_syntax
+
+module Err = Compiler_error.Pass (struct
+    let name = "tail_call"
+  end)
 
 type term_desc =
   | Atom of atom
@@ -149,11 +153,10 @@ and of_anf (anf : Anf.anf) : anf =
 ;;
 
 let placeholder_anf_for_ty (tenv : type_env) (ty : Monomorphize.ty) (loc : Lexer.loc)
-  : anf Or_error.t
+  : anf Compiler_error.t
   =
-  let open Or_error.Let_syntax in
   let make ?(env = []) desc = Ok (({ desc; ty; loc } : term), env) in
-  let rec build (ty : Monomorphize.ty) : (term * (string * term) list) Or_error.t =
+  let rec build (ty : Monomorphize.ty) : (term * (string * term) list) Compiler_error.t =
     match ty with
     | TyInt -> make (Atom (Int 0))
     | TyFloat -> make (Atom (Float 0.0))
@@ -164,7 +167,7 @@ let placeholder_anf_for_ty (tenv : type_env) (ty : Monomorphize.ty) (loc : Lexer
       (match Map.find tenv s with
        | Some (RecordDecl fields) ->
          let%bind fields =
-           Or_error.all (List.map fields ~f:(fun (_, f_ty) -> build f_ty))
+           Compiler_error.all (List.map fields ~f:(fun (_, f_ty) -> build f_ty))
          in
          let args, nested_bindings =
            List.fold_right
@@ -179,13 +182,11 @@ let placeholder_anf_for_ty (tenv : type_env) (ty : Monomorphize.ty) (loc : Lexer
          in
          make ~env:nested_bindings (Record (s, args))
        | Some (VariantDecl _) | None ->
-         error_s [%message "tail_call: unknown struct type" s])
+         Err.fail "unknown struct type" ~d:[%message (s : string)])
     | TyVariant s ->
       (match Map.find tenv s with
        | Some (VariantDecl ((first_ctor, first_arg_tys) :: _)) ->
-         let%bind arg_terms =
-           Or_error.all (List.map first_arg_tys ~f:(fun arg_ty -> build arg_ty))
-         in
+         let%bind arg_terms = Compiler_error.all (List.map first_arg_tys ~f:build) in
          let args, nested_bindings =
            List.fold_right
              arg_terms
@@ -199,9 +200,9 @@ let placeholder_anf_for_ty (tenv : type_env) (ty : Monomorphize.ty) (loc : Lexer
          in
          make ~env:nested_bindings (Variant (s, first_ctor, args))
        | Some (VariantDecl []) | Some (RecordDecl _) | None ->
-         error_s [%message "tail_call: unknown variant type" s])
+         Err.fail "unknown variant type" ~d:[%message (s : string)])
     | TyArrow _ ->
-      error_s [%message "tail_call: unexpected arrow in tail" (ty : Monomorphize.ty)]
+      Err.fail "unexpected arrow in tail" ~d:[%message (ty : Monomorphize.ty)]
   in
   let%map term, bindings = build ty in
   List.fold_right
@@ -227,17 +228,15 @@ let contains_call (t : Anf.term) (v : string) : bool =
 ;;
 
 let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : string list)
-  : anf Or_error.t
+  : anf Compiler_error.t
   =
-  let rec patch (anf : Anf.anf) : anf Or_error.t =
-    let pure desc : anf Or_error.t = Ok { desc; ty = anf.ty; loc = anf.loc } in
+  let rec patch (anf : Anf.anf) : anf Compiler_error.t =
+    let pure desc : anf Compiler_error.t = Ok { desc; ty = anf.ty; loc = anf.loc } in
     match anf.desc with
     | Let (v, bind, tail) ->
       if contains_call bind name
       then
-        error_s
-          [%message
-            "tail_call: non-tail rec call detected" (name : string) (anf.loc : Lexer.loc)]
+        Err.fail "non-tail rec call detected" ~loc:anf.loc ~d:[%message (name : string)]
       else (
         let%bind tail = patch tail in
         pure (Let (v, of_term bind, tail)))
@@ -251,7 +250,7 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : strin
         |> List.map ~f:(fun (ctor, vars, body) ->
           let%map body = patch body in
           ctor, vars, body)
-        |> Or_error.all
+        |> Compiler_error.all
       in
       pure (Return { desc = Match (scrutinee, cases); ty; loc })
     | Return { desc = App (f, xs); ty = _; loc } when String.equal f name ->
@@ -270,13 +269,13 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : strin
       (match tail with
        | Ok res -> res
        | Unequal_lengths ->
-         error_s [%message "tail_call: args and xs don't match" (loc : Lexer.loc)])
+         Err.fail "args and xs don't match" ~loc ~d:[%message (args : string list)])
     | Return tail -> pure (Return (of_term tail))
   in
   patch anf
 ;;
 
-let remove_rec_top (tenv : type_env) (top : Anf.top) : top Or_error.t =
+let remove_rec_top (tenv : type_env) (top : Anf.top) : top Compiler_error.t =
   let pure desc = Ok { desc; ty = top.ty; loc = top.loc } in
   match top.desc with
   | Const (v, anf) -> pure (Const (v, of_anf anf))
@@ -302,7 +301,7 @@ let remove_rec_top (tenv : type_env) (top : Anf.top) : top Or_error.t =
     pure (Define { name; args; body; ret_ty })
 ;;
 
-let remove_rec (Program t : Anf.t) : t Or_error.t =
+let remove_rec (Program t : Anf.t) : t Compiler_error.t =
   let%bind tenv =
     t
     |> List.filter_map ~f:(fun top ->
@@ -310,7 +309,8 @@ let remove_rec (Program t : Anf.t) : t Or_error.t =
       | TypeDef (s, decl) -> Some (s, decl)
       | Define _ | Extern _ | Const _ -> None)
     |> String.Map.of_alist_or_error
+    |> Err.of_or_error
   in
-  let%map tops = Or_error.all (List.map ~f:(remove_rec_top tenv) t) in
+  let%map tops = Compiler_error.all (List.map ~f:(remove_rec_top tenv) t) in
   Program tops
 ;;

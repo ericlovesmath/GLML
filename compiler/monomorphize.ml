@@ -1,9 +1,11 @@
 open Core
 open Sexplib.Sexp
 open Stlc
-open Or_error.Let_syntax
+open Compiler_error.Let_syntax
 
-(* TODO: Remove [exn] functions and make this proper [Or_error.t] *)
+module Err = Compiler_error.Pass (struct
+    let name = "monomorphize"
+  end)
 
 let rec has_tyvars (ty : Typecheck.ty) : bool =
   match ty with
@@ -214,7 +216,9 @@ let rec resolve_spec
     let spec_name = Utils.fresh (name ^ "_" ^ mangle_ty concrete_ty) in
     let spec_map = add_spec env name concrete_ty spec_name in
     let sub = subst ~poly:entry.poly_type ~concrete:concrete_ty in
-    let sub = Typecheck.solve_scheme_constrs entry.poly_constrs sub |> Or_error.ok_exn in
+    let sub =
+      Typecheck.solve_scheme_constrs entry.poly_constrs sub |> Compiler_error.ok_exn
+    in
     let body = Typecheck.subst_term sub entry.poly_bind in
     (* For recursive functions, rename self-references *)
     let body =
@@ -280,7 +284,9 @@ and rewrite_refs (poly_env : poly_env) (env : spec_map) (t : Typecheck.term)
         let env, specs, defs1 =
           List.fold usages ~init:(env, [], []) ~f:(fun (env, specs, defs) concrete_ty ->
             let sub = subst ~poly:bind.ty ~concrete:concrete_ty in
-            let sub = Typecheck.solve_scheme_constrs constrs sub |> Or_error.ok_exn in
+            let sub =
+              Typecheck.solve_scheme_constrs constrs sub |> Compiler_error.ok_exn
+            in
             let spec_bind = Typecheck.subst_term sub bind in
             let spec_name = Utils.fresh (v ^ "_" ^ mangle_ty concrete_ty) in
             let env, spec_bind, new_defs = rewrite_refs poly_env env spec_bind in
@@ -459,9 +465,9 @@ let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
 
 type t = Program of top list [@@deriving sexp_of]
 
-let rec ty_of (t : Typecheck.ty) : ty Or_error.t =
+let rec ty_of (t : Typecheck.ty) : ty Compiler_error.t =
   match t with
-  | TyVar _ -> error_s [%message "monomorphize: unexpected TyVar after monomorphization"]
+  | TyVar _ -> Err.fail "unexpected TyVar after monomorphization"
   | TyFloat -> Ok TyFloat
   | TyInt -> Ok TyInt
   | TyBool -> Ok TyBool
@@ -475,22 +481,22 @@ let rec ty_of (t : Typecheck.ty) : ty Or_error.t =
     Ok (TyArrow (a, b))
 ;;
 
-let rec term_of_tc (t : Typecheck.term) : term Or_error.t =
+let rec term_of_tc (t : Typecheck.term) : term Compiler_error.t =
   let%bind ty = ty_of t.ty in
   let%bind desc = term_desc_of_tc t.desc in
   Ok ({ desc; ty; loc = t.loc } : term)
 
-and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Or_error.t =
+and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Compiler_error.t =
   match d with
   | Var v -> Ok (Var v)
   | Float f -> Ok (Float f)
   | Int i -> Ok (Int i)
   | Bool b -> Ok (Bool b)
   | Vec (n, ts) ->
-    let%map ts = Or_error.all (List.map ts ~f:term_of_tc) in
+    let%map ts = Compiler_error.all (List.map ts ~f:term_of_tc) in
     Vec (n, ts)
   | Mat (n, m, ts) ->
-    let%map ts = Or_error.all (List.map ts ~f:term_of_tc) in
+    let%map ts = Compiler_error.all (List.map ts ~f:term_of_tc) in
     Mat (n, m, ts)
   | Lam (v, lam_ty, body) ->
     let%bind lam_ty = ty_of lam_ty in
@@ -505,7 +511,7 @@ and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Or_error.t =
     let%bind body = term_of_tc body in
     if List.is_empty constrs
     then Ok (Let (r, v, bind, body))
-    else error_s [%message "monomorphize: Let has constraints" (d : Typecheck.term_desc)]
+    else Err.fail "Let has constraints" ~d:[%message (d : Typecheck.term_desc)]
   | If (c, t, e) ->
     let%bind c = term_of_tc c in
     let%bind t = term_of_tc t in
@@ -519,16 +525,16 @@ and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Or_error.t =
     let%map t = term_of_tc t in
     Index (t, i)
   | Builtin (b, ts) ->
-    let%map ts = Or_error.all (List.map ts ~f:term_of_tc) in
+    let%map ts = Compiler_error.all (List.map ts ~f:term_of_tc) in
     Builtin (b, ts)
   | Record (s, ts) ->
-    let%map ts = Or_error.all (List.map ts ~f:term_of_tc) in
+    let%map ts = Compiler_error.all (List.map ts ~f:term_of_tc) in
     Record (s, ts)
   | Field (t, f) ->
     let%map t = term_of_tc t in
     Field (t, f)
   | Variant (ty_name, ctor, args) ->
-    let%map args = Or_error.all (List.map args ~f:term_of_tc) in
+    let%map args = Compiler_error.all (List.map args ~f:term_of_tc) in
     Variant (ty_name, ctor, args)
   | Match (scrutinee, cases) ->
     let%bind scrutinee = term_of_tc scrutinee in
@@ -537,12 +543,12 @@ and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Or_error.t =
       |> List.map ~f:(fun (ctor, vars, body) ->
         let%map body = term_of_tc body in
         ctor, vars, body)
-      |> Or_error.all
+      |> Compiler_error.all
     in
     Ok (Match (scrutinee, cases))
 ;;
 
-let top_of_tc (t : Typecheck.top) : top Or_error.t =
+let top_of_tc (t : Typecheck.top) : top Compiler_error.t =
   let%bind ty = ty_of t.ty in
   let%bind desc =
     match t.desc with
@@ -555,23 +561,23 @@ let top_of_tc (t : Typecheck.top) : top Or_error.t =
         List.map fields ~f:(fun (field_name, field_ty) ->
           let%map field_ty = ty_of field_ty in
           field_name, field_ty)
-        |> Or_error.all
+        |> Compiler_error.all
       in
       TypeDef (name, RecordDecl fields)
     | TypeDef (name, VariantDecl ctors) ->
       let%map ctors =
         ctors
         |> List.map ~f:(fun (ctor_name, tys) ->
-          let%map tys = Or_error.all (List.map tys ~f:ty_of) in
+          let%map tys = Compiler_error.all (List.map tys ~f:ty_of) in
           ctor_name, tys)
-        |> Or_error.all
+        |> Compiler_error.all
       in
       TypeDef (name, VariantDecl ctors)
   in
   Ok { desc; ty; loc = t.loc }
 ;;
 
-let monomorphize (Program tops : Typecheck.t) : t Or_error.t =
+let monomorphize (Program tops : Typecheck.t) : t Compiler_error.t =
   let _, _, tops =
     List.fold
       tops
@@ -603,6 +609,6 @@ let monomorphize (Program tops : Typecheck.t) : t Or_error.t =
           poly_env, env, acc @ ref_defs @ inner_defs @ [ top ]
         | Extern _ | TypeDef _ -> poly_env, env, acc @ [ top ])
   in
-  let%map tops = Or_error.all (List.map tops ~f:top_of_tc) in
+  let%map tops = Compiler_error.all (List.map tops ~f:top_of_tc) in
   Program tops
 ;;

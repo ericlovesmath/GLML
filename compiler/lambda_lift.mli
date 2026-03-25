@@ -1,5 +1,3 @@
-open Core
-
 type term_desc =
   | Var of string
   | Float of float
@@ -49,4 +47,4 @@ type top =
 type t = Program of top list [@@deriving sexp_of]
 
 (** Lambda lifting, moving all lambda forms to the toplevel *)
-val lift : Uncurry.t -> t Or_error.t
+val lift : Uncurry.t -> t Compiler_error.t

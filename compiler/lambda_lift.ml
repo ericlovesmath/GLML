@@ -1,6 +1,10 @@
 open Core
 open Sexplib.Sexp
-open Or_error.Let_syntax
+open Compiler_error.Let_syntax
+
+module Err = Compiler_error.Pass (struct
+    let name = "lambda_lift"
+  end)
 
 type term_desc =
   | Var of string
@@ -149,11 +153,11 @@ let unroll_arrow ty =
 ;;
 
 let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
-  : (term * top list) Or_error.t
+  : (term * top list) Compiler_error.t
   =
   let lift = lift_term globals env in
   let lift_list ts =
-    let%map pairs = Or_error.all (List.map ts ~f:lift) in
+    let%map pairs = Compiler_error.all (List.map ts ~f:lift) in
     let terms, tops = List.unzip pairs in
     terms, List.concat tops
   in
@@ -162,8 +166,7 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
   | Var v ->
     (match Map.find env v with
      | None -> make (Var v) []
-     | Some _ ->
-       error_s [%message "first-class functions are not supported" (t.loc : Lexer.loc)])
+     | Some _ -> Err.fail "first-class functions are not supported" ~loc:t.loc)
   | Float f -> make (Float f) []
   | Int i -> make (Int i) []
   | Bool b -> make (Bool b) []
@@ -207,8 +210,7 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
     let lifted_fn : top = { desc; ty; loc } in
     let%bind bind, bind_tops = lift_term globals env bind in
     return (bind, body_tops @ [ lifted_fn ] @ bind_tops)
-  | Let (Rec _, _, _, _) ->
-    error_s [%message "lift_term: rec tag on non-lambda" (t.loc : Lexer.loc)]
+  | Let (Rec _, _, _, _) -> Err.fail "rec tag on non-lambda" ~loc:t.loc
   | Let (Nonrec, v, bind, body) ->
     let%bind bind, bind_tops = lift bind in
     let%bind body, body_tops = lift body in
@@ -248,11 +250,10 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
           (ctor, vars, body) :: acc_cases, acc_tops @ body_tops)
     in
     make (Match (scrutinee, List.rev cases)) (s_tops @ c_tops)
-  | Lam _ ->
-    error_s [%message "first-class anon functions are unsupported" (t.loc : Lexer.loc)]
+  | Lam _ -> Err.fail "first-class anon functions are unsupported" ~loc:t.loc
 ;;
 
-let lift_top (globals : String.Set.t) (top : Uncurry.top) : top list Or_error.t =
+let lift_top (globals : String.Set.t) (top : Uncurry.top) : top list Compiler_error.t =
   let make desc = { desc; ty = top.ty; loc = top.loc } in
   let lift = lift_term globals String.Map.empty in
   match top.desc with
@@ -266,7 +267,7 @@ let lift_top (globals : String.Set.t) (top : Uncurry.top) : top list Or_error.t 
   | TypeDef (name, decl) -> return [ make (TypeDef (name, decl)) ]
 ;;
 
-let lift (Program tops : Uncurry.t) : t Or_error.t =
+let lift (Program tops : Uncurry.t) : t Compiler_error.t =
   let globals =
     tops
     |> List.filter_map ~f:(fun top ->
@@ -276,6 +277,6 @@ let lift (Program tops : Uncurry.t) : t Or_error.t =
       | TypeDef _ -> None)
     |> String.Set.of_list
   in
-  let%bind top_blocks = Or_error.all (List.map tops ~f:(lift_top globals)) in
+  let%bind top_blocks = Compiler_error.all (List.map tops ~f:(lift_top globals)) in
   return (Program (List.concat top_blocks))
 ;;

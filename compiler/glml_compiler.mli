@@ -1,4 +1,5 @@
 open Core
+module Compiler_error = Compiler_error
 
 (** Passes in compiler available to be dumped *)
 module Passes : sig
@@ -22,4 +23,4 @@ end
 
 (** Compile from [Stlc.t] string repr to GLSL, pass handlers to dump the sexp
     output of each [Passes.t] if desired (defaults to none) *)
-val compile : ?dump:(Sexp.t -> unit) Passes.Map.t -> string -> string Or_error.t
+val compile : ?dump:(Sexp.t -> unit) Passes.Map.t -> string -> string Compiler_error.t

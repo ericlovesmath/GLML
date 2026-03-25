@@ -1,4 +1,3 @@
-open Core
 open Anf
 
 type term_desc =
@@ -59,4 +58,4 @@ type top =
 type t = Program of top list [@@deriving sexp_of]
 
 (** Removes variants and replaces them with tagged structs *)
-val lower : Tail_call.t -> t Or_error.t
+val lower : Tail_call.t -> t Compiler_error.t
