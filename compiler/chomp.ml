@@ -1,5 +1,6 @@
 open Core
 open Lexer
+open Compiler_error
 
 module Maybe = struct
   type error_info =
@@ -206,13 +207,19 @@ let chainl1 (p : 'a t) (op : ('a -> 'a -> 'a) t) : 'a t =
 
 let optional (p : 'a t) : 'a option t = p >>| Option.some <|> return None
 
-let run p s =
-  Maybe.to_or_error
-    (let last_loc = Lexer.init_loc in
-     let%bind.Maybe x, st = p { seq = Sequence.of_list s; last_loc } in
-     match Sequence.next st.seq with
-     | Some ((_, loc), _) -> fail ~loc "run_stream_not_fully_consumed"
-     | None -> Success x)
+let run ~pass p s =
+  let maybe =
+    let last_loc = Lexer.init_loc in
+    let%bind.Maybe x, st = p { seq = Sequence.of_list s; last_loc } in
+    match Sequence.next st.seq with
+    | Some ((_, loc), _) -> fail ~loc "run_stream_not_fully_consumed"
+    | None -> Success x
+  in
+  match maybe with
+  | Success x -> Ok x
+  | Fail info | Fatal info ->
+    let loc = Option.map info.found ~f:snd in
+    Compiler_error.of_or_error ~pass ?loc (Maybe.to_or_error maybe)
 ;;
 
 let tok t = satisfy (equal_token t)

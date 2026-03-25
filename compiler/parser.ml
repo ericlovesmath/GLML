@@ -92,8 +92,8 @@ let%expect_test "ty parse tests" =
     s
     |> Lexer.init
     |> Lexer.lex
-    |> Or_error.map ~f:(run ty_p)
-    |> Or_error.join
+    |> Compiler_error.bind ~f:(Chomp.run ~pass:"parser" ty_p)
+    |> Compiler_error.to_or_error
     |> Or_error.sexp_of_t sexp_of_ty
     |> print_s
   in
@@ -129,10 +129,10 @@ let%expect_test "ty parse tests" =
   test "()";
   [%expect
     {|
-    (Error ((chomp_error satisfy_eof) (contexts (between ty))))
+    (Error ("parser: ((chomp_error satisfy_eof) (contexts (between ty)))" ()))
     (Error
-     ((chomp_error satisfy_map_fail)
-      (contexts ("between (1:1 - 1:2)" "ty (1:1 - 1:2)"))))
+     ( "parser: ((chomp_error satisfy_map_fail)\
+      \n (contexts (\"between (1:1 - 1:2)\" \"ty (1:1 - 1:2)\")))" ()))
     |}]
 ;;
 
@@ -422,8 +422,8 @@ let test s =
   s
   |> Lexer.init
   |> Lexer.lex
-  |> Or_error.map ~f:(run term_p)
-  |> Or_error.join
+  |> Compiler_error.bind ~f:(Chomp.run ~pass:"parser" term_p)
+  |> Compiler_error.to_or_error
   |> Or_error.sexp_of_t sexp_of_term
   |> print_s
 ;;
@@ -530,11 +530,14 @@ let%expect_test "regression test, sequential non-parenthesized terms" =
   [%expect
     {|
     (Ok (let x 1. (+ x 1.)))
-    (Error ((chomp_error run_stream_not_fully_consumed) (contexts ())))
+    (Error
+     ("parser: ((chomp_error run_stream_not_fully_consumed) (contexts ()))" ()))
     (Ok (+ 1. (let x 1. x)))
-    (Error ((chomp_error run_stream_not_fully_consumed) (contexts ())))
+    (Error
+     ("parser: ((chomp_error run_stream_not_fully_consumed) (contexts ()))" ()))
     (Ok (app f (let x 1. x)))
-    (Error ((chomp_error run_stream_not_fully_consumed) (contexts ())))
+    (Error
+     ("parser: ((chomp_error run_stream_not_fully_consumed) (contexts ()))" ()))
     (Ok (vec2 1. (let x 2. x)))
     (Ok (if true 1. (+ 2. 3.)))
     |}]
@@ -608,12 +611,14 @@ let glml_p =
   >>| fun tops -> Program tops
 ;;
 
+let parse tokens = Chomp.run ~pass:"parser" glml_p tokens
+
 let test s =
   s
   |> Lexer.init
   |> Lexer.lex
-  |> Or_error.map ~f:(run glml_p)
-  |> Or_error.join
+  |> Compiler_error.bind ~f:parse
+  |> Compiler_error.to_or_error
   |> Or_error.sexp_of_t sexp_of_t
   |> print_s
 ;;

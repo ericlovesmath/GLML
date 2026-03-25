@@ -1,12 +1,25 @@
 open Core
+open Sexplib.Sexp
 
 (* TODO: [to_string_hum[? *)
 (* TODO: Refactor this whole file :P *)
 (* TODO: Function to take in raw glml string and underline [loc] *)
 
+type pos =
+  { i : int
+  ; line : int
+  ; col : int
+  }
+
+let sexp_of_pos { i = _; line; col } = Sexp.Atom [%string "%{line#Int}:%{col#Int}"]
+
+type loc = pos * pos
+
+let sexp_of_loc (l, r) = List [ sexp_of_pos l; Atom "-"; sexp_of_pos r ]
+
 type error =
   { pass : string
-  ; loc : Lexer.loc option
+  ; loc : loc option
   ; msg : string
   ; details : Sexp.t option
   }
@@ -36,7 +49,7 @@ let to_or_error (r : 'a t) : 'a Or_error.t =
     let parts =
       [ Sexp.Atom (pass ^ ": " ^ msg) ]
       @ (match loc with
-         | Some loc -> [ [%message (loc : Lexer.loc)] ]
+         | Some loc -> [ [%message (loc : loc)] ]
          | None -> [])
       @ [ Option.sexp_of_t Fn.id details ]
     in
