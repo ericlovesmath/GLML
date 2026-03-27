@@ -22,7 +22,7 @@ type term_desc =
   | Record of string * term list
   | Field of term * string
   | Variant of string * string * term list
-  | Match of term * (string * string list * term) list
+  | Match of term * (Stlc.pat * term) list
 
 and term =
   { desc : term_desc
@@ -54,9 +54,7 @@ let rec sexp_of_term_desc = function
   | Variant (ty_name, ctor, args) ->
     List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_term)
   | Match (scrutinee, cases) ->
-    let sexp_of_case (ctor, vars, body) =
-      List [ Atom ctor; List (List.map vars ~f:(fun v -> Atom v)); sexp_of_term body ]
-    in
+    let sexp_of_case (pat, body) = List [ Stlc.sexp_of_pat pat; sexp_of_term body ] in
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
@@ -135,7 +133,8 @@ let free_vars (env : env) (t : Uncurry.term) : Monomorphize.ty String.Map.t =
     | Variant (_, _, args) -> union_list (List.map args ~f:fv)
     | Match (scrutinee, cases) ->
       let fv_cases =
-        List.map cases ~f:(fun (_, vars, body) ->
+        List.map cases ~f:(fun (pat, body) ->
+          let vars = Stlc.pat_bound_vars pat in
           List.fold vars ~init:(fv body) ~f:Map.remove)
       in
       union_list (fv scrutinee :: fv_cases)
@@ -242,12 +241,9 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
   | Match (scrutinee, cases) ->
     let%bind scrutinee, s_tops = lift scrutinee in
     let%bind cases, c_tops =
-      List.fold_result
-        cases
-        ~init:([], [])
-        ~f:(fun (acc_cases, acc_tops) (ctor, vars, body) ->
-          let%map body, body_tops = lift body in
-          (ctor, vars, body) :: acc_cases, acc_tops @ body_tops)
+      List.fold_result cases ~init:([], []) ~f:(fun (acc_cases, acc_tops) (pat, body) ->
+        let%map body, body_tops = lift body in
+        (pat, body) :: acc_cases, acc_tops @ body_tops)
     in
     make (Match (scrutinee, List.rev cases)) (s_tops @ c_tops)
   | Lam _ -> Err.fail "first-class anon functions are unsupported" ~loc:t.loc
