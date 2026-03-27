@@ -34,12 +34,12 @@ let%expect_test "compile examples" =
       (Define Nonrec sdf
        (lambda (s (shape))
         (lambda (p ((vec 2)))
-         (match s (Circle (r) (- (length p) r))
-          (Rect (w h)
+         (match s ((Circle r) (- (length p) r))
+          ((Rect w h)
            (let d (vec2 (- (abs (index p 0)) w) (- (abs (index p 1)) h))
             (+ (length (max d (vec2 0. 0.)))
              (min (max (index d 0) (index d 1)) 0.))))
-          (Empty () 1.)))))
+          ((Empty) 1.)))))
       (Define Nonrec scene
        (lambda (p ((vec 2)))
         (let circle (app (app sdf (Variant Circle 0.3)) p)
@@ -77,13 +77,13 @@ let%expect_test "compile examples" =
       (Define Nonrec sdf_0
        (lambda (s_1 (shape))
         (lambda (p_2 ((vec 2)))
-         (match s_1 (Circle (r_3) (- (length p_2) r_3))
-          (Rect (w_4 h_5)
+         (match s_1 ((Circle r_3) (- (length p_2) r_3))
+          ((Rect w_4 h_5)
            (let d_6
             (vec2 (- (abs (index p_2 0)) w_4) (- (abs (index p_2 1)) h_5))
             (+ (length (max d_6 (vec2 0. 0.)))
              (min (max (index d_6 0) (index d_6 1)) 0.))))
-          (Empty () 1.)))))
+          ((Empty) 1.)))))
       (Define Nonrec scene_7
        (lambda (p_8 ((vec 2)))
         (let circle_9 (app (app sdf_0 (Variant Circle 0.3)) p_8)
@@ -124,9 +124,9 @@ let%expect_test "compile examples" =
         ((lambda (s_1 shape)
           ((lambda (p_2 (vec 2))
             ((match (s_1 : shape)
-              (Circle (r_3)
+              ((Circle r_3)
                ((- ((length (p_2 : (vec 2))) : float) (r_3 : float)) : float))
-              (Rect (w_4 h_5)
+              ((Rect w_4 h_5)
                ((let d_6
                  ((vec2
                    ((- ((abs ((index (p_2 : (vec 2)) 0) : float)) : float)
@@ -150,7 +150,7 @@ let%expect_test "compile examples" =
                     : float))
                   : float))
                 : float))
-              (Empty () (1. : float)))
+              ((Empty) (1. : float)))
              : float))
            : ((vec 2) -> float)))
          : (shape -> ((vec 2) -> float))))
@@ -295,9 +295,9 @@ let%expect_test "compile examples" =
         ((lambda (s_1 shape)
           ((lambda (p_2 (vec 2))
             ((match (s_1 : shape)
-              (Circle (r_3)
+              ((Circle r_3)
                ((- ((length (p_2 : (vec 2))) : float) (r_3 : float)) : float))
-              (Rect (w_4 h_5)
+              ((Rect w_4 h_5)
                ((let d_6
                  ((vec2
                    ((- ((abs ((index (p_2 : (vec 2)) 0) : float)) : float)
@@ -321,7 +321,7 @@ let%expect_test "compile examples" =
                     : float))
                   : float))
                 : float))
-              (Empty () (1. : float)))
+              ((Empty) (1. : float)))
              : float))
            : ((vec 2) -> float)))
          : (shape -> ((vec 2) -> float))))
@@ -462,13 +462,13 @@ let%expect_test "compile examples" =
        : shape)
       ((Define Nonrec sdf_0
         (lambda ((s_1 shape) (p_2 (vec 2)))
-         (match s_1 (Circle (r_3) (- (length p_2) r_3))
-          (Rect (w_4 h_5)
+         (match s_1 ((Circle r_3) (- (length p_2) r_3))
+          ((Rect w_4 h_5)
            (let d_6
             (vec2 (- (abs (index p_2 0)) w_4) (- (abs (index p_2 1)) h_5))
             (+ (length (max d_6 (vec2 0. 0.)))
              (min (max (index d_6 0) (index d_6 1)) 0.))))
-          (Empty () 1.))))
+          ((Empty) 1.))))
        : (shape -> ((vec 2) -> float)))
       ((Define Nonrec scene_7
         (lambda ((p_8 (vec 2)))
@@ -511,12 +511,12 @@ let%expect_test "compile examples" =
       : shape)
      ((Define Nonrec (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
-        (match s_1 (Circle (r_3) (- (length p_2) r_3))
-         (Rect (w_4 h_5)
+        (match s_1 ((Circle r_3) (- (length p_2) r_3))
+         ((Rect w_4 h_5)
           (let d_6 (vec2 (- (abs (index p_2 0)) w_4) (- (abs (index p_2 1)) h_5))
            (+ (length (max d_6 (vec2 0. 0.)))
             (min (max (index d_6 0) (index d_6 1)) 0.))))
-         (Empty () 1.))))
+         ((Empty) 1.))))
       : (shape -> ((vec 2) -> float)))
      ((Define Nonrec (name scene_7) (args ((p_8 (vec 2))))
        (body
@@ -560,8 +560,8 @@ let%expect_test "compile examples" =
        (body
         (return
          (match s_1
-          (Circle (r_3) (let anf_95 (length p_2) (return (- anf_95 r_3))))
-          (Rect (w_4 h_5)
+          ((Circle r_3) (let anf_95 (length p_2) (return (- anf_95 r_3))))
+          ((Rect w_4 h_5)
            (let anf_96 (index p_2 0)
             (let anf_97 (abs anf_96)
              (let anf_98 (- anf_97 w_4)
@@ -577,7 +577,7 @@ let%expect_test "compile examples" =
                        (let anf_107 (max anf_105 anf_106)
                         (let anf_108 (min anf_107 0.)
                          (return (+ anf_104 anf_108)))))))))))))))))
-          (Empty () (return 1.))))))
+          ((Empty) (return 1.))))))
       : (shape -> ((vec 2) -> float)))
      ((Define Nonrec (name scene_7) (args ((p_8 (vec 2))))
        (body
@@ -644,8 +644,8 @@ let%expect_test "compile examples" =
        (body
         (return
          (match s_1
-          (Circle (r_3) (let anf_95 (length p_2) (return (- anf_95 r_3))))
-          (Rect (w_4 h_5)
+          ((Circle r_3) (let anf_95 (length p_2) (return (- anf_95 r_3))))
+          ((Rect w_4 h_5)
            (let anf_96 (index p_2 0)
             (let anf_97 (abs anf_96)
              (let anf_98 (- anf_97 w_4)
@@ -661,7 +661,7 @@ let%expect_test "compile examples" =
                        (let anf_107 (max anf_105 anf_106)
                         (let anf_108 (min anf_107 0.)
                          (return (+ anf_104 anf_108)))))))))))))))))
-          (Empty () (return 1.))))))
+          ((Empty) (return 1.))))))
       : (shape -> ((vec 2) -> float)))
      ((Define (name scene_7) (args ((p_8 (vec 2))))
        (body

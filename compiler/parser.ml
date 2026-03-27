@@ -42,6 +42,21 @@ let between brace_type p =
   tok l *> p <* tok r <??> "between"
 ;;
 
+(** Match patterns *)
+let pat_p =
+  (let%bind ctor = constructor_p in
+   let%bind vars =
+     between `Paren (commas ident_p) <|> (ident_p >>| fun v -> [ v ]) <|> return []
+   in
+   return (PatCtor (ctor, vars)))
+  <|> tok TRUE *> return (PatLitBool true)
+  <|> tok FALSE *> return (PatLitBool false)
+  <|> tok SUB *> commit (num_p >>| fun n -> PatLitInt (-n))
+  <|> (num_p >>| fun n -> PatLitInt n)
+  <|> (ident_p >>| fun v -> PatVar v)
+  <??> "pat"
+;;
+
 let ty_vec_p =
   let%bind n =
     satisfy_map (function
@@ -244,7 +259,6 @@ and term_lam_p =
             return (make_lambdas params t))))
     st
 
-(* TODO: All branches of math must be a constructor right now, which is limiting *)
 and term_match_p =
   fun st ->
   (with_term_loc
@@ -255,16 +269,10 @@ and term_match_p =
             let%bind cases =
               many1
                 (let%bind _ = tok BAR in
-                 let%bind ctor = constructor_p in
-                 let%bind vars =
-                   (* [Const (x, y)] or [Const x] or [Const] *)
-                   between `Paren (commas ident_p)
-                   <|> (ident_p >>| fun v -> [ v ])
-                   <|> return []
-                 in
+                 let%bind pat = pat_p in
                  let%bind _ = tok ARROW in
                  let%bind body = term_p in
-                 return (ctor, vars, body))
+                 return (pat, body))
             in
             return (Match (scrutinee, cases))))
    <??> "term_match")
@@ -437,6 +445,8 @@ let%expect_test "term parse tests" =
   test "Constr x";
   test "Constr (x, 2.0)";
   test "match x with | Constr x -> a | Alt b -> b";
+  test "match x with | true -> a | _ -> b";
+  test "match x with | -1 -> a | 23 -> b | var -> c";
   [%expect
     {|
     variable_name
@@ -457,7 +467,9 @@ let%expect_test "term parse tests" =
     (Variant Constr)
     (Variant Constr x)
     (Variant Constr x 2.)
-    (match x (Constr (x) a) (Alt (b) b))
+    (match x ((Constr x) a) ((Alt b) b))
+    (match x (true a) (_ b))
+    (match x (-1 a) (23 b) (var c))
     |}];
   test "-113.0";
   test "-113.";
