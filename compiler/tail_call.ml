@@ -19,7 +19,7 @@ type term_desc =
   | Record of string * atom list
   | Field of atom * string
   | Variant of string * string * atom list
-  | Match of atom * (string * string list * anf) list
+  | Match of atom * (Stlc.pat * anf) list
 
 and term =
   { desc : term_desc
@@ -59,13 +59,7 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | Variant (ty_name, ctor, args) ->
     List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_atom)
   | Match (scrutinee, cases) ->
-    let sexp_of_case (ctor, vars, body) =
-      List
-        [ Atom ctor
-        ; List (List.map vars ~f:(fun v -> Sexplib.Sexp.Atom v))
-        ; sexp_of_anf body
-        ]
-    in
+    let sexp_of_case (pat, body) = List [ Stlc.sexp_of_pat pat; sexp_of_anf body ] in
     List (Atom "match" :: sexp_of_atom scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
@@ -141,9 +135,7 @@ let rec of_term (t : Anf.term) : term =
   | If (c, t, f) -> pure (If (c, of_anf t, of_anf f))
   | Variant (ty_name, ctor, args) -> pure (Variant (ty_name, ctor, args))
   | Match (scrutinee, cases) ->
-    pure
-      (Match
-         (scrutinee, List.map cases ~f:(fun (ctor, vars, body) -> ctor, vars, of_anf body)))
+    pure (Match (scrutinee, List.map cases ~f:(Tuple2.map_snd ~f:of_anf)))
 
 and of_anf (anf : Anf.anf) : anf =
   let pure desc : anf = { desc; ty = anf.ty; loc = anf.loc } in
@@ -216,8 +208,7 @@ let contains_call (t : Anf.term) (v : string) : bool =
     match t.desc with
     | App (f, _) -> String.equal f v
     | If (_, t, f) -> contains_call_anf t || contains_call_anf f
-    | Match (_, cases) ->
-      List.exists cases ~f:(fun (_, _, body) -> contains_call_anf body)
+    | Match (_, cases) -> List.exists cases ~f:(fun (_, body) -> contains_call_anf body)
     | _ -> false
   and contains_call_anf (a : Anf.anf) : bool =
     match a.desc with
@@ -247,9 +238,9 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : strin
     | Return { desc = Match (scrutinee, cases); ty; loc } ->
       let%bind cases =
         cases
-        |> List.map ~f:(fun (ctor, vars, body) ->
+        |> List.map ~f:(fun (pat, body) ->
           let%map body = patch body in
-          ctor, vars, body)
+          pat, body)
         |> Compiler_error.all
       in
       pure (Return { desc = Match (scrutinee, cases); ty; loc })

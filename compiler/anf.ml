@@ -26,7 +26,7 @@ type term_desc =
   | Record of string * atom list
   | Field of atom * string
   | Variant of string * string * atom list
-  | Match of atom * (string * string list * anf) list
+  | Match of atom * (Stlc.pat * anf) list
 
 and term =
   { desc : term_desc
@@ -63,9 +63,7 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | Variant (ty_name, ctor, args) ->
     List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_atom)
   | Match (scrutinee, cases) ->
-    let sexp_of_case (ctor, vars, body) =
-      List [ Atom ctor; List (List.map vars ~f:(fun v -> Sexp.Atom v)); sexp_of_anf body ]
-    in
+    let sexp_of_case (pat, body) = List [ Stlc.sexp_of_pat pat; sexp_of_anf body ] in
     List (Atom "match" :: sexp_of_atom scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
@@ -163,9 +161,7 @@ let rec normalize (expr : Lambda_lift.term) : anf =
     atomize_list args (fun args -> pure (Variant (ty_name, ctor, args)))
   | Match (scrutinee, cases) ->
     atomize scrutinee (fun s ->
-      let cases =
-        List.map cases ~f:(fun (ctor, vars, body) -> ctor, vars, normalize body)
-      in
+      let cases = List.map cases ~f:(Tuple2.map_snd ~f:normalize) in
       pure (Match (s, cases)))
 
 and atomize (expr : Lambda_lift.term) (k : atom -> anf) : anf =

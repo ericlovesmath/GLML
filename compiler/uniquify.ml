@@ -79,18 +79,23 @@ let rec uniquify_term (ctx : env) (t : term) : term Compiler_error.t =
     let%bind scrutinee = aux scrutinee in
     let%bind cases =
       cases
-      |> List.map ~f:(fun (ctor, vs, body) ->
-        let vs' = List.map vs ~f:Utils.fresh in
-        let ctx =
-          List.fold2 vs vs' ~init:ctx ~f:(fun ctx v v' -> Map.set ctx ~key:v ~data:v')
-        in
-        let%bind ctx =
-          match ctx with
-          | Ok ctx -> Ok ctx
-          | Unequal_lengths -> Err.fail "unequal lengths, unreachable"
+      |> List.map ~f:(fun (pat, body) ->
+        let pat, ctx =
+          match pat with
+          | PatCtor (ctor, vs) ->
+            let vs' = List.map vs ~f:Utils.fresh in
+            let ctx =
+              (* TODO: Evil evil exn that I'm too lazy to thread a [List.fold_result] *)
+              List.fold2_exn vs vs' ~init:ctx ~f:(fun c v v' -> Map.set c ~key:v ~data:v')
+            in
+            PatCtor (ctor, vs'), ctx
+          | PatVar v ->
+            let v' = Utils.fresh v in
+            PatVar v', Map.set ctx ~key:v ~data:v'
+          | PatLitBool _ | PatLitInt _ -> pat, ctx
         in
         let%map body = uniquify_term ctx body in
-        ctor, vs', body)
+        pat, body)
       |> Compiler_error.all
     in
     pure (Match (scrutinee, cases))
