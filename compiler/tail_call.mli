@@ -12,7 +12,7 @@ type term_desc =
   | Record of string * atom list
   | Field of atom * string
   | Variant of string * string * atom list
-  | Match of atom * (string * string list * anf) list
+  | Match of atom * (Stlc.pat * anf) list
 [@@deriving sexp_of]
 
 and term =

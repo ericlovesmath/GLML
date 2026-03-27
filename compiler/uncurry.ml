@@ -18,7 +18,7 @@ type term_desc =
   | Record of string * term list
   | Field of term * string
   | Variant of string * string * term list
-  | Match of term * (string * string list * term) list
+  | Match of term * (Stlc.pat * term) list
 
 and term =
   { desc : term_desc
@@ -58,9 +58,7 @@ let rec sexp_of_term_desc = function
   | Variant (ty_name, ctor, args) ->
     List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_term)
   | Match (scrutinee, cases) ->
-    let sexp_of_case (ctor, vars, body) =
-      List [ Atom ctor; List (List.map vars ~f:(fun v -> Atom v)); sexp_of_term body ]
-    in
+    let sexp_of_case (pat, body) = List [ Stlc.sexp_of_pat pat; sexp_of_term body ] in
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
@@ -120,9 +118,7 @@ and uncurry_term_desc (t : Monomorphize.term_desc) : term_desc =
   | Field (t, f) -> Field (uncurry_term t, f)
   | Variant (ty_name, ctor, args) -> Variant (ty_name, ctor, List.map args ~f:uncurry_term)
   | Match (scrutinee, cases) ->
-    Match
-      ( uncurry_term scrutinee
-      , List.map cases ~f:(fun (ctor, vars, body) -> ctor, vars, uncurry_term body) )
+    Match (uncurry_term scrutinee, List.map cases ~f:(Tuple2.map_snd ~f:uncurry_term))
 
 and uncurry_term (t : Monomorphize.term) : term =
   { desc = uncurry_term_desc t.desc; ty = t.ty; loc = t.loc }

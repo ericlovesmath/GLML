@@ -59,7 +59,7 @@ type term_desc =
   | Record of string * term list
   | Field of term * string
   | Variant of string * string * term list
-  | Match of term * (string * string list * term) list
+  | Match of term * (Stlc.pat * term) list
 [@@deriving sexp_of]
 
 and term =

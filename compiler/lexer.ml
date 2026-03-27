@@ -203,7 +203,7 @@ let read_lexeme (t : t) : token Or_error.t =
           let frac_part = read_while Char.is_digit t in
           Ok (FLOAT_LIT (Float.of_string (int_part ^ "." ^ frac_part)))
         | _ -> Ok (NUMERIC (Int.of_string int_part)))
-     | c when Char.is_alpha c ->
+     | c when Char.is_alpha c || Char.equal '_' c ->
        let s = read_while (fun c -> Char.is_alphanum c || String.mem "_'" c) t in
        (match s with
         | "true" -> Ok TRUE

@@ -1,3 +1,12 @@
+type pat =
+  | PatCtor of string * string list
+  | PatLitBool of bool
+  | PatLitInt of int
+  | PatVar of string
+[@@deriving sexp_of, equal]
+
+val pat_bound_vars : pat -> string list
+
 type ty =
   | TyFloat
   | TyInt
@@ -37,7 +46,7 @@ type term_desc =
   | Record of (string * term) list
   | Field of term * string
   | Variant of string * term list
-  | Match of term * (string * string list * term) list
+  | Match of term * (pat * term) list
 [@@deriving sexp_of]
 
 and term =

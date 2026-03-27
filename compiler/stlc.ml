@@ -1,6 +1,26 @@
 open Core
 open Sexplib.Sexp
 
+type pat =
+  | PatCtor of string * string list
+  | PatLitBool of bool
+  | PatLitInt of int
+  | PatVar of string
+[@@deriving equal]
+
+let sexp_of_pat = function
+  | PatCtor (ctor, vars) -> List (List.map (ctor :: vars) ~f:(fun v -> Atom v))
+  | PatLitBool b -> Atom (Bool.to_string b)
+  | PatLitInt n -> Atom (Int.to_string n)
+  | PatVar v -> Atom v
+;;
+
+let pat_bound_vars = function
+  | PatCtor (_, vs) -> vs
+  | PatLitBool _ | PatLitInt _ -> []
+  | PatVar v -> [ v ]
+;;
+
 type ty =
   | TyFloat
   | TyInt
@@ -50,7 +70,7 @@ type term_desc =
   | Record of (string * term) list
   | Field of term * string
   | Variant of string * term list
-  | Match of term * (string * string list * term) list
+  | Match of term * (pat * term) list
 
 and term =
   { desc : term_desc
@@ -107,9 +127,7 @@ let rec sexp_of_term_desc = function
   | Variant (ctor, args) ->
     List (Atom "Variant" :: Atom ctor :: List.map args ~f:sexp_of_term)
   | Match (scrutinee, cases) ->
-    let sexp_of_case (ctor, vars, body) =
-      List [ Atom ctor; List (List.map vars ~f:(fun v -> Atom v)); sexp_of_term body ]
-    in
+    let sexp_of_case (pat, body) = List [ sexp_of_pat pat; sexp_of_term body ] in
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
