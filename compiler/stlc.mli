@@ -2,6 +2,7 @@ type pat =
   | PatCtor of string * string list
   | PatLitBool of bool
   | PatLitInt of int
+  | PatLitFloat of float
   | PatVar of string
 [@@deriving sexp_of, equal]
 

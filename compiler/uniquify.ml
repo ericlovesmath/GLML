@@ -92,7 +92,7 @@ let rec uniquify_term (ctx : env) (t : term) : term Compiler_error.t =
           | PatVar v ->
             let v' = Utils.fresh v in
             PatVar v', Map.set ctx ~key:v ~data:v'
-          | PatLitBool _ | PatLitInt _ -> pat, ctx
+          | PatLitBool _ | PatLitInt _ | PatLitFloat _ -> pat, ctx
         in
         let%map body = uniquify_term ctx body in
         pat, body)

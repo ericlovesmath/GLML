@@ -5,6 +5,7 @@ type pat =
   | PatCtor of string * string list
   | PatLitBool of bool
   | PatLitInt of int
+  | PatLitFloat of float
   | PatVar of string
 [@@deriving equal]
 
@@ -12,12 +13,13 @@ let sexp_of_pat = function
   | PatCtor (ctor, vars) -> List (List.map (ctor :: vars) ~f:(fun v -> Atom v))
   | PatLitBool b -> Atom (Bool.to_string b)
   | PatLitInt n -> Atom (Int.to_string n)
+  | PatLitFloat f -> Atom (Float.to_string f)
   | PatVar v -> Atom v
 ;;
 
 let pat_bound_vars = function
   | PatCtor (_, vs) -> vs
-  | PatLitBool _ | PatLitInt _ -> []
+  | PatLitBool _ | PatLitInt _ | PatLitFloat _ -> []
   | PatVar v -> [ v ]
 ;;
 

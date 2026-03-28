@@ -805,10 +805,11 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
     in
     (* Validate no mixing of pattern kinds *)
     let%bind () =
-      let kind_of : pat -> [ `Variant | `Bool | `Int ] option = function
+      let kind_of : pat -> [ `Variant | `Bool | `Int | `Float ] option = function
         | PatCtor _ -> Some `Variant
         | PatLitBool _ -> Some `Bool
         | PatLitInt _ -> Some `Int
+        | PatLitFloat _ -> Some `Float
         | PatVar _ -> None
       in
       match first_meaningful with
@@ -819,7 +820,8 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
           match kind_of pat with
           | None -> Ok ()
           | Some k ->
-            if Option.equal Poly.( = ) (Some k) first_kind
+            (* TODO: Poly equality is kind of evil *)
+            if Poly.equal (Some k) first_kind
             then Ok ()
             else Err.fail "mixed pattern kinds in match" ~loc)
     in
@@ -935,7 +937,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
                (List.fold2_exn vars expected_arg_tys ~init:ctx ~f:(fun ctx v ty ->
                   Map.set ctx ~key:v ~data:([], [], ty)))
          | PatVar v -> Ok (Map.set ctx ~key:v ~data:([], [], TyVariant variant_name))
-         | PatLitBool _ | PatLitInt _ -> Ok ctx)
+         | PatLitBool _ | PatLitInt _ | PatLitFloat _ -> Ok ctx)
      | Some (PatLitBool _) ->
        (* Bool match *)
        let%bind () =
@@ -994,6 +996,30 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
        typecheck_cases ~scrutinee_ty:TyInt ~ctx_for_pat:(fun pat ->
          match pat with
          | PatVar v -> Ok (Map.set ctx ~key:v ~data:([], [], TyInt))
+         | _ -> Ok ctx)
+     | Some (PatLitFloat _) ->
+       let%bind () =
+         if has_catchall
+         then Ok ()
+         else Err.fail "float match must have a wildcard/var catch-all" ~loc
+       in
+       (* Duplicate Checking *)
+       let%bind () =
+         let float_cases =
+           List.filter_map cases ~f:(fun (p, _) ->
+             match p with
+             | PatLitFloat f -> Some f
+             | _ -> None)
+         in
+         List.fold_result float_cases ~init:[] ~f:(fun seen f ->
+           if List.exists seen ~f:(Float.equal f)
+           then Err.fail "duplicate float pattern" ~loc ~d:[%message (f : float)]
+           else Ok (f :: seen))
+         |> Result.ignore_m
+       in
+       typecheck_cases ~scrutinee_ty:TyFloat ~ctx_for_pat:(fun pat ->
+         match pat with
+         | PatVar v -> Ok (Map.set ctx ~key:v ~data:([], [], TyFloat))
          | _ -> Ok ctx))
 ;;
 
