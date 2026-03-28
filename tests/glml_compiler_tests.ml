@@ -1027,3 +1027,181 @@ let%expect_test "promotion of ints to floats" =
     }
     |}]
 ;;
+
+let%expect_test "bool match" =
+  test
+    {|
+    #extern bool b
+    let main (coord : vec2) =
+      match b with
+      | true -> [1.0, 0.0, 0.0]
+      | false -> [0.0, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform bool b;
+    vec3 main_pure(vec2 coord_0) {
+        if (b) {
+            return vec3(1., 0., 0.);
+        } else {
+            return vec3(0., 0., 0.);
+        }
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    #extern bool b
+    let main (coord : vec2) =
+      let x = match b with
+        | true -> 1.0
+      in [x, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    [typecheck] at 4:15-5:22: non-exhaustive bool match (missing true or false)
+      |
+    4 |       let x = match b with
+    5 |         | true -> 1.0
+      |
+    |}];
+  test
+    {|
+    #extern bool b
+    let main (coord : vec2) =
+      let x = match b with
+        | true -> 1.0
+        | true -> 1.0
+        | false -> 1.0
+      in [x, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    [typecheck] at 4:15-7:23: duplicate bool pattern
+      b: true
+      |
+    4 |       let x = match b with
+    5 |         | true -> 1.0
+    6 |         | true -> 1.0
+    7 |         | false -> 1.0
+      |
+    |}];
+  test
+    {|
+    #extern bool b
+    let main (coord : vec2) =
+      let x = match b with
+        | false -> 1.0
+        | _ -> 0.0
+      in [x, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform bool b;
+    vec3 main_pure(vec2 coord_0) {
+        float x_1 = 0.;
+        if (b) {
+            bool __2 = b;
+            x_1 = 0.;
+        } else {
+            x_1 = 1.;
+        }
+        return vec3(x_1, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "int match" =
+  test
+    {|
+    #extern int n
+    let main (coord : vec2) =
+      let x = match n with
+        | 0 -> 0.0
+        | 1 -> 1.0
+        | _ -> 2.0
+      in [x, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform int n;
+    vec3 main_pure(vec2 coord_0) {
+        float x_1 = 0.;
+        switch (n) {
+            case 0: {
+                x_1 = 0.;
+                break;
+            }
+            case 1: {
+                x_1 = 1.;
+                break;
+            }
+            default: {
+                int __2 = n;
+                x_1 = 2.;
+                break;
+            }
+        }
+        return vec3(x_1, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    #extern int n
+    let main (coord : vec2) =
+      let x = match n with
+        | 0 -> 0.0
+        | 4 -> 0.0
+      in [x, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    [typecheck] at 4:15-6:19: int match must have a wildcard/var catch-all
+      |
+    4 |       let x = match n with
+    5 |         | 0 -> 0.0
+    6 |         | 4 -> 0.0
+      |
+    |}];
+  test
+    {|
+    #extern int n
+    let main (coord : vec2) =
+      let x = match n with
+        | 0 -> 0.0
+        | 0 -> 1.0
+        | k -> 0.0
+      in [x, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    [typecheck] at 4:15-7:19: duplicate int pattern
+      n: 0
+      |
+    4 |       let x = match n with
+    5 |         | 0 -> 0.0
+    6 |         | 0 -> 1.0
+    7 |         | k -> 0.0
+      |
+    |}]
+;;
