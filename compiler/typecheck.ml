@@ -82,7 +82,7 @@ type term_desc =
   | Record of string * term list
   | Field of term * string
   | Variant of string * string * term list
-  | Match of term * (string * string list * term) list
+  | Match of term * (Stlc.pat * term) list
 
 and term =
   { desc : term_desc
@@ -146,9 +146,7 @@ let rec sexp_of_term_desc = function
   | Variant (ty_name, ctor, args) ->
     List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_term)
   | Match (scrutinee, cases) ->
-    let sexp_of_case (ctor, vars, body) =
-      List [ Atom ctor; List (List.map vars ~f:(fun v -> Atom v)); sexp_of_term body ]
-    in
+    let sexp_of_case (pat, body) = List [ Stlc.sexp_of_pat pat; sexp_of_term body ] in
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = List [ sexp_of_term_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
@@ -234,9 +232,7 @@ let rec subst_term (sub : substitution) (t : term) : term =
     | Field (t, f) -> Field (subst t, f)
     | Variant (ty_name, ctor, args) -> Variant (ty_name, ctor, List.map args ~f:subst)
     | Match (scrutinee, cases) ->
-      Match
-        ( subst scrutinee
-        , List.map cases ~f:(fun (ctor, vars, body) -> ctor, vars, subst body) )
+      Match (subst scrutinee, List.map cases ~f:(fun (pat, body) -> pat, subst body))
   in
   { t with desc; ty = subst_ty sub t.ty }
 ;;
@@ -791,86 +787,214 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
         (TyVariant variant_name)
         constrs_args)
   | Match (scrutinee, cases) ->
+    (* TODO: The pattern matching typechecking code sucks so much my god, use Eq constrs? *)
     let%bind scrutinee, constrs_s = gen_term structs variants ctx scrutinee in
     let ret_ty = fresh_tyvar () in
-    let%bind variant_name, variant_ctors =
-      let find_from_ty ty =
-        match ty with
-        | TyVariant name ->
-          (match Map.find variants name with
-           | Some ctors -> Some (name, ctors)
-           | None -> None)
-        | _ -> None
+    let has_catchall =
+      List.exists cases ~f:(fun (pat, _) ->
+        match pat with
+        | PatVar _ -> true
+        | _ -> false)
+    in
+    (* Find first nonvar pattern to determine match kind *)
+    let first_meaningful =
+      List.find_map cases ~f:(fun (pat, _) ->
+        match pat with
+        | PatVar _ -> None
+        | _ -> Some pat)
+    in
+    (* Validate no mixing of pattern kinds *)
+    let%bind () =
+      let kind_of : pat -> [ `Variant | `Bool | `Int ] option = function
+        | PatCtor _ -> Some `Variant
+        | PatLitBool _ -> Some `Bool
+        | PatLitInt _ -> Some `Int
+        | PatVar _ -> None
       in
-      match find_from_ty scrutinee.ty with
-      | Some x -> Ok x
-      | None ->
-        let case_ctors = List.map cases ~f:(fun (ctor, _, _) -> ctor) in
-        let candidates =
-          Map.filter variants ~f:(fun ctors ->
-            let ctor_names = List.map ctors ~f:fst in
-            List.for_all case_ctors ~f:(fun c ->
-              List.mem ctor_names c ~equal:String.equal))
-        in
-        (match Map.to_alist candidates with
-         | [ (name, ctors) ] -> Ok (name, ctors)
-         | [] -> Err.fail "match cases don't match any variant type" ~loc
-         | _ -> Err.fail "ambiguous match variant type" ~loc)
+      match first_meaningful with
+      | None -> Ok ()
+      | Some first ->
+        let first_kind = kind_of first in
+        List.fold_result cases ~init:() ~f:(fun () (pat, _) ->
+          match kind_of pat with
+          | None -> Ok ()
+          | Some k ->
+            if Option.equal Poly.( = ) (Some k) first_kind
+            then Ok ()
+            else Err.fail "mixed pattern kinds in match" ~loc)
     in
-    let case_ctors_list = List.map cases ~f:(fun (c, _, _) -> c) in
-    (* Exhaustive Checking *)
-    let%bind () =
-      let case_ctors = String.Set.of_list case_ctors_list in
-      let all_ctors = List.map variant_ctors ~f:fst |> String.Set.of_list in
-      let missing = Set.diff all_ctors case_ctors in
-      if Set.is_empty missing
-      then Ok ()
-      else Err.fail "non-exhaustive match" ~loc ~d:[%message (missing : String.Set.t)]
-    in
-    (* Duplicate Case Checking *)
-    let%bind () =
-      let init = String.Set.of_list [] in
-      List.fold_result case_ctors_list ~init ~f:(fun seen ctor ->
-        if Set.mem seen ctor
-        then Err.fail "duplicate match case" ~loc ~d:[%message (ctor : string)]
-        else Ok (Set.add seen ctor))
-      |> Result.ignore_m
-    in
-    (* Type-check each case *)
-    let%bind cases, constrs_cases =
-      List.fold_result
-        cases
-        ~init:([], [])
-        ~f:(fun (acc_cases, acc_constrs) (ctor, vars, body) ->
-          let%bind _, expected_arg_tys =
-            match List.find variant_ctors ~f:(fun (c, _) -> String.equal c ctor) with
-            | Some x -> Ok x
-            | None ->
-              Err.fail "unknown constructor in match" ~loc ~d:[%message (ctor : string)]
-          in
-          if List.length vars <> List.length expected_arg_tys
-          then (
-            let expected = List.length expected_arg_tys in
-            let got = List.length vars in
-            Err.fail
-              "wrong number of bindings in match case"
-              ~loc
-              ~d:[%message (ctor : string) (expected : int) (got : int)])
-          else (
-            let ctx =
-              List.fold2_exn vars expected_arg_tys ~init:ctx ~f:(fun ctx v ty ->
-                Map.set ctx ~key:v ~data:([], [], ty))
-            in
+    let typecheck_cases ~scrutinee_ty ~ctx_for_pat =
+      let%bind cases, constrs_cases =
+        List.fold_result
+          cases
+          ~init:([], [])
+          ~f:(fun (acc_cases, acc_constrs) (pat, body) ->
+            let%bind ctx = ctx_for_pat pat in
             let%bind body, constrs_body = gen_term structs variants ctx body in
             return
-              ( (ctor, vars, body) :: acc_cases
-              , (constr (Eq (body.ty, ret_ty)) :: constrs_body) @ acc_constrs )))
+              ( (pat, body) :: acc_cases
+              , (constr (Eq (body.ty, ret_ty)) :: constrs_body) @ acc_constrs ))
+      in
+      let scrutinee_constr = constr (Eq (scrutinee.ty, scrutinee_ty)) in
+      make
+        (Match (scrutinee, List.rev cases))
+        ret_ty
+        (scrutinee_constr :: (constrs_s @ constrs_cases))
     in
-    let scrutinee_constr = constr (Eq (scrutinee.ty, TyVariant variant_name)) in
-    make
-      (Match (scrutinee, List.rev cases))
-      ret_ty
-      (scrutinee_constr :: (constrs_s @ constrs_cases))
+    (match first_meaningful with
+     | Some (PatVar _) -> Err.fail "unreachable PatVar"
+     | None ->
+       (* All vars: scrutinee can be any type *)
+       typecheck_cases ~scrutinee_ty:scrutinee.ty ~ctx_for_pat:(fun pat ->
+         match pat with
+         | PatVar v -> Ok (Map.set ctx ~key:v ~data:([], [], scrutinee.ty))
+         | _ -> Ok ctx)
+     | Some (PatCtor _) ->
+       (* Variant match *)
+       let%bind variant_name, variant_ctors =
+         let find_from_ty ty =
+           match ty with
+           | TyVariant name ->
+             (match Map.find variants name with
+              | Some ctors -> Some (name, ctors)
+              | None -> None)
+           | _ -> None
+         in
+         match find_from_ty scrutinee.ty with
+         | Some x -> Ok x
+         | None ->
+           let case_ctors =
+             List.filter_map cases ~f:(fun (pat, _) ->
+               match pat with
+               | PatCtor (c, _) -> Some c
+               | _ -> None)
+           in
+           let candidates =
+             Map.filter variants ~f:(fun ctors ->
+               let ctor_names = List.map ctors ~f:fst in
+               List.for_all case_ctors ~f:(fun c ->
+                 List.mem ctor_names c ~equal:String.equal))
+           in
+           (match Map.to_alist candidates with
+            | [ (name, ctors) ] -> Ok (name, ctors)
+            | [] -> Err.fail "match cases don't match any variant type" ~loc
+            | _ -> Err.fail "ambiguous match variant type" ~loc)
+       in
+       (* Exhaustiveness Checking *)
+       let%bind () =
+         if has_catchall
+         then Ok ()
+         else (
+           let case_ctors =
+             List.filter_map cases ~f:(fun (pat, _) ->
+               match pat with
+               | PatCtor (c, _) -> Some c
+               | _ -> None)
+             |> String.Set.of_list
+           in
+           let all_ctors = List.map variant_ctors ~f:fst |> String.Set.of_list in
+           let missing = Set.diff all_ctors case_ctors in
+           if Set.is_empty missing
+           then Ok ()
+           else
+             Err.fail "non-exhaustive match" ~loc ~d:[%message (missing : String.Set.t)])
+       in
+       (* Duplicate Case Checking *)
+       let%bind () =
+         let ctor_cases =
+           List.filter_map cases ~f:(fun (pat, _) ->
+             match pat with
+             | PatCtor (c, _) -> Some c
+             | _ -> None)
+         in
+         List.fold_result ctor_cases ~init:String.Set.empty ~f:(fun seen ctor ->
+           if Set.mem seen ctor
+           then Err.fail "duplicate match case" ~loc ~d:[%message (ctor : string)]
+           else Ok (Set.add seen ctor))
+         |> Result.ignore_m
+       in
+       typecheck_cases ~scrutinee_ty:(TyVariant variant_name) ~ctx_for_pat:(fun pat ->
+         match pat with
+         | PatCtor (ctor, vars) ->
+           let%bind _, expected_arg_tys =
+             match List.find variant_ctors ~f:(fun (c, _) -> String.equal c ctor) with
+             | Some x -> Ok x
+             | None ->
+               Err.fail "unknown constructor in match" ~loc ~d:[%message (ctor : string)]
+           in
+           if List.length vars <> List.length expected_arg_tys
+           then (
+             let expected = List.length expected_arg_tys in
+             let got = List.length vars in
+             Err.fail
+               "wrong number of bindings in match case"
+               ~loc
+               ~d:[%message (ctor : string) (expected : int) (got : int)])
+           else
+             Ok
+               (List.fold2_exn vars expected_arg_tys ~init:ctx ~f:(fun ctx v ty ->
+                  Map.set ctx ~key:v ~data:([], [], ty)))
+         | PatVar v -> Ok (Map.set ctx ~key:v ~data:([], [], TyVariant variant_name))
+         | PatLitBool _ | PatLitInt _ -> Ok ctx)
+     | Some (PatLitBool _) ->
+       (* Bool match *)
+       let%bind () =
+         if has_catchall
+         then Ok ()
+         else (
+           let has_true =
+             List.exists cases ~f:(fun (p, _) -> equal_pat p (PatLitBool true))
+           in
+           let has_false =
+             List.exists cases ~f:(fun (p, _) -> equal_pat p (PatLitBool false))
+           in
+           if has_true && has_false
+           then Ok ()
+           else Err.fail "non-exhaustive bool match (missing true or false)" ~loc)
+       in
+       (* Duplicate Checking *)
+       let%bind () =
+         let bool_cases =
+           List.filter_map cases ~f:(fun (p, _) ->
+             match p with
+             | PatLitBool b -> Some b
+             | _ -> None)
+         in
+         List.fold_result bool_cases ~init:[] ~f:(fun seen b ->
+           if List.mem seen b ~equal:Bool.equal
+           then Err.fail "duplicate bool pattern" ~loc ~d:[%message (b : bool)]
+           else Ok (b :: seen))
+         |> Result.ignore_m
+       in
+       typecheck_cases ~scrutinee_ty:TyBool ~ctx_for_pat:(fun pat ->
+         match pat with
+         | PatVar v -> Ok (Map.set ctx ~key:v ~data:([], [], TyBool))
+         | _ -> Ok ctx)
+     | Some (PatLitInt _) ->
+       (* Int match: requires catch-all *)
+       let%bind () =
+         if has_catchall
+         then Ok ()
+         else Err.fail "int match must have a wildcard/var catch-all" ~loc
+       in
+       (* Duplicate Checking *)
+       let%bind () =
+         let int_cases =
+           List.filter_map cases ~f:(fun (p, _) ->
+             match p with
+             | PatLitInt n -> Some n
+             | _ -> None)
+         in
+         List.fold_result int_cases ~init:[] ~f:(fun seen n ->
+           if List.mem seen n ~equal:Int.equal
+           then Err.fail "duplicate int pattern" ~loc ~d:[%message (n : int)]
+           else Ok (n :: seen))
+         |> Result.ignore_m
+       in
+       typecheck_cases ~scrutinee_ty:TyInt ~ctx_for_pat:(fun pat ->
+         match pat with
+         | PatVar v -> Ok (Map.set ctx ~key:v ~data:([], [], TyInt))
+         | _ -> Ok ctx))
 ;;
 
 let typecheck (Program terms : Stlc.t) : t Compiler_error.t =
