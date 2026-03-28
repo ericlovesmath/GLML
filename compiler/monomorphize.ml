@@ -59,7 +59,7 @@ let collect_var_usages (name : string) (t : Typecheck.term) : Typecheck.ty list 
     | Variant (_, _, args) -> List.fold args ~init:acc ~f:walk
     | Match (scrutinee, cases) ->
       let acc = walk acc scrutinee in
-      List.fold cases ~init:acc ~f:(fun acc (_, _, body) -> walk acc body)
+      List.fold cases ~init:acc ~f:(fun acc (_, body) -> walk acc body)
   in
   let usages = walk [] t in
   List.stable_dedup usages ~compare:(fun a b -> if Typecheck.equal_ty a b then 0 else 1)
@@ -90,10 +90,10 @@ let rec rename_var (src : string) (dst : string) (t : Typecheck.term) : Typechec
     | Match (scrutinee, cases) ->
       Match
         ( rename scrutinee
-        , List.map cases ~f:(fun (ctor, vars, body) ->
-            if List.mem vars src ~equal:String.equal
-            then ctor, vars, body
-            else ctor, vars, rename body) )
+        , List.map cases ~f:(fun (pat, body) ->
+            let vars = Stlc.pat_bound_vars pat in
+            if List.mem vars src ~equal:String.equal then pat, body else pat, rename body)
+        )
   in
   { t with desc }
 ;;
@@ -128,13 +128,14 @@ let rec rewrite_var_at_type
     | Field (t, f) -> Field (rewrite t, f)
     | Variant (ty_name, ctor, args) -> Variant (ty_name, ctor, List.map args ~f:rewrite)
     | Match (scrutinee, cases) ->
-      (* TODO: This pattern on matches seems pretty common *)
+      (* TODO: This pattern on matches seems pretty common, maybe factor out *)
       Match
         ( rewrite scrutinee
-        , List.map cases ~f:(fun (ctor, vars, body) ->
+        , List.map cases ~f:(fun (pat, body) ->
+            let vars = Stlc.pat_bound_vars pat in
             if List.mem vars name ~equal:String.equal
-            then ctor, vars, body
-            else ctor, vars, rewrite body) )
+            then pat, body
+            else pat, rewrite body) )
   in
   { t with desc }
 ;;
@@ -176,7 +177,7 @@ let collect_poly_refs (poly_env : poly_env) (t : Typecheck.term)
     | Variant (_, _, args) -> List.fold args ~init:acc ~f:walk
     | Match (scrutinee, cases) ->
       let acc = walk acc scrutinee in
-      List.fold cases ~init:acc ~f:(fun acc (_, _, body) -> walk acc body)
+      List.fold cases ~init:acc ~f:(fun acc (_, body) -> walk acc body)
   in
   let refs = walk [] t in
   List.stable_dedup refs ~compare:(fun (n1, t1) (n2, t2) ->
@@ -344,9 +345,9 @@ and rewrite_refs (poly_env : poly_env) (env : spec_map) (t : Typecheck.term)
     | Match (scrutinee, cases) ->
       let env, scrutinee, defs1 = rewrite_refs poly_env env scrutinee in
       let env, cases_rev, defs2 =
-        List.fold cases ~init:(env, [], []) ~f:(fun (env, acc, defs) (ctor, vars, body) ->
+        List.fold cases ~init:(env, [], []) ~f:(fun (env, acc, defs) (pat, body) ->
           let env, body, new_defs = rewrite_refs poly_env env body in
-          env, (ctor, vars, body) :: acc, defs @ new_defs)
+          env, (pat, body) :: acc, defs @ new_defs)
       in
       Match (scrutinee, List.rev cases_rev), env, defs1 @ defs2
   in
@@ -405,7 +406,7 @@ type term_desc =
   | Record of string * term list
   | Field of term * string
   | Variant of string * string * term list
-  | Match of term * (string * string list * term) list
+  | Match of term * (Stlc.pat * term) list
 
 and term =
   { desc : term_desc
@@ -442,9 +443,7 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | Variant (ty_name, ctor, args) ->
     List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_term)
   | Match (scrutinee, cases) ->
-    let sexp_of_case (ctor, vars, body) =
-      List [ Atom ctor; List (List.map vars ~f:(fun v -> Atom v)); sexp_of_term body ]
-    in
+    let sexp_of_case (pat, body) = List [ Stlc.sexp_of_pat pat; sexp_of_term body ] in
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = List [ sexp_of_term_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
@@ -540,9 +539,9 @@ and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Compiler_error.t =
     let%bind scrutinee = term_of_tc scrutinee in
     let%bind cases =
       cases
-      |> List.map ~f:(fun (ctor, vars, body) ->
+      |> List.map ~f:(fun (pat, body) ->
         let%map body = term_of_tc body in
-        ctor, vars, body)
+        pat, body)
       |> Compiler_error.all
     in
     Ok (Match (scrutinee, cases))

@@ -141,15 +141,16 @@ let placeholder_atom_for_ty (ty : ty) : Anf.atom Compiler_error.t =
 ;;
 
 let find_ctor_info (tenv : type_env) (ctor : string)
-  : (int * (string * ty list) list) Compiler_error.t
+  : (string * int * (string * ty list) list) Compiler_error.t
   =
-  Map.data tenv
-  |> List.find_map ~f:(function
+  Map.to_alist tenv
+  |> List.find_map ~f:(fun (ty_name, decl) ->
+    match decl with
     | RecordDecl _ -> None
     | VariantDecl ctors ->
       ctors
       |> List.findi ~f:(fun _ (c, _) -> String.equal c ctor)
-      |> Option.map ~f:(fun (i, _) -> i, ctors))
+      |> Option.map ~f:(fun (i, _) -> ty_name, i, ctors))
   |> Err.of_option "unknown ctor" ~d:[%message (ctor : string)]
 ;;
 
@@ -158,6 +159,21 @@ let find_tag (ctors : (string * ty list) list) (ctor : string) : int Compiler_er
   |> List.findi ~f:(fun _ (c, _) -> String.equal c ctor)
   |> Option.map ~f:fst
   |> Err.of_option "unknown ctor" ~d:[%message (ctor : string)]
+;;
+
+let find_catchall (cases : (Stlc.pat * _) list) =
+  List.find_map cases ~f:(fun (pat, body) ->
+    match pat with
+    | PatVar v -> Some (v, body)
+    | _ -> None)
+;;
+
+let bind_opt_var ~loc ~scrut ~ty var_opt (body : anf) : anf =
+  match var_opt with
+  | None -> body
+  | Some v ->
+    let bind : term = { desc = Atom scrut; ty; loc } in
+    { desc = Let (v, bind, body); ty = body.ty; loc }
 ;;
 
 let prepend_var_decls
@@ -261,44 +277,166 @@ and lower_anf (tenv : type_env) (anf : Tail_call.anf) : anf Compiler_error.t =
     pure (Set (v, a, tail))
   | Continue -> pure Continue
 
-and lower_match
+and lower_variant_match
       (tenv : type_env)
       (scrut : Anf.atom)
-      (cases : (string * string list * Tail_call.anf) list)
+      (cases : (Stlc.pat * Tail_call.anf) list)
       (result_ty : ty)
       (loc : Lexer.loc)
       (k : term -> anf)
   : anf Compiler_error.t
   =
   let result_ty = lower_ty result_ty in
-  let%bind first_ctor, _, _ = List.hd cases |> Err.of_option "empty cases" in
-  let%bind _, ctors = find_ctor_info tenv first_ctor in
+  (* Find the first PatCtor to discover the variant type *)
+  let%bind first_ctor =
+    List.find_map cases ~f:(fun (pat, _) ->
+      match pat with
+      | Stlc.PatCtor (c, _) -> Some c
+      | _ -> None)
+    |> Err.of_option "lower_variant_match: no PatCtor found"
+  in
+  let%bind ty_name, _, ctors = find_ctor_info tenv first_ctor in
   let lower_case ctor vars body =
     let%bind lowered = lower_anf tenv body in
     prepend_var_decls ~scrut ~loc ~ctors ctor vars lowered
   in
-  match cases with
-  | [] -> Err.fail "empty cases"
-  | [ (ctor, vars, body) ] ->
+  (* Separate non-wildcard cases from a possible catch-all *)
+  let ctor_cases =
+    List.filter_map cases ~f:(fun (pat, body) ->
+      match pat with
+      | Stlc.PatCtor (ctor, vars) -> Some (ctor, vars, body)
+      | _ -> None)
+  in
+  let catchall_case = find_catchall cases in
+  match ctor_cases with
+  | [ (ctor, vars, body) ] when Option.is_none catchall_case ->
     let%bind branch = lower_case ctor vars body in
     Ok (map_last_return k branch)
   | _ ->
-    let n = List.length cases in
+    let n_ctor = List.length ctor_cases in
+    let has_default = Option.is_some catchall_case in
     let%bind switch_cases =
-      cases
-      |> List.mapi ~f:(fun idx (ctor, vars, body) ->
+      List.mapi ctor_cases ~f:(fun idx (ctor, vars, body) ->
         let%bind tag = find_tag ctors ctor in
         let%bind branch = lower_case ctor vars body in
-        let label : Glsl.switch_case = if idx = n - 1 then Default else Case tag in
+        let is_last = idx = n_ctor - 1 && not has_default in
+        let label : Glsl.switch_case = if is_last then Default else Case tag in
         Ok (label, branch))
       |> Compiler_error.all
+    in
+    let%bind default_cases =
+      match catchall_case with
+      | None -> Ok []
+      | Some (v, body) ->
+        let%bind body = lower_anf tenv body in
+        let body = bind_opt_var ~loc ~scrut ~ty:(TyRecord ty_name) (Some v) body in
+        Ok [ Glsl.Default, body ]
     in
     let tag_v = Utils.fresh "_lv_tag" in
     let tag_term : term = { desc = Field (scrut, "tag"); ty = TyInt; loc } in
     let switch_term : term =
-      { desc = Switch (Var tag_v, switch_cases); ty = result_ty; loc }
+      { desc = Switch (Var tag_v, switch_cases @ default_cases); ty = result_ty; loc }
     in
     Ok ({ desc = Let (tag_v, tag_term, k switch_term); ty = result_ty; loc } : anf)
+
+(** NOTE: GLSL can't match on bools, which is why this is pulled out *)
+and lower_bool_match
+      (tenv : type_env)
+      (scrut : Anf.atom)
+      (cases : (Stlc.pat * Tail_call.anf) list)
+      (result_ty : ty)
+      (loc : Lexer.loc)
+      (k : term -> anf)
+  : anf Compiler_error.t
+  =
+  (* TODO: Maybe be can merge the lowering match functions *)
+  let find_branch b =
+    List.find_map cases ~f:(fun (pat, body) ->
+      match pat with
+      | PatLitBool lit when Bool.equal lit b -> Some (None, body)
+      | PatVar v -> Some (Some v, body)
+      | _ -> None)
+  in
+  let%bind t, t_body = find_branch true |> Err.of_option "no true in bool match" in
+  let%bind f, f_body = find_branch false |> Err.of_option "no false in bool match" in
+  let%bind t_anf = lower_anf tenv t_body in
+  let%bind f_anf = lower_anf tenv f_body in
+  let t_anf = bind_opt_var ~loc ~scrut ~ty:TyBool t t_anf in
+  let f_anf = bind_opt_var ~loc ~scrut ~ty:TyBool f f_anf in
+  let ty = lower_ty result_ty in
+  let if_term : term = { desc = If (scrut, t_anf, f_anf); ty; loc } in
+  Ok (k if_term)
+
+and lower_int_match
+      (tenv : type_env)
+      (scrut : Anf.atom)
+      (cases : (Stlc.pat * Tail_call.anf) list)
+      (result_ty : ty)
+      (loc : Lexer.loc)
+      (k : term -> anf)
+  : anf Compiler_error.t
+  =
+  let result_ty = lower_ty result_ty in
+  let int_cases =
+    List.filter_map cases ~f:(fun (pat, body) ->
+      match pat with
+      | PatLitInt n -> Some (n, body)
+      | _ -> None)
+  in
+  let default_case = find_catchall cases in
+  let%bind switch_cases =
+    List.map int_cases ~f:(fun (n_val, body) ->
+      let%bind lowered = lower_anf tenv body in
+      Ok (Glsl.Case n_val, lowered))
+    |> Compiler_error.all
+  in
+  let%bind default_cases =
+    match default_case with
+    | None -> Ok []
+    | Some (v, body) ->
+      let%bind lowered = lower_anf tenv body in
+      let lowered = bind_opt_var ~loc ~scrut ~ty:TyInt (Some v) lowered in
+      Ok [ Glsl.Default, lowered ]
+  in
+  let switch_term : term =
+    { desc = Switch (scrut, switch_cases @ default_cases); ty = result_ty; loc }
+  in
+  Ok (k switch_term)
+
+and lower_match
+      (tenv : type_env)
+      (scrut : Anf.atom)
+      (cases : (Stlc.pat * Tail_call.anf) list)
+      (result_ty : ty)
+      (loc : Lexer.loc)
+      (k : term -> anf)
+  : anf Compiler_error.t
+  =
+  (* Determine match kind from first var pattern *)
+  let kind =
+    List.find_map cases ~f:(fun (pat, _) ->
+      match pat with
+      | Stlc.PatVar _ -> None
+      | _ -> Some pat)
+  in
+  match kind with
+  | None | Some (PatVar _) ->
+    (* [PatVar] never exists, but needed for exhaustiveness, hacky? *)
+    (match cases with
+     | [] -> Err.fail "empty cases"
+     | (pat, body) :: _ ->
+       let%map lowered = lower_anf tenv body in
+       let lowered =
+         match pat with
+         | PatVar v ->
+           let bind : term = { desc = Atom scrut; ty = lower_ty result_ty; loc } in
+           ({ desc = Let (v, bind, lowered); ty = lowered.ty; loc } : anf)
+         | _ -> lowered
+       in
+       map_last_return k lowered)
+  | Some (PatCtor _) -> lower_variant_match tenv scrut cases result_ty loc k
+  | Some (PatLitBool _) -> lower_bool_match tenv scrut cases result_ty loc k
+  | Some (PatLitInt _) -> lower_int_match tenv scrut cases result_ty loc k
 ;;
 
 let lower_top (tenv : type_env) (top : Tail_call.top) : top Compiler_error.t =
