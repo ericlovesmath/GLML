@@ -403,6 +403,57 @@ and lower_int_match
   in
   Ok (k switch_term)
 
+(** NOTE: GLSL has no float switch, so this lowers to a nested if-else chain *)
+and lower_float_match
+      (tenv : type_env)
+      (scrut : Anf.atom)
+      (cases : (Stlc.pat * Tail_call.anf) list)
+      (result_ty : ty)
+      (loc : Lexer.loc)
+      (k : term -> anf)
+  : anf Compiler_error.t
+  =
+  let ty = lower_ty result_ty in
+  let float_cases =
+    List.filter_map cases ~f:(fun (pat, body) ->
+      match pat with
+      | Stlc.PatLitFloat f -> Some (f, body)
+      | _ -> None)
+  in
+  let default_case = find_catchall cases in
+  let%bind lowered_float_cases =
+    List.map float_cases ~f:(fun (f_val, body) ->
+      let%map lowered = lower_anf tenv body in
+      f_val, lowered)
+    |> Compiler_error.all
+  in
+  let%bind default_anf =
+    match default_case with
+    | None -> Err.fail "float match: missing catch-all"
+    | Some (v, body) ->
+      let%map lowered = lower_anf tenv body in
+      bind_opt_var ~loc ~scrut ~ty:TyFloat (Some v) lowered
+  in
+  match lowered_float_cases with
+  | [] -> Ok default_anf
+  | (f, body) :: tl ->
+    let%bind inner_else =
+      List.fold_right tl ~init:(Ok default_anf) ~f:(fun (f_val, case_body) acc ->
+        let%bind acc = acc in
+        let cmp_v = Utils.fresh "_lv_cmp" in
+        let cmp_term : term =
+          { desc = Bop (Glsl.Eq, scrut, Float f_val); ty = TyBool; loc }
+        in
+        let if_term : term = { desc = If (Var cmp_v, case_body, acc); ty; loc } in
+        Ok
+          ({ desc = Let (cmp_v, cmp_term, { desc = Return if_term; ty; loc }); ty; loc }
+           : anf))
+    in
+    let cmp_v = Utils.fresh "_lv_cmp" in
+    let cmp_term : term = { desc = Bop (Glsl.Eq, scrut, Float f); ty = TyBool; loc } in
+    let if_term : term = { desc = If (Var cmp_v, body, inner_else); ty; loc } in
+    Ok ({ desc = Let (cmp_v, cmp_term, k if_term); ty; loc } : anf)
+
 and lower_match
       (tenv : type_env)
       (scrut : Anf.atom)
@@ -437,6 +488,7 @@ and lower_match
   | Some (PatCtor _) -> lower_variant_match tenv scrut cases result_ty loc k
   | Some (PatLitBool _) -> lower_bool_match tenv scrut cases result_ty loc k
   | Some (PatLitInt _) -> lower_int_match tenv scrut cases result_ty loc k
+  | Some (PatLitFloat _) -> lower_float_match tenv scrut cases result_ty loc k
 ;;
 
 let lower_top (tenv : type_env) (top : Tail_call.top) : top Compiler_error.t =

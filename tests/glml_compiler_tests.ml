@@ -1205,3 +1205,135 @@ let%expect_test "int match" =
       |
     |}]
 ;;
+
+let%expect_test "float match" =
+  test
+    {|
+    #extern float x
+    let main (coord : vec2) =
+      let c = match x with
+        | 1.0 -> 0.0
+        | 2.5 -> 1.0
+        | _ -> 2.0
+      in [c, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform float x;
+    vec3 main_pure(vec2 coord_0) {
+        bool _lv_cmp_5 = (x == 1.);
+        float c_1 = 0.;
+        if (_lv_cmp_5) {
+            c_1 = 0.;
+        } else {
+            bool _lv_cmp_4 = (x == 2.5);
+            if (_lv_cmp_4) {
+                c_1 = 1.;
+            } else {
+                float __2 = x;
+                c_1 = 2.;
+            }
+        }
+        return vec3(c_1, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* Float match in return position *)
+  test
+    {|
+    #extern float x
+    let main (coord : vec2) =
+      match x with
+        | 0.0 -> [1.0, 0.0, 0.0]
+        | 1.0 -> [0.0, 1.0, 0.0]
+        | _ -> [0.0, 0.0, 1.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform float x;
+    vec3 main_pure(vec2 coord_0) {
+        bool _lv_cmp_4 = (x == 0.);
+        if (_lv_cmp_4) {
+            return vec3(1., 0., 0.);
+        } else {
+            bool _lv_cmp_3 = (x == 1.);
+            if (_lv_cmp_3) {
+                return vec3(0., 1., 0.);
+            } else {
+                float __1 = x;
+                return vec3(0., 0., 1.);
+            }
+        }
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    #extern float x
+    let main (coord : vec2) =
+      match x with
+        | 0.0 -> [1.0, 0.0, 0.0]
+        | 1.0 -> [0.0, 1.0, 0.0]
+    |};
+  [%expect
+    {|
+    [typecheck] at 4:7-6:33: float match must have a wildcard/var catch-all
+      |
+    4 |       match x with
+    5 |         | 0.0 -> [1.0, 0.0, 0.0]
+    6 |         | 1.0 -> [0.0, 1.0, 0.0]
+      |
+    |}];
+  test
+    {|
+    #extern float x
+    let main (coord : vec2) =
+      match x with
+        | 0.0 -> [1.0, 0.0, 0.0]
+        | 0.0 -> [0.0, 1.0, 0.0]
+        | _ -> [0.0, 0.0, 1.0]
+    |};
+  [%expect
+    {|
+    [typecheck] at 4:7-7:31: duplicate float pattern
+      f: 0
+      |
+    4 |       match x with
+    5 |         | 0.0 -> [1.0, 0.0, 0.0]
+    6 |         | 0.0 -> [0.0, 1.0, 0.0]
+    7 |         | _ -> [0.0, 0.0, 1.0]
+      |
+    |}];
+  test
+    {|
+    #extern float x
+    let main (coord : vec2) =
+      match x with
+        | 0.0 -> [1.0, 0.0, 0.0]
+        | -0.0 -> [0.0, 1.0, 0.0]
+        | _ -> [0.0, 0.0, 1.0]
+    |};
+  [%expect
+    {|
+    [typecheck] at 4:7-7:31: duplicate float pattern
+      f: -0
+      |
+    4 |       match x with
+    5 |         | 0.0 -> [1.0, 0.0, 0.0]
+    6 |         | -0.0 -> [0.0, 1.0, 0.0]
+    7 |         | _ -> [0.0, 0.0, 1.0]
+      |
+    |}]
+;;

@@ -22,6 +22,13 @@ let num_p =
   <??> "num"
 ;;
 
+let float_p =
+  satisfy_map (function
+    | FLOAT_LIT f -> Some f
+    | _ -> None)
+  <??> "float"
+;;
+
 let commas p = sep_by1 (tok COMMA) p
 
 let constructor_p =
@@ -51,8 +58,13 @@ let pat_p =
    return (PatCtor (ctor, vars)))
   <|> tok TRUE *> return (PatLitBool true)
   <|> tok FALSE *> return (PatLitBool false)
-  <|> tok SUB *> commit (num_p >>| fun n -> PatLitInt (-n))
+  <|> (float_p >>| fun f -> PatLitFloat f)
   <|> (num_p >>| fun n -> PatLitInt n)
+  <|> tok SUB
+      *> commit
+           (float_p
+            >>| (fun f -> PatLitFloat (-.f))
+            <|> (num_p >>| fun n -> PatLitInt (-n)))
   <|> (ident_p >>| fun v -> PatVar v)
   <??> "pat"
 ;;
@@ -147,13 +159,6 @@ let%expect_test "ty parse tests" =
     [parser]: satisfy_map_fail
       contexts: ("between (1:1 - 1:2)" "ty (1:1 - 1:2)")
     |}]
-;;
-
-let float_p =
-  satisfy_map (function
-    | FLOAT_LIT f -> Some f
-    | _ -> None)
-  <??> "float"
 ;;
 
 let term_number_p =
@@ -447,6 +452,7 @@ let%expect_test "term parse tests" =
   test "match x with | Constr x -> a | Alt b -> b";
   test "match x with | true -> a | _ -> b";
   test "match x with | -1 -> a | 23 -> b | var -> c";
+  test "match x with | -1. -> a | 0. -> b | 2.4 -> c | _ -> d";
   [%expect
     {|
     variable_name
@@ -470,6 +476,7 @@ let%expect_test "term parse tests" =
     (match x ((Constr x) a) ((Alt b) b))
     (match x (true a) (_ b))
     (match x (-1 a) (23 b) (var c))
+    (match x (-1. a) (0. b) (2.4 c) (_ d))
     |}];
   test "-113.0";
   test "-113.";
