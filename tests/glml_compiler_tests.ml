@@ -1176,7 +1176,7 @@ let%expect_test "int match" =
     |};
   [%expect
     {|
-    [typecheck] at 4:15-6:19: int match must have a wildcard/var catch-all
+    [typecheck] at 4:15-6:19: int match must have a catch-all
       |
     4 |       let x = match n with
     5 |         | 0 -> 0.0
@@ -1289,7 +1289,7 @@ let%expect_test "float match" =
     |};
   [%expect
     {|
-    [typecheck] at 4:7-6:33: float match must have a wildcard/var catch-all
+    [typecheck] at 4:7-6:33: float match must have a catch-all
       |
     4 |       match x with
     5 |         | 0.0 -> [1.0, 0.0, 0.0]
