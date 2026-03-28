@@ -1,0 +1,137 @@
+#extern vec2 u_resolution
+#extern float u_time
+#extern vec2 u_mouse
+
+let rotate (p : vec2) (angle : float) =
+  let s = #sin(angle) in
+  let c = #cos(angle) in
+  [p.0 * c - p.1 * s, p.0 * s + p.1 * c]
+
+// 3D noise using trilinear interpolation
+let noise3d (p : vec3) =
+  let i = #floor(p) in
+  let f = #fract(p) in
+  let u = f * f * (3.0 - 2.0 * f) in
+
+  // Simple hash-based noise for terrain
+  let hash (p : vec3) =
+    let d = #dot(p, [127.1, 311.7, 74.7]) in
+    #fract(#sin(d) * 43758.5453)
+  in
+
+  // Corner hashes
+  let a = hash i in
+  let b = hash (i + [1, 0, 0]) in
+  let c = hash (i + [0, 1, 0]) in
+  let d = hash (i + [1, 1, 0]) in
+  let e = hash (i + [0, 0, 1]) in
+  let f = hash (i + [1, 0, 1]) in
+  let g = hash (i + [0, 1, 1]) in
+  let h = hash (i + [1, 1, 1]) in
+
+  // Trilinear interpolation
+  let ab = #mix(a, b, u.0) in
+  let cd = #mix(c, d, u.0) in
+  let ef = #mix(e, f, u.0) in
+  let gh = #mix(g, h, u.0) in
+  let abcd = #mix(ab, cd, u.1) in
+  let efgh = #mix(ef, gh, u.1) in
+  #mix(abcd, efgh, u.2)
+
+// Fractal Brownian Motion for rough terrain
+let fbm (p : vec3) =
+  noise3d (p * 1.0) * 0.5
+  + noise3d (p * 2.0) * 0.25
+  + noise3d (p * 4.0) * 0.125
+  + noise3d (p * 8.0) * 0.0625
+
+// SDF: sphere with terrain displacement
+let sdPlanet (p : vec3) (radius : float) =
+  let len = #length(p) in
+  let dir = p / len in
+  let terrain = fbm (dir * 3.0) * 0.4 in
+  len - radius - terrain
+
+let map (p : vec3) = sdPlanet p 1.5
+
+// Normal estimation via central differences
+let getNormal (p : vec3) =
+  let e = 0.002 in
+  let e_x = [e, 0, 0] in
+  let e_y = [0, e, 0] in
+  let e_z = [0, 0, e] in
+  let dx = map (p + e_x) - map (p - e_x) in
+  let dy = map (p + e_y) - map (p - e_y) in
+  let dz = map (p + e_z) - map (p - e_z) in
+  #normalize([dx, dy, dz])
+
+// Raymarching loop
+let march (ro : vec3) (rd : vec3) =
+  let rec march (t : float) (steps : int) =
+    if steps > 120 then t
+    else
+      let d = map (ro + rd * t) in
+      if d < 0.0005 then t
+      else if t > 50.0 then 50.1
+      else march (t + d * 0.8) (steps + 1)
+  in
+  march 0.0 0
+
+let main (coord : vec2) =
+  let res_min = #min(u_resolution.0, u_resolution.1) in
+  let uv = (coord * 2.0 - u_resolution) / res_min in
+  let mouseUV = (u_mouse * 2.0 - u_resolution) / res_min in
+
+  // Mouse rotation
+  let rotate_by_mouse ray = 
+    let rotX = -mouseUV.1 * 1.5 in
+    let ro_yz = rotate [ray.1, ray.2] rotX in
+    let rotY = -mouseUV.0 * 1.5 in
+    let ro_xz = rotate [ray.0, ro_yz.1] rotY in
+    [ro_xz.0, ro_yz.0, ro_xz.1]
+  in
+
+  // Ray setup
+  let ro = rotate_by_mouse [0, 0, -4] in
+  let rd = rotate_by_mouse #normalize([uv.0, uv.1, 1.5]) in
+
+  // March the ray
+  let t = march ro rd in
+
+  if t > 50.0 then
+    [0, 0, 0]
+  else
+    // Hit the planet — compute shading
+    let hitPos = ro + rd * t in
+    let n = getNormal hitPos in
+    let lightDir = #normalize([1.0, 0.8, -0.5]) in
+    let diff = #max(#dot(n, lightDir), 0) in
+    let ambient = 0.08 in
+
+    // Height-based coloring from terrain
+    let dir = hitPos / #length(hitPos) in
+    let rawHeight = fbm (dir * 3.0) in
+    let seaLevel = 0.35 in
+    let h_norm = #clamp((rawHeight - seaLevel) / (1.0 - seaLevel), 0.0, 1.0) in
+
+    // Color palette
+    let deepColor = [0.02, 0.05, 0.2] in
+    let landColor = [0.15, 0.35, 0.1] in
+    let mountColor = [0.4, 0.3, 0.2] in
+    let snowColor = [0.85, 0.85, 0.9] in
+
+    let baseColor = if h_norm < 0.3 then
+      #mix(deepColor, landColor, h_norm / 0.3)
+    else if h_norm < 0.6 then
+      #mix(landColor, mountColor, (h_norm - 0.3) / 0.3)
+    else
+      #mix(mountColor, snowColor, (h_norm - 0.6) / 0.4)
+    in
+
+    // Rim lighting for atmosphere
+    let fresnel = 1.0 - #max(#dot(n, rd * -1.0), 0) in
+    let rim = fresnel * fresnel * fresnel * 0.4 in
+    let atmoColor = [0.3, 0.5, 1.0] in
+
+    baseColor * (diff * 0.9 + ambient) +  atmoColor * rim
+
