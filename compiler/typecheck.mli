@@ -7,13 +7,13 @@ type ty =
   | TyVec of int
   | TyMat of int * int
   | TyArrow of ty * ty
-  | TyRecord of string
+  | TyRecord of string * ty list
   | TyVariant of string
   | TyVar of string
 [@@deriving sexp_of, equal]
 
 type type_decl =
-  | RecordDecl of (string * ty) list
+  | RecordDecl of string list * (string * ty) list
   | VariantDecl of (string * ty list) list
 [@@deriving sexp_of]
 

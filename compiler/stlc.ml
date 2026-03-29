@@ -32,6 +32,7 @@ type ty =
   | TyArrow of ty * ty
   | TyName of string
   | TyVar of string
+  | TyApp of string * ty list
 [@@deriving equal]
 
 let rec sexp_of_ty = function
@@ -43,10 +44,11 @@ let rec sexp_of_ty = function
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
   | TyName s -> Atom s
   | TyVar v -> Atom ("'" ^ v)
+  | TyApp (s, args) -> List (Atom s :: List.map args ~f:sexp_of_ty)
 ;;
 
 type type_decl =
-  | RecordDecl of (string * ty) list
+  | RecordDecl of string list * (string * ty) list
   | VariantDecl of (string * ty list) list
 [@@deriving sexp_of]
 

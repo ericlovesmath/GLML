@@ -17,10 +17,11 @@ type ty =
   | TyArrow of ty * ty
   | TyName of string
   | TyVar of string
+  | TyApp of string * ty list
 [@@deriving sexp_of, equal]
 
 type type_decl =
-  | RecordDecl of (string * ty) list
+  | RecordDecl of string list * (string * ty) list
   | VariantDecl of (string * ty list) list
 [@@deriving sexp_of]
 
