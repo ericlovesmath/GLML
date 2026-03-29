@@ -92,26 +92,32 @@ let ty_singles_p =
     | BOOL -> Some TyBool
     | INT -> Some TyInt
     | FLOAT -> Some TyFloat
-    | ID s -> Some (TyName s)
     | TYVAR v -> Some (TyVar v)
     | _ -> None)
   <??> "ty_single"
 ;;
 
-let ty_atom_p = ty_singles_p <|> ty_vec_p <|> ty_mat_p
+let rec ty_atom_p st =
+  ((let%bind name = ident_p in
+    (let%map args = between `Bracket (commas ty_p) in
+     TyApp (name, args))
+    <|> return (TyName name))
+   <|> ty_singles_p
+   <|> ty_vec_p
+   <|> ty_mat_p
+   <??> "ty_atom")
+    st
 
-let rec ty_arrow_p =
-  fun st ->
+and ty_arrow_p st =
   (let%bind l = ty_atom_p <|> between `Paren ty_p in
    let%bind _ = tok ARROW in
    let%bind r = ty_p in
    return (TyArrow (l, r)) <??> "ty_arrow")
     st
 
-and ty_p =
-  fun st ->
-  let ty_p = ty_arrow_p <|> ty_atom_p in
-  (ty_p <|> between `Paren ty_p <??> "ty") st
+and ty_p st =
+  let p = ty_arrow_p <|> ty_atom_p in
+  (p <|> between `Paren p <??> "ty") st
 ;;
 
 let test sexp_of parser s =
@@ -150,6 +156,15 @@ let%expect_test "ty parse tests" =
     (vec 4)
     (((mat 3 2) -> (vec 2)) -> ((vec 2) -> int))
     |}];
+  test "box[float]";
+  test "pair[float, int]";
+  test "pair[box[float], int]";
+  [%expect
+    {|
+    (box float)
+    (pair float int)
+    (pair (box float) int)
+    |}];
   test "";
   test "()";
   [%expect
@@ -157,7 +172,7 @@ let%expect_test "ty parse tests" =
     [parser]: satisfy_eof
       contexts: (between ty)
     [parser]: satisfy_map_fail
-      contexts: ("between (1:1 - 1:2)" "ty (1:1 - 1:2)")
+      contexts: ("ty_atom (1:2 - 1:3)" "between (1:1 - 1:2)" "ty (1:1 - 1:2)")
     |}]
 ;;
 
@@ -579,6 +594,14 @@ let top_record_p =
   (with_top_loc
      (let%bind _ = tok TYPE in
       let%bind id = ident_p in
+      let%bind params =
+        let tyvar_p =
+          satisfy_map (function
+            | TYVAR s -> Some s
+            | _ -> None)
+        in
+        between `Bracket (commas tyvar_p) <|> return []
+      in
       let%bind _ = tok EQ in
       let%bind fields =
         between
@@ -589,7 +612,7 @@ let top_record_p =
               let%bind f_ty = ty_p in
               return (f_id, f_ty)))
       in
-      return (TypeDef (id, RecordDecl fields)))
+      return (TypeDef (id, RecordDecl (params, fields))))
    <??> "top_record")
     st
 ;;
@@ -624,6 +647,7 @@ let%expect_test "glml parse tests" =
     #extern float u_time
 
     type point = { x : float, y : int }
+    type point['a, 'b] = { x : 'a, y : 'b }
 
     type shape = Circle of int * float | Triangle
 
@@ -637,7 +661,8 @@ let%expect_test "glml parse tests" =
   [%expect
     {|
     (Program
-     ((Extern float u_time) (TypeDef point (RecordDecl ((x float) (y int))))
+     ((Extern float u_time) (TypeDef point (RecordDecl () ((x float) (y int))))
+      (TypeDef point (RecordDecl (a b) ((x 'a) (y 'b))))
       (TypeDef shape (VariantDecl ((Circle (int float)) (Triangle ()))))
       (Define Nonrec a_struct (record (x 0.) (y 0)))
       (Define Nonrec toplevel (+ 1 2)) (Define Nonrec main (+ 1 2))

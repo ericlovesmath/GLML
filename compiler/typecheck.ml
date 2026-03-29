@@ -17,7 +17,7 @@ type ty =
   | TyVec of int
   | TyMat of int * int
   | TyArrow of ty * ty
-  | TyRecord of string
+  | TyRecord of string * ty list
   | TyVariant of string
   | TyVar of string
 [@@deriving equal]
@@ -29,13 +29,14 @@ let rec sexp_of_ty = function
   | TyVec i -> List [ Atom "vec"; Atom (Int.to_string i) ]
   | TyMat (x, y) -> List [ Atom "mat"; Atom (Int.to_string x); Atom (Int.to_string y) ]
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
-  | TyRecord s -> Atom s
+  | TyRecord (s, []) -> Atom s
+  | TyRecord (s, args) -> List (Atom s :: List.map args ~f:sexp_of_ty)
   | TyVariant s -> Atom s
   | TyVar v -> Atom ("'" ^ v)
 ;;
 
 type type_decl =
-  | RecordDecl of (string * ty) list
+  | RecordDecl of string list * (string * ty) list
   | VariantDecl of (string * ty list) list
 [@@deriving sexp_of]
 
@@ -184,7 +185,8 @@ let fresh_tyvar () = TyVar (Utils.fresh "v")
 let rec subst_ty (sub : substitution) (ty : ty) : ty =
   match ty with
   | TyVar v -> List.Assoc.find ~equal:String.equal sub v |> Option.value ~default:ty
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ | TyVariant _ -> ty
+  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVariant _ -> ty
+  | TyRecord (s, args) -> TyRecord (s, List.map args ~f:(subst_ty sub))
   | TyArrow (f, x) -> TyArrow (subst_ty sub f, subst_ty sub x)
 ;;
 
@@ -239,8 +241,8 @@ let rec subst_term (sub : substitution) (t : term) : term =
 
 let rec ftv_of_ty = function
   | TyVar v -> String.Set.singleton v
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ | TyVariant _ ->
-    String.Set.empty
+  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVariant _ -> String.Set.empty
+  | TyRecord (_, args) -> String.Set.union_list (List.map args ~f:ftv_of_ty)
   | TyArrow (t1, t2) -> Set.union (ftv_of_ty t1) (ftv_of_ty t2)
 ;;
 
@@ -287,7 +289,8 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t
   | (loc, TyVar v, ty) :: con | (loc, ty, TyVar v) :: con ->
     let rec occurs_in = function
       | TyVar v' -> String.equal v v'
-      | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ | TyVariant _ -> false
+      | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVariant _ -> false
+      | TyRecord (_, args) -> List.exists args ~f:occurs_in
       | TyArrow (ty, ty') -> occurs_in ty || occurs_in ty'
     in
     if equal_ty (TyVar v) ty
@@ -303,6 +306,9 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t
       return ((v, subst_ty sub ty) :: sub))
   | (loc, TyArrow (f, x), TyArrow (f', x')) :: con ->
     unify ((loc, f, f') :: (loc, x, x') :: con)
+  | (loc, TyRecord (s, args), TyRecord (s', args')) :: con
+    when String.equal s s' && List.length args = List.length args' ->
+    unify (List.map2_exn args args' ~f:(fun a a' -> loc, a, a') @ con)
   | (loc, ty, ty') :: con ->
     if equal_ty ty ty'
     then unify con
@@ -394,17 +400,27 @@ let resolve_constraints structs (constrs : constr list)
     | ({ desc = FieldAccess (ty, f, ret); loc } as c) :: rest ->
       (match ty with
        | TyVar _ -> aux (c :: deferred) eqs rest
-       | TyRecord struct_name ->
+       | TyRecord (struct_name, type_args) ->
          (match Map.find structs struct_name with
           | None -> Err.fail "unknown struct" ~loc ~d:[%message (struct_name : string)]
-          | Some fields ->
-            (match List.Assoc.find fields ~equal:String.equal f with
-             | None ->
-               Err.fail
-                 "field not found in struct"
-                 ~loc
-                 ~d:[%message (f : string) (struct_name : string)]
-             | Some field_ty -> aux deferred ((loc, ret, field_ty) :: eqs) rest))
+          | Some (params, fields) ->
+            if List.length params <> List.length type_args
+            then
+              Err.fail
+                "wrong number of type args for struct"
+                ~loc
+                ~d:[%message (struct_name : string)]
+            else (
+              let sub = List.zip_exn params type_args in
+              match List.Assoc.find fields ~equal:String.equal f with
+              | None ->
+                Err.fail
+                  "field not found in struct"
+                  ~loc
+                  ~d:[%message (f : string) (struct_name : string)]
+              | Some field_ty ->
+                let field_ty = subst_ty sub field_ty in
+                aux deferred ((loc, ret, field_ty) :: eqs) rest))
        | ty -> Err.fail "field access on non-record type" ~loc ~d:[%message (ty : ty)])
   in
   aux [] [] constrs
@@ -456,7 +472,8 @@ let rec is_value (t : Stlc.term) : bool =
 let rec resolve_stlc_ty (variants : 'a String.Map.t) (t : Stlc.ty) : ty =
   match t with
   | TyName s when Map.mem variants s -> TyVariant s
-  | TyName s -> TyRecord s
+  | TyName s -> TyRecord (s, [])
+  | TyApp (name, args) -> TyRecord (name, List.map args ~f:(resolve_stlc_ty variants))
   | TyArrow (l, r) -> TyArrow (resolve_stlc_ty variants l, resolve_stlc_ty variants r)
   | TyFloat -> TyFloat
   | TyInt -> TyInt
@@ -480,7 +497,7 @@ let rec build_function_type variants (term : Stlc.term) (ret_ty : ty) : ty =
 (** Infer the type of a binding (used between top-level Define and inner Let).
     Returns [substituted term * resolved type * new context * scheme constraints * remaining constraints] *)
 let rec infer_binding
-          (structs : substitution String.Map.t)
+          (structs : (string list * (string * ty) list) String.Map.t)
           (variants : (string * ty list) list String.Map.t)
           (ctx : context)
           (loc : Lexer.loc)
@@ -719,7 +736,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
   | Record fields ->
     let provided_fields = String.Set.of_list (List.map fields ~f:fst) in
     let candidates =
-      Map.filter structs ~f:(fun struct_fields ->
+      Map.filter structs ~f:(fun (_, struct_fields) ->
         struct_fields
         |> List.map ~f:fst
         |> String.Set.of_list
@@ -736,10 +753,13 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
          "record is ambiguous, matches multiple structs"
          ~loc
          ~d:[%message (provided_fields : String.Set.t)]
-     | [ (struct_name, struct_fields) ] ->
+     | [ (struct_name, (params, struct_fields)) ] ->
+       let sub = List.map params ~f:(fun p -> p, fresh_tyvar ()) in
+       let inst_fields = List.map struct_fields ~f:(fun (n, ty) -> n, subst_ty sub ty) in
+       let type_args = List.map sub ~f:snd in
        let%bind args, constrs_args =
          List.fold_result
-           struct_fields
+           inst_fields
            ~init:([], [])
            ~f:(fun (acc, acc_constrs) (name, ty) ->
              match List.Assoc.find fields ~equal:String.equal name with
@@ -749,7 +769,10 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
              | None ->
                Err.fail "(unreachable) missing field" ~loc ~d:[%message (name : string)])
        in
-       make (Record (struct_name, List.rev args)) (TyRecord struct_name) constrs_args)
+       make
+         (Record (struct_name, List.rev args))
+         (TyRecord (struct_name, type_args))
+         constrs_args)
   | Field (t, f) ->
     let%bind t, constrs_t = gen_term structs variants ctx t in
     let ret_ty = fresh_tyvar () in
@@ -1029,14 +1052,14 @@ let typecheck (Program terms : Stlc.t) : t Compiler_error.t =
           let ctx = Map.set ctx ~key:v ~data:([], [], ty) in
           let top = { desc = Extern v; ty; loc = top.loc; scheme_constrs = [] } in
           Ok (ctx, structs, variants, top :: acc)
-        | TypeDef (name, Stlc.RecordDecl fields) ->
+        | TypeDef (name, Stlc.RecordDecl (params, fields)) ->
           let fields =
             List.map fields ~f:(fun (f, ty) -> f, resolve_stlc_ty variants ty)
           in
-          let structs = Map.set structs ~key:name ~data:fields in
+          let structs = Map.set structs ~key:name ~data:(params, fields) in
           let top =
-            { desc = TypeDef (name, RecordDecl fields)
-            ; ty = TyRecord name
+            { desc = TypeDef (name, RecordDecl (params, fields))
+            ; ty = TyRecord (name, [])
             ; loc = top.loc
             ; scheme_constrs = []
             }
