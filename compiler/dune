@@ -12,6 +12,7 @@
    stlc
    uniquify
    typecheck
+   specialize_structs
    monomorphize
    uncurry
    lambda_lift

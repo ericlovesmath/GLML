@@ -7,13 +7,6 @@ module Err = Compiler_error.Pass (struct
     let name = "monomorphize"
   end)
 
-let rec has_tyvars (ty : Typecheck.ty) : bool =
-  match ty with
-  | TyVar _ -> true
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ | TyVariant _ -> false
-  | TyArrow (a, b) -> has_tyvars a || has_tyvars b
-;;
-
 let rec subst ~(poly : Typecheck.ty) ~(concrete : Typecheck.ty)
   : (string * Typecheck.ty) list
   =
@@ -22,20 +15,6 @@ let rec subst ~(poly : Typecheck.ty) ~(concrete : Typecheck.ty)
   | TyArrow (l, r), TyArrow (l', r') ->
     subst ~poly:l ~concrete:l' @ subst ~poly:r ~concrete:r'
   | _, _ -> []
-;;
-
-(** String suffix to add to generated functions *)
-let rec mangle_ty (ty : Typecheck.ty) : string =
-  match ty with
-  | TyFloat -> "float"
-  | TyInt -> "int"
-  | TyBool -> "bool"
-  | TyVec n -> "vec" ^ Int.to_string n
-  | TyMat (x, y) -> "mat" ^ Int.to_string x ^ "x" ^ Int.to_string y
-  | TyRecord s -> s
-  | TyVariant s -> s
-  | TyVar v -> "tv" ^ v
-  | TyArrow (a, b) -> mangle_ty a ^ "_to_" ^ mangle_ty b
 ;;
 
 (** Collect all concrete types a variable is used at in a term *)
@@ -161,7 +140,8 @@ let collect_poly_refs (poly_env : poly_env) (t : Typecheck.term)
   let rec walk acc (t : Typecheck.term) =
     let acc =
       match t.desc with
-      | Var v when Map.mem poly_env v && not (has_tyvars t.ty) -> (v, t.ty) :: acc
+      | Var v when Map.mem poly_env v && Specialize_structs.is_concrete t.ty ->
+        (v, t.ty) :: acc
       | _ -> acc
     in
     match t.desc with
@@ -214,7 +194,7 @@ let rec resolve_spec
   | Some spec_name -> env, spec_name, []
   | None ->
     let entry = Map.find_exn poly_env name in
-    let spec_name = Utils.fresh (name ^ "_" ^ mangle_ty concrete_ty) in
+    let spec_name = Utils.fresh (name ^ "_" ^ Specialize_structs.mangle_ty concrete_ty) in
     let spec_map = add_spec env name concrete_ty spec_name in
     let sub = subst ~poly:entry.poly_type ~concrete:concrete_ty in
     let sub =
@@ -255,7 +235,7 @@ and rewrite_refs (poly_env : poly_env) (env : spec_map) (t : Typecheck.term)
     match t.desc with
     | Var v ->
       (match Map.find poly_env v with
-       | Some _ when not (has_tyvars t.ty) ->
+       | Some _ when Specialize_structs.is_concrete t.ty ->
          let env, spec_name, defs = resolve_spec poly_env env v t.ty in
          Var spec_name, env, defs
        | _ -> t.desc, env, [])
@@ -273,7 +253,8 @@ and rewrite_refs (poly_env : poly_env) (env : spec_map) (t : Typecheck.term)
       let env, f, defs1 = rewrite_refs poly_env env f in
       let env, x, defs2 = rewrite_refs poly_env env x in
       App (f, x), env, defs1 @ defs2
-    | Let (recur, v, constrs, bind, body) when has_tyvars bind.ty ->
+    | Let (recur, v, constrs, bind, body)
+      when not (Specialize_structs.is_concrete bind.ty) ->
       (* Specialization for inner polymorphic lets *)
       let usages = collect_var_usages v body in
       if List.is_empty usages
@@ -289,7 +270,9 @@ and rewrite_refs (poly_env : poly_env) (env : spec_map) (t : Typecheck.term)
               Typecheck.solve_scheme_constrs constrs sub |> Compiler_error.ok_exn
             in
             let spec_bind = Typecheck.subst_term sub bind in
-            let spec_name = Utils.fresh (v ^ "_" ^ mangle_ty concrete_ty) in
+            let spec_name =
+              Utils.fresh (v ^ "_" ^ Specialize_structs.mangle_ty concrete_ty)
+            in
             let env, spec_bind, new_defs = rewrite_refs poly_env env spec_bind in
             let spec_bind =
               match recur with
@@ -472,7 +455,9 @@ let rec ty_of (t : Typecheck.ty) : ty Compiler_error.t =
   | TyBool -> Ok TyBool
   | TyVec n -> Ok (TyVec n)
   | TyMat (x, y) -> Ok (TyMat (x, y))
-  | TyRecord s -> Ok (TyRecord s)
+  | TyRecord (s, []) -> Ok (TyRecord s)
+  | TyRecord (_, _ :: _) ->
+    Err.fail "unexpected parametrized TyRecord after SpecializeStructs"
   | TyVariant s -> Ok (TyVariant s)
   | TyArrow (a, b) ->
     let%bind a = ty_of a in
@@ -555,7 +540,7 @@ let top_of_tc (t : Typecheck.top) : top Compiler_error.t =
       let%map bind = term_of_tc bind in
       Define (r, v, bind)
     | Extern v -> Ok (Extern v)
-    | TypeDef (name, RecordDecl fields) ->
+    | TypeDef (name, RecordDecl ([], fields)) ->
       let%map fields =
         List.map fields ~f:(fun (field_name, field_ty) ->
           let%map field_ty = ty_of field_ty in
@@ -563,6 +548,8 @@ let top_of_tc (t : Typecheck.top) : top Compiler_error.t =
         |> Compiler_error.all
       in
       TypeDef (name, RecordDecl fields)
+    | TypeDef (_, RecordDecl (_ :: _, _)) ->
+      Err.fail "unexpected parametrized TypeDef after SpecializeStructs"
     | TypeDef (name, VariantDecl ctors) ->
       let%map ctors =
         ctors
@@ -584,7 +571,7 @@ let monomorphize (Program tops : Typecheck.t) : t Compiler_error.t =
       ~f:(fun (poly_env, env, acc) (top : Typecheck.top) ->
         match top.desc with
         (* Polymorphic case: register in poly_env, emit nothing *)
-        | Define (recur, v, bind) when has_tyvars top.ty ->
+        | Define (recur, v, bind) when not (Specialize_structs.is_concrete top.ty) ->
           let entry =
             { poly_type = top.ty
             ; poly_bind = bind
