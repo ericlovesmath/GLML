@@ -1337,3 +1337,180 @@ let%expect_test "float match" =
       |
     |}]
 ;;
+
+let%expect_test "parametrized structs" =
+  (* Simple box: box[float] generates box_float struct *)
+  test
+    {|
+    type box['a] = { value: 'a }
+    let f (b: box[float]) : float = b.value
+    let main (coord: vec2) : vec3 = [f { value = 1.0 }, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct box_float {
+        float value;
+    };
+    float f_0(box_float b_1) {
+        return b_1.value;
+    }
+    vec3 main_pure(vec2 coord_2) {
+        box_float anf_6 = box_float(1.);
+        float anf_7 = f_0(anf_6);
+        return vec3(anf_7, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* Pair type: two type params *)
+  test
+    {|
+    type pair['a, 'b] = { fst: 'a, snd: 'b }
+    let get_fst (p: pair[float, int]) : float = p.fst
+    let main (coord: vec2) : vec3 =
+      let p = { fst = 1.0, snd = 0 } in
+      [get_fst p, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct pair_float_int {
+        float fst;
+        int snd;
+    };
+    float get_fst_0(pair_float_int p_1) {
+        return p_1.fst;
+    }
+    vec3 main_pure(vec2 coord_2) {
+        pair_float_int p_3 = pair_float_int(1., 0);
+        float anf_8 = get_fst_0(p_3);
+        return vec3(anf_8, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* Inferred type args: no explicit annotation on record literal *)
+  test
+    {|
+    type box['a] = { value: 'a }
+    let main (coord: vec2) : vec3 =
+      let b = { value = 1.0 } in
+      [b.value, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct box_float {
+        float value;
+    };
+    vec3 main_pure(vec2 coord_0) {
+        box_float b_1 = box_float(1.);
+        float anf_4 = b_1.value;
+        return vec3(anf_4, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* Deduplication: two functions using box[float] produce only one struct *)
+  test
+    {|
+    type box['a] = { value: 'a }
+    let get1 (b: box[float]) : float = b.value
+    let get2 (b: box[float]) : float = b.value
+    let main (coord: vec2) : vec3 =
+      [get1 { value = 1.0 } + get2 { value = 2.0 }, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct box_float {
+        float value;
+    };
+    float get1_0(box_float b_1) {
+        return b_1.value;
+    }
+    float get2_2(box_float b_3) {
+        return b_3.value;
+    }
+    vec3 main_pure(vec2 coord_4) {
+        box_float anf_12 = box_float(1.);
+        float anf_13 = get1_0(anf_12);
+        box_float anf_14 = box_float(2.);
+        float anf_15 = get2_2(anf_14);
+        float anf_16 = (anf_13 + anf_15);
+        return vec3(anf_16, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* Error: wrong arity for type application *)
+  test
+    {|
+    type box['a] = { value: 'a }
+    let f (b: box[float, int]) : float = b.value
+    let main (coord: vec2) : vec3 = [0.0, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    [typecheck] at 3:42-3:49: wrong number of type args for struct
+      struct_name: box
+      |
+    3 |     let f (b: box[float, int]) : float = b.value
+      |                                          ^^^^^^^
+  |}];
+  test
+    {|
+    type box['a] = { value: 'a }
+    type point['a, 'b] = { x : box['a], y: 'b }
+    let main (coord: vec2) : vec3 =
+    let b = { x = { value = { value = 1.0 } }, y = { value = 2.0 } } in
+    [b.x.value.value, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct box_float {
+        float value;
+    };
+    struct box_box_float {
+        box_float value;
+    };
+    struct point_box_float_box_float {
+        box_box_float x;
+        box_float y;
+    };
+    vec3 main_pure(vec2 coord_0) {
+        box_float anf_10 = box_float(1.);
+        box_box_float anf_11 = box_box_float(anf_10);
+        box_float anf_12 = box_float(2.);
+        point_box_float_box_float b_1 = point_box_float_box_float(anf_11, anf_12);
+        box_box_float anf_13 = b_1.x;
+        box_float anf_14 = anf_13.value;
+        float anf_15 = anf_14.value;
+        return vec3(anf_15, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+  |}]
+;;

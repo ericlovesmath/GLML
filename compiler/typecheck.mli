@@ -88,6 +88,7 @@ type substitution = (string * ty) list
 
 (** Applies a [substitution] to all type annotations in a typed [term].
     Used by [Monomorphize] to instantiate polymorphic bindings at concrete types. *)
+val subst_ty : substitution -> ty -> ty
 val subst_term : substitution -> term -> term
 
 (** Given a scheme's deferred constraints and a substitution mapping its tyvars
