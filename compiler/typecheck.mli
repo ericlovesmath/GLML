@@ -49,7 +49,7 @@ type term_desc =
   | Bool of bool
   | Vec of int * term list
   | Mat of int * int * term list
-  | Lam of string * ty * term
+  | Lam of string * term
   | App of term * term
   | Let of recur * string * constr list * term * term
   | If of term * term * term

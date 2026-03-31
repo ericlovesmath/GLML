@@ -46,13 +46,12 @@ let rec collect_from_ty ~(struct_poly_env : struct_poly_env) (ty : ty)
       | Some (params, fields) ->
         let sub = List.zip_exn params args in
         List.concat_map fields ~f:(fun (_, fty) ->
-          let fty' = subst_ty sub fty in
-          collect_from_ty ~struct_poly_env fty')
+          let fty = subst_ty sub fty in
+          collect_from_ty ~struct_poly_env fty)
     in
     deps_from_args @ deps_from_fields @ [ name, args ]
 ;;
 
-(* TODO: Does... Let bindings even need the type now? In that case do I even need this? *)
 let collect_from_term ~(struct_poly_env : struct_poly_env) (t : term)
   : (string * ty list) list
   =
@@ -63,7 +62,7 @@ let collect_from_term ~(struct_poly_env : struct_poly_env) (t : term)
       | Var _ | Float _ | Int _ | Bool _ -> []
       | Vec (_, ts) | Mat (_, _, ts) | Builtin (_, ts) | Record (_, ts) ->
         List.concat_map ts ~f:walk
-      | Lam (_, lam_ty, body) -> collect_from_ty ~struct_poly_env lam_ty @ walk body
+      | Lam (_, body) -> walk body
       | App (f, x) -> walk f @ walk x
       | Let (_, _, _, bind, body) -> walk bind @ walk body
       | If (c, t, e) -> walk c @ walk t @ walk e
@@ -94,14 +93,10 @@ let collect_from_top ~(struct_poly_env : struct_poly_env) (top : top)
     collect_from_ty ~struct_poly_env top.ty @ collect_from_term ~struct_poly_env bind
 ;;
 
-(** Stable dedup using structural equality, keeping first occurrence. *)
-let equal_instance (n1, args1) (n2, args2) =
-  String.equal n1 n2 && List.equal equal_ty args1 args2
-;;
-
 let dedup_instances (instances : (string * ty list) list) : (string * ty list) list =
+  let eq (n, args) (n', args') = String.equal n n' && List.equal equal_ty args args' in
   List.fold instances ~init:[] ~f:(fun acc inst ->
-    if List.exists acc ~f:(equal_instance inst) then acc else inst :: acc)
+    if List.exists acc ~f:(eq inst) then acc else inst :: acc)
   |> List.rev
 ;;
 
@@ -146,7 +141,7 @@ let rec rewrite_term ~(struct_poly_env : struct_poly_env) (t : term) : term =
     | Var _ | Float _ | Int _ | Bool _ -> t.desc
     | Vec (n, ts) -> Vec (n, List.map ts ~f:rewrite)
     | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:rewrite)
-    | Lam (v, lam_ty, body) -> Lam (v, rewrite_ty ~struct_poly_env lam_ty, rewrite body)
+    | Lam (v, body) -> Lam (v, rewrite body)
     | App (f, x) -> App (rewrite f, rewrite x)
     | Let (recur, v, constrs, bind, body) ->
       Let (recur, v, constrs, rewrite bind, rewrite body)

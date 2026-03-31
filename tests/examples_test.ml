@@ -121,8 +121,8 @@ let%expect_test "compile examples" =
         (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
        : shape)
       ((Define Nonrec sdf_0
-        ((lambda (s_1 shape)
-          ((lambda (p_2 (vec 2))
+        ((lambda s_1
+          ((lambda p_2
             ((match (s_1 : shape)
               ((Circle r_3)
                ((- ((length (p_2 : (vec 2))) : float) (r_3 : float)) : float))
@@ -156,7 +156,7 @@ let%expect_test "compile examples" =
          : (shape -> ((vec 2) -> float))))
        : (shape -> ((vec 2) -> float)))
       ((Define Nonrec scene_7
-        ((lambda (p_8 (vec 2))
+        ((lambda p_8
           ((let circle_9
             ((app
               ((app (sdf_0 : (shape -> ((vec 2) -> float)))
@@ -177,7 +177,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> float)))
        : ((vec 2) -> float))
       ((Define Nonrec get_uv_11
-        ((lambda (coord_12 'v_49)
+        ((lambda coord_12
           ((let top_13
             ((- ((* (2. : float) (coord_12 : 'v_49)) : 'v_49)
               (u_resolution : (vec 2)))
@@ -196,7 +196,7 @@ let%expect_test "compile examples" =
          (MulBroadcast 'v_51 float 'v_51))
         ('v_49 -> 'v_51)))
       ((Define Nonrec main
-        ((lambda (coord_15 (vec 2))
+        ((lambda coord_15
           ((let p_16
             ((app (get_uv_11 : ((vec 2) -> (vec 2))) (coord_15 : (vec 2))) :
              (vec 2))
@@ -292,8 +292,8 @@ let%expect_test "compile examples" =
         (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
        : shape)
       ((Define Nonrec sdf_0
-        ((lambda (s_1 shape)
-          ((lambda (p_2 (vec 2))
+        ((lambda s_1
+          ((lambda p_2
             ((match (s_1 : shape)
               ((Circle r_3)
                ((- ((length (p_2 : (vec 2))) : float) (r_3 : float)) : float))
@@ -327,7 +327,7 @@ let%expect_test "compile examples" =
          : (shape -> ((vec 2) -> float))))
        : (shape -> ((vec 2) -> float)))
       ((Define Nonrec scene_7
-        ((lambda (p_8 (vec 2))
+        ((lambda p_8
           ((let circle_9
             ((app
               ((app (sdf_0 : (shape -> ((vec 2) -> float)))
@@ -348,7 +348,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> float)))
        : ((vec 2) -> float))
       ((Define Nonrec get_uv_11_vec2_to_vec2_94
-        ((lambda (coord_12 (vec 2))
+        ((lambda coord_12
           ((let top_13
             ((- ((* (2. : float) (coord_12 : (vec 2))) : (vec 2))
               (u_resolution : (vec 2)))
@@ -363,7 +363,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> (vec 2))))
        : ((vec 2) -> (vec 2)))
       ((Define Nonrec main
-        ((lambda (coord_15 (vec 2))
+        ((lambda coord_15
           ((let p_16
             ((app (get_uv_11_vec2_to_vec2_94 : ((vec 2) -> (vec 2)))
               (coord_15 : (vec 2)))
@@ -1104,7 +1104,7 @@ let%expect_test "compile examples" =
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Define Nonrec get_uv_0
-        ((lambda (coord_1 'v_11)
+        ((lambda coord_1
           ((let top_2
             ((- ((* (2. : float) (coord_1 : 'v_11)) : 'v_11)
               (u_resolution : (vec 2)))
@@ -1123,7 +1123,7 @@ let%expect_test "compile examples" =
          (MulBroadcast 'v_13 float 'v_13))
         ('v_11 -> 'v_13)))
       ((Define Nonrec main
-        ((lambda (coord_4 (vec 2))
+        ((lambda coord_4
           ((let uv_5
             ((app (get_uv_0 : ((vec 2) -> (vec 2))) (coord_4 : (vec 2))) :
              (vec 2))
@@ -1170,7 +1170,7 @@ let%expect_test "compile examples" =
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Define Nonrec get_uv_0_vec2_to_vec2_35
-        ((lambda (coord_1 (vec 2))
+        ((lambda coord_1
           ((let top_2
             ((- ((* (2. : float) (coord_1 : (vec 2))) : (vec 2))
               (u_resolution : (vec 2)))
@@ -1185,7 +1185,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> (vec 2))))
        : ((vec 2) -> (vec 2)))
       ((Define Nonrec main
-        ((lambda (coord_4 (vec 2))
+        ((lambda coord_4
           ((let uv_5
             ((app (get_uv_0_vec2_to_vec2_35 : ((vec 2) -> (vec 2)))
               (coord_4 : (vec 2)))
@@ -1537,7 +1537,7 @@ let%expect_test "compile examples" =
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Define Nonrec get_uv_0
-        ((lambda (coord_1 'v_19)
+        ((lambda coord_1
           ((let top_2
             ((- ((* (2. : float) (coord_1 : 'v_19)) : 'v_19)
               (u_resolution : (vec 2)))
@@ -1556,11 +1556,11 @@ let%expect_test "compile examples" =
          (MulBroadcast 'v_21 float 'v_21))
         ('v_19 -> 'v_21)))
       ((Define (Rec 1000) mandel_4
-        ((lambda (zx_5 'v_39)
-          ((lambda (zy_6 'v_42)
-            ((lambda (cx_7 'v_29)
-              ((lambda (cy_8 'v_30)
-                ((lambda (i_9 float)
+        ((lambda zx_5
+          ((lambda zy_6
+            ((lambda cx_7
+              ((lambda cy_8
+                ((lambda i_9
                   ((if
                     ((||
                       ((>
@@ -1623,7 +1623,7 @@ let%expect_test "compile examples" =
          (MulBroadcast 'v_39 'v_42 'v_41) (MulBroadcast float 'v_39 'v_39))
         ('v_39 -> ('v_42 -> ('v_29 -> ('v_30 -> (float -> float)))))))
       ((Define Nonrec main
-        ((lambda (coord_12 (vec 2))
+        ((lambda coord_12
           ((let uv_13
             ((app (get_uv_0 : ((vec 2) -> (vec 2))) (coord_12 : (vec 2))) :
              (vec 2))
@@ -1700,11 +1700,11 @@ let%expect_test "compile examples" =
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Define (Rec 1000)
         mandel_4_float_to_float_to_float_to_float_to_float_to_float_81
-        ((lambda (zx_5 float)
-          ((lambda (zy_6 float)
-            ((lambda (cx_7 float)
-              ((lambda (cy_8 float)
-                ((lambda (i_9 float)
+        ((lambda zx_5
+          ((lambda zy_6
+            ((lambda cx_7
+              ((lambda cy_8
+                ((lambda i_9
                   ((if
                     ((||
                       ((>
@@ -1762,7 +1762,7 @@ let%expect_test "compile examples" =
          : (float -> (float -> (float -> (float -> (float -> float)))))))
        : (float -> (float -> (float -> (float -> (float -> float))))))
       ((Define Nonrec get_uv_0_vec2_to_vec2_82
-        ((lambda (coord_1 (vec 2))
+        ((lambda coord_1
           ((let top_2
             ((- ((* (2. : float) (coord_1 : (vec 2))) : (vec 2))
               (u_resolution : (vec 2)))
@@ -1777,7 +1777,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> (vec 2))))
        : ((vec 2) -> (vec 2)))
       ((Define Nonrec main
-        ((lambda (coord_12 (vec 2))
+        ((lambda coord_12
           ((let uv_13
             ((app (get_uv_0_vec2_to_vec2_82 : ((vec 2) -> (vec 2)))
               (coord_12 : (vec 2)))
@@ -2361,7 +2361,7 @@ let%expect_test "compile examples" =
      (((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
       ((Extern u_time) : float)
       ((Define Nonrec get_uv_0
-        ((lambda (coord_1 'v_8)
+        ((lambda coord_1
           ((let top_2
             ((- ((* (2. : float) (coord_1 : 'v_8)) : 'v_8)
               (u_resolution : (vec 2)))
@@ -2380,7 +2380,7 @@ let%expect_test "compile examples" =
          (MulBroadcast 'v_10 float 'v_10))
         ('v_8 -> 'v_10)))
       ((Define Nonrec main
-        ((lambda (coord_4 (vec 2))
+        ((lambda coord_4
           ((let uv_5
             ((app (get_uv_0 : ((vec 2) -> (vec 2))) (coord_4 : (vec 2))) :
              (vec 2))
@@ -2416,7 +2416,7 @@ let%expect_test "compile examples" =
      (((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
       ((Extern u_time) : float)
       ((Define Nonrec get_uv_0_vec2_to_vec2_28
-        ((lambda (coord_1 (vec 2))
+        ((lambda coord_1
           ((let top_2
             ((- ((* (2. : float) (coord_1 : (vec 2))) : (vec 2))
               (u_resolution : (vec 2)))
@@ -2431,7 +2431,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> (vec 2))))
        : ((vec 2) -> (vec 2)))
       ((Define Nonrec main
-        ((lambda (coord_4 (vec 2))
+        ((lambda coord_4
           ((let uv_5
             ((app (get_uv_0_vec2_to_vec2_28 : ((vec 2) -> (vec 2)))
               (coord_4 : (vec 2)))
@@ -2933,8 +2933,8 @@ let%expect_test "compile examples" =
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Extern u_mouse) : (vec 2))
       ((Define Nonrec rotate_0
-        ((lambda (p_1 (vec 2))
-          ((lambda (angle_2 float)
+        ((lambda p_1
+          ((lambda angle_2
             ((let s_3 ((sin (angle_2 : float)) : float)
               ((let c_4 ((cos (angle_2 : float)) : float)
                 ((vec2
@@ -2957,7 +2957,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> (float -> (vec 2)))))
        : ((vec 2) -> (float -> (vec 2))))
       ((Define Nonrec noise3d_5
-        ((lambda (p_6 (vec 3))
+        ((lambda p_6
           ((let i_7 ((floor (p_6 : (vec 3))) : (vec 3))
             ((let f_8 ((fract (p_6 : (vec 3))) : (vec 3))
               ((let u_9
@@ -2966,7 +2966,7 @@ let%expect_test "compile examples" =
                    : (vec 3)))
                  : (vec 3))
                 ((let hash_10
-                  ((lambda (p_11 (vec 3))
+                  ((lambda p_11
                     ((let d_12
                       ((dot (p_11 : (vec 3))
                         ((vec3 (127.1 : float) (311.7 : float) (74.7 : float)) :
@@ -3078,7 +3078,7 @@ let%expect_test "compile examples" =
          : ((vec 3) -> float)))
        : ((vec 3) -> float))
       ((Define Nonrec fbm_27
-        ((lambda (p_28 (vec 3))
+        ((lambda p_28
           ((+
             ((+
               ((+
@@ -3112,8 +3112,8 @@ let%expect_test "compile examples" =
          : ((vec 3) -> float)))
        : ((vec 3) -> float))
       ((Define Nonrec sdPlanet_29
-        ((lambda (p_30 (vec 3))
-          ((lambda (radius_31 float)
+        ((lambda p_30
+          ((lambda radius_31
             ((let len_32 ((length (p_30 : (vec 3))) : float)
               ((let dir_33 ((/ (p_30 : (vec 3)) (len_32 : float)) : (vec 3))
                 ((let terrain_34
@@ -3133,7 +3133,7 @@ let%expect_test "compile examples" =
          : ((vec 3) -> (float -> float))))
        : ((vec 3) -> (float -> float)))
       ((Define Nonrec map_35
-        ((lambda (p_36 (vec 3))
+        ((lambda p_36
           ((app
             ((app (sdPlanet_29 : ((vec 3) -> (float -> float))) (p_36 : (vec 3)))
              : (float -> float))
@@ -3142,7 +3142,7 @@ let%expect_test "compile examples" =
          : ((vec 3) -> float)))
        : ((vec 3) -> float))
       ((Define Nonrec getNormal_37
-        ((lambda (p_38 (vec 3))
+        ((lambda p_38
           ((let e_39 (0.002 : float)
             ((let e_x_40 ((vec3 (e_39 : float) (0 : int) (0 : int)) : (vec 3))
               ((let e_y_41 ((vec3 (0 : int) (e_39 : float) (0 : int)) : (vec 3))
@@ -3189,11 +3189,11 @@ let%expect_test "compile examples" =
          : ((vec 3) -> (vec 3))))
        : ((vec 3) -> (vec 3)))
       ((Define Nonrec march_46
-        ((lambda (ro_47 (vec 3))
-          ((lambda (rd_48 (vec 3))
+        ((lambda ro_47
+          ((lambda rd_48
             ((let (rec 1000) march_49
-              ((lambda (t_50 float)
-                ((lambda (steps_51 int)
+              ((lambda t_50
+                ((lambda steps_51
                   ((if ((> (steps_51 : int) (120 : int)) : bool) (t_50 : float)
                     ((let d_52
                       ((app (map_35 : ((vec 3) -> float))
@@ -3229,7 +3229,7 @@ let%expect_test "compile examples" =
          : ((vec 3) -> ((vec 3) -> float))))
        : ((vec 3) -> ((vec 3) -> float)))
       ((Define Nonrec main
-        ((lambda (coord_53 (vec 2))
+        ((lambda coord_53
           ((let res_min_54
             ((min ((index (u_resolution : (vec 2)) 0) : float)
               ((index (u_resolution : (vec 2)) 1) : float))
@@ -3249,7 +3249,7 @@ let%expect_test "compile examples" =
                   (res_min_54 : float))
                  : (vec 2))
                 ((let rotate_by_mouse_57
-                  ((lambda (ray_58 'v_204)
+                  ((lambda ray_58
                     ((let rotX_59
                       ((*
                         ((* (-1 : int)
@@ -3511,8 +3511,8 @@ let%expect_test "compile examples" =
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Extern u_mouse) : (vec 2))
       ((Define Nonrec rotate_0
-        ((lambda (p_1 (vec 2))
-          ((lambda (angle_2 float)
+        ((lambda p_1
+          ((lambda angle_2
             ((let s_3 ((sin (angle_2 : float)) : float)
               ((let c_4 ((cos (angle_2 : float)) : float)
                 ((vec2
@@ -3535,7 +3535,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> (float -> (vec 2)))))
        : ((vec 2) -> (float -> (vec 2))))
       ((Define Nonrec noise3d_5
-        ((lambda (p_6 (vec 3))
+        ((lambda p_6
           ((let i_7 ((floor (p_6 : (vec 3))) : (vec 3))
             ((let f_8 ((fract (p_6 : (vec 3))) : (vec 3))
               ((let u_9
@@ -3544,7 +3544,7 @@ let%expect_test "compile examples" =
                    : (vec 3)))
                  : (vec 3))
                 ((let hash_10
-                  ((lambda (p_11 (vec 3))
+                  ((lambda p_11
                     ((let d_12
                       ((dot (p_11 : (vec 3))
                         ((vec3 (127.1 : float) (311.7 : float) (74.7 : float)) :
@@ -3656,7 +3656,7 @@ let%expect_test "compile examples" =
          : ((vec 3) -> float)))
        : ((vec 3) -> float))
       ((Define Nonrec fbm_27
-        ((lambda (p_28 (vec 3))
+        ((lambda p_28
           ((+
             ((+
               ((+
@@ -3690,8 +3690,8 @@ let%expect_test "compile examples" =
          : ((vec 3) -> float)))
        : ((vec 3) -> float))
       ((Define Nonrec sdPlanet_29
-        ((lambda (p_30 (vec 3))
-          ((lambda (radius_31 float)
+        ((lambda p_30
+          ((lambda radius_31
             ((let len_32 ((length (p_30 : (vec 3))) : float)
               ((let dir_33 ((/ (p_30 : (vec 3)) (len_32 : float)) : (vec 3))
                 ((let terrain_34
@@ -3711,7 +3711,7 @@ let%expect_test "compile examples" =
          : ((vec 3) -> (float -> float))))
        : ((vec 3) -> (float -> float)))
       ((Define Nonrec map_35
-        ((lambda (p_36 (vec 3))
+        ((lambda p_36
           ((app
             ((app (sdPlanet_29 : ((vec 3) -> (float -> float))) (p_36 : (vec 3)))
              : (float -> float))
@@ -3720,7 +3720,7 @@ let%expect_test "compile examples" =
          : ((vec 3) -> float)))
        : ((vec 3) -> float))
       ((Define Nonrec getNormal_37
-        ((lambda (p_38 (vec 3))
+        ((lambda p_38
           ((let e_39 (0.002 : float)
             ((let e_x_40 ((vec3 (e_39 : float) (0 : int) (0 : int)) : (vec 3))
               ((let e_y_41 ((vec3 (0 : int) (e_39 : float) (0 : int)) : (vec 3))
@@ -3767,11 +3767,11 @@ let%expect_test "compile examples" =
          : ((vec 3) -> (vec 3))))
        : ((vec 3) -> (vec 3)))
       ((Define Nonrec march_46
-        ((lambda (ro_47 (vec 3))
-          ((lambda (rd_48 (vec 3))
+        ((lambda ro_47
+          ((lambda rd_48
             ((let (rec 1000) march_49
-              ((lambda (t_50 float)
-                ((lambda (steps_51 int)
+              ((lambda t_50
+                ((lambda steps_51
                   ((if ((> (steps_51 : int) (120 : int)) : bool) (t_50 : float)
                     ((let d_52
                       ((app (map_35 : ((vec 3) -> float))
@@ -3807,7 +3807,7 @@ let%expect_test "compile examples" =
          : ((vec 3) -> ((vec 3) -> float))))
        : ((vec 3) -> ((vec 3) -> float)))
       ((Define Nonrec main
-        ((lambda (coord_53 (vec 2))
+        ((lambda coord_53
           ((let res_min_54
             ((min ((index (u_resolution : (vec 2)) 0) : float)
               ((index (u_resolution : (vec 2)) 1) : float))
@@ -3827,7 +3827,7 @@ let%expect_test "compile examples" =
                   (res_min_54 : float))
                  : (vec 2))
                 ((let rotate_by_mouse_57_vec3_to_vec3_278
-                  ((lambda (ray_58 (vec 3))
+                  ((lambda ray_58
                     ((let rotX_59
                       ((*
                         ((* (-1 : int)
@@ -6018,7 +6018,7 @@ let%expect_test "compile examples" =
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Define Nonrec get_uv_0
-        ((lambda (coord_1 'v_10)
+        ((lambda coord_1
           ((let top_2
             ((- ((* (2. : float) (coord_1 : 'v_10)) : 'v_10)
               (u_resolution : (vec 2)))
@@ -6037,7 +6037,7 @@ let%expect_test "compile examples" =
          (MulBroadcast 'v_12 float 'v_12))
         ('v_10 -> 'v_12)))
       ((Define Nonrec main
-        ((lambda (coord_4 (vec 2))
+        ((lambda coord_4
           ((let uv_5
             ((app (get_uv_0 : ((vec 2) -> (vec 2))) (coord_4 : (vec 2))) :
              (vec 2))
@@ -6084,7 +6084,7 @@ let%expect_test "compile examples" =
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Define Nonrec get_uv_0_vec2_to_vec2_36
-        ((lambda (coord_1 (vec 2))
+        ((lambda coord_1
           ((let top_2
             ((- ((* (2. : float) (coord_1 : (vec 2))) : (vec 2))
               (u_resolution : (vec 2)))
@@ -6099,7 +6099,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> (vec 2))))
        : ((vec 2) -> (vec 2)))
       ((Define Nonrec main
-        ((lambda (coord_4 (vec 2))
+        ((lambda coord_4
           ((let uv_5
             ((app (get_uv_0_vec2_to_vec2_36 : ((vec 2) -> (vec 2)))
               (coord_4 : (vec 2)))
@@ -6544,8 +6544,8 @@ let%expect_test "compile examples" =
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Extern u_mouse) : (vec 2))
       ((Define Nonrec rotate_0
-        ((lambda (p_1 (vec 2))
-          ((lambda (angle_2 float)
+        ((lambda p_1
+          ((lambda angle_2
             ((let s_3 ((sin (angle_2 : float)) : float)
               ((let c_4 ((cos (angle_2 : float)) : float)
                 ((vec2
@@ -6568,8 +6568,8 @@ let%expect_test "compile examples" =
          : ((vec 2) -> (float -> (vec 2)))))
        : ((vec 2) -> (float -> (vec 2))))
       ((Define Nonrec sMin_5
-        ((lambda (a_6 float)
-          ((lambda (b_7 float)
+        ((lambda a_6
+          ((lambda b_7
             ((let k_8 (0.1 : float)
               ((let h_9
                 ((clamp
@@ -6594,7 +6594,7 @@ let%expect_test "compile examples" =
          : (float -> (float -> float))))
        : (float -> (float -> float)))
       ((Define Nonrec palette_10
-        ((lambda (t_11 float)
+        ((lambda t_11
           ((let cfg_12
             ((vec3 (0.3 : float) (0.416 : float) (0.557 : float)) : (vec 3))
             ((+
@@ -6612,8 +6612,8 @@ let%expect_test "compile examples" =
          : (float -> (vec 3))))
        : (float -> (vec 3)))
       ((Define Nonrec sdTorus_13
-        ((lambda (p_14 (vec 3))
-          ((lambda (t_15 (vec 2))
+        ((lambda p_14
+          ((lambda t_15
             ((let q_16
               ((vec2
                 ((-
@@ -6634,7 +6634,7 @@ let%expect_test "compile examples" =
          : ((vec 3) -> ((vec 2) -> float))))
        : ((vec 3) -> ((vec 2) -> float)))
       ((Define Nonrec map_17
-        ((lambda (p_18 (vec 3))
+        ((lambda p_18
           ((let angle_19 ((* (u_time : float) (2. : float)) : float)
             ((let p_xy_20
               ((app
@@ -6688,11 +6688,11 @@ let%expect_test "compile examples" =
          : ((vec 3) -> float)))
        : ((vec 3) -> float))
       ((Define Nonrec march_24
-        ((lambda (ro_25 (vec 3))
-          ((lambda (rd_26 (vec 3))
+        ((lambda ro_25
+          ((lambda rd_26
             ((let (rec 1000) march_27
-              ((lambda (t_28 float)
-                ((lambda (steps_29 int)
+              ((lambda t_28
+                ((lambda steps_29
                   ((if ((> (steps_29 : int) (80 : int)) : bool) (t_28 : float)
                     ((let d_30
                       ((app (map_17 : ((vec 3) -> float))
@@ -6726,7 +6726,7 @@ let%expect_test "compile examples" =
          : ((vec 3) -> ((vec 3) -> float))))
        : ((vec 3) -> ((vec 3) -> float)))
       ((Define Nonrec main
-        ((lambda (coord_31 (vec 2))
+        ((lambda coord_31
           ((let res_min_32
             ((min ((index (u_resolution : (vec 2)) 0) : float)
               ((index (u_resolution : (vec 2)) 1) : float))
@@ -6886,8 +6886,8 @@ let%expect_test "compile examples" =
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Extern u_mouse) : (vec 2))
       ((Define Nonrec rotate_0
-        ((lambda (p_1 (vec 2))
-          ((lambda (angle_2 float)
+        ((lambda p_1
+          ((lambda angle_2
             ((let s_3 ((sin (angle_2 : float)) : float)
               ((let c_4 ((cos (angle_2 : float)) : float)
                 ((vec2
@@ -6910,8 +6910,8 @@ let%expect_test "compile examples" =
          : ((vec 2) -> (float -> (vec 2)))))
        : ((vec 2) -> (float -> (vec 2))))
       ((Define Nonrec sMin_5
-        ((lambda (a_6 float)
-          ((lambda (b_7 float)
+        ((lambda a_6
+          ((lambda b_7
             ((let k_8 (0.1 : float)
               ((let h_9
                 ((clamp
@@ -6936,7 +6936,7 @@ let%expect_test "compile examples" =
          : (float -> (float -> float))))
        : (float -> (float -> float)))
       ((Define Nonrec palette_10
-        ((lambda (t_11 float)
+        ((lambda t_11
           ((let cfg_12
             ((vec3 (0.3 : float) (0.416 : float) (0.557 : float)) : (vec 3))
             ((+
@@ -6954,8 +6954,8 @@ let%expect_test "compile examples" =
          : (float -> (vec 3))))
        : (float -> (vec 3)))
       ((Define Nonrec sdTorus_13
-        ((lambda (p_14 (vec 3))
-          ((lambda (t_15 (vec 2))
+        ((lambda p_14
+          ((lambda t_15
             ((let q_16
               ((vec2
                 ((-
@@ -6976,7 +6976,7 @@ let%expect_test "compile examples" =
          : ((vec 3) -> ((vec 2) -> float))))
        : ((vec 3) -> ((vec 2) -> float)))
       ((Define Nonrec map_17
-        ((lambda (p_18 (vec 3))
+        ((lambda p_18
           ((let angle_19 ((* (u_time : float) (2. : float)) : float)
             ((let p_xy_20
               ((app
@@ -7030,11 +7030,11 @@ let%expect_test "compile examples" =
          : ((vec 3) -> float)))
        : ((vec 3) -> float))
       ((Define Nonrec march_24
-        ((lambda (ro_25 (vec 3))
-          ((lambda (rd_26 (vec 3))
+        ((lambda ro_25
+          ((lambda rd_26
             ((let (rec 1000) march_27
-              ((lambda (t_28 float)
-                ((lambda (steps_29 int)
+              ((lambda t_28
+                ((lambda steps_29
                   ((if ((> (steps_29 : int) (80 : int)) : bool) (t_28 : float)
                     ((let d_30
                       ((app (map_17 : ((vec 3) -> float))
@@ -7068,7 +7068,7 @@ let%expect_test "compile examples" =
          : ((vec 3) -> ((vec 3) -> float))))
        : ((vec 3) -> ((vec 3) -> float)))
       ((Define Nonrec main
-        ((lambda (coord_31 (vec 2))
+        ((lambda coord_31
           ((let res_min_32
             ((min ((index (u_resolution : (vec 2)) 0) : float)
               ((index (u_resolution : (vec 2)) 1) : float))
@@ -8585,7 +8585,7 @@ let%expect_test "compile examples" =
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Define Nonrec get_uv_0
-        ((lambda (coord_1 (vec 2))
+        ((lambda coord_1
           ((let top_2
             ((- ((* (2. : float) (coord_1 : (vec 2))) : (vec 2))
               (u_resolution : (vec 2)))
@@ -8600,7 +8600,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> (vec 2))))
        : ((vec 2) -> (vec 2)))
       ((Define Nonrec rotate_4
-        ((lambda (angle_5 float)
+        ((lambda angle_5
           ((let s_6 ((sin (angle_5 : float)) : float)
             ((let c_7 ((cos (angle_5 : float)) : float)
               ((mat2x2 (c_7 : float) ((* (-1. : float) (s_6 : float)) : float)
@@ -8611,8 +8611,8 @@ let%expect_test "compile examples" =
          : (float -> (mat 2 2))))
        : (float -> (mat 2 2)))
       ((Define (Rec 1000) gcd_8
-        ((lambda (a_9 float)
-          ((lambda (b_10 float)
+        ((lambda a_9
+          ((lambda b_10
             ((if ((< (a_9 : float) (0.05 : float)) : bool) (b_10 : float)
               ((if ((< (b_10 : float) (0.05 : float)) : bool) (a_9 : float)
                 ((if ((> (a_9 : float) (b_10 : float)) : bool)
@@ -8634,7 +8634,7 @@ let%expect_test "compile examples" =
          : (float -> (float -> float))))
        : (float -> (float -> float)))
       ((Define Nonrec main
-        ((lambda (coord_11 (vec 2))
+        ((lambda coord_11
           ((let uv_12
             ((app (get_uv_0 : ((vec 2) -> (vec 2))) (coord_11 : (vec 2))) :
              (vec 2))
@@ -8685,7 +8685,7 @@ let%expect_test "compile examples" =
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Define Nonrec get_uv_0
-        ((lambda (coord_1 (vec 2))
+        ((lambda coord_1
           ((let top_2
             ((- ((* (2. : float) (coord_1 : (vec 2))) : (vec 2))
               (u_resolution : (vec 2)))
@@ -8700,7 +8700,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> (vec 2))))
        : ((vec 2) -> (vec 2)))
       ((Define Nonrec rotate_4
-        ((lambda (angle_5 float)
+        ((lambda angle_5
           ((let s_6 ((sin (angle_5 : float)) : float)
             ((let c_7 ((cos (angle_5 : float)) : float)
               ((mat2x2 (c_7 : float) ((* (-1. : float) (s_6 : float)) : float)
@@ -8711,8 +8711,8 @@ let%expect_test "compile examples" =
          : (float -> (mat 2 2))))
        : (float -> (mat 2 2)))
       ((Define (Rec 1000) gcd_8
-        ((lambda (a_9 float)
-          ((lambda (b_10 float)
+        ((lambda a_9
+          ((lambda b_10
             ((if ((< (a_9 : float) (0.05 : float)) : bool) (b_10 : float)
               ((if ((< (b_10 : float) (0.05 : float)) : bool) (a_9 : float)
                 ((if ((> (a_9 : float) (b_10 : float)) : bool)
@@ -8734,7 +8734,7 @@ let%expect_test "compile examples" =
          : (float -> (float -> float))))
        : (float -> (float -> float)))
       ((Define Nonrec main
-        ((lambda (coord_11 (vec 2))
+        ((lambda coord_11
           ((let uv_12
             ((app (get_uv_0 : ((vec 2) -> (vec 2))) (coord_11 : (vec 2))) :
              (vec 2))
@@ -9328,7 +9328,7 @@ let%expect_test "compile examples" =
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Define Nonrec smoothNoise_0
-        ((lambda (p_1 (vec 2))
+        ((lambda p_1
           ((let i_2 ((floor (p_1 : (vec 2))) : (vec 2))
             ((let pf_3 ((- (p_1 : (vec 2)) (i_2 : (vec 2))) : (vec 2))
               ((let inter_4
@@ -9395,7 +9395,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> float)))
        : ((vec 2) -> float))
       ((Define Nonrec fractalNoise_11
-        ((lambda (p_12 (vec 2))
+        ((lambda p_12
           ((+
             ((+
               ((+
@@ -9428,7 +9428,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> float)))
        : ((vec 2) -> float))
       ((Define Nonrec warpedNoise_13
-        ((lambda (p_14 (vec 2))
+        ((lambda p_14
           ((let m_15
             ((*
               ((vec2 (u_time : float)
@@ -9489,7 +9489,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> float)))
        : ((vec 2) -> float))
       ((Define Nonrec main
-        ((lambda (coord_21 (vec 2))
+        ((lambda coord_21
           ((let uv_22
             ((/
               ((- (coord_21 : (vec 2))
@@ -9632,7 +9632,7 @@ let%expect_test "compile examples" =
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Define Nonrec smoothNoise_0
-        ((lambda (p_1 (vec 2))
+        ((lambda p_1
           ((let i_2 ((floor (p_1 : (vec 2))) : (vec 2))
             ((let pf_3 ((- (p_1 : (vec 2)) (i_2 : (vec 2))) : (vec 2))
               ((let inter_4
@@ -9699,7 +9699,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> float)))
        : ((vec 2) -> float))
       ((Define Nonrec fractalNoise_11
-        ((lambda (p_12 (vec 2))
+        ((lambda p_12
           ((+
             ((+
               ((+
@@ -9732,7 +9732,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> float)))
        : ((vec 2) -> float))
       ((Define Nonrec warpedNoise_13
-        ((lambda (p_14 (vec 2))
+        ((lambda p_14
           ((let m_15
             ((*
               ((vec2 (u_time : float)
@@ -9793,7 +9793,7 @@ let%expect_test "compile examples" =
          : ((vec 2) -> float)))
        : ((vec 2) -> float))
       ((Define Nonrec main
-        ((lambda (coord_21 (vec 2))
+        ((lambda coord_21
           ((let uv_22
             ((/
               ((- (coord_21 : (vec 2))

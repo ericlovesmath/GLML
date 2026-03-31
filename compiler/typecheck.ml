@@ -73,7 +73,7 @@ type term_desc =
   | Bool of bool
   | Vec of int * term list
   | Mat of int * int * term list
-  | Lam of string * ty * term
+  | Lam of string * term
   | App of term * term
   | Let of recur * string * constr list * term * term
   | If of term * term * term
@@ -122,8 +122,8 @@ let rec sexp_of_term_desc = function
     List
       (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
        :: List.map ts ~f:sexp_of_term)
-  | Lam (v, ty, body) ->
-    List [ Atom "lambda"; List [ Atom v; sexp_of_ty ty ]; sexp_of_term body ]
+  | Lam (v, body) ->
+    List [ Atom "lambda"; Atom v; sexp_of_term body ]
   | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
   | Let (Rec n, v, constrs, bind, body) ->
     let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
@@ -222,7 +222,7 @@ let rec subst_term (sub : substitution) (t : term) : term =
     | Var _ | Float _ | Int _ | Bool _ -> t.desc
     | Vec (n, ts) -> Vec (n, List.map ts ~f:subst)
     | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:subst)
-    | Lam (v, ty, body) -> Lam (v, subst_ty sub ty, subst body)
+    | Lam (v, body) -> Lam (v, subst body)
     | App (f, x) -> App (subst f, subst x)
     | Let (recur, v, constrs, bind, body) ->
       Let (recur, v, subst_constraints sub constrs, subst bind, subst body)
@@ -574,7 +574,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
     in
     let ctx = Map.set ctx ~key:v ~data:([], [], ty_v) in
     let%bind body, constrs = gen_term structs variants ctx body in
-    make (Lam (v, ty_v, body)) (TyArrow (ty_v, body.ty)) constrs
+    make (Lam (v, body)) (TyArrow (ty_v, body.ty)) constrs
   | App (f, x) ->
     let%bind f, constrs_f = gen_term structs variants ctx f in
     let%bind x, constrs_x = gen_term structs variants ctx x in
