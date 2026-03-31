@@ -81,47 +81,52 @@ let sexp_of_top t =
 
 type t = Program of top list [@@deriving sexp_of]
 
+let arg_ty (t : Monomorphize.term) =
+  match t.ty with
+  | TyArrow (a, _) -> a
+  | _ -> failwith "applying a non function type"
+;;
+
 let rec collect_lams (t : Monomorphize.term) : (string * Monomorphize.ty) list * term =
   match t.desc with
-  | Lam (v, ty, body) ->
+  | Lam (v, body) ->
     let args, body = collect_lams body in
-    (v, ty) :: args, body
+    (v, arg_ty t) :: args, body
   | _ -> [], uncurry_term t
 
-and collect_apps (t : Monomorphize.term) : term * term list =
-  match t.desc with
-  | App (f, x) ->
-    let f', args = collect_apps f in
-    f', args @ [ uncurry_term x ]
-  | _ -> uncurry_term t, []
-
-and uncurry_term_desc (t : Monomorphize.term_desc) : term_desc =
-  match t with
-  | Var v -> Var v
-  | Float f -> Float f
-  | Int i -> Int i
-  | Bool b -> Bool b
-  | Vec (n, ts) -> Vec (n, List.map ts ~f:uncurry_term)
-  | Mat (x, y, ts) -> Mat (x, y, List.map ts ~f:uncurry_term)
-  | Lam (v, ty, body) ->
-    let args, body = collect_lams body in
-    Lam ((v, ty) :: args, body)
-  | App (f, x) ->
-    let f', args = collect_apps f in
-    App (f', args @ [ uncurry_term x ])
-  | Let (recur, v, bind, body) -> Let (recur, v, uncurry_term bind, uncurry_term body)
-  | If (c, t_true, e) -> If (uncurry_term c, uncurry_term t_true, uncurry_term e)
-  | Bop (op, l, r) -> Bop (op, uncurry_term l, uncurry_term r)
-  | Index (t_sub, i) -> Index (uncurry_term t_sub, i)
-  | Builtin (b, ts) -> Builtin (b, List.map ts ~f:uncurry_term)
-  | Record (s, ts) -> Record (s, List.map ts ~f:uncurry_term)
-  | Field (t, f) -> Field (uncurry_term t, f)
-  | Variant (ty_name, ctor, args) -> Variant (ty_name, ctor, List.map args ~f:uncurry_term)
-  | Match (scrutinee, cases) ->
-    Match (uncurry_term scrutinee, List.map cases ~f:(Tuple2.map_snd ~f:uncurry_term))
-
 and uncurry_term (t : Monomorphize.term) : term =
-  { desc = uncurry_term_desc t.desc; ty = t.ty; loc = t.loc }
+  let desc =
+    match t.desc with
+    | Var v -> Var v
+    | Float f -> Float f
+    | Int i -> Int i
+    | Bool b -> Bool b
+    | Vec (n, ts) -> Vec (n, List.map ts ~f:uncurry_term)
+    | Mat (x, y, ts) -> Mat (x, y, List.map ts ~f:uncurry_term)
+    | Lam (v, body) ->
+      let args, body = collect_lams body in
+      Lam ((v, arg_ty t) :: args, body)
+    | App _ ->
+      let rec collect (acc : term list) (t : Monomorphize.term) =
+        match t.desc with
+        | App (f, x) -> collect (uncurry_term x :: acc) f
+        | _ -> uncurry_term t, acc
+      in
+      let f, args = collect [] t in
+      App (f, args)
+    | Let (recur, v, bind, body) -> Let (recur, v, uncurry_term bind, uncurry_term body)
+    | If (c, t_true, e) -> If (uncurry_term c, uncurry_term t_true, uncurry_term e)
+    | Bop (op, l, r) -> Bop (op, uncurry_term l, uncurry_term r)
+    | Index (t_sub, i) -> Index (uncurry_term t_sub, i)
+    | Builtin (b, ts) -> Builtin (b, List.map ts ~f:uncurry_term)
+    | Record (s, ts) -> Record (s, List.map ts ~f:uncurry_term)
+    | Field (t, f) -> Field (uncurry_term t, f)
+    | Variant (ty_name, ctor, args) ->
+      Variant (ty_name, ctor, List.map args ~f:uncurry_term)
+    | Match (scrutinee, cases) ->
+      Match (uncurry_term scrutinee, List.map cases ~f:(Tuple2.map_snd ~f:uncurry_term))
+  in
+  { desc; ty = t.ty; loc = t.loc }
 ;;
 
 let uncurry_top (t : Monomorphize.top) : top =

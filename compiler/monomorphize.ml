@@ -29,7 +29,7 @@ let collect_var_usages (name : string) (t : Typecheck.term) : Typecheck.ty list 
     | Var _ | Float _ | Int _ | Bool _ -> acc
     | Vec (_, ts) | Mat (_, _, ts) | Builtin (_, ts) | Record (_, ts) ->
       List.fold ts ~init:acc ~f:walk
-    | Lam (_, _, body) -> walk acc body
+    | Lam (_, body) -> walk acc body
     | App (f, x) -> walk (walk acc f) x
     | Let (_, _, _, bind, body) -> walk (walk acc bind) body
     | If (c, t, e) -> walk (walk (walk acc c) t) e
@@ -53,7 +53,7 @@ let rec rename_var (src : string) (dst : string) (t : Typecheck.term) : Typechec
     | Var _ | Float _ | Int _ | Bool _ -> t.desc
     | Vec (n, ts) -> Vec (n, List.map ts ~f:rename)
     | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:rename)
-    | Lam (v, ty, body) -> if String.equal v src then t.desc else Lam (v, ty, rename body)
+    | Lam (v, body) -> if String.equal v src then t.desc else Lam (v, rename body)
     | App (f, x) -> App (rename f, rename x)
     | Let (recur, v, constrs, bind, body) ->
       let bind = rename bind in
@@ -92,8 +92,7 @@ let rec rewrite_var_at_type
     | Var _ | Float _ | Int _ | Bool _ -> t.desc
     | Vec (n, ts) -> Vec (n, List.map ts ~f:rewrite)
     | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:rewrite)
-    | Lam (v, ty, body) ->
-      if String.equal v name then t.desc else Lam (v, ty, rewrite body)
+    | Lam (v, body) -> if String.equal v name then t.desc else Lam (v, rewrite body)
     | App (f, x) -> App (rewrite f, rewrite x)
     | Let (recur, v, constrs, bind, body) ->
       let bind = rewrite bind in
@@ -138,6 +137,7 @@ let collect_poly_refs (poly_env : poly_env) (t : Typecheck.term)
   : (string * Typecheck.ty) list
   =
   let rec walk acc (t : Typecheck.term) =
+    (* TODO: Refactor this is kind of sad and foldy *)
     let acc =
       match t.desc with
       | Var v when Map.mem poly_env v && Specialize_structs.is_concrete t.ty ->
@@ -148,7 +148,7 @@ let collect_poly_refs (poly_env : poly_env) (t : Typecheck.term)
     | Var _ | Float _ | Int _ | Bool _ -> acc
     | Vec (_, ts) | Mat (_, _, ts) | Builtin (_, ts) | Record (_, ts) ->
       List.fold ts ~init:acc ~f:walk
-    | Lam (_, _, body) -> walk acc body
+    | Lam (_, body) -> walk acc body
     | App (f, x) -> walk (walk acc f) x
     | Let (_, _, _, bind, body) -> walk (walk acc bind) body
     | If (c, t, e) -> walk (walk (walk acc c) t) e
@@ -246,9 +246,9 @@ and rewrite_refs (poly_env : poly_env) (env : spec_map) (t : Typecheck.term)
     | Mat (n, m, ts) ->
       let env, ts, defs = rewrite_refs_list poly_env env ts in
       Mat (n, m, ts), env, defs
-    | Lam (v, ty, body) ->
+    | Lam (v, body) ->
       let env, body, defs = rewrite_refs poly_env env body in
-      Lam (v, ty, body), env, defs
+      Lam (v, body), env, defs
     | App (f, x) ->
       let env, f, defs1 = rewrite_refs poly_env env f in
       let env, x, defs2 = rewrite_refs poly_env env x in
@@ -379,7 +379,7 @@ type term_desc =
   | Bool of bool
   | Vec of int * term list
   | Mat of int * int * term list
-  | Lam of string * ty * term
+  | Lam of string * term
   | App of term * term
   | Let of recur * string * term * term
   | If of term * term * term
@@ -407,8 +407,7 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
     List
       (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
        :: List.map ts ~f:sexp_of_term)
-  | Lam (v, lam_ty, body) ->
-    List [ Atom "lambda"; List [ Atom v; sexp_of_ty lam_ty ]; sexp_of_term body ]
+  | Lam (v, body) -> List [ Atom "lambda"; Atom v; sexp_of_term body ]
   | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
   | Let (Rec n, v, bind, body) ->
     let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
@@ -482,10 +481,9 @@ and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Compiler_error.t =
   | Mat (n, m, ts) ->
     let%map ts = Compiler_error.all (List.map ts ~f:term_of_tc) in
     Mat (n, m, ts)
-  | Lam (v, lam_ty, body) ->
-    let%bind lam_ty = ty_of lam_ty in
-    let%bind body = term_of_tc body in
-    Ok (Lam (v, lam_ty, body))
+  | Lam (v, body) ->
+    let%map body = term_of_tc body in
+    Lam (v, body)
   | App (f, x) ->
     let%bind f = term_of_tc f in
     let%bind x = term_of_tc x in
