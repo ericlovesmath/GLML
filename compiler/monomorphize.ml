@@ -456,8 +456,10 @@ let rec ty_of (t : Typecheck.ty) : ty Compiler_error.t =
   | TyMat (x, y) -> Ok (TyMat (x, y))
   | TyRecord (s, []) -> Ok (TyRecord s)
   | TyRecord (_, _ :: _) ->
-    Err.fail "unexpected parametrized TyRecord after SpecializeStructs"
-  | TyVariant s -> Ok (TyVariant s)
+    Err.fail "unexpected parametrized TyRecord after [specialize_structs]"
+  | TyVariant (s, []) -> Ok (TyVariant s)
+  | TyVariant (_, _ :: _) ->
+    Err.fail "unexpected parametrized TyVariant after [specialize_structs]"
   | TyArrow (a, b) ->
     let%bind a = ty_of a in
     let%bind b = ty_of b in
@@ -548,7 +550,9 @@ let top_of_tc (t : Typecheck.top) : top Compiler_error.t =
       TypeDef (name, RecordDecl fields)
     | TypeDef (_, RecordDecl (_ :: _, _)) ->
       Err.fail "unexpected parametrized TypeDef after SpecializeStructs"
-    | TypeDef (name, VariantDecl ctors) ->
+    | TypeDef (_, VariantDecl (_ :: _, _)) ->
+      Err.fail "unexpected parametrized VariantDecl after SpecializeStructs"
+    | TypeDef (name, VariantDecl ([], ctors)) ->
       let%map ctors =
         ctors
         |> List.map ~f:(fun (ctor_name, tys) ->

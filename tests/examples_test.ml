@@ -30,7 +30,7 @@ let%expect_test "compile examples" =
      ((Extern (vec 2) u_resolution) (Extern (vec 2) u_mouse)
       (Extern float u_time)
       (TypeDef shape
-       (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
+       (VariantDecl () ((Circle (float)) (Rect (float float)) (Empty ()))))
       (Define Nonrec sdf
        (lambda (s (shape))
         (lambda (p ((vec 2)))
@@ -73,7 +73,7 @@ let%expect_test "compile examples" =
      ((Extern (vec 2) u_resolution) (Extern (vec 2) u_mouse)
       (Extern float u_time)
       (TypeDef shape
-       (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
+       (VariantDecl () ((Circle (float)) (Rect (float float)) (Empty ()))))
       (Define Nonrec sdf_0
        (lambda (s_1 (shape))
         (lambda (p_2 ((vec 2)))
@@ -118,7 +118,7 @@ let%expect_test "compile examples" =
      (((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
       ((Extern u_time) : float)
       ((TypeDef shape
-        (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
+        (VariantDecl () ((Circle (float)) (Rect (float float)) (Empty ()))))
        : shape)
       ((Define Nonrec sdf_0
         ((lambda s_1

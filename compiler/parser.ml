@@ -589,19 +589,21 @@ let top_extern_p =
      <??> "top_extern")
 ;;
 
+let ty_params_p =
+  let tyvar_p =
+    satisfy_map (function
+      | TYVAR s -> Some s
+      | _ -> None)
+  in
+  between `Bracket (commas tyvar_p) <|> return []
+;;
+
 let top_record_p =
   fun st ->
   (with_top_loc
      (let%bind _ = tok TYPE in
       let%bind id = ident_p in
-      let%bind params =
-        let tyvar_p =
-          satisfy_map (function
-            | TYVAR s -> Some s
-            | _ -> None)
-        in
-        between `Bracket (commas tyvar_p) <|> return []
-      in
+      let%bind ty_params = ty_params_p in
       let%bind _ = tok EQ in
       let%bind fields =
         between
@@ -612,7 +614,7 @@ let top_record_p =
               let%bind f_ty = ty_p in
               return (f_id, f_ty)))
       in
-      return (TypeDef (id, RecordDecl (params, fields))))
+      return (TypeDef (id, RecordDecl (ty_params, fields))))
    <??> "top_record")
     st
 ;;
@@ -621,6 +623,7 @@ let top_variant_p =
   with_top_loc
     (let%bind _ = tok TYPE in
      let%bind id = ident_p in
+     let%bind ty_params = ty_params_p in
      let%bind _ = tok EQ in
      let%bind ctors =
        let ctor_p =
@@ -631,7 +634,7 @@ let top_variant_p =
        let%bind _ = optional (tok BAR) in
        sep_by1 (tok BAR) ctor_p
      in
-     return (TypeDef (id, VariantDecl ctors)))
+     return (TypeDef (id, VariantDecl (ty_params, ctors))))
   <??> "top_variant"
 ;;
 
@@ -650,6 +653,7 @@ let%expect_test "glml parse tests" =
     type point['a, 'b] = { x : 'a, y : 'b }
 
     type shape = Circle of int * float | Triangle
+    type either['a, 'b] = Left of 'a | Right of 'b
 
     let a_struct = { x = 0.0, y = 0 }
     let toplevel = 1 + 2
@@ -663,7 +667,8 @@ let%expect_test "glml parse tests" =
     (Program
      ((Extern float u_time) (TypeDef point (RecordDecl () ((x float) (y int))))
       (TypeDef point (RecordDecl (a b) ((x 'a) (y 'b))))
-      (TypeDef shape (VariantDecl ((Circle (int float)) (Triangle ()))))
+      (TypeDef shape (VariantDecl () ((Circle (int float)) (Triangle ()))))
+      (TypeDef either (VariantDecl (a b) ((Left ('a)) (Right ('b)))))
       (Define Nonrec a_struct (record (x 0.) (y 0)))
       (Define Nonrec toplevel (+ 1 2)) (Define Nonrec main (+ 1 2))
       (Define Nonrec f (lambda (x (bool)) (lambda (y (bool)) (&& x y))))

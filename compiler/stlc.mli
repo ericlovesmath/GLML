@@ -20,9 +20,10 @@ type ty =
   | TyApp of string * ty list
 [@@deriving sexp_of, equal]
 
+(* TODO: Move params [string list] to [TypeDef] in [top_desc]? *)
 type type_decl =
   | RecordDecl of string list * (string * ty) list
-  | VariantDecl of (string * ty list) list
+  | VariantDecl of string list * (string * ty list) list
 [@@deriving sexp_of]
 
 type recur =

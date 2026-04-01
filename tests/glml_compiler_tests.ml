@@ -1514,3 +1514,113 @@ let%expect_test "parametrized structs" =
     }
   |}]
 ;;
+
+let%expect_test "parametrized variants" =
+  test
+    {|
+    type option['a] = Some of 'a | None
+
+    let unwrap (opt : option[int]) (default : int) =
+      match opt with
+      | Some x -> x
+      | None -> default
+
+    let main (uv : vec2) =
+      let a = unwrap (Some 10) 10 in
+      let b = unwrap None 5 in
+      let c = unwrap None 5 in
+      [a, b, c]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct option_int {
+        int tag;
+        int Some_0;
+    };
+    int unwrap_0(option_int opt_1, int default_2) {
+        int _lv_tag_22 = opt_1.tag;
+        switch (_lv_tag_22) {
+            case 0: {
+                int x_3 = opt_1.Some_0;
+                return x_3;
+                break;
+            }
+            default: {
+                return default_2;
+                break;
+            }
+        }
+    }
+    vec3 main_pure(vec2 uv_4) {
+        option_int anf_19 = option_int(0, 10);
+        int a_5 = unwrap_0(anf_19, 10);
+        option_int anf_20 = option_int(1, 0);
+        int b_6 = unwrap_0(anf_20, 5);
+        option_int anf_21 = option_int(1, 0);
+        int c_7 = unwrap_0(anf_21, 5);
+        float pf_23 = float(a_5);
+        float pf_24 = float(b_6);
+        float pf_25 = float(c_7);
+        return vec3(pf_23, pf_24, pf_25);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    type result['a, 'b] = Ok of 'a | Err of 'b
+
+    let unwrap (r : result[float, int]) (default : float) =
+      match r with
+      | Ok x -> x
+      | Err _ -> default
+
+    let main (uv : vec2) : vec3 =
+      let a = unwrap (Ok 5.4) 5.0 in
+      let b = unwrap (Err 2) 2.3 in
+      [uv.0, a, b]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct result_float_int {
+        int tag;
+        float Ok_0;
+        int Err_0;
+    };
+    float unwrap_0(result_float_int r_1, float default_2) {
+        int _lv_tag_23 = r_1.tag;
+        switch (_lv_tag_23) {
+            case 0: {
+                float x_3 = r_1.Ok_0;
+                return x_3;
+                break;
+            }
+            default: {
+                int __4 = r_1.Err_0;
+                return default_2;
+                break;
+            }
+        }
+    }
+    vec3 main_pure(vec2 uv_5) {
+        result_float_int anf_20 = result_float_int(0, 5.4, 0);
+        float a_6 = unwrap_0(anf_20, 5.);
+        result_float_int anf_21 = result_float_int(1, 0., 2);
+        float b_7 = unwrap_0(anf_21, 2.3);
+        float anf_22 = uv_5[0];
+        return vec3(anf_22, a_6, b_7);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
