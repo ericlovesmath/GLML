@@ -140,7 +140,7 @@ let collect_poly_refs (poly_env : poly_env) (t : Typecheck.term)
     (* TODO: Refactor this is kind of sad and foldy *)
     let acc =
       match t.desc with
-      | Var v when Map.mem poly_env v && Specialize_structs.is_concrete t.ty ->
+      | Var v when Map.mem poly_env v && Specialize_params.is_concrete t.ty ->
         (v, t.ty) :: acc
       | _ -> acc
     in
@@ -194,7 +194,7 @@ let rec resolve_spec
   | Some spec_name -> env, spec_name, []
   | None ->
     let entry = Map.find_exn poly_env name in
-    let spec_name = Utils.fresh (name ^ "_" ^ Specialize_structs.mangle_ty concrete_ty) in
+    let spec_name = Utils.fresh (name ^ "_" ^ Specialize_params.mangle_ty concrete_ty) in
     let spec_map = add_spec env name concrete_ty spec_name in
     let sub = subst ~poly:entry.poly_type ~concrete:concrete_ty in
     let sub =
@@ -235,7 +235,7 @@ and rewrite_refs (poly_env : poly_env) (env : spec_map) (t : Typecheck.term)
     match t.desc with
     | Var v ->
       (match Map.find poly_env v with
-       | Some _ when Specialize_structs.is_concrete t.ty ->
+       | Some _ when Specialize_params.is_concrete t.ty ->
          let env, spec_name, defs = resolve_spec poly_env env v t.ty in
          Var spec_name, env, defs
        | _ -> t.desc, env, [])
@@ -254,7 +254,7 @@ and rewrite_refs (poly_env : poly_env) (env : spec_map) (t : Typecheck.term)
       let env, x, defs2 = rewrite_refs poly_env env x in
       App (f, x), env, defs1 @ defs2
     | Let (recur, v, constrs, bind, body)
-      when not (Specialize_structs.is_concrete bind.ty) ->
+      when not (Specialize_params.is_concrete bind.ty) ->
       (* Specialization for inner polymorphic lets *)
       let usages = collect_var_usages v body in
       if List.is_empty usages
@@ -271,7 +271,7 @@ and rewrite_refs (poly_env : poly_env) (env : spec_map) (t : Typecheck.term)
             in
             let spec_bind = Typecheck.subst_term sub bind in
             let spec_name =
-              Utils.fresh (v ^ "_" ^ Specialize_structs.mangle_ty concrete_ty)
+              Utils.fresh (v ^ "_" ^ Specialize_params.mangle_ty concrete_ty)
             in
             let env, spec_bind, new_defs = rewrite_refs poly_env env spec_bind in
             let spec_bind =
@@ -573,7 +573,7 @@ let monomorphize (Program tops : Typecheck.t) : t Compiler_error.t =
       ~f:(fun (poly_env, env, acc) (top : Typecheck.top) ->
         match top.desc with
         (* Polymorphic case: register in poly_env, emit nothing *)
-        | Define (recur, v, bind) when not (Specialize_structs.is_concrete top.ty) ->
+        | Define (recur, v, bind) when not (Specialize_params.is_concrete top.ty) ->
           let entry =
             { poly_type = top.ty
             ; poly_bind = bind

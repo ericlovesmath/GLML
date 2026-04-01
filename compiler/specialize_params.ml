@@ -1,4 +1,3 @@
-(* TODO: Rename file probably because this specializes both structs and variants *)
 open Core
 open Typecheck
 
