@@ -1,13 +1,11 @@
 open Core
 open Typecheck
 
-(* TODO: Combine the poly envs into one, some refactoring? Or at least remove [poly] name *)
+(** Maps parametrized type names to their declarations *)
+type env = type_decl String.Map.t
 
-(** Maps parametrized struct names to (params, fields) *)
-type struct_poly_env = (string list * (string * ty) list) String.Map.t
-
-(** Maps parametrized variant names to (params, ctors) *)
-type variant_poly_env = (string list * (string * ty list) list) String.Map.t
+(* TODO: We should not assume that we can look up again by mangling the type again and using that
+   as the key, that feels like it could clash easily and be potentially very fragile *)
 
 (** String suffix to add to generated functions *)
 let rec mangle_ty (ty : ty) : string =
@@ -18,13 +16,9 @@ let rec mangle_ty (ty : ty) : string =
   | TyVec n -> "vec" ^ Int.to_string n
   | TyMat (x, y) -> "mat" ^ Int.to_string x ^ "x" ^ Int.to_string y
   | TyRecord (s, []) -> s
-  | TyRecord (s, args) -> String.concat ~sep:"_" (s :: List.map args ~f:mangle_ty)
+  | TyRecord (s, args) -> "r_" ^ String.concat ~sep:"_" (s :: List.map args ~f:mangle_ty)
   | TyVariant (s, []) -> s
-  (* TODO: This makes name mangling for records and variants potentially clash,
-     maybe I should somehow generate the unique names to account for this in the
-     future. Right now, even something like nested variants in different ways
-     might be indistinguishable. *)
-  | TyVariant (s, args) -> String.concat ~sep:"_" (s :: List.map args ~f:mangle_ty)
+  | TyVariant (s, args) -> "v_" ^ String.concat ~sep:"_" (s :: List.map args ~f:mangle_ty)
   | TyVar v -> "tv" ^ v
   | TyArrow (a, b) -> mangle_ty a ^ "_to_" ^ mangle_ty b
 ;;
@@ -40,88 +34,50 @@ let rec is_concrete (ty : ty) : bool =
 
 (** Collect (name, args) instantiation pairs in topological dependency order.
     Recursively expands field/ctor types to find transitive dependencies. *)
-let rec collect_record_from_ty
-          ~(struct_poly_env : struct_poly_env)
-          ~(variant_poly_env : variant_poly_env)
-          (ty : ty)
-  : (string * ty list) list
-  =
-  match ty with
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVar _ -> []
-  | TyVariant (_, args) ->
-    List.concat_map args ~f:(collect_record_from_ty ~struct_poly_env ~variant_poly_env)
-  | TyArrow (a, b) ->
-    collect_record_from_ty ~struct_poly_env ~variant_poly_env a
-    @ collect_record_from_ty ~struct_poly_env ~variant_poly_env b
-  | TyRecord (_, []) -> []
-  | TyRecord (name, args) when not (is_concrete (TyRecord (name, args))) -> []
-  | TyRecord (name, args) ->
-    let deps_from_args =
-      List.concat_map args ~f:(collect_record_from_ty ~struct_poly_env ~variant_poly_env)
-    in
-    let deps_from_fields =
-      match Map.find struct_poly_env name with
-      | None -> []
-      | Some (params, fields) ->
-        let sub = List.zip_exn params args in
-        List.concat_map fields ~f:(fun (_, fty) ->
-          let fty = subst_ty sub fty in
-          collect_record_from_ty ~struct_poly_env ~variant_poly_env fty)
-    in
-    deps_from_args @ deps_from_fields @ [ name, args ]
-;;
-
-let rec collect_variant_from_ty
-          ~(struct_poly_env : struct_poly_env)
-          ~(variant_poly_env : variant_poly_env)
-          (ty : ty)
-  : (string * ty list) list
-  =
-  match ty with
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVar _ -> []
-  | TyRecord (_, args) ->
-    List.concat_map args ~f:(collect_variant_from_ty ~struct_poly_env ~variant_poly_env)
-  | TyArrow (a, b) ->
-    collect_variant_from_ty ~struct_poly_env ~variant_poly_env a
-    @ collect_variant_from_ty ~struct_poly_env ~variant_poly_env b
-  | TyVariant (_, []) -> []
-  | TyVariant (name, args) when not (is_concrete (TyVariant (name, args))) -> []
-  | TyVariant (name, args) ->
-    let deps_from_args =
-      List.concat_map args ~f:(collect_variant_from_ty ~struct_poly_env ~variant_poly_env)
-    in
-    let deps_from_ctors =
-      match Map.find variant_poly_env name with
-      | None -> []
-      | Some (params, ctors) ->
-        let sub = List.zip_exn params args in
-        List.concat_map ctors ~f:(fun (_, tys) ->
-          List.concat_map tys ~f:(fun fty ->
-            let fty = subst_ty sub fty in
-            collect_variant_from_ty ~struct_poly_env ~variant_poly_env fty))
-    in
-    deps_from_args @ deps_from_ctors @ [ name, args ]
-;;
-
-let collect_from_ty
-      ~(struct_poly_env : struct_poly_env)
-      ~(variant_poly_env : variant_poly_env)
-      (ty : ty)
+let rec collect_from_ty ~(env : env) (ty : ty)
   : [ `Record of string * ty list | `Variant of string * ty list ] list
   =
-  let records = collect_record_from_ty ~struct_poly_env ~variant_poly_env ty in
-  let variants = collect_variant_from_ty ~struct_poly_env ~variant_poly_env ty in
-  List.map records ~f:(fun x -> `Record x) @ List.map variants ~f:(fun x -> `Variant x)
+  match ty with
+  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVar _ -> []
+  | TyArrow (a, b) -> collect_from_ty ~env a @ collect_from_ty ~env b
+  | TyRecord (_, []) | TyVariant (_, []) -> []
+  | TyRecord (name, args) when not (is_concrete (TyRecord (name, args))) -> []
+  | TyVariant (name, args) when not (is_concrete (TyVariant (name, args))) -> []
+  | TyRecord (name, args) ->
+    (* TODO: This makes name mangling for records and variants potentially clash,
+     maybe I should somehow generate the unique names to account for this in the
+     future. Right now, even something like nested variants in different ways
+     might be indistinguishable. *)
+    let deps_from_args = List.concat_map args ~f:(collect_from_ty ~env) in
+    let deps_from_fields =
+      match Map.find env name with
+      | Some (RecordDecl (params, fields)) ->
+        let sub = List.zip_exn params args in
+        List.concat_map fields ~f:(fun (_, fty) ->
+          collect_from_ty ~env (subst_ty sub fty))
+      | _ -> []
+    in
+    deps_from_args @ deps_from_fields @ [ `Record (name, args) ]
+  | TyVariant (name, args) ->
+    let deps_from_args = List.concat_map args ~f:(collect_from_ty ~env) in
+    let deps_from_ctors =
+      match Map.find env name with
+      | Some (VariantDecl (params, ctors)) ->
+        let sub = List.zip_exn params args in
+        List.concat_map ctors ~f:(fun (_, tys) ->
+          List.concat_map tys ~f:(fun fty -> collect_from_ty ~env (subst_ty sub fty)))
+      | _ -> []
+    in
+    deps_from_args @ deps_from_ctors @ [ `Variant (name, args) ]
 ;;
 
-let collect_from_term
-      ~(struct_poly_env : struct_poly_env)
-      ~(variant_poly_env : variant_poly_env)
-      (t : term)
+(* TODO: I'm too lazy I need to refactor this, is there a native [List.concat_map] for
+   [Either] types, maybe? That seems reasonable. *)
+let collect_from_term ~(env : env) (t : term)
   : [ `Record of string * ty list | `Variant of string * ty list ] list
   =
   let rec walk (t : term) =
-    let from_ty = collect_from_ty ~struct_poly_env ~variant_poly_env t.ty in
+    let from_ty = collect_from_ty ~env t.ty in
     let from_desc =
       match t.desc with
       | Var _ | Float _ | Int _ | Bool _ -> []
@@ -142,31 +98,19 @@ let collect_from_term
   walk t
 ;;
 
-(* TODO: I'm too lazy I need to refactor this, is there a native [List.concat_map] for
-   [Either] types, maybe? That seems reasonable. *)
-let collect_from_top
-      ~(struct_poly_env : struct_poly_env)
-      ~(variant_poly_env : variant_poly_env)
-      (top : top)
+let collect_from_top ~(env : env) (top : top)
   : [ `Record of string * ty list | `Variant of string * ty list ] list
   =
   match top.desc with
-  | TypeDef (_, RecordDecl (params, fields)) ->
-    if List.is_empty params
-    then
-      List.concat_map fields ~f:(fun (_, fty) ->
-        collect_from_ty ~struct_poly_env ~variant_poly_env fty)
-    else []
-  | TypeDef (_, VariantDecl (params, ctors)) ->
-    if List.is_empty params
-    then
-      List.concat_map ctors ~f:(fun (_, tys) ->
-        List.concat_map tys ~f:(collect_from_ty ~struct_poly_env ~variant_poly_env))
-    else []
+  | TypeDef (_, RecordDecl (params, _)) when not (List.is_empty params) -> []
+  | TypeDef (_, VariantDecl (params, _)) when not (List.is_empty params) -> []
+  | TypeDef (_, RecordDecl (_, fields)) ->
+    List.concat_map fields ~f:(fun (_, fty) -> collect_from_ty ~env fty)
+  | TypeDef (_, VariantDecl (_, ctors)) ->
+    List.concat_map ctors ~f:(fun (_, tys) ->
+      List.concat_map tys ~f:(collect_from_ty ~env))
   | Extern _ -> []
-  | Define (_, _, bind) ->
-    collect_from_ty ~struct_poly_env ~variant_poly_env top.ty
-    @ collect_from_term ~struct_poly_env ~variant_poly_env bind
+  | Define (_, _, bind) -> collect_from_ty ~env top.ty @ collect_from_term ~env bind
 ;;
 
 let dedup_tagged_instances
@@ -186,18 +130,16 @@ let dedup_tagged_instances
   |> List.rev
 ;;
 
-let specialize_struct
-      ~(struct_poly_env : struct_poly_env)
-      ~(loc : Lexer.loc)
-      (name : string)
-      (args : ty list)
+let specialize_struct ~(env : env) ~(loc : Lexer.loc) (name : string) (args : ty list)
   : top
   =
-  let params, fields = Map.find_exn struct_poly_env name in
-  let sub = List.zip_exn params args in
-  let specialized_fields =
-    List.map fields ~f:(fun (field_name, fty) -> field_name, subst_ty sub fty)
+  let params, fields =
+    match Map.find_exn env name with
+    | RecordDecl (params, fields) -> params, fields
+    | _ -> failwith "specialze_struct on non record"
   in
+  let sub = List.zip_exn params args in
+  let specialized_fields = List.map fields ~f:(Tuple2.map_snd ~f:(subst_ty sub)) in
   let mangled = mangle_ty (TyRecord (name, args)) in
   { desc = TypeDef (mangled, RecordDecl ([], specialized_fields))
   ; ty = TyRecord (mangled, [])
@@ -206,17 +148,17 @@ let specialize_struct
   }
 ;;
 
-let specialize_variant
-      ~(variant_poly_env : variant_poly_env)
-      ~(loc : Lexer.loc)
-      (name : string)
-      (args : ty list)
+let specialize_variant ~(env : env) ~(loc : Lexer.loc) (name : string) (args : ty list)
   : top
   =
-  let params, ctors = Map.find_exn variant_poly_env name in
+  let params, ctors =
+    match Map.find_exn env name with
+    | VariantDecl (params, ctors) -> params, ctors
+    | _ -> assert false
+  in
   let sub = List.zip_exn params args in
   let specialized_ctors =
-    List.map ctors ~f:(fun (ctor_name, tys) -> ctor_name, List.map tys ~f:(subst_ty sub))
+    List.map ctors ~f:(Tuple2.map_snd ~f:(List.map ~f:(subst_ty sub)))
   in
   let mangled = mangle_ty (TyVariant (name, args)) in
   { desc = TypeDef (mangled, VariantDecl ([], specialized_ctors))
@@ -226,40 +168,53 @@ let specialize_variant
   }
 ;;
 
-let rec rewrite_ty
-          ~(struct_poly_env : struct_poly_env)
-          ~(variant_poly_env : variant_poly_env)
-          (ty : ty)
-  : ty
-  =
+let rec rewrite_ty ~(env : env) (ty : ty) : ty =
   match ty with
   | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVar _ -> ty
-  | TyArrow (a, b) ->
-    TyArrow
-      ( rewrite_ty ~struct_poly_env ~variant_poly_env a
-      , rewrite_ty ~struct_poly_env ~variant_poly_env b )
+  | TyArrow (a, b) -> TyArrow (rewrite_ty ~env a, rewrite_ty ~env b)
   | TyRecord (_, []) -> ty
   | TyRecord (name, args)
-    when is_concrete (TyRecord (name, args)) && Map.mem struct_poly_env name ->
-    TyRecord (mangle_ty (TyRecord (name, args)), [])
-  | TyRecord (name, args) ->
-    TyRecord (name, List.map args ~f:(rewrite_ty ~struct_poly_env ~variant_poly_env))
+    when is_concrete (TyRecord (name, args))
+         &&
+         match Map.find env name with
+         | Some (RecordDecl _) -> true
+         | _ -> false -> TyRecord (mangle_ty (TyRecord (name, args)), [])
+  | TyRecord (name, args) -> TyRecord (name, List.map args ~f:(rewrite_ty ~env))
   | TyVariant (_, []) -> ty
   | TyVariant (name, args)
-    when is_concrete (TyVariant (name, args)) && Map.mem variant_poly_env name ->
-    TyVariant (mangle_ty (TyVariant (name, args)), [])
-  | TyVariant (name, args) ->
-    TyVariant (name, List.map args ~f:(rewrite_ty ~struct_poly_env ~variant_poly_env))
+    when is_concrete (TyVariant (name, args))
+         &&
+         match Map.find env name with
+         | Some (VariantDecl _) -> true
+         | _ -> false -> TyVariant (mangle_ty (TyVariant (name, args)), [])
+  | TyVariant (name, args) -> TyVariant (name, List.map args ~f:(rewrite_ty ~env))
 ;;
 
-let rec rewrite_term
-          ~(struct_poly_env : struct_poly_env)
-          ~(variant_poly_env : variant_poly_env)
-          (t : term)
-  : term
-  =
-  let rewrite = rewrite_term ~struct_poly_env ~variant_poly_env in
-  let ty = rewrite_ty ~struct_poly_env ~variant_poly_env t.ty in
+(* TODO: hmm... weird code duplicating from above *)
+(* TODO: hmm... a lot of checking if instance of RecordDevl or TyVariant, but there's also just a lot
+   of generally checking of struct vs record in this code that can probably be improved *)
+let maybe_mangle_name ~(env : env) ~fallback (ty : ty) : string =
+  match ty with
+  | TyRecord (n, args)
+    when (not (List.is_empty args))
+         && is_concrete ty
+         &&
+         match Map.find env n with
+         | Some (RecordDecl _) -> true
+         | _ -> false -> mangle_ty (TyRecord (n, args))
+  | TyVariant (n, args)
+    when (not (List.is_empty args))
+         && is_concrete ty
+         &&
+         match Map.find env n with
+         | Some (VariantDecl _) -> true
+         | _ -> false -> mangle_ty (TyVariant (n, args))
+  | _ -> fallback
+;;
+
+let rec rewrite_term ~(env : env) (t : term) : term =
+  let rewrite = rewrite_term ~env in
+  let ty = rewrite_ty ~env t.ty in
   let desc : term_desc =
     match t.desc with
     | Var _ | Float _ | Int _ | Bool _ -> t.desc
@@ -274,26 +229,11 @@ let rec rewrite_term
     | Index (t, i) -> Index (rewrite t, i)
     | Builtin (b, ts) -> Builtin (b, List.map ts ~f:rewrite)
     | Record (name, ts) ->
-      let new_name =
-        match t.ty with
-        | TyRecord (n, args)
-          when (not (List.is_empty args))
-               && is_concrete (TyRecord (n, args))
-               && Map.mem struct_poly_env n -> mangle_ty (TyRecord (n, args))
-        | _ -> name
-      in
+      let new_name = maybe_mangle_name ~env ~fallback:name t.ty in
       Record (new_name, List.map ts ~f:rewrite)
     | Field (t, f) -> Field (rewrite t, f)
     | Variant (ty_name, ctor, args) ->
-      (* TODO: Duplicated from above mostly... *)
-      let new_ty_name =
-        match t.ty with
-        | TyVariant (n, vargs)
-          when (not (List.is_empty vargs))
-               && is_concrete (TyVariant (n, vargs))
-               && Map.mem variant_poly_env n -> mangle_ty (TyVariant (n, vargs))
-        | _ -> ty_name
-      in
+      let new_ty_name = maybe_mangle_name ~env ~fallback:ty_name t.ty in
       Variant (new_ty_name, ctor, List.map args ~f:rewrite)
     | Match (scrutinee, cases) ->
       Match (rewrite scrutinee, List.map cases ~f:(fun (pat, body) -> pat, rewrite body))
@@ -301,28 +241,18 @@ let rec rewrite_term
   { t with ty; desc }
 ;;
 
-let rewrite_top
-      ~(struct_poly_env : struct_poly_env)
-      ~(variant_poly_env : variant_poly_env)
-      (top : top)
-  : top
-  =
-  let ty = rewrite_ty ~struct_poly_env ~variant_poly_env top.ty in
+let rewrite_top ~(env : env) (top : top) : top =
+  let ty = rewrite_ty ~env top.ty in
   let desc : top_desc =
     match top.desc with
-    | Define (r, v, bind) ->
-      Define (r, v, rewrite_term ~struct_poly_env ~variant_poly_env bind)
+    | Define (r, v, bind) -> Define (r, v, rewrite_term ~env bind)
     | Extern _ -> top.desc
     | TypeDef (name, RecordDecl (params, fields)) ->
-      let fields =
-        List.map fields ~f:(fun (fn, fty) ->
-          fn, rewrite_ty ~struct_poly_env ~variant_poly_env fty)
-      in
+      let fields = List.map fields ~f:(fun (fn, fty) -> fn, rewrite_ty ~env fty) in
       TypeDef (name, RecordDecl (params, fields))
     | TypeDef (name, VariantDecl (params, ctors)) ->
       let ctors =
-        List.map ctors ~f:(fun (cn, tys) ->
-          cn, List.map tys ~f:(rewrite_ty ~struct_poly_env ~variant_poly_env))
+        List.map ctors ~f:(fun (cn, tys) -> cn, List.map tys ~f:(rewrite_ty ~env))
       in
       TypeDef (name, VariantDecl (params, ctors))
   in
@@ -330,69 +260,42 @@ let rewrite_top
 ;;
 
 let specialize (Program tops : t) : t =
-  let struct_poly_tops =
+  let poly_tops =
     List.filter_map tops ~f:(fun top ->
       match top.desc with
-      | TypeDef (name, RecordDecl (params, fields)) when not (List.is_empty params) ->
-        Some (name, params, fields, top.loc)
+      | TypeDef (name, (RecordDecl (params, _) as decl)) when not (List.is_empty params)
+        -> Some (name, decl, top.loc)
+      | TypeDef (name, (VariantDecl (params, _) as decl)) when not (List.is_empty params)
+        -> Some (name, decl, top.loc)
       | _ -> None)
   in
-  let struct_poly_env =
-    struct_poly_tops
-    |> List.map ~f:(fun (name, params, fields, _) -> name, (params, fields))
+  let env =
+    poly_tops
+    |> List.map ~f:(fun (name, decl, _) -> name, decl)
     |> String.Map.of_alist_exn
   in
-  let struct_locs =
-    struct_poly_tops
-    |> List.map ~f:(fun (name, _, _, loc) -> name, loc)
-    |> String.Map.of_alist_exn
+  let poly_locs =
+    poly_tops |> List.map ~f:(fun (name, _, loc) -> name, loc) |> String.Map.of_alist_exn
   in
-  let variant_poly_tops =
-    List.filter_map tops ~f:(fun top ->
-      match top.desc with
-      | TypeDef (name, VariantDecl (params, ctors)) when not (List.is_empty params) ->
-        Some (name, params, ctors, top.loc)
-      | _ -> None)
-  in
-  let variant_poly_env =
-    variant_poly_tops
-    |> List.map ~f:(fun (name, params, ctors, _) -> name, (params, ctors))
-    |> String.Map.of_alist_exn
-  in
-  let variant_locs =
-    variant_poly_tops
-    |> List.map ~f:(fun (name, _, _, loc) -> name, loc)
-    |> String.Map.of_alist_exn
-  in
-  let all_instances =
-    List.concat_map tops ~f:(collect_from_top ~struct_poly_env ~variant_poly_env)
+  let new_def_tops =
+    tops
+    |> List.concat_map ~f:(collect_from_top ~env)
     |> dedup_tagged_instances
-  in
-  let struct_def_tops =
-    List.filter_map all_instances ~f:(function
-      | `Record (name, args) when Map.mem struct_poly_env name ->
-        let loc = Map.find_exn struct_locs name in
-        Some (specialize_struct ~struct_poly_env ~loc name args)
-      | _ -> None)
-  in
-  let variant_def_tops =
-    List.filter_map all_instances ~f:(function
-      | `Variant (name, args) when Map.mem variant_poly_env name ->
-        let loc = Map.find_exn variant_locs name in
-        Some (specialize_variant ~variant_poly_env ~loc name args)
+    |> List.filter_map ~f:(function
+      | `Record (name, args) when Map.mem env name ->
+        let loc = Map.find_exn poly_locs name in
+        Some (specialize_struct ~env ~loc name args)
+      | `Variant (name, args) when Map.mem env name ->
+        let loc = Map.find_exn poly_locs name in
+        Some (specialize_variant ~env ~loc name args)
       | _ -> None)
   in
   let filtered_tops =
     List.filter tops ~f:(fun top ->
       match top.desc with
-      | TypeDef (name, RecordDecl _) when Map.mem struct_poly_env name -> false
-      | TypeDef (name, VariantDecl _) when Map.mem variant_poly_env name -> false
+      | TypeDef (name, (RecordDecl _ | VariantDecl _)) when Map.mem env name -> false
       | _ -> true)
   in
-  let rewritten =
-    List.map
-      (struct_def_tops @ variant_def_tops @ filtered_tops)
-      ~f:(rewrite_top ~struct_poly_env ~variant_poly_env)
-  in
+  let rewritten = List.map (new_def_tops @ filtered_tops) ~f:(rewrite_top ~env) in
   Program rewritten
 ;;
