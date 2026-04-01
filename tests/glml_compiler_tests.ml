@@ -1351,14 +1351,14 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct box_float {
+    struct r_box_float {
         float value;
     };
-    float f_0(box_float b_1) {
+    float f_0(r_box_float b_1) {
         return b_1.value;
     }
     vec3 main_pure(vec2 coord_2) {
-        box_float anf_6 = box_float(1.);
+        r_box_float anf_6 = r_box_float(1.);
         float anf_7 = f_0(anf_6);
         return vec3(anf_7, 0., 0.);
     }
@@ -1381,15 +1381,15 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct pair_float_int {
+    struct r_pair_float_int {
         float fst;
         int snd;
     };
-    float get_fst_0(pair_float_int p_1) {
+    float get_fst_0(r_pair_float_int p_1) {
         return p_1.fst;
     }
     vec3 main_pure(vec2 coord_2) {
-        pair_float_int p_3 = pair_float_int(1., 0);
+        r_pair_float_int p_3 = r_pair_float_int(1., 0);
         float anf_8 = get_fst_0(p_3);
         return vec3(anf_8, 0., 0.);
     }
@@ -1411,11 +1411,11 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct box_float {
+    struct r_box_float {
         float value;
     };
     vec3 main_pure(vec2 coord_0) {
-        box_float b_1 = box_float(1.);
+        r_box_float b_1 = r_box_float(1.);
         float anf_4 = b_1.value;
         return vec3(anf_4, 0., 0.);
     }
@@ -1438,19 +1438,19 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct box_float {
+    struct r_box_float {
         float value;
     };
-    float get1_0(box_float b_1) {
+    float get1_0(r_box_float b_1) {
         return b_1.value;
     }
-    float get2_2(box_float b_3) {
+    float get2_2(r_box_float b_3) {
         return b_3.value;
     }
     vec3 main_pure(vec2 coord_4) {
-        box_float anf_12 = box_float(1.);
+        r_box_float anf_12 = r_box_float(1.);
         float anf_13 = get1_0(anf_12);
-        box_float anf_14 = box_float(2.);
+        r_box_float anf_14 = r_box_float(2.);
         float anf_15 = get2_2(anf_14);
         float anf_16 = (anf_13 + anf_15);
         return vec3(anf_16, 0., 0.);
@@ -1488,23 +1488,23 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct box_float {
+    struct r_box_float {
         float value;
     };
-    struct box_box_float {
-        box_float value;
+    struct r_box_r_box_float {
+        r_box_float value;
     };
-    struct point_box_float_box_float {
-        box_box_float x;
-        box_float y;
+    struct r_point_r_box_float_r_box_float {
+        r_box_r_box_float x;
+        r_box_float y;
     };
     vec3 main_pure(vec2 coord_0) {
-        box_float anf_10 = box_float(1.);
-        box_box_float anf_11 = box_box_float(anf_10);
-        box_float anf_12 = box_float(2.);
-        point_box_float_box_float b_1 = point_box_float_box_float(anf_11, anf_12);
-        box_box_float anf_13 = b_1.x;
-        box_float anf_14 = anf_13.value;
+        r_box_float anf_10 = r_box_float(1.);
+        r_box_r_box_float anf_11 = r_box_r_box_float(anf_10);
+        r_box_float anf_12 = r_box_float(2.);
+        r_point_r_box_float_r_box_float b_1 = r_point_r_box_float_r_box_float(anf_11, anf_12);
+        r_box_r_box_float anf_13 = b_1.x;
+        r_box_float anf_14 = anf_13.value;
         float anf_15 = anf_14.value;
         return vec3(anf_15, 0., 0.);
     }
@@ -1512,7 +1512,7 @@ let%expect_test "parametrized structs" =
         vec3 color = main_pure(gl_FragCoord.xy);
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
     }
-  |}]
+    |}]
 ;;
 
 let%expect_test "parametrized variants" =
@@ -1536,11 +1536,11 @@ let%expect_test "parametrized variants" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct option_int {
+    struct v_option_int {
         int tag;
         int Some_0;
     };
-    int unwrap_0(option_int opt_1, int default_2) {
+    int unwrap_0(v_option_int opt_1, int default_2) {
         int _lv_tag_22 = opt_1.tag;
         switch (_lv_tag_22) {
             case 0: {
@@ -1555,11 +1555,11 @@ let%expect_test "parametrized variants" =
         }
     }
     vec3 main_pure(vec2 uv_4) {
-        option_int anf_19 = option_int(0, 10);
+        v_option_int anf_19 = v_option_int(0, 10);
         int a_5 = unwrap_0(anf_19, 10);
-        option_int anf_20 = option_int(1, 0);
+        v_option_int anf_20 = v_option_int(1, 0);
         int b_6 = unwrap_0(anf_20, 5);
-        option_int anf_21 = option_int(1, 0);
+        v_option_int anf_21 = v_option_int(1, 0);
         int c_7 = unwrap_0(anf_21, 5);
         float pf_23 = float(a_5);
         float pf_24 = float(b_6);
@@ -1590,12 +1590,12 @@ let%expect_test "parametrized variants" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct result_float_int {
+    struct v_result_float_int {
         int tag;
         float Ok_0;
         int Err_0;
     };
-    float unwrap_0(result_float_int r_1, float default_2) {
+    float unwrap_0(v_result_float_int r_1, float default_2) {
         int _lv_tag_23 = r_1.tag;
         switch (_lv_tag_23) {
             case 0: {
@@ -1611,9 +1611,9 @@ let%expect_test "parametrized variants" =
         }
     }
     vec3 main_pure(vec2 uv_5) {
-        result_float_int anf_20 = result_float_int(0, 5.4, 0);
+        v_result_float_int anf_20 = v_result_float_int(0, 5.4, 0);
         float a_6 = unwrap_0(anf_20, 5.);
-        result_float_int anf_21 = result_float_int(1, 0., 2);
+        v_result_float_int anf_21 = v_result_float_int(1, 0., 2);
         float b_7 = unwrap_0(anf_21, 2.3);
         float anf_22 = uv_5[0];
         return vec3(anf_22, a_6, b_7);
