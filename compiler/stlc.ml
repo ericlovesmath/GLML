@@ -49,7 +49,7 @@ let rec sexp_of_ty = function
 
 type type_decl =
   | RecordDecl of string list * (string * ty) list
-  | VariantDecl of (string * ty list) list
+  | VariantDecl of string list * (string * ty list) list
 [@@deriving sexp_of]
 
 type recur =

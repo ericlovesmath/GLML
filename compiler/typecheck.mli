@@ -8,13 +8,13 @@ type ty =
   | TyMat of int * int
   | TyArrow of ty * ty
   | TyRecord of string * ty list
-  | TyVariant of string
+  | TyVariant of string * ty list
   | TyVar of string
 [@@deriving sexp_of, equal]
 
 type type_decl =
   | RecordDecl of string list * (string * ty) list
-  | VariantDecl of (string * ty list) list
+  | VariantDecl of string list * (string * ty list) list
 [@@deriving sexp_of]
 
 type type_class =
@@ -86,9 +86,11 @@ type top =
 type t = Program of top list [@@deriving sexp_of]
 type substitution = (string * ty) list
 
+(** Applies a [substitution] to a [ty] (incredibly descriptive comment) *)
+val subst_ty : substitution -> ty -> ty
+
 (** Applies a [substitution] to all type annotations in a typed [term].
     Used by [Monomorphize] to instantiate polymorphic bindings at concrete types. *)
-val subst_ty : substitution -> ty -> ty
 val subst_term : substitution -> term -> term
 
 (** Given a scheme's deferred constraints and a substitution mapping its tyvars

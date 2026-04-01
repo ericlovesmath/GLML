@@ -18,7 +18,7 @@ type ty =
   | TyMat of int * int
   | TyArrow of ty * ty
   | TyRecord of string * ty list
-  | TyVariant of string
+  | TyVariant of string * ty list
   | TyVar of string
 [@@deriving equal]
 
@@ -31,13 +31,14 @@ let rec sexp_of_ty = function
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
   | TyRecord (s, []) -> Atom s
   | TyRecord (s, args) -> List (Atom s :: List.map args ~f:sexp_of_ty)
-  | TyVariant s -> Atom s
+  | TyVariant (s, []) -> Atom s
+  | TyVariant (s, args) -> List (Atom s :: List.map args ~f:sexp_of_ty)
   | TyVar v -> Atom ("'" ^ v)
 ;;
 
 type type_decl =
   | RecordDecl of string list * (string * ty) list
-  | VariantDecl of (string * ty list) list
+  | VariantDecl of string list * (string * ty list) list
 [@@deriving sexp_of]
 
 (** Internal typeclasses grouping GLSL types by their supported operations
@@ -122,8 +123,7 @@ let rec sexp_of_term_desc = function
     List
       (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
        :: List.map ts ~f:sexp_of_term)
-  | Lam (v, body) ->
-    List [ Atom "lambda"; Atom v; sexp_of_term body ]
+  | Lam (v, body) -> List [ Atom "lambda"; Atom v; sexp_of_term body ]
   | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
   | Let (Rec n, v, constrs, bind, body) ->
     let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
@@ -185,7 +185,8 @@ let fresh_tyvar () = TyVar (Utils.fresh "v")
 let rec subst_ty (sub : substitution) (ty : ty) : ty =
   match ty with
   | TyVar v -> List.Assoc.find ~equal:String.equal sub v |> Option.value ~default:ty
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVariant _ -> ty
+  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ -> ty
+  | TyVariant (s, args) -> TyVariant (s, List.map args ~f:(subst_ty sub))
   | TyRecord (s, args) -> TyRecord (s, List.map args ~f:(subst_ty sub))
   | TyArrow (f, x) -> TyArrow (subst_ty sub f, subst_ty sub x)
 ;;
@@ -241,8 +242,9 @@ let rec subst_term (sub : substitution) (t : term) : term =
 
 let rec ftv_of_ty = function
   | TyVar v -> String.Set.singleton v
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVariant _ -> String.Set.empty
-  | TyRecord (_, args) -> String.Set.union_list (List.map args ~f:ftv_of_ty)
+  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ -> String.Set.empty
+  | TyVariant (_, args) | TyRecord (_, args) ->
+    String.Set.union_list (List.map args ~f:ftv_of_ty)
   | TyArrow (t1, t2) -> Set.union (ftv_of_ty t1) (ftv_of_ty t2)
 ;;
 
@@ -289,8 +291,8 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t
   | (loc, TyVar v, ty) :: con | (loc, ty, TyVar v) :: con ->
     let rec occurs_in = function
       | TyVar v' -> String.equal v v'
-      | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVariant _ -> false
-      | TyRecord (_, args) -> List.exists args ~f:occurs_in
+      | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ -> false
+      | TyVariant (_, args) | TyRecord (_, args) -> List.exists args ~f:occurs_in
       | TyArrow (ty, ty') -> occurs_in ty || occurs_in ty'
     in
     if equal_ty (TyVar v) ty
@@ -307,6 +309,9 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t
   | (loc, TyArrow (f, x), TyArrow (f', x')) :: con ->
     unify ((loc, f, f') :: (loc, x, x') :: con)
   | (loc, TyRecord (s, args), TyRecord (s', args')) :: con
+    when String.equal s s' && List.length args = List.length args' ->
+    unify (List.map2_exn args args' ~f:(fun a a' -> loc, a, a') @ con)
+  | (loc, TyVariant (s, args), TyVariant (s', args')) :: con
     when String.equal s s' && List.length args = List.length args' ->
     unify (List.map2_exn args args' ~f:(fun a a' -> loc, a, a') @ con)
   | (loc, ty, ty') :: con ->
@@ -471,8 +476,10 @@ let rec is_value (t : Stlc.term) : bool =
 
 let rec resolve_stlc_ty (variants : 'a String.Map.t) (t : Stlc.ty) : ty =
   match t with
-  | TyName s when Map.mem variants s -> TyVariant s
+  | TyName s when Map.mem variants s -> TyVariant (s, [])
   | TyName s -> TyRecord (s, [])
+  | TyApp (name, args) when Map.mem variants name ->
+    TyVariant (name, List.map args ~f:(resolve_stlc_ty variants))
   | TyApp (name, args) -> TyRecord (name, List.map args ~f:(resolve_stlc_ty variants))
   | TyArrow (l, r) -> TyArrow (resolve_stlc_ty variants l, resolve_stlc_ty variants r)
   | TyFloat -> TyFloat
@@ -498,7 +505,7 @@ let rec build_function_type variants (term : Stlc.term) (ret_ty : ty) : ty =
     Returns [substituted term * resolved type * new context * scheme constraints * remaining constraints] *)
 let rec infer_binding
           (structs : (string list * (string * ty) list) String.Map.t)
-          (variants : (string * ty list) list String.Map.t)
+          (variants : (string list * (string * ty list) list) String.Map.t)
           (ctx : context)
           (loc : Lexer.loc)
           (bind_stlc : Stlc.term)
@@ -778,11 +785,11 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
     let ret_ty = fresh_tyvar () in
     make (Field (t, f)) ret_ty (constr (FieldAccess (t.ty, f, ret_ty)) :: constrs_t)
   | Variant (ctor, args) ->
-    let%bind variant_name, expected_arg_tys =
+    let%bind variant_name, params, ctor_arg_tys =
       let found =
-        Map.fold variants ~init:[] ~f:(fun ~key:vname ~data:ctors acc ->
+        Map.fold variants ~init:[] ~f:(fun ~key:vname ~data:(params, ctors) acc ->
           match List.find ctors ~f:(fun (c, _) -> String.equal c ctor) with
-          | Some (_, arg_tys) -> (vname, arg_tys) :: acc
+          | Some (_, arg_tys) -> (vname, params, arg_tys) :: acc
           | None -> acc)
       in
       match found with
@@ -790,6 +797,9 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
       | [] -> Err.fail "unknown constructor" ~loc ~d:[%message (ctor : string)]
       | _ -> Err.fail "ambiguous constructor" ~loc ~d:[%message (ctor : string)]
     in
+    let param_sub = List.map params ~f:(fun p -> p, fresh_tyvar ()) in
+    let expected_arg_tys = List.map ctor_arg_tys ~f:(subst_ty param_sub) in
+    let type_args = List.map param_sub ~f:snd in
     if List.length args <> List.length expected_arg_tys
     then Err.fail "wrong number of args to constructor" ~loc ~d:[%message (ctor : string)]
     else (
@@ -807,7 +817,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
       in
       make
         (Variant (variant_name, ctor, List.rev args))
-        (TyVariant variant_name)
+        (TyVariant (variant_name, type_args))
         constrs_args)
   | Match (scrutinee, cases) ->
     (* TODO: The pattern matching typechecking code sucks so much my god, use Eq constrs? *)
@@ -928,12 +938,12 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
        typecheck_cases ~scrutinee_ty:TyFloat ~ctx_for_pat:(prim_ctx_for_pat TyFloat)
      | Some `MatchVariant ->
        (* Variant match *)
-       let%bind variant_name, variant_ctors =
+       let%bind variant_name, variant_params, variant_ctors =
          let find_from_ty ty =
            match ty with
-           | TyVariant name ->
+           | TyVariant (name, _) ->
              (match Map.find variants name with
-              | Some ctors -> Some (name, ctors)
+              | Some (params, ctors) -> Some (name, params, ctors)
               | None -> None)
            | _ -> None
          in
@@ -947,16 +957,19 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
                | _ -> None)
            in
            let candidates =
-             Map.filter variants ~f:(fun ctors ->
+             Map.filter variants ~f:(fun (_, ctors) ->
                let ctor_names = List.map ctors ~f:fst in
                List.for_all case_ctors ~f:(fun c ->
                  List.mem ctor_names c ~equal:String.equal))
            in
            (match Map.to_alist candidates with
-            | [ (name, ctors) ] -> Ok (name, ctors)
+            | [ (name, (params, ctors)) ] -> Ok (name, params, ctors)
             | [] -> Err.fail "match cases don't match any variant type" ~loc
             | _ -> Err.fail "ambiguous match variant type" ~loc)
        in
+       let param_sub = List.map variant_params ~f:(fun p -> p, fresh_tyvar ()) in
+       let type_args = List.map param_sub ~f:snd in
+       let scrutinee_ty = TyVariant (variant_name, type_args) in
        (* Exhaustiveness Checking *)
        let%bind () =
          if has_catchall
@@ -985,15 +998,16 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
            ~err_msg:"duplicate match case"
            ~sexp_of_dup:(fun ctor -> [%message (ctor : string)])
        in
-       typecheck_cases ~scrutinee_ty:(TyVariant variant_name) ~ctx_for_pat:(fun pat ->
+       typecheck_cases ~scrutinee_ty ~ctx_for_pat:(fun pat ->
          match pat with
          | PatCtor (ctor, vars) ->
-           let%bind _, expected_arg_tys =
+           let%bind _, ctor_arg_tys =
              match List.find variant_ctors ~f:(fun (c, _) -> String.equal c ctor) with
              | Some x -> Ok x
              | None ->
                Err.fail "unknown constructor in match" ~loc ~d:[%message (ctor : string)]
            in
+           let expected_arg_tys = List.map ctor_arg_tys ~f:(subst_ty param_sub) in
            if List.length vars <> List.length expected_arg_tys
            then (
              let expected = List.length expected_arg_tys in
@@ -1006,7 +1020,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
              Ok
                (List.fold2_exn vars expected_arg_tys ~init:ctx ~f:(fun ctx v ty ->
                   Map.set ctx ~key:v ~data:([], [], ty)))
-         | PatVar v -> Ok (Map.set ctx ~key:v ~data:([], [], TyVariant variant_name))
+         | PatVar v -> Ok (Map.set ctx ~key:v ~data:([], [], scrutinee_ty))
          | PatLitBool _ | PatLitInt _ | PatLitFloat _ -> Ok ctx))
 ;;
 
@@ -1065,15 +1079,16 @@ let typecheck (Program terms : Stlc.t) : t Compiler_error.t =
             }
           in
           Ok (ctx, structs, variants, top :: acc)
-        | TypeDef (name, Stlc.VariantDecl ctors) ->
+        | TypeDef (name, Stlc.VariantDecl (params, ctors)) ->
           let ctors =
             List.map ctors ~f:(fun (c, tys) ->
               c, List.map tys ~f:(resolve_stlc_ty variants))
           in
-          let variants = Map.set variants ~key:name ~data:ctors in
+          let variants = Map.set variants ~key:name ~data:(params, ctors) in
+          let param_tyvars = List.map params ~f:(fun p -> TyVar p) in
           let top =
-            { desc = TypeDef (name, VariantDecl ctors)
-            ; ty = TyVariant name
+            { desc = TypeDef (name, VariantDecl (params, ctors))
+            ; ty = TyVariant (name, param_tyvars)
             ; loc = top.loc
             ; scheme_constrs = []
             }
