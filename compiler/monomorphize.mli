@@ -58,4 +58,4 @@ type t = Program of top list [@@deriving sexp_of]
 
 (** Specializes polymorphic functions, generating a new instance for every concrete
     monomorphic type that lives in the general polymorphic type *)
-val monomorphize : Typecheck.t -> t Compiler_error.t
+val monomorphize : sp_env:Specialize_params.env -> Typecheck.t -> t Compiler_error.t

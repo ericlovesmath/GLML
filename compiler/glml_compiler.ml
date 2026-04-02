@@ -37,8 +37,8 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   trace Uniquify (Stlc.sexp_of_t t);
   let%bind t = Typecheck.typecheck t in
   trace Typecheck (Typecheck.sexp_of_t t);
-  let t = Specialize_params.specialize t in
-  let%bind t = Monomorphize.monomorphize t in
+  let t, sp_env = Specialize_params.specialize t in
+  let%bind t = Monomorphize.monomorphize ~sp_env t in
   trace Monomorphize (Monomorphize.sexp_of_t t);
   let t = Uncurry.uncurry t in
   trace Uncurry (Uncurry.sexp_of_t t);
