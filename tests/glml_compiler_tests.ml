@@ -1699,3 +1699,55 @@ let%expect_test "regression - polymorphic struct type in function" =
     }
     |}]
 ;;
+
+let%expect_test "regression - polymorphic variant type in function" =
+  test
+    {|
+    type option['a] = Some of 'a | None
+
+    let is_some o = match o with | Some _ -> true | None -> false
+
+    let main (coord: vec2) : vec3 =
+      let b = if is_some (Some 1.0) then 1.0 else 0.0 in
+      [b, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct v_option_float {
+        int tag;
+        float Some_0;
+    };
+    bool is_some_0_v_option_float_to_bool_11(v_option_float o_1) {
+        int _lv_tag_14 = o_1.tag;
+        switch (_lv_tag_14) {
+            case 0: {
+                float __2 = o_1.Some_0;
+                return true;
+                break;
+            }
+            default: {
+                return false;
+                break;
+            }
+        }
+    }
+    vec3 main_pure(vec2 coord_3) {
+        v_option_float anf_12 = v_option_float(0, 1.);
+        bool anf_13 = is_some_0_v_option_float_to_bool_11(anf_12);
+        float b_4 = 0.;
+        if (anf_13) {
+            b_4 = 1.;
+        } else {
+            b_4 = 0.;
+        }
+        return vec3(b_4, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
