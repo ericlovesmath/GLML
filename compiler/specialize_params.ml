@@ -259,7 +259,7 @@ let rewrite_top ~(env : env) (top : top) : top =
   { top with ty; desc }
 ;;
 
-let specialize (Program tops : t) : t =
+let specialize (Program tops : t) : t * env =
   let poly_tops =
     List.filter_map tops ~f:(fun top ->
       match top.desc with
@@ -297,5 +297,5 @@ let specialize (Program tops : t) : t =
       | _ -> true)
   in
   let rewritten = List.map (new_def_tops @ filtered_tops) ~f:(rewrite_top ~env) in
-  Program rewritten
+  Program rewritten, env
 ;;

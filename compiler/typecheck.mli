@@ -96,7 +96,11 @@ val subst_term : substitution -> term -> term
 (** Given a scheme's deferred constraints and a substitution mapping its tyvars
     to concrete types, applies [substitution], then solves the remaining constraints.
     Used by [Monomorphize] after instantiate polymorphic bindings. *)
-val solve_scheme_constrs : constr list -> substitution -> substitution Compiler_error.t
+val solve_scheme_constrs
+  :  ?structs:(string list * (string * ty) list) Core.String.Map.t
+  -> constr list
+  -> substitution
+  -> substitution Compiler_error.t
 
 (** Typechecker using Hindley-Milner extended with GLSL-specific constraints.
 

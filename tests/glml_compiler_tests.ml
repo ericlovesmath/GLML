@@ -1624,3 +1624,78 @@ let%expect_test "parametrized variants" =
     }
     |}]
 ;;
+
+let%expect_test "regression - polymorphic struct type in function" =
+  test
+    {|
+    type box['a] = { value: 'a }
+    let f (b: box['a]) : 'a = b.value
+    let main (coord: vec2) : vec3 = [f { value = 1.0 }, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct r_box_float {
+        float value;
+    };
+    float f_0_r_box_float_to_float_7(r_box_float b_1) {
+        return b_1.value;
+    }
+    vec3 main_pure(vec2 coord_2) {
+        r_box_float anf_8 = r_box_float(1.);
+        float anf_9 = f_0_r_box_float_to_float_7(anf_8);
+        return vec3(anf_9, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    type box['a] = { value: 'a }
+    let f b = b.value
+    let main (coord: vec2) : vec3 =
+      let a = f { value = 1.0 } in
+      let b = if f { value = true } then 1 else 2 in
+      [a, b, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct r_box_float {
+        float value;
+    };
+    struct r_box_bool {
+        bool value;
+    };
+    bool f_0_r_box_bool_to_bool_15(r_box_bool b_1) {
+        return b_1.value;
+    }
+    float f_0_r_box_float_to_float_16(r_box_float b_1) {
+        return b_1.value;
+    }
+    vec3 main_pure(vec2 coord_2) {
+        r_box_float anf_17 = r_box_float(1.);
+        float a_3 = f_0_r_box_float_to_float_16(anf_17);
+        r_box_bool anf_18 = r_box_bool(true);
+        bool anf_19 = f_0_r_box_bool_to_bool_15(anf_18);
+        int b_4 = 0;
+        if (anf_19) {
+            b_4 = 1;
+        } else {
+            b_4 = 2;
+        }
+        float pf_20 = float(b_4);
+        return vec3(a_3, pf_20, 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
