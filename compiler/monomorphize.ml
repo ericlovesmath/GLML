@@ -14,6 +14,14 @@ let rec subst ~(poly : Typecheck.ty) ~(concrete : Typecheck.ty)
   | TyVar v, _ -> [ v, concrete ]
   | TyArrow (l, r), TyArrow (l', r') ->
     subst ~poly:l ~concrete:l' @ subst ~poly:r ~concrete:r'
+  | TyRecord (n, args), TyRecord (n', args')
+    when String.equal n n' && List.length args = List.length args' ->
+    List.concat_map (List.zip_exn args args') ~f:(fun (a, a') ->
+      subst ~poly:a ~concrete:a')
+  | TyVariant (n, args), TyVariant (n', args')
+    when String.equal n n' && List.length args = List.length args' ->
+    List.concat_map (List.zip_exn args args') ~f:(fun (a, a') ->
+      subst ~poly:a ~concrete:a')
   | _, _ -> []
 ;;
 
@@ -354,7 +362,8 @@ and rewrite_refs
       in
       Match (scrutinee, List.rev cases_rev), env, defs1 @ defs2
   in
-  env, { t with desc }, defs
+  let ty = Specialize_params.rewrite_ty ~env:sp_env t.ty in
+  env, { t with desc; ty }, defs
 
 and rewrite_refs_list
       (poly_env : poly_env)
@@ -591,21 +600,33 @@ let top_of_tc (t : Typecheck.top) : top Compiler_error.t =
   Ok { desc; ty; loc = t.loc }
 ;;
 
-let build_spec_structs (Program tops : Typecheck.t)
+let build_spec_structs (Program tops : Typecheck.t) (sp_env : Specialize_params.env)
   : (string list * (string * Typecheck.ty) list) String.Map.t
   =
-  List.filter_map tops ~f:(fun top ->
-    match top.desc with
-    | TypeDef (name, RecordDecl (params, fields)) -> Some (name, (params, fields))
-    | _ -> None)
-  |> String.Map.of_alist_exn
+  let from_program =
+    List.filter_map tops ~f:(fun top ->
+      match top.desc with
+      | TypeDef (name, RecordDecl (params, fields)) -> Some (name, (params, fields))
+      | _ -> None)
+  in
+  (* Also include original parametrized record decls from sp_env so that
+     solve_scheme_constrs can resolve FieldAccess constraints that reference
+     the un-mangled struct name (e.g. "box" instead of "r_box_float"). *)
+  let from_sp_env =
+    Map.to_alist sp_env
+    |> List.filter_map ~f:(fun (name, decl) ->
+      match decl with
+      | Typecheck.RecordDecl (params, fields) -> Some (name, (params, fields))
+      | Typecheck.VariantDecl _ -> None)
+  in
+  from_program @ from_sp_env |> String.Map.of_alist_exn
 ;;
 
 let monomorphize ~(sp_env : Specialize_params.env) (program : Typecheck.t)
   : t Compiler_error.t
   =
   let (Program tops) = program in
-  let spec_structs = build_spec_structs program in
+  let spec_structs = build_spec_structs program sp_env in
   let _, _, tops =
     List.fold
       tops

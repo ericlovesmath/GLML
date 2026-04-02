@@ -212,9 +212,13 @@ let maybe_mangle_name ~(env : env) ~fallback (ty : ty) : string =
   | _ -> fallback
 ;;
 
-let rec rewrite_term ~(env : env) (t : term) : term =
-  let rewrite = rewrite_term ~env in
-  let ty = rewrite_ty ~env t.ty in
+let rec rewrite_term ~(env : env) ?(poly_names = String.Set.empty) (t : term) : term =
+  let rewrite = rewrite_term ~env ~poly_names in
+  let ty =
+    match t.desc with
+    | Var v when Set.mem poly_names v -> t.ty
+    | _ -> rewrite_ty ~env t.ty
+  in
   let desc : term_desc =
     match t.desc with
     | Var _ | Float _ | Int _ | Bool _ -> t.desc
@@ -241,11 +245,11 @@ let rec rewrite_term ~(env : env) (t : term) : term =
   { t with ty; desc }
 ;;
 
-let rewrite_top ~(env : env) (top : top) : top =
+let rewrite_top ~(env : env) ~(poly_names : String.Set.t) (top : top) : top =
   let ty = rewrite_ty ~env top.ty in
   let desc : top_desc =
     match top.desc with
-    | Define (r, v, bind) -> Define (r, v, rewrite_term ~env bind)
+    | Define (r, v, bind) -> Define (r, v, rewrite_term ~env ~poly_names bind)
     | Extern _ -> top.desc
     | TypeDef (name, RecordDecl (params, fields)) ->
       let fields = List.map fields ~f:(fun (fn, fty) -> fn, rewrite_ty ~env fty) in
@@ -296,6 +300,16 @@ let specialize (Program tops : t) : t * env =
       | TypeDef (name, (RecordDecl _ | VariantDecl _)) when Map.mem env name -> false
       | _ -> true)
   in
-  let rewritten = List.map (new_def_tops @ filtered_tops) ~f:(rewrite_top ~env) in
+  let poly_names =
+    tops
+    |> List.filter_map ~f:(fun top ->
+      match top.desc with
+      | Define (_, v, _) when not (is_concrete top.ty) -> Some v
+      | _ -> None)
+    |> String.Set.of_list
+  in
+  let rewritten =
+    List.map (new_def_tops @ filtered_tops) ~f:(rewrite_top ~env ~poly_names)
+  in
   Program rewritten, env
 ;;
