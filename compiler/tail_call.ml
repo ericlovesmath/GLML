@@ -147,14 +147,16 @@ and of_anf (anf : Anf.anf) : anf =
 let placeholder_anf_for_ty (tenv : type_env) (ty : Monomorphize.ty) (loc : Lexer.loc)
   : anf Compiler_error.t
   =
+  let atom (desc : atom_desc) = ({ desc; ty; loc } : atom) in
   let make ?(env = []) desc = Ok (({ desc; ty; loc } : term), env) in
   let rec build (ty : Monomorphize.ty) : (term * (string * term) list) Compiler_error.t =
     match ty with
-    | TyInt -> make (Atom (Int 0))
-    | TyFloat -> make (Atom (Float 0.0))
-    | TyBool -> make (Atom (Bool false))
-    | TyVec n -> make (Vec (n, List.init n ~f:(Fn.const (Float 0.0))))
-    | TyMat (n, m) -> make (Mat (n, m, List.init (n * m) ~f:(Fn.const (Float 0.0))))
+    | TyInt -> make (Atom (atom (Int 0)))
+    | TyFloat -> make (Atom (atom (Float 0.0)))
+    | TyBool -> make (Atom (atom (Bool false)))
+    | TyVec n -> make (Vec (n, List.init n ~f:(Fn.const (atom (Float 0.0)))))
+    | TyMat (n, m) ->
+      make (Mat (n, m, List.init (n * m) ~f:(Fn.const (atom (Float 0.0)))))
     | TyRecord s ->
       (match Map.find tenv s with
        | Some (RecordDecl fields) ->
@@ -170,7 +172,7 @@ let placeholder_anf_for_ty (tenv : type_env) (ty : Monomorphize.ty) (loc : Lexer
                | Atom a -> a :: args, bindings @ all_bindings
                | _ ->
                  let name = Utils.fresh "_tco_struct" in
-                 Var name :: args, bindings @ [ name, t ] @ all_bindings)
+                 atom (Var name) :: args, bindings @ [ name, t ] @ all_bindings)
          in
          make ~env:nested_bindings (Record (s, args))
        | Some (VariantDecl _) | None ->
@@ -188,7 +190,7 @@ let placeholder_anf_for_ty (tenv : type_env) (ty : Monomorphize.ty) (loc : Lexer
                | Atom a -> a :: args, bindings @ all_bindings
                | _ ->
                  let name = Utils.fresh "_tco_variant" in
-                 Var name :: args, bindings @ [ name, t ] @ all_bindings)
+                 atom (Var name) :: args, bindings @ [ name, t ] @ all_bindings)
          in
          make ~env:nested_bindings (Variant (s, first_ctor, args))
        | Some (VariantDecl []) | Some (RecordDecl _) | None ->
@@ -222,6 +224,7 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : strin
   : anf Compiler_error.t
   =
   let rec patch (anf : Anf.anf) : anf Compiler_error.t =
+    let atom (desc : atom_desc) = ({ desc; ty = anf.ty; loc = anf.loc } : atom) in
     let pure desc : anf Compiler_error.t = Ok { desc; ty = anf.ty; loc = anf.loc } in
     match anf.desc with
     | Let (v, bind, tail) ->
@@ -247,9 +250,11 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : strin
     | Return { desc = App (f, xs); ty = _; loc } when String.equal f name ->
       let tmp = Utils.fresh "_iter_inc" in
       let inc_iter_continue =
-        let iter_inc : term = { desc = Bop (Add, Var iter, Int 1); ty = TyInt; loc } in
+        let iter_inc : term =
+          { desc = Bop (Add, atom (Var iter), atom (Int 1)); ty = TyInt; loc }
+        in
         let%bind continue = pure Continue in
-        let%bind set_iter_to_tmp = pure (Set (iter, Var tmp, continue)) in
+        let%bind set_iter_to_tmp = pure (Set (iter, atom (Var tmp), continue)) in
         pure (Let (tmp, iter_inc, set_iter_to_tmp))
       in
       let tail =
@@ -267,6 +272,7 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : strin
 ;;
 
 let remove_rec_top (tenv : type_env) (top : Anf.top) : top Compiler_error.t =
+  let atom desc : atom = { desc; ty = top.ty; loc = top.loc } in
   let pure desc = Ok { desc; ty = top.ty; loc = top.loc } in
   match top.desc with
   | Const (v, anf) -> pure (Const (v, of_anf anf))
@@ -277,14 +283,14 @@ let remove_rec_top (tenv : type_env) (top : Anf.top) : top Compiler_error.t =
   | Define { name; recur = Rec limit; args; body; ret_ty } ->
     let loc = body.loc in
     let iter = Utils.fresh "_iter" in
-    let while_cond : term = { desc = Bop (Lt, Var iter, Int limit); ty = top.ty; loc } in
+    let while_cond : term = { desc = Bop (Lt, atom (Var iter), atom (Int limit)); ty = top.ty; loc } in
     let%bind while_body = patch_tail_anf body name iter (List.map ~f:fst args) in
     let%bind while_after = placeholder_anf_for_ty tenv ret_ty body.loc in
     let while_anf : anf =
       { desc = While (while_cond, while_body, while_after); ty = top.ty; loc }
     in
     let body : anf =
-      { desc = Let (iter, { desc = Atom (Int 0); ty = Monomorphize.TyInt; loc }, while_anf)
+      { desc = Let (iter, { desc = Atom (atom (Int 0)); ty = Monomorphize.TyInt; loc }, while_anf)
       ; ty = top.ty
       ; loc
       }

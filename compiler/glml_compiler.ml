@@ -8,6 +8,7 @@ module Passes = struct
       | Stlc
       | Uniquify
       | Typecheck
+      | Specialize_params
       | Monomorphize
       | Uncurry
       | Lambda_lift
@@ -38,6 +39,7 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   let%bind t = Typecheck.typecheck t in
   trace Typecheck (Typecheck.sexp_of_t t);
   let t, sp_env = Specialize_params.specialize t in
+  trace Specialize_params (Typecheck.sexp_of_t t);
   let%bind t = Monomorphize.monomorphize ~sp_env t in
   trace Monomorphize (Monomorphize.sexp_of_t t);
   let t = Uncurry.uncurry t in

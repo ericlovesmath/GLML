@@ -1,18 +1,26 @@
 open Core
 open Sexplib.Sexp
 
-type atom =
+type atom_desc =
   | Var of string
   | Float of float
   | Int of int
   | Bool of bool
 
-let sexp_of_atom = function
+let sexp_of_atom_desc = function
   | Var v -> Atom v
   | Float f -> Atom (Float.to_string f)
   | Int i -> Atom (Int.to_string i)
   | Bool b -> Atom (Bool.to_string b)
 ;;
+
+type atom =
+  { desc : atom_desc
+  ; ty : Monomorphize.ty
+  ; loc : Lexer.loc
+  }
+
+let sexp_of_atom t = sexp_of_atom_desc t.desc
 
 type term_desc =
   | Atom of atom
@@ -120,14 +128,15 @@ type t = Program of top list
 let sexp_of_t (Program tops) = List (Atom "Program" :: List.map tops ~f:sexp_of_top)
 
 let rec normalize (expr : Lambda_lift.term) : anf =
+  let atom (desc : atom_desc) : term_desc = Atom { desc; ty = expr.ty; loc = expr.loc } in
   let pure (desc : term_desc) : anf =
     { desc = Return { desc; ty = expr.ty; loc = expr.loc }; ty = expr.ty; loc = expr.loc }
   in
   match expr.desc with
-  | Var v -> pure (Atom (Var v))
-  | Float f -> pure (Atom (Float f))
-  | Int i -> pure (Atom (Int i))
-  | Bool b -> pure (Atom (Bool b))
+  | Var v -> pure (atom (Var v))
+  | Float f -> pure (atom (Float f))
+  | Int i -> pure (atom (Int i))
+  | Bool b -> pure (atom (Bool b))
   | Let (v, bind, body) ->
     let bind = normalize bind in
     let body = normalize body in
@@ -139,8 +148,8 @@ let rec normalize (expr : Lambda_lift.term) : anf =
     in
     make_let bind
   | App (f, args) ->
-    atomize f (fun f_atom ->
-      match f_atom with
+    atomize f (fun (f : atom) ->
+      match f.desc with
       | Var v -> atomize_list args (fun args_atoms -> pure (App (v, args_atoms)))
       | _ -> failwith "normalize: app function must be a variable for now")
   | Bop (op, l, r) ->
@@ -165,15 +174,16 @@ let rec normalize (expr : Lambda_lift.term) : anf =
       pure (Match (s, cases)))
 
 and atomize (expr : Lambda_lift.term) (k : atom -> anf) : anf =
+  let pure (desc : atom_desc) : atom = { desc; ty = expr.ty; loc = expr.loc } in
   match expr.desc with
-  | Var v -> k (Var v)
-  | Float f -> k (Float f)
-  | Int i -> k (Int i)
-  | Bool b -> k (Bool b)
+  | Var v -> k (pure (Var v))
+  | Float f -> k (pure (Float f))
+  | Int i -> k (pure (Int i))
+  | Bool b -> k (pure (Bool b))
   | _ ->
     let anf_block = normalize expr in
     let v = Utils.fresh "anf" in
-    let rem = k (Var v) in
+    let rem = k (pure (Var v)) in
     let pure (desc : anf_desc) : anf = { desc; ty = rem.ty; loc = expr.loc } in
     let rec make_let (a : anf) =
       match a.desc with

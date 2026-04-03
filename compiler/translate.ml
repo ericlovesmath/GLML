@@ -23,7 +23,7 @@ let to_glsl_ty (ty : Monomorphize.ty) : ty Compiler_error.t =
 ;;
 
 let to_glsl_atom (a : Anf.atom) : term =
-  match a with
+  match a.desc with
   | Var v -> Var v
   | Float f -> Float f
   | Int i -> Int i
