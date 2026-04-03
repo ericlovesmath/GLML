@@ -356,8 +356,6 @@ let resolve_constraints structs (constrs : constr list)
       (match l, r with
        | TyVar a, TyVar b when String.equal a b ->
          aux (c :: deferred) ((loc, ret, l) :: eqs) rest
-       | TyFloat, TyVar _ -> aux (c :: deferred) ((loc, ret, r) :: eqs) rest
-       | TyVar _, TyFloat -> aux (c :: deferred) ((loc, ret, l) :: eqs) rest
        | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
        | TyFloat, TyFloat -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
        | TyInt, TyInt -> aux deferred ((loc, ret, TyInt) :: eqs) rest
@@ -365,6 +363,9 @@ let resolve_constraints structs (constrs : constr list)
        | TyVec n, TyVec n' when n = n' -> aux deferred ((loc, ret, TyVec n) :: eqs) rest
        | TyFloat, TyVec n | TyVec n, TyFloat ->
          aux deferred ((loc, ret, TyVec n) :: eqs) rest
+       | TyInt, TyVec n | TyVec n, TyInt -> aux deferred ((loc, ret, TyVec n) :: eqs) rest
+       | TyInt, TyMat (x, y) | TyMat (x, y), TyInt ->
+         aux deferred ((loc, ret, TyMat (x, y)) :: eqs) rest
        | TyMat (x, y), TyMat (w, z) when x = w && y = z ->
          aux deferred ((loc, ret, TyMat (x, y)) :: eqs) rest
        | _ -> Err.fail "invalid broadcast" ~loc ~d:[%message (l : ty) (r : ty)])
@@ -372,8 +373,6 @@ let resolve_constraints structs (constrs : constr list)
       (match l, r with
        | TyVar a, TyVar b when String.equal a b ->
          aux (c :: deferred) ((loc, ret, l) :: eqs) rest
-       | TyFloat, TyVar _ -> aux (c :: deferred) ((loc, ret, r) :: eqs) rest
-       | TyVar _, TyFloat -> aux (c :: deferred) ((loc, ret, l) :: eqs) rest
        | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
        | TyMat (x, y), TyMat (w, z) when x = w && y = z ->
          aux deferred ((loc, ret, TyMat (x, y)) :: eqs) rest
@@ -389,6 +388,9 @@ let resolve_constraints structs (constrs : constr list)
        | TyVec n, TyVec n' when n = n' -> aux deferred ((loc, ret, TyVec n) :: eqs) rest
        | TyFloat, TyVec n | TyVec n, TyFloat ->
          aux deferred ((loc, ret, TyVec n) :: eqs) rest
+       | TyInt, TyVec n | TyVec n, TyInt -> aux deferred ((loc, ret, TyVec n) :: eqs) rest
+       | TyInt, TyMat (x, y) | TyMat (x, y), TyInt ->
+         aux deferred ((loc, ret, TyMat (x, y)) :: eqs) rest
        | _ -> Err.fail "invalid mul/div broadcast" ~loc ~d:[%message (l : ty) (r : ty)])
     | ({ desc = IndexAccess (t, i, ret); loc } as c) :: rest ->
       (match t with
@@ -621,9 +623,10 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
       match op with
       | Add | Sub -> [ constr (Broadcast (l.ty, r.ty, ret_ty)) ]
       | Mod ->
-        [ constr (HasClass (GenType, l.ty))
-        ; constr (HasClass (GenType, r.ty))
-        ; constr (Broadcast (l.ty, r.ty, ret_ty))
+        let bt = fresh_tyvar () in
+        [ constr (Broadcast (l.ty, r.ty, bt))
+        ; constr (Broadcast (bt, TyFloat, ret_ty))
+        ; constr (HasClass (GenType, ret_ty))
         ]
       | Mul | Div -> [ constr (MulBroadcast (l.ty, r.ty, ret_ty)) ]
       | Eq ->
@@ -632,8 +635,9 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
         ; constr (Eq (ret_ty, TyBool))
         ]
       | Lt | Gt | Leq | Geq ->
-        [ constr (HasClass (Comparable, l.ty))
-        ; constr (Eq (l.ty, r.ty))
+        let fresh_ty = fresh_tyvar () in
+        [ constr (Broadcast (l.ty, r.ty, fresh_ty))
+        ; constr (HasClass (Comparable, fresh_ty))
         ; constr (Eq (ret_ty, TyBool))
         ]
       | And | Or ->
@@ -673,24 +677,45 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
           | Sign
           | Floor
           | Ceil )
-        , [ t ] ) -> Ok [ constr (HasClass (GenType, t)); constr (Eq (ty, t)) ]
+        , [ t ] ) ->
+        let bt = fresh_tyvar () in
+        Ok
+          [ constr (Broadcast (t, TyFloat, bt))
+          ; constr (HasClass (GenType, bt))
+          ; constr (Eq (ty, bt))
+          ]
       | (Min | Max | Pow), [ t; t' ] ->
-        Ok [ constr (HasClass (GenType, ty)); constr (Broadcast (t, t', ty)) ]
+        let bt = fresh_tyvar () in
+        Ok
+          [ constr (Broadcast (t, t', bt))
+          ; constr (Broadcast (bt, TyFloat, ty))
+          ; constr (HasClass (GenType, ty))
+          ]
       | Clamp, [ t; t'; t'' ] ->
         let tmp = fresh_tyvar () in
+        let bt = fresh_tyvar () in
         Ok
-          [ constr (HasClass (GenType, ty))
-          ; constr (Broadcast (t', t'', tmp))
-          ; constr (Broadcast (t, tmp, ty))
+          [ constr (Broadcast (t', t'', tmp))
+          ; constr (Broadcast (t, tmp, bt))
+          ; constr (Broadcast (bt, TyFloat, ty))
+          ; constr (HasClass (GenType, ty))
           ]
       | Mix, [ t; t'; t'' ] ->
         let tmp = fresh_tyvar () in
+        let bt = fresh_tyvar () in
         Ok
-          [ constr (HasClass (GenType, ty))
-          ; constr (Broadcast (t, t', tmp))
-          ; constr (Broadcast (tmp, t'', ty))
+          [ constr (Broadcast (t, t', tmp))
+          ; constr (Broadcast (tmp, t'', bt))
+          ; constr (Broadcast (bt, TyFloat, ty))
+          ; constr (HasClass (GenType, ty))
           ]
-      | Length, [ t ] -> Ok [ constr (HasClass (GenType, t)); constr (Eq (ty, TyFloat)) ]
+      | Length, [ t ] ->
+        let bt = fresh_tyvar () in
+        Ok
+          [ constr (Broadcast (t, TyFloat, bt))
+          ; constr (HasClass (GenType, bt))
+          ; constr (Eq (ty, TyFloat))
+          ]
       | (Distance | Dot), [ t; t' ] ->
         Ok
           [ constr (HasClass (GenType, t))
@@ -703,18 +728,37 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
           ; constr (Eq (t', TyVec 3))
           ; constr (Eq (ty, TyVec 3))
           ]
-      | Normalize, [ t ] -> Ok [ constr (HasClass (GenType, t)); constr (Eq (ty, t)) ]
-      | Fract, [ t ] -> Ok [ constr (HasClass (GenType, t)); constr (Eq (ty, t)) ]
+      | Normalize, [ t ] ->
+        let bt = fresh_tyvar () in
+        Ok
+          [ constr (Broadcast (t, TyFloat, bt))
+          ; constr (HasClass (GenType, bt))
+          ; constr (Eq (ty, bt))
+          ]
+      | Fract, [ t ] ->
+        let bt = fresh_tyvar () in
+        Ok
+          [ constr (Broadcast (t, TyFloat, bt))
+          ; constr (HasClass (GenType, bt))
+          ; constr (Eq (ty, bt))
+          ]
       | Step, [ t; t' ] ->
-        Ok [ constr (HasClass (GenType, ty)); constr (Broadcast (t, t', ty)) ]
+        let bt = fresh_tyvar () in
+        Ok
+          [ constr (Broadcast (t, t', bt))
+          ; constr (Broadcast (bt, TyFloat, ty))
+          ; constr (HasClass (GenType, ty))
+          ]
       | Reflect, [ t; t' ] ->
         Ok [ constr (HasClass (GenType, t)); constr (Eq (t, t')); constr (Eq (ty, t)) ]
       | Smoothstep, [ t; t'; t'' ] ->
         let tmp = fresh_tyvar () in
+        let bt = fresh_tyvar () in
         Ok
-          [ constr (HasClass (GenType, ty))
-          ; constr (Broadcast (t, t', tmp))
-          ; constr (Broadcast (tmp, t'', ty))
+          [ constr (Broadcast (t, t', tmp))
+          ; constr (Broadcast (tmp, t'', bt))
+          ; constr (Broadcast (bt, TyFloat, ty))
+          ; constr (HasClass (GenType, ty))
           ]
       | _ -> Err.fail "invalid builtin arguments" ~loc ~d:[%message (b : Glsl.builtin)]
     in
@@ -775,7 +819,13 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
              match List.Assoc.find fields ~equal:String.equal name with
              | Some arg ->
                let%bind arg, constrs = gen_term structs variants ctx arg in
-               return (arg :: acc, (constr (Eq (arg.ty, ty)) :: constrs) @ acc_constrs)
+               let field_constr =
+                 match ty with
+                 (* Concrete field allows coercion via promote_ints *)
+                 | TyFloat -> constr (HasClass (Comparable, arg.ty))
+                 | _ -> constr (Eq (arg.ty, ty))
+               in
+               return (arg :: acc, (field_constr :: constrs) @ acc_constrs)
              | None ->
                Err.fail "(unreachable) missing field" ~loc ~d:[%message (name : string)])
        in
@@ -814,9 +864,14 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
           ~f:(fun acc arg expected_ty ->
             let%bind acc_args, acc_constrs = acc in
             let%bind arg, constrs = gen_term structs variants ctx arg in
-            return
-              ( arg :: acc_args
-              , (constr (Eq (arg.ty, expected_ty)) :: constrs) @ acc_constrs ))
+            let arg_constr =
+              match expected_ty with
+              | TyFloat ->
+                (* Concrete float ctor arg allows coercion via promote_ints *)
+                constr (HasClass (Comparable, arg.ty))
+              | _ -> constr (Eq (arg.ty, expected_ty))
+            in
+            return (arg :: acc_args, (arg_constr :: constrs) @ acc_constrs))
       in
       make
         (Variant (variant_name, ctor, List.rev args))
