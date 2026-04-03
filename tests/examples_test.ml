@@ -284,6 +284,177 @@ let%expect_test "compile examples" =
          : ((vec 2) -> (vec 3))))
        : ((vec 2) -> (vec 3)))))
 
+    === specialize params (2d_sdf_variants.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+      ((Extern u_time) : float)
+      ((TypeDef shape
+        (VariantDecl () ((Circle (float)) (Rect (float float)) (Empty ()))))
+       : shape)
+      ((Define Nonrec sdf_0
+        ((lambda s_1
+          ((lambda p_2
+            ((match (s_1 : shape)
+              ((Circle r_3)
+               ((- ((length (p_2 : (vec 2))) : float) (r_3 : float)) : float))
+              ((Rect w_4 h_5)
+               ((let d_6
+                 ((vec2
+                   ((- ((abs ((index (p_2 : (vec 2)) 0) : float)) : float)
+                     (w_4 : float))
+                    : float)
+                   ((- ((abs ((index (p_2 : (vec 2)) 1) : float)) : float)
+                     (h_5 : float))
+                    : float))
+                  : (vec 2))
+                 ((+
+                   ((length
+                     ((max (d_6 : (vec 2))
+                       ((vec2 (0. : float) (0. : float)) : (vec 2)))
+                      : (vec 2)))
+                    : float)
+                   ((min
+                     ((max ((index (d_6 : (vec 2)) 0) : float)
+                       ((index (d_6 : (vec 2)) 1) : float))
+                      : float)
+                     (0. : float))
+                    : float))
+                  : float))
+                : float))
+              ((Empty) (1. : float)))
+             : float))
+           : ((vec 2) -> float)))
+         : (shape -> ((vec 2) -> float))))
+       : (shape -> ((vec 2) -> float)))
+      ((Define Nonrec scene_7
+        ((lambda p_8
+          ((let circle_9
+            ((app
+              ((app (sdf_0 : (shape -> ((vec 2) -> float)))
+                ((Variant shape Circle (0.3 : float)) : shape))
+               : ((vec 2) -> float))
+              (p_8 : (vec 2)))
+             : float)
+            ((let rect_10
+              ((app
+                ((app (sdf_0 : (shape -> ((vec 2) -> float)))
+                  ((Variant shape Rect (0.7 : float) (0.1 : float)) : shape))
+                 : ((vec 2) -> float))
+                (p_8 : (vec 2)))
+               : float)
+              ((min (circle_9 : float) (rect_10 : float)) : float))
+             : float))
+           : float))
+         : ((vec 2) -> float)))
+       : ((vec 2) -> float))
+      ((Define Nonrec get_uv_11
+        ((lambda coord_12
+          ((let top_13
+            ((- ((* (2. : float) (coord_12 : 'v_49)) : 'v_49)
+              (u_resolution : (vec 2)))
+             : 'v_51)
+            ((let bot_14
+              ((min ((index (u_resolution : (vec 2)) 0) : float)
+                ((index (u_resolution : (vec 2)) 1) : float))
+               : float)
+              ((/ (top_13 : 'v_51) (bot_14 : float)) : 'v_51))
+             : 'v_51))
+           : 'v_51))
+         : ('v_49 -> 'v_51)))
+       :
+       (forall
+        ((Broadcast 'v_49 (vec 2) 'v_51) (MulBroadcast float 'v_49 'v_49)
+         (MulBroadcast 'v_51 float 'v_51))
+        ('v_49 -> 'v_51)))
+      ((Define Nonrec main
+        ((lambda coord_15
+          ((let p_16
+            ((app (get_uv_11 : ((vec 2) -> (vec 2))) (coord_15 : (vec 2))) :
+             (vec 2))
+            ((let m_17
+              ((app (get_uv_11 : ((vec 2) -> (vec 2))) (u_mouse : (vec 2))) :
+               (vec 2))
+              ((let d_18
+                ((app (scene_7 : ((vec 2) -> float)) (p_16 : (vec 2))) : float)
+                ((let col_19
+                  ((if ((> (d_18 : float) (0. : float)) : bool)
+                    ((vec3 (0.9 : float) (0.6 : float) (0.3 : float)) : (vec 3))
+                    ((vec3 (0.65 : float) (0.85 : float) (1. : float)) : (vec 3)))
+                   : (vec 3))
+                  ((let col_20
+                    ((let darken_21
+                      ((- (1. : float)
+                        ((exp
+                          ((* (-6. : float) ((abs (d_18 : float)) : float)) :
+                           float))
+                         : float))
+                       : float)
+                      ((let rings_22
+                        ((+ (0.8 : float)
+                          ((* (0.2 : float)
+                            ((cos ((* (150. : float) (d_18 : float)) : float)) :
+                             float))
+                           : float))
+                         : float)
+                        ((*
+                          ((* (col_19 : (vec 3)) (darken_21 : float)) : (vec 3))
+                          (rings_22 : float))
+                         : (vec 3)))
+                       : (vec 3)))
+                     : (vec 3))
+                    ((let col_23
+                      ((mix (col_20 : (vec 3))
+                        ((vec3 (1. : float) (1. : float) (1. : float)) : (vec 3))
+                        ((- (1. : float)
+                          ((smoothstep (0. : float) (0.01 : float)
+                            ((abs (d_18 : float)) : float))
+                           : float))
+                         : float))
+                       : (vec 3))
+                      ((let col_24
+                        ((let d_25
+                          ((abs
+                            ((app (scene_7 : ((vec 2) -> float))
+                              (m_17 : (vec 2)))
+                             : float))
+                           : float)
+                          ((let dm_26
+                            ((length
+                              ((- (p_16 : (vec 2)) (m_17 : (vec 2))) : (vec 2)))
+                             : float)
+                            ((let d_27
+                              ((min
+                                ((-
+                                  ((abs
+                                    ((- (dm_26 : float) (d_25 : float)) : float))
+                                   : float)
+                                  (0.0025 : float))
+                                 : float)
+                                ((- (dm_26 : float) (0.015 : float)) : float))
+                               : float)
+                              ((mix (col_23 : (vec 3))
+                                ((vec3 (1. : float) (1. : float) (0. : float)) :
+                                 (vec 3))
+                                ((- (1. : float)
+                                  ((smoothstep (0. : float) (0.005 : float)
+                                    (d_27 : float))
+                                   : float))
+                                 : float))
+                               : (vec 3)))
+                             : (vec 3)))
+                           : (vec 3)))
+                         : (vec 3))
+                        (col_24 : (vec 3)))
+                       : (vec 3)))
+                     : (vec 3)))
+                   : (vec 3)))
+                 : (vec 3)))
+               : (vec 3)))
+             : (vec 3)))
+           : (vec 3)))
+         : ((vec 2) -> (vec 3))))
+       : ((vec 2) -> (vec 3)))))
+
     === monomorphize (2d_sdf_variants.glml) ===
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
@@ -1166,6 +1337,72 @@ let%expect_test "compile examples" =
          : ((vec 2) -> (vec 3))))
        : ((vec 2) -> (vec 3)))))
 
+    === specialize params (checkerboard.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+      ((Define Nonrec get_uv_0
+        ((lambda coord_1
+          ((let top_2
+            ((- ((* (2. : float) (coord_1 : 'v_11)) : 'v_11)
+              (u_resolution : (vec 2)))
+             : 'v_13)
+            ((let bot_3
+              ((min ((index (u_resolution : (vec 2)) 0) : float)
+                ((index (u_resolution : (vec 2)) 1) : float))
+               : float)
+              ((/ (top_2 : 'v_13) (bot_3 : float)) : 'v_13))
+             : 'v_13))
+           : 'v_13))
+         : ('v_11 -> 'v_13)))
+       :
+       (forall
+        ((Broadcast 'v_11 (vec 2) 'v_13) (MulBroadcast float 'v_11 'v_11)
+         (MulBroadcast 'v_13 float 'v_13))
+        ('v_11 -> 'v_13)))
+      ((Define Nonrec main
+        ((lambda coord_4
+          ((let uv_5
+            ((app (get_uv_0 : ((vec 2) -> (vec 2))) (coord_4 : (vec 2))) :
+             (vec 2))
+            ((let size_6 (5. : float)
+              ((let cx_7
+                ((floor
+                  ((+
+                    ((* ((index (uv_5 : (vec 2)) 0) : float) (size_6 : float)) :
+                     float)
+                    ((* (u_time : float) (2. : float)) : float))
+                   : float))
+                 : float)
+                ((let cy_8
+                  ((floor
+                    ((* ((index (uv_5 : (vec 2)) 1) : float) (size_6 : float)) :
+                     float))
+                   : float)
+                  ((let checker_sum_9 ((+ (cx_7 : float) (cy_8 : float)) : float)
+                    ((let is_even_10
+                      ((- (checker_sum_9 : float)
+                        ((*
+                          ((floor
+                            ((/ (checker_sum_9 : float) (2. : float)) : float))
+                           : float)
+                          (2. : float))
+                         : float))
+                       : float)
+                      ((if ((< (is_even_10 : float) (0.5 : float)) : bool)
+                        ((vec3 (0.2 : float) (0.2 : float) (0.2 : float)) :
+                         (vec 3))
+                        ((vec3 (0.8 : float) (0.8 : float) (0.8 : float)) :
+                         (vec 3)))
+                       : (vec 3)))
+                     : (vec 3)))
+                   : (vec 3)))
+                 : (vec 3)))
+               : (vec 3)))
+             : (vec 3)))
+           : (vec 3)))
+         : ((vec 2) -> (vec 3))))
+       : ((vec 2) -> (vec 3)))))
+
     === monomorphize (checkerboard.glml) ===
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
@@ -1534,6 +1771,168 @@ let%expect_test "compile examples" =
                (+ (* (sin (+ (* n_18 (vec3 10. 20. 30.)) u_time)) 0.5) 0.5))))))))))))
 
     === typecheck (mandelbrot.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+      ((Define Nonrec get_uv_0
+        ((lambda coord_1
+          ((let top_2
+            ((- ((* (2. : float) (coord_1 : 'v_19)) : 'v_19)
+              (u_resolution : (vec 2)))
+             : 'v_21)
+            ((let bot_3
+              ((min ((index (u_resolution : (vec 2)) 0) : float)
+                ((index (u_resolution : (vec 2)) 1) : float))
+               : float)
+              ((/ (top_2 : 'v_21) (bot_3 : float)) : 'v_21))
+             : 'v_21))
+           : 'v_21))
+         : ('v_19 -> 'v_21)))
+       :
+       (forall
+        ((Broadcast 'v_19 (vec 2) 'v_21) (MulBroadcast float 'v_19 'v_19)
+         (MulBroadcast 'v_21 float 'v_21))
+        ('v_19 -> 'v_21)))
+      ((Define (Rec 1000) mandel_4
+        ((lambda zx_5
+          ((lambda zy_6
+            ((lambda cx_7
+              ((lambda cy_8
+                ((lambda i_9
+                  ((if
+                    ((||
+                      ((>
+                        ((length
+                          ((vec2 (zx_5 : 'v_39) (zy_6 : 'v_42)) : (vec 2)))
+                         : float)
+                        (2. : float))
+                       : bool)
+                      ((> (i_9 : float) (150. : float)) : bool))
+                     : bool)
+                    (i_9 : float)
+                    ((let next_zx_10
+                      ((+
+                        ((- ((* (zx_5 : 'v_39) (zx_5 : 'v_39)) : 'v_39)
+                          ((* (zy_6 : 'v_42) (zy_6 : 'v_42)) : 'v_42))
+                         : 'v_38)
+                        (cx_7 : 'v_29))
+                       : 'v_39)
+                      ((let next_zy_11
+                        ((+
+                          ((* ((* (2. : float) (zx_5 : 'v_39)) : 'v_39)
+                            (zy_6 : 'v_42))
+                           : 'v_41)
+                          (cy_8 : 'v_30))
+                         : 'v_42)
+                        ((app
+                          ((app
+                            ((app
+                              ((app
+                                ((app
+                                  (mandel_4 :
+                                   ('v_39 ->
+                                    ('v_42 ->
+                                     ('v_29 -> ('v_30 -> (float -> float))))))
+                                  (next_zx_10 : 'v_39))
+                                 :
+                                 ('v_42 ->
+                                  ('v_29 -> ('v_30 -> (float -> float)))))
+                                (next_zy_11 : 'v_42))
+                               : ('v_29 -> ('v_30 -> (float -> float))))
+                              (cx_7 : 'v_29))
+                             : ('v_30 -> (float -> float)))
+                            (cy_8 : 'v_30))
+                           : (float -> float))
+                          ((+ (i_9 : float) (1. : float)) : float))
+                         : float))
+                       : float))
+                     : float))
+                   : float))
+                 : (float -> float)))
+               : ('v_30 -> (float -> float))))
+             : ('v_29 -> ('v_30 -> (float -> float)))))
+           : ('v_42 -> ('v_29 -> ('v_30 -> (float -> float))))))
+         : ('v_39 -> ('v_42 -> ('v_29 -> ('v_30 -> (float -> float)))))))
+       :
+       (forall
+        ((Comparable 'v_42) (Comparable 'v_39) (Broadcast 'v_38 'v_29 'v_39)
+         (Broadcast 'v_39 'v_42 'v_38) (MulBroadcast 'v_39 'v_39 'v_39)
+         (MulBroadcast 'v_42 'v_42 'v_42) (Broadcast 'v_41 'v_30 'v_42)
+         (MulBroadcast 'v_39 'v_42 'v_41) (MulBroadcast float 'v_39 'v_39))
+        ('v_39 -> ('v_42 -> ('v_29 -> ('v_30 -> (float -> float)))))))
+      ((Define Nonrec main
+        ((lambda coord_12
+          ((let uv_13
+            ((app (get_uv_0 : ((vec 2) -> (vec 2))) (coord_12 : (vec 2))) :
+             (vec 2))
+            ((let zoom_14
+              ((exp
+                ((+
+                  ((*
+                    ((sin ((* (u_time : float) (0.4 : float)) : float)) : float)
+                    (4.5 : float))
+                   : float)
+                  (3.5 : float))
+                 : float))
+               : float)
+              ((let cx_15
+                ((+ (-0.7453 : float)
+                  ((/ ((index (uv_13 : (vec 2)) 0) : float) (zoom_14 : float)) :
+                   float))
+                 : float)
+                ((let cy_16
+                  ((+ (0.1127 : float)
+                    ((/ ((index (uv_13 : (vec 2)) 1) : float) (zoom_14 : float))
+                     : float))
+                   : float)
+                  ((let iter_17
+                    ((app
+                      ((app
+                        ((app
+                          ((app
+                            ((app
+                              (mandel_4 :
+                               (float ->
+                                (float -> (float -> (float -> (float -> float))))))
+                              (0. : float))
+                             : (float -> (float -> (float -> (float -> float)))))
+                            (0. : float))
+                           : (float -> (float -> (float -> float))))
+                          (cx_15 : float))
+                         : (float -> (float -> float)))
+                        (cy_16 : float))
+                       : (float -> float))
+                      (0. : float))
+                     : float)
+                    ((if ((> (iter_17 : float) (149. : float)) : bool)
+                      ((vec3 (0. : float) (0. : float) (0. : float)) : (vec 3))
+                      ((let n_18 ((/ (iter_17 : float) (150. : float)) : float)
+                        ((+
+                          ((*
+                            ((sin
+                              ((+
+                                ((* (n_18 : float)
+                                  ((vec3 (10. : float) (20. : float)
+                                    (30. : float))
+                                   : (vec 3)))
+                                 : (vec 3))
+                                (u_time : float))
+                               : (vec 3)))
+                             : (vec 3))
+                            (0.5 : float))
+                           : (vec 3))
+                          (0.5 : float))
+                         : (vec 3)))
+                       : (vec 3)))
+                     : (vec 3)))
+                   : (vec 3)))
+                 : (vec 3)))
+               : (vec 3)))
+             : (vec 3)))
+           : (vec 3)))
+         : ((vec 2) -> (vec 3))))
+       : ((vec 2) -> (vec 3)))))
+
+    === specialize params (mandelbrot.glml) ===
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Define Nonrec get_uv_0
@@ -2411,6 +2810,61 @@ let%expect_test "compile examples" =
          : ((vec 2) -> (vec 3))))
        : ((vec 2) -> (vec 3)))))
 
+    === specialize params (mouse_circle.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+      ((Extern u_time) : float)
+      ((Define Nonrec get_uv_0
+        ((lambda coord_1
+          ((let top_2
+            ((- ((* (2. : float) (coord_1 : 'v_8)) : 'v_8)
+              (u_resolution : (vec 2)))
+             : 'v_10)
+            ((let bot_3
+              ((min ((index (u_resolution : (vec 2)) 0) : float)
+                ((index (u_resolution : (vec 2)) 1) : float))
+               : float)
+              ((/ (top_2 : 'v_10) (bot_3 : float)) : 'v_10))
+             : 'v_10))
+           : 'v_10))
+         : ('v_8 -> 'v_10)))
+       :
+       (forall
+        ((Broadcast 'v_8 (vec 2) 'v_10) (MulBroadcast float 'v_8 'v_8)
+         (MulBroadcast 'v_10 float 'v_10))
+        ('v_8 -> 'v_10)))
+      ((Define Nonrec main
+        ((lambda coord_4
+          ((let uv_5
+            ((app (get_uv_0 : ((vec 2) -> (vec 2))) (coord_4 : (vec 2))) :
+             (vec 2))
+            ((let mouseUV_6
+              ((/
+                ((- ((* (2. : float) (u_mouse : (vec 2))) : (vec 2))
+                  (u_resolution : (vec 2)))
+                 : (vec 2))
+                ((index (u_resolution : (vec 2)) 1) : float))
+               : (vec 2))
+              ((let radius_7
+                ((+
+                  ((* ((sin ((* (u_time : float) (2. : float)) : float)) : float)
+                    (0.1 : float))
+                   : float)
+                  (0.15 : float))
+                 : float)
+                ((if
+                  ((< ((distance (uv_5 : (vec 2)) (mouseUV_6 : (vec 2))) : float)
+                    (radius_7 : float))
+                   : bool)
+                  ((vec3 (0. : float) (0. : float) (0.5 : float)) : (vec 3))
+                  ((vec3 (0.5 : float) (0.5 : float) (1. : float)) : (vec 3)))
+                 : (vec 3)))
+               : (vec 3)))
+             : (vec 3)))
+           : (vec 3)))
+         : ((vec 2) -> (vec 3))))
+       : ((vec 2) -> (vec 3)))))
+
     === monomorphize (mouse_circle.glml) ===
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
@@ -2929,6 +3383,584 @@ let%expect_test "compile examples" =
                                   (* atmoColor_82 rim_81)))))))))))))))))))))))))))))))
 
     === typecheck (planet.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+      ((Extern u_mouse) : (vec 2))
+      ((Define Nonrec rotate_0
+        ((lambda p_1
+          ((lambda angle_2
+            ((let s_3 ((sin (angle_2 : float)) : float)
+              ((let c_4 ((cos (angle_2 : float)) : float)
+                ((vec2
+                  ((-
+                    ((* ((index (p_1 : (vec 2)) 0) : float) (c_4 : float)) :
+                     float)
+                    ((* ((index (p_1 : (vec 2)) 1) : float) (s_3 : float)) :
+                     float))
+                   : float)
+                  ((+
+                    ((* ((index (p_1 : (vec 2)) 0) : float) (s_3 : float)) :
+                     float)
+                    ((* ((index (p_1 : (vec 2)) 1) : float) (c_4 : float)) :
+                     float))
+                   : float))
+                 : (vec 2)))
+               : (vec 2)))
+             : (vec 2)))
+           : (float -> (vec 2))))
+         : ((vec 2) -> (float -> (vec 2)))))
+       : ((vec 2) -> (float -> (vec 2))))
+      ((Define Nonrec noise3d_5
+        ((lambda p_6
+          ((let i_7 ((floor (p_6 : (vec 3))) : (vec 3))
+            ((let f_8 ((fract (p_6 : (vec 3))) : (vec 3))
+              ((let u_9
+                ((* ((* (f_8 : (vec 3)) (f_8 : (vec 3))) : (vec 3))
+                  ((- (3. : float) ((* (2. : float) (f_8 : (vec 3))) : (vec 3)))
+                   : (vec 3)))
+                 : (vec 3))
+                ((let hash_10
+                  ((lambda p_11
+                    ((let d_12
+                      ((dot (p_11 : (vec 3))
+                        ((vec3 (127.1 : float) (311.7 : float) (74.7 : float)) :
+                         (vec 3)))
+                       : float)
+                      ((fract
+                        ((* ((sin (d_12 : float)) : float) (43758.5453 : float))
+                         : float))
+                       : float))
+                     : float))
+                   : ((vec 3) -> float))
+                  ((let a_13
+                    ((app (hash_10 : ((vec 3) -> float)) (i_7 : (vec 3))) :
+                     float)
+                    ((let b_14
+                      ((app (hash_10 : ((vec 3) -> float))
+                        ((+ (i_7 : (vec 3))
+                          ((vec3 (1 : int) (0 : int) (0 : int)) : (vec 3)))
+                         : (vec 3)))
+                       : float)
+                      ((let c_15
+                        ((app (hash_10 : ((vec 3) -> float))
+                          ((+ (i_7 : (vec 3))
+                            ((vec3 (0 : int) (1 : int) (0 : int)) : (vec 3)))
+                           : (vec 3)))
+                         : float)
+                        ((let d_16
+                          ((app (hash_10 : ((vec 3) -> float))
+                            ((+ (i_7 : (vec 3))
+                              ((vec3 (1 : int) (1 : int) (0 : int)) : (vec 3)))
+                             : (vec 3)))
+                           : float)
+                          ((let e_17
+                            ((app (hash_10 : ((vec 3) -> float))
+                              ((+ (i_7 : (vec 3))
+                                ((vec3 (0 : int) (0 : int) (1 : int)) : (vec 3)))
+                               : (vec 3)))
+                             : float)
+                            ((let f_18
+                              ((app (hash_10 : ((vec 3) -> float))
+                                ((+ (i_7 : (vec 3))
+                                  ((vec3 (1 : int) (0 : int) (1 : int)) :
+                                   (vec 3)))
+                                 : (vec 3)))
+                               : float)
+                              ((let g_19
+                                ((app (hash_10 : ((vec 3) -> float))
+                                  ((+ (i_7 : (vec 3))
+                                    ((vec3 (0 : int) (1 : int) (1 : int)) :
+                                     (vec 3)))
+                                   : (vec 3)))
+                                 : float)
+                                ((let h_20
+                                  ((app (hash_10 : ((vec 3) -> float))
+                                    ((+ (i_7 : (vec 3))
+                                      ((vec3 (1 : int) (1 : int) (1 : int)) :
+                                       (vec 3)))
+                                     : (vec 3)))
+                                   : float)
+                                  ((let ab_21
+                                    ((mix (a_13 : float) (b_14 : float)
+                                      ((index (u_9 : (vec 3)) 0) : float))
+                                     : float)
+                                    ((let cd_22
+                                      ((mix (c_15 : float) (d_16 : float)
+                                        ((index (u_9 : (vec 3)) 0) : float))
+                                       : float)
+                                      ((let ef_23
+                                        ((mix (e_17 : float) (f_18 : float)
+                                          ((index (u_9 : (vec 3)) 0) : float))
+                                         : float)
+                                        ((let gh_24
+                                          ((mix (g_19 : float) (h_20 : float)
+                                            ((index (u_9 : (vec 3)) 0) : float))
+                                           : float)
+                                          ((let abcd_25
+                                            ((mix (ab_21 : float) (cd_22 : float)
+                                              ((index (u_9 : (vec 3)) 1) : float))
+                                             : float)
+                                            ((let efgh_26
+                                              ((mix (ef_23 : float)
+                                                (gh_24 : float)
+                                                ((index (u_9 : (vec 3)) 1) :
+                                                 float))
+                                               : float)
+                                              ((mix (abcd_25 : float)
+                                                (efgh_26 : float)
+                                                ((index (u_9 : (vec 3)) 2) :
+                                                 float))
+                                               : float))
+                                             : float))
+                                           : float))
+                                         : float))
+                                       : float))
+                                     : float))
+                                   : float))
+                                 : float))
+                               : float))
+                             : float))
+                           : float))
+                         : float))
+                       : float))
+                     : float))
+                   : float))
+                 : float))
+               : float))
+             : float))
+           : float))
+         : ((vec 3) -> float)))
+       : ((vec 3) -> float))
+      ((Define Nonrec fbm_27
+        ((lambda p_28
+          ((+
+            ((+
+              ((+
+                ((*
+                  ((app (noise3d_5 : ((vec 3) -> float))
+                    ((* (p_28 : (vec 3)) (1. : float)) : (vec 3)))
+                   : float)
+                  (0.5 : float))
+                 : float)
+                ((*
+                  ((app (noise3d_5 : ((vec 3) -> float))
+                    ((* (p_28 : (vec 3)) (2. : float)) : (vec 3)))
+                   : float)
+                  (0.25 : float))
+                 : float))
+               : float)
+              ((*
+                ((app (noise3d_5 : ((vec 3) -> float))
+                  ((* (p_28 : (vec 3)) (4. : float)) : (vec 3)))
+                 : float)
+                (0.125 : float))
+               : float))
+             : float)
+            ((*
+              ((app (noise3d_5 : ((vec 3) -> float))
+                ((* (p_28 : (vec 3)) (8. : float)) : (vec 3)))
+               : float)
+              (0.0625 : float))
+             : float))
+           : float))
+         : ((vec 3) -> float)))
+       : ((vec 3) -> float))
+      ((Define Nonrec sdPlanet_29
+        ((lambda p_30
+          ((lambda radius_31
+            ((let len_32 ((length (p_30 : (vec 3))) : float)
+              ((let dir_33 ((/ (p_30 : (vec 3)) (len_32 : float)) : (vec 3))
+                ((let terrain_34
+                  ((*
+                    ((app (fbm_27 : ((vec 3) -> float))
+                      ((* (dir_33 : (vec 3)) (3. : float)) : (vec 3)))
+                     : float)
+                    (0.4 : float))
+                   : float)
+                  ((- ((- (len_32 : float) (radius_31 : float)) : float)
+                    (terrain_34 : float))
+                   : float))
+                 : float))
+               : float))
+             : float))
+           : (float -> float)))
+         : ((vec 3) -> (float -> float))))
+       : ((vec 3) -> (float -> float)))
+      ((Define Nonrec map_35
+        ((lambda p_36
+          ((app
+            ((app (sdPlanet_29 : ((vec 3) -> (float -> float))) (p_36 : (vec 3)))
+             : (float -> float))
+            (1.5 : float))
+           : float))
+         : ((vec 3) -> float)))
+       : ((vec 3) -> float))
+      ((Define Nonrec getNormal_37
+        ((lambda p_38
+          ((let e_39 (0.002 : float)
+            ((let e_x_40 ((vec3 (e_39 : float) (0 : int) (0 : int)) : (vec 3))
+              ((let e_y_41 ((vec3 (0 : int) (e_39 : float) (0 : int)) : (vec 3))
+                ((let e_z_42
+                  ((vec3 (0 : int) (0 : int) (e_39 : float)) : (vec 3))
+                  ((let dx_43
+                    ((-
+                      ((app (map_35 : ((vec 3) -> float))
+                        ((+ (p_38 : (vec 3)) (e_x_40 : (vec 3))) : (vec 3)))
+                       : float)
+                      ((app (map_35 : ((vec 3) -> float))
+                        ((- (p_38 : (vec 3)) (e_x_40 : (vec 3))) : (vec 3)))
+                       : float))
+                     : float)
+                    ((let dy_44
+                      ((-
+                        ((app (map_35 : ((vec 3) -> float))
+                          ((+ (p_38 : (vec 3)) (e_y_41 : (vec 3))) : (vec 3)))
+                         : float)
+                        ((app (map_35 : ((vec 3) -> float))
+                          ((- (p_38 : (vec 3)) (e_y_41 : (vec 3))) : (vec 3)))
+                         : float))
+                       : float)
+                      ((let dz_45
+                        ((-
+                          ((app (map_35 : ((vec 3) -> float))
+                            ((+ (p_38 : (vec 3)) (e_z_42 : (vec 3))) : (vec 3)))
+                           : float)
+                          ((app (map_35 : ((vec 3) -> float))
+                            ((- (p_38 : (vec 3)) (e_z_42 : (vec 3))) : (vec 3)))
+                           : float))
+                         : float)
+                        ((normalize
+                          ((vec3 (dx_43 : float) (dy_44 : float) (dz_45 : float))
+                           : (vec 3)))
+                         : (vec 3)))
+                       : (vec 3)))
+                     : (vec 3)))
+                   : (vec 3)))
+                 : (vec 3)))
+               : (vec 3)))
+             : (vec 3)))
+           : (vec 3)))
+         : ((vec 3) -> (vec 3))))
+       : ((vec 3) -> (vec 3)))
+      ((Define Nonrec march_46
+        ((lambda ro_47
+          ((lambda rd_48
+            ((let (rec 1000) march_49
+              ((lambda t_50
+                ((lambda steps_51
+                  ((if ((> (steps_51 : int) (120 : int)) : bool) (t_50 : float)
+                    ((let d_52
+                      ((app (map_35 : ((vec 3) -> float))
+                        ((+ (ro_47 : (vec 3))
+                          ((* (rd_48 : (vec 3)) (t_50 : float)) : (vec 3)))
+                         : (vec 3)))
+                       : float)
+                      ((if ((< (d_52 : float) (0.0005 : float)) : bool)
+                        (t_50 : float)
+                        ((if ((> (t_50 : float) (50. : float)) : bool)
+                          (50.1 : float)
+                          ((app
+                            ((app (march_49 : (float -> (int -> float)))
+                              ((+ (t_50 : float)
+                                ((* (d_52 : float) (0.8 : float)) : float))
+                               : float))
+                             : (int -> float))
+                            ((+ (steps_51 : int) (1 : int)) : int))
+                           : float))
+                         : float))
+                       : float))
+                     : float))
+                   : float))
+                 : (int -> float)))
+               : (float -> (int -> float)))
+              ((app
+                ((app (march_49 : (float -> (int -> float))) (0. : float)) :
+                 (int -> float))
+                (0 : int))
+               : float))
+             : float))
+           : ((vec 3) -> float)))
+         : ((vec 3) -> ((vec 3) -> float))))
+       : ((vec 3) -> ((vec 3) -> float)))
+      ((Define Nonrec main
+        ((lambda coord_53
+          ((let res_min_54
+            ((min ((index (u_resolution : (vec 2)) 0) : float)
+              ((index (u_resolution : (vec 2)) 1) : float))
+             : float)
+            ((let uv_55
+              ((/
+                ((- ((* (coord_53 : (vec 2)) (2. : float)) : (vec 2))
+                  (u_resolution : (vec 2)))
+                 : (vec 2))
+                (res_min_54 : float))
+               : (vec 2))
+              ((let mouseUV_56
+                ((/
+                  ((- ((* (u_mouse : (vec 2)) (2. : float)) : (vec 2))
+                    (u_resolution : (vec 2)))
+                   : (vec 2))
+                  (res_min_54 : float))
+                 : (vec 2))
+                ((let rotate_by_mouse_57
+                  ((lambda ray_58
+                    ((let rotX_59
+                      ((*
+                        ((* (-1 : int)
+                          ((index (mouseUV_56 : (vec 2)) 1) : float))
+                         : float)
+                        (1.5 : float))
+                       : float)
+                      ((let ro_yz_60
+                        ((app
+                          ((app (rotate_0 : ((vec 2) -> (float -> (vec 2))))
+                            ((vec2 ((index (ray_58 : 'v_204) 1) : 'v_208)
+                              ((index (ray_58 : 'v_204) 2) : 'v_209))
+                             : (vec 2)))
+                           : (float -> (vec 2)))
+                          (rotX_59 : float))
+                         : (vec 2))
+                        ((let rotY_61
+                          ((*
+                            ((* (-1 : int)
+                              ((index (mouseUV_56 : (vec 2)) 0) : float))
+                             : float)
+                            (1.5 : float))
+                           : float)
+                          ((let ro_xz_62
+                            ((app
+                              ((app (rotate_0 : ((vec 2) -> (float -> (vec 2))))
+                                ((vec2 ((index (ray_58 : 'v_204) 0) : 'v_215)
+                                  ((index (ro_yz_60 : (vec 2)) 1) : float))
+                                 : (vec 2)))
+                               : (float -> (vec 2)))
+                              (rotY_61 : float))
+                             : (vec 2))
+                            ((vec3 ((index (ro_xz_62 : (vec 2)) 0) : float)
+                              ((index (ro_yz_60 : (vec 2)) 0) : float)
+                              ((index (ro_xz_62 : (vec 2)) 1) : float))
+                             : (vec 3)))
+                           : (vec 3)))
+                         : (vec 3)))
+                       : (vec 3)))
+                     : (vec 3)))
+                   :
+                   (forall
+                    ((Comparable 'v_209) (IndexAccess 'v_204 2 'v_209)
+                     (Comparable 'v_208) (IndexAccess 'v_204 1 'v_208)
+                     (Comparable 'v_215) (IndexAccess 'v_204 0 'v_215))
+                    ('v_204 -> (vec 3))))
+                  ((let ro_63
+                    ((app (rotate_by_mouse_57 : ((vec 3) -> (vec 3)))
+                      ((vec3 (0 : int) (0 : int) (-4 : int)) : (vec 3)))
+                     : (vec 3))
+                    ((let rd_64
+                      ((app (rotate_by_mouse_57 : ((vec 3) -> (vec 3)))
+                        ((normalize
+                          ((vec3 ((index (uv_55 : (vec 2)) 0) : float)
+                            ((index (uv_55 : (vec 2)) 1) : float) (1.5 : float))
+                           : (vec 3)))
+                         : (vec 3)))
+                       : (vec 3))
+                      ((let t_65
+                        ((app
+                          ((app (march_46 : ((vec 3) -> ((vec 3) -> float)))
+                            (ro_63 : (vec 3)))
+                           : ((vec 3) -> float))
+                          (rd_64 : (vec 3)))
+                         : float)
+                        ((if ((> (t_65 : float) (50. : float)) : bool)
+                          ((vec3 (0 : int) (0 : int) (0 : int)) : (vec 3))
+                          ((let hitPos_66
+                            ((+ (ro_63 : (vec 3))
+                              ((* (rd_64 : (vec 3)) (t_65 : float)) : (vec 3)))
+                             : (vec 3))
+                            ((let n_67
+                              ((app (getNormal_37 : ((vec 3) -> (vec 3)))
+                                (hitPos_66 : (vec 3)))
+                               : (vec 3))
+                              ((let lightDir_68
+                                ((normalize
+                                  ((vec3 (1. : float) (0.8 : float)
+                                    (-0.5 : float))
+                                   : (vec 3)))
+                                 : (vec 3))
+                                ((let diff_69
+                                  ((max
+                                    ((dot (n_67 : (vec 3))
+                                      (lightDir_68 : (vec 3)))
+                                     : float)
+                                    (0 : int))
+                                   : float)
+                                  ((let ambient_70 (0.08 : float)
+                                    ((let dir_71
+                                      ((/ (hitPos_66 : (vec 3))
+                                        ((length (hitPos_66 : (vec 3))) : float))
+                                       : (vec 3))
+                                      ((let rawHeight_72
+                                        ((app (fbm_27 : ((vec 3) -> float))
+                                          ((* (dir_71 : (vec 3)) (3. : float)) :
+                                           (vec 3)))
+                                         : float)
+                                        ((let seaLevel_73 (0.35 : float)
+                                          ((let h_norm_74
+                                            ((clamp
+                                              ((/
+                                                ((- (rawHeight_72 : float)
+                                                  (seaLevel_73 : float))
+                                                 : float)
+                                                ((- (1. : float)
+                                                  (seaLevel_73 : float))
+                                                 : float))
+                                               : float)
+                                              (0. : float) (1. : float))
+                                             : float)
+                                            ((let deepColor_75
+                                              ((vec3 (0.02 : float)
+                                                (0.05 : float) (0.2 : float))
+                                               : (vec 3))
+                                              ((let landColor_76
+                                                ((vec3 (0.15 : float)
+                                                  (0.35 : float) (0.1 : float))
+                                                 : (vec 3))
+                                                ((let mountColor_77
+                                                  ((vec3 (0.4 : float)
+                                                    (0.3 : float) (0.2 : float))
+                                                   : (vec 3))
+                                                  ((let snowColor_78
+                                                    ((vec3 (0.85 : float)
+                                                      (0.85 : float)
+                                                      (0.9 : float))
+                                                     : (vec 3))
+                                                    ((let baseColor_79
+                                                      ((if
+                                                        ((< (h_norm_74 : float)
+                                                          (0.3 : float))
+                                                         : bool)
+                                                        ((mix
+                                                          (deepColor_75 :
+                                                           (vec 3))
+                                                          (landColor_76 :
+                                                           (vec 3))
+                                                          ((/ (h_norm_74 : float)
+                                                            (0.3 : float))
+                                                           : float))
+                                                         : (vec 3))
+                                                        ((if
+                                                          ((< (h_norm_74 : float)
+                                                            (0.6 : float))
+                                                           : bool)
+                                                          ((mix
+                                                            (landColor_76 :
+                                                             (vec 3))
+                                                            (mountColor_77 :
+                                                             (vec 3))
+                                                            ((/
+                                                              ((-
+                                                                (h_norm_74 :
+                                                                 float)
+                                                                (0.3 : float))
+                                                               : float)
+                                                              (0.3 : float))
+                                                             : float))
+                                                           : (vec 3))
+                                                          ((mix
+                                                            (mountColor_77 :
+                                                             (vec 3))
+                                                            (snowColor_78 :
+                                                             (vec 3))
+                                                            ((/
+                                                              ((-
+                                                                (h_norm_74 :
+                                                                 float)
+                                                                (0.6 : float))
+                                                               : float)
+                                                              (0.4 : float))
+                                                             : float))
+                                                           : (vec 3)))
+                                                         : (vec 3)))
+                                                       : (vec 3))
+                                                      ((let fresnel_80
+                                                        ((- (1. : float)
+                                                          ((max
+                                                            ((dot
+                                                              (n_67 : (vec 3))
+                                                              ((*
+                                                                (rd_64 : (vec 3))
+                                                                (-1. : float))
+                                                               : (vec 3)))
+                                                             : float)
+                                                            (0 : int))
+                                                           : float))
+                                                         : float)
+                                                        ((let rim_81
+                                                          ((*
+                                                            ((*
+                                                              ((*
+                                                                (fresnel_80 :
+                                                                 float)
+                                                                (fresnel_80 :
+                                                                 float))
+                                                               : float)
+                                                              (fresnel_80 :
+                                                               float))
+                                                             : float)
+                                                            (0.4 : float))
+                                                           : float)
+                                                          ((let atmoColor_82
+                                                            ((vec3 (0.3 : float)
+                                                              (0.5 : float)
+                                                              (1. : float))
+                                                             : (vec 3))
+                                                            ((+
+                                                              ((*
+                                                                (baseColor_79 :
+                                                                 (vec 3))
+                                                                ((+
+                                                                  ((*
+                                                                    (diff_69 :
+                                                                     float)
+                                                                    (0.9 : float))
+                                                                   : float)
+                                                                  (ambient_70 :
+                                                                   float))
+                                                                 : float))
+                                                               : (vec 3))
+                                                              ((*
+                                                                (atmoColor_82 :
+                                                                 (vec 3))
+                                                                (rim_81 : float))
+                                                               : (vec 3)))
+                                                             : (vec 3)))
+                                                           : (vec 3)))
+                                                         : (vec 3)))
+                                                       : (vec 3)))
+                                                     : (vec 3)))
+                                                   : (vec 3)))
+                                                 : (vec 3)))
+                                               : (vec 3)))
+                                             : (vec 3)))
+                                           : (vec 3)))
+                                         : (vec 3)))
+                                       : (vec 3)))
+                                     : (vec 3)))
+                                   : (vec 3)))
+                                 : (vec 3)))
+                               : (vec 3)))
+                             : (vec 3)))
+                           : (vec 3)))
+                         : (vec 3)))
+                       : (vec 3)))
+                     : (vec 3)))
+                   : (vec 3)))
+                 : (vec 3)))
+               : (vec 3)))
+             : (vec 3)))
+           : (vec 3)))
+         : ((vec 2) -> (vec 3))))
+       : ((vec 2) -> (vec 3)))))
+
+    === specialize params (planet.glml) ===
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Extern u_mouse) : (vec 2))
@@ -6080,6 +7112,72 @@ let%expect_test "compile examples" =
          : ((vec 2) -> (vec 3))))
        : ((vec 2) -> (vec 3)))))
 
+    === specialize params (rainbow.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+      ((Define Nonrec get_uv_0
+        ((lambda coord_1
+          ((let top_2
+            ((- ((* (2. : float) (coord_1 : 'v_10)) : 'v_10)
+              (u_resolution : (vec 2)))
+             : 'v_12)
+            ((let bot_3
+              ((min ((index (u_resolution : (vec 2)) 0) : float)
+                ((index (u_resolution : (vec 2)) 1) : float))
+               : float)
+              ((/ (top_2 : 'v_12) (bot_3 : float)) : 'v_12))
+             : 'v_12))
+           : 'v_12))
+         : ('v_10 -> 'v_12)))
+       :
+       (forall
+        ((Broadcast 'v_10 (vec 2) 'v_12) (MulBroadcast float 'v_10 'v_10)
+         (MulBroadcast 'v_12 float 'v_12))
+        ('v_10 -> 'v_12)))
+      ((Define Nonrec main
+        ((lambda coord_4
+          ((let uv_5
+            ((app (get_uv_0 : ((vec 2) -> (vec 2))) (coord_4 : (vec 2))) :
+             (vec 2))
+            ((let wave_6
+              ((+
+                ((* (5. : float)
+                  ((+ ((index (uv_5 : (vec 2)) 0) : float)
+                    ((index (uv_5 : (vec 2)) 1) : float))
+                   : float))
+                 : float)
+                (u_time : float))
+               : float)
+              ((let r_7
+                ((+ ((* ((sin (wave_6 : float)) : float) (0.3 : float)) : float)
+                  (0.7 : float))
+                 : float)
+                ((let g_8
+                  ((+
+                    ((*
+                      ((sin ((+ (wave_6 : float) (2. : float)) : float)) : float)
+                      (0.3 : float))
+                     : float)
+                    (0.7 : float))
+                   : float)
+                  ((let b_9
+                    ((+
+                      ((*
+                        ((sin ((+ (wave_6 : float) (4. : float)) : float)) :
+                         float)
+                        (0.3 : float))
+                       : float)
+                      (0.7 : float))
+                     : float)
+                    ((vec3 (r_7 : float) (g_8 : float) (b_9 : float)) : (vec 3)))
+                   : (vec 3)))
+                 : (vec 3)))
+               : (vec 3)))
+             : (vec 3)))
+           : (vec 3)))
+         : ((vec 2) -> (vec 3))))
+       : ((vec 2) -> (vec 3)))))
+
     === monomorphize (rainbow.glml) ===
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
@@ -6540,6 +7638,348 @@ let%expect_test "compile examples" =
                           (+ col_48 glow_49)))))))))))))))))))))))
 
     === typecheck (raymarch.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+      ((Extern u_mouse) : (vec 2))
+      ((Define Nonrec rotate_0
+        ((lambda p_1
+          ((lambda angle_2
+            ((let s_3 ((sin (angle_2 : float)) : float)
+              ((let c_4 ((cos (angle_2 : float)) : float)
+                ((vec2
+                  ((-
+                    ((* ((index (p_1 : (vec 2)) 0) : float) (c_4 : float)) :
+                     float)
+                    ((* ((index (p_1 : (vec 2)) 1) : float) (s_3 : float)) :
+                     float))
+                   : float)
+                  ((+
+                    ((* ((index (p_1 : (vec 2)) 0) : float) (s_3 : float)) :
+                     float)
+                    ((* ((index (p_1 : (vec 2)) 1) : float) (c_4 : float)) :
+                     float))
+                   : float))
+                 : (vec 2)))
+               : (vec 2)))
+             : (vec 2)))
+           : (float -> (vec 2))))
+         : ((vec 2) -> (float -> (vec 2)))))
+       : ((vec 2) -> (float -> (vec 2))))
+      ((Define Nonrec sMin_5
+        ((lambda a_6
+          ((lambda b_7
+            ((let k_8 (0.1 : float)
+              ((let h_9
+                ((clamp
+                  ((+ (0.5 : float)
+                    ((/
+                      ((* (0.5 : float)
+                        ((- (b_7 : float) (a_6 : float)) : float))
+                       : float)
+                      (k_8 : float))
+                     : float))
+                   : float)
+                  (0. : float) (1. : float))
+                 : float)
+                ((- ((mix (b_7 : float) (a_6 : float) (h_9 : float)) : float)
+                  ((* ((* (k_8 : float) (h_9 : float)) : float)
+                    ((- (1. : float) (h_9 : float)) : float))
+                   : float))
+                 : float))
+               : float))
+             : float))
+           : (float -> float)))
+         : (float -> (float -> float))))
+       : (float -> (float -> float)))
+      ((Define Nonrec palette_10
+        ((lambda t_11
+          ((let cfg_12
+            ((vec3 (0.3 : float) (0.416 : float) (0.557 : float)) : (vec 3))
+            ((+
+              ((*
+                ((cos
+                  ((* ((+ (cfg_12 : (vec 3)) (t_11 : float)) : (vec 3))
+                    (6.28318 : float))
+                   : (vec 3)))
+                 : (vec 3))
+                (0.5 : float))
+               : (vec 3))
+              (0.5 : float))
+             : (vec 3)))
+           : (vec 3)))
+         : (float -> (vec 3))))
+       : (float -> (vec 3)))
+      ((Define Nonrec sdTorus_13
+        ((lambda p_14
+          ((lambda t_15
+            ((let q_16
+              ((vec2
+                ((-
+                  ((length
+                    ((vec2 ((index (p_14 : (vec 3)) 0) : float)
+                      ((index (p_14 : (vec 3)) 2) : float))
+                     : (vec 2)))
+                   : float)
+                  ((index (t_15 : (vec 2)) 0) : float))
+                 : float)
+                ((index (p_14 : (vec 3)) 1) : float))
+               : (vec 2))
+              ((- ((length (q_16 : (vec 2))) : float)
+                ((index (t_15 : (vec 2)) 1) : float))
+               : float))
+             : float))
+           : ((vec 2) -> float)))
+         : ((vec 3) -> ((vec 2) -> float))))
+       : ((vec 3) -> ((vec 2) -> float)))
+      ((Define Nonrec map_17
+        ((lambda p_18
+          ((let angle_19 ((* (u_time : float) (2. : float)) : float)
+            ((let p_xy_20
+              ((app
+                ((app (rotate_0 : ((vec 2) -> (float -> (vec 2))))
+                  ((vec2 ((index (p_18 : (vec 3)) 0) : float)
+                    ((index (p_18 : (vec 3)) 1) : float))
+                   : (vec 2)))
+                 : (float -> (vec 2)))
+                (angle_19 : float))
+               : (vec 2))
+              ((let p_prime_21
+                ((vec3 ((index (p_xy_20 : (vec 2)) 0) : float)
+                  ((index (p_xy_20 : (vec 2)) 1) : float)
+                  ((index (p_18 : (vec 3)) 2) : float))
+                 : (vec 3))
+                ((let p_yz_22
+                  ((app
+                    ((app (rotate_0 : ((vec 2) -> (float -> (vec 2))))
+                      ((vec2 ((index (p_prime_21 : (vec 3)) 1) : float)
+                        ((index (p_prime_21 : (vec 3)) 2) : float))
+                       : (vec 2)))
+                     : (float -> (vec 2)))
+                    (angle_19 : float))
+                   : (vec 2))
+                  ((let p_prime_23
+                    ((vec3 ((index (p_prime_21 : (vec 3)) 0) : float)
+                      ((index (p_yz_22 : (vec 2)) 0) : float)
+                      ((index (p_yz_22 : (vec 2)) 1) : float))
+                     : (vec 3))
+                    ((app
+                      ((app (sMin_5 : (float -> (float -> float)))
+                        ((app
+                          ((app (sdTorus_13 : ((vec 3) -> ((vec 2) -> float)))
+                            (p_prime_23 : (vec 3)))
+                           : ((vec 2) -> float))
+                          ((vec2 (1. : float) (0.3 : float)) : (vec 2)))
+                         : float))
+                       : (float -> float))
+                      ((app
+                        ((app (sdTorus_13 : ((vec 3) -> ((vec 2) -> float)))
+                          (p_18 : (vec 3)))
+                         : ((vec 2) -> float))
+                        ((vec2 (2. : float) (0.5 : float)) : (vec 2)))
+                       : float))
+                     : float))
+                   : float))
+                 : float))
+               : float))
+             : float))
+           : float))
+         : ((vec 3) -> float)))
+       : ((vec 3) -> float))
+      ((Define Nonrec march_24
+        ((lambda ro_25
+          ((lambda rd_26
+            ((let (rec 1000) march_27
+              ((lambda t_28
+                ((lambda steps_29
+                  ((if ((> (steps_29 : int) (80 : int)) : bool) (t_28 : float)
+                    ((let d_30
+                      ((app (map_17 : ((vec 3) -> float))
+                        ((+ (ro_25 : (vec 3))
+                          ((* (rd_26 : (vec 3)) (t_28 : float)) : (vec 3)))
+                         : (vec 3)))
+                       : float)
+                      ((if ((< (d_30 : float) (0.001 : float)) : bool)
+                        (t_28 : float)
+                        ((if ((> (t_28 : float) (100. : float)) : bool)
+                          (100.1 : float)
+                          ((app
+                            ((app (march_27 : (float -> (int -> float)))
+                              ((+ (t_28 : float) (d_30 : float)) : float))
+                             : (int -> float))
+                            ((+ (steps_29 : int) (1 : int)) : int))
+                           : float))
+                         : float))
+                       : float))
+                     : float))
+                   : float))
+                 : (int -> float)))
+               : (float -> (int -> float)))
+              ((app
+                ((app (march_27 : (float -> (int -> float))) (0. : float)) :
+                 (int -> float))
+                (0 : int))
+               : float))
+             : float))
+           : ((vec 3) -> float)))
+         : ((vec 3) -> ((vec 3) -> float))))
+       : ((vec 3) -> ((vec 3) -> float)))
+      ((Define Nonrec main
+        ((lambda coord_31
+          ((let res_min_32
+            ((min ((index (u_resolution : (vec 2)) 0) : float)
+              ((index (u_resolution : (vec 2)) 1) : float))
+             : float)
+            ((let uv_33
+              ((/
+                ((- ((* (coord_31 : (vec 2)) (2. : float)) : (vec 2))
+                  (u_resolution : (vec 2)))
+                 : (vec 2))
+                (res_min_32 : float))
+               : (vec 2))
+              ((let mouseUV_34
+                ((/
+                  ((- ((* (u_mouse : (vec 2)) (2. : float)) : (vec 2))
+                    (u_resolution : (vec 2)))
+                   : (vec 2))
+                  (res_min_32 : float))
+                 : (vec 2))
+                ((let ro_init_35
+                  ((vec3 (0. : float) (0. : float) (-10. : float)) : (vec 3))
+                  ((let rd_init_36
+                    ((normalize
+                      ((vec3 ((index (uv_33 : (vec 2)) 0) : float)
+                        ((index (uv_33 : (vec 2)) 1) : float) (1. : float))
+                       : (vec 3)))
+                     : (vec 3))
+                    ((let rotX_37
+                      ((- (0. : float)
+                        ((index (mouseUV_34 : (vec 2)) 1) : float))
+                       : float)
+                      ((let rotY_38
+                        ((- (0. : float)
+                          ((index (mouseUV_34 : (vec 2)) 0) : float))
+                         : float)
+                        ((let ro_yz_39
+                          ((app
+                            ((app (rotate_0 : ((vec 2) -> (float -> (vec 2))))
+                              ((vec2 ((index (ro_init_35 : (vec 3)) 1) : float)
+                                ((index (ro_init_35 : (vec 3)) 2) : float))
+                               : (vec 2)))
+                             : (float -> (vec 2)))
+                            (rotX_37 : float))
+                           : (vec 2))
+                          ((let rd_yz_40
+                            ((app
+                              ((app (rotate_0 : ((vec 2) -> (float -> (vec 2))))
+                                ((vec2 ((index (rd_init_36 : (vec 3)) 1) : float)
+                                  ((index (rd_init_36 : (vec 3)) 2) : float))
+                                 : (vec 2)))
+                               : (float -> (vec 2)))
+                              (rotX_37 : float))
+                             : (vec 2))
+                            ((let ro_41
+                              ((vec3 ((index (ro_init_35 : (vec 3)) 0) : float)
+                                ((index (ro_yz_39 : (vec 2)) 0) : float)
+                                ((index (ro_yz_39 : (vec 2)) 1) : float))
+                               : (vec 3))
+                              ((let rd_42
+                                ((vec3 ((index (rd_init_36 : (vec 3)) 0) : float)
+                                  ((index (rd_yz_40 : (vec 2)) 0) : float)
+                                  ((index (rd_yz_40 : (vec 2)) 1) : float))
+                                 : (vec 3))
+                                ((let ro_xz_43
+                                  ((app
+                                    ((app
+                                      (rotate_0 :
+                                       ((vec 2) -> (float -> (vec 2))))
+                                      ((vec2
+                                        ((index (ro_41 : (vec 3)) 0) : float)
+                                        ((index (ro_41 : (vec 3)) 2) : float))
+                                       : (vec 2)))
+                                     : (float -> (vec 2)))
+                                    (rotY_38 : float))
+                                   : (vec 2))
+                                  ((let rd_xz_44
+                                    ((app
+                                      ((app
+                                        (rotate_0 :
+                                         ((vec 2) -> (float -> (vec 2))))
+                                        ((vec2
+                                          ((index (rd_42 : (vec 3)) 0) : float)
+                                          ((index (rd_42 : (vec 3)) 2) : float))
+                                         : (vec 2)))
+                                       : (float -> (vec 2)))
+                                      (rotY_38 : float))
+                                     : (vec 2))
+                                    ((let ro_45
+                                      ((vec3
+                                        ((index (ro_xz_43 : (vec 2)) 0) : float)
+                                        ((index (ro_41 : (vec 3)) 1) : float)
+                                        ((index (ro_xz_43 : (vec 2)) 1) : float))
+                                       : (vec 3))
+                                      ((let rd_46
+                                        ((vec3
+                                          ((index (rd_xz_44 : (vec 2)) 0) :
+                                           float)
+                                          ((index (rd_42 : (vec 3)) 1) : float)
+                                          ((index (rd_xz_44 : (vec 2)) 1) :
+                                           float))
+                                         : (vec 3))
+                                        ((let t_47
+                                          ((app
+                                            ((app
+                                              (march_24 :
+                                               ((vec 3) -> ((vec 3) -> float)))
+                                              (ro_45 : (vec 3)))
+                                             : ((vec 3) -> float))
+                                            (rd_46 : (vec 3)))
+                                           : float)
+                                          ((let col_48
+                                            ((if
+                                              ((> (t_47 : float) (100. : float))
+                                               : bool)
+                                              ((vec3 (0.2 : float) (0.2 : float)
+                                                (0.2 : float))
+                                               : (vec 3))
+                                              ((app
+                                                (palette_10 : (float -> (vec 3)))
+                                                ((* (t_47 : float) (0.3 : float))
+                                                 : float))
+                                               : (vec 3)))
+                                             : (vec 3))
+                                            ((let glow_49
+                                              ((/ (0.02 : float)
+                                                ((length
+                                                  ((- (uv_33 : (vec 2))
+                                                    (mouseUV_34 : (vec 2)))
+                                                   : (vec 2)))
+                                                 : float))
+                                               : float)
+                                              ((+ (col_48 : (vec 3))
+                                                (glow_49 : float))
+                                               : (vec 3)))
+                                             : (vec 3)))
+                                           : (vec 3)))
+                                         : (vec 3)))
+                                       : (vec 3)))
+                                     : (vec 3)))
+                                   : (vec 3)))
+                                 : (vec 3)))
+                               : (vec 3)))
+                             : (vec 3)))
+                           : (vec 3)))
+                         : (vec 3)))
+                       : (vec 3)))
+                     : (vec 3)))
+                   : (vec 3)))
+                 : (vec 3)))
+               : (vec 3)))
+             : (vec 3)))
+           : (vec 3)))
+         : ((vec 2) -> (vec 3))))
+       : ((vec 2) -> (vec 3)))))
+
+    === specialize params (raymarch.glml) ===
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Extern u_mouse) : (vec 2))
@@ -8681,6 +10121,106 @@ let%expect_test "compile examples" =
          : ((vec 2) -> (vec 3))))
        : ((vec 2) -> (vec 3)))))
 
+    === specialize params (recursion.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+      ((Define Nonrec get_uv_0
+        ((lambda coord_1
+          ((let top_2
+            ((- ((* (2. : float) (coord_1 : (vec 2))) : (vec 2))
+              (u_resolution : (vec 2)))
+             : (vec 2))
+            ((let bot_3
+              ((min ((index (u_resolution : (vec 2)) 0) : float)
+                ((index (u_resolution : (vec 2)) 1) : float))
+               : float)
+              ((/ (top_2 : (vec 2)) (bot_3 : float)) : (vec 2)))
+             : (vec 2)))
+           : (vec 2)))
+         : ((vec 2) -> (vec 2))))
+       : ((vec 2) -> (vec 2)))
+      ((Define Nonrec rotate_4
+        ((lambda angle_5
+          ((let s_6 ((sin (angle_5 : float)) : float)
+            ((let c_7 ((cos (angle_5 : float)) : float)
+              ((mat2x2 (c_7 : float) ((* (-1. : float) (s_6 : float)) : float)
+                (s_6 : float) (c_7 : float))
+               : (mat 2 2)))
+             : (mat 2 2)))
+           : (mat 2 2)))
+         : (float -> (mat 2 2))))
+       : (float -> (mat 2 2)))
+      ((Define (Rec 1000) gcd_8
+        ((lambda a_9
+          ((lambda b_10
+            ((if ((< (a_9 : float) (0.05 : float)) : bool) (b_10 : float)
+              ((if ((< (b_10 : float) (0.05 : float)) : bool) (a_9 : float)
+                ((if ((> (a_9 : float) (b_10 : float)) : bool)
+                  ((app
+                    ((app (gcd_8 : (float -> (float -> float)))
+                      ((- (a_9 : float) (b_10 : float)) : float))
+                     : (float -> float))
+                    (b_10 : float))
+                   : float)
+                  ((app
+                    ((app (gcd_8 : (float -> (float -> float))) (a_9 : float)) :
+                     (float -> float))
+                    ((- (b_10 : float) (a_9 : float)) : float))
+                   : float))
+                 : float))
+               : float))
+             : float))
+           : (float -> float)))
+         : (float -> (float -> float))))
+       : (float -> (float -> float)))
+      ((Define Nonrec main
+        ((lambda coord_11
+          ((let uv_12
+            ((app (get_uv_0 : ((vec 2) -> (vec 2))) (coord_11 : (vec 2))) :
+             (vec 2))
+            ((let uv_13
+              ((*
+                ((app (rotate_4 : (float -> (mat 2 2))) (u_time : float)) :
+                 (mat 2 2))
+                (uv_12 : (vec 2)))
+               : (vec 2))
+              ((let x_14
+                ((abs
+                  ((*
+                    ((* ((index (uv_13 : (vec 2)) 0) : float)
+                      ((sin ((* (u_time : float) (2. : float)) : float)) : float))
+                     : float)
+                    (2. : float))
+                   : float))
+                 : float)
+                ((let y_15
+                  ((abs
+                    ((*
+                      ((* ((index (uv_13 : (vec 2)) 1) : float)
+                        ((sin ((* (u_time : float) (2. : float)) : float)) :
+                         float))
+                       : float)
+                      (2. : float))
+                     : float))
+                   : float)
+                  ((let res_16
+                    ((app
+                      ((app (gcd_8 : (float -> (float -> float))) (x_14 : float))
+                       : (float -> float))
+                      (y_15 : float))
+                     : float)
+                    ((vec3 (res_16 : float)
+                      ((* (res_16 : float) (0.5 : float)) : float)
+                      ((- (1. : float) (res_16 : float)) : float))
+                     : (vec 3)))
+                   : (vec 3)))
+                 : (vec 3)))
+               : (vec 3)))
+             : (vec 3)))
+           : (vec 3)))
+         : ((vec 2) -> (vec 3))))
+       : ((vec 2) -> (vec 3)))))
+
     === monomorphize (recursion.glml) ===
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
@@ -9325,6 +10865,310 @@ let%expect_test "compile examples" =
                      (sqrt (max final_col_34 0.)))))))))))))))))))
 
     === typecheck (warped_noise.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+      ((Define Nonrec smoothNoise_0
+        ((lambda p_1
+          ((let i_2 ((floor (p_1 : (vec 2))) : (vec 2))
+            ((let pf_3 ((- (p_1 : (vec 2)) (i_2 : (vec 2))) : (vec 2))
+              ((let inter_4
+                ((* ((* (pf_3 : (vec 2)) (pf_3 : (vec 2))) : (vec 2))
+                  ((- (3. : float) ((* (2. : float) (pf_3 : (vec 2))) : (vec 2)))
+                   : (vec 2)))
+                 : (vec 2))
+                ((let v4_5
+                  ((vec4 (0. : float) (1. : float) (27. : float) (28. : float)) :
+                   (vec 4))
+                  ((let seed_6
+                    ((+
+                      ((+ (v4_5 : (vec 4)) ((index (i_2 : (vec 2)) 0) : float)) :
+                       (vec 4))
+                      ((* ((index (i_2 : (vec 2)) 1) : float) (27. : float)) :
+                       float))
+                     : (vec 4))
+                    ((let hash_7
+                      ((fract
+                        ((*
+                          ((sin
+                            ((% (seed_6 : (vec 4)) (6.2831853 : float)) :
+                             (vec 4)))
+                           : (vec 4))
+                          (200000. : float))
+                         : (vec 4)))
+                       : (vec 4))
+                      ((let col0_8
+                        ((vec2 ((index (hash_7 : (vec 4)) 0) : float)
+                          ((index (hash_7 : (vec 4)) 1) : float))
+                         : (vec 2))
+                        ((let col1_9
+                          ((vec2 ((index (hash_7 : (vec 4)) 2) : float)
+                            ((index (hash_7 : (vec 4)) 3) : float))
+                           : (vec 2))
+                          ((let res_v_10
+                            ((+
+                              ((* (col0_8 : (vec 2))
+                                ((- (1. : float)
+                                  ((index (inter_4 : (vec 2)) 1) : float))
+                                 : float))
+                               : (vec 2))
+                              ((* (col1_9 : (vec 2))
+                                ((index (inter_4 : (vec 2)) 1) : float))
+                               : (vec 2)))
+                             : (vec 2))
+                            ((dot (res_v_10 : (vec 2))
+                              ((vec2
+                                ((- (1. : float)
+                                  ((index (inter_4 : (vec 2)) 0) : float))
+                                 : float)
+                                ((index (inter_4 : (vec 2)) 0) : float))
+                               : (vec 2)))
+                             : float))
+                           : float))
+                         : float))
+                       : float))
+                     : float))
+                   : float))
+                 : float))
+               : float))
+             : float))
+           : float))
+         : ((vec 2) -> float)))
+       : ((vec 2) -> float))
+      ((Define Nonrec fractalNoise_11
+        ((lambda p_12
+          ((+
+            ((+
+              ((+
+                ((*
+                  ((app (smoothNoise_0 : ((vec 2) -> float)) (p_12 : (vec 2))) :
+                   float)
+                  (0.5333 : float))
+                 : float)
+                ((*
+                  ((app (smoothNoise_0 : ((vec 2) -> float))
+                    ((* (p_12 : (vec 2)) (2. : float)) : (vec 2)))
+                   : float)
+                  (0.2667 : float))
+                 : float))
+               : float)
+              ((*
+                ((app (smoothNoise_0 : ((vec 2) -> float))
+                  ((* (p_12 : (vec 2)) (4. : float)) : (vec 2)))
+                 : float)
+                (0.1333 : float))
+               : float))
+             : float)
+            ((*
+              ((app (smoothNoise_0 : ((vec 2) -> float))
+                ((* (p_12 : (vec 2)) (8. : float)) : (vec 2)))
+               : float)
+              (0.0667 : float))
+             : float))
+           : float))
+         : ((vec 2) -> float)))
+       : ((vec 2) -> float))
+      ((Define Nonrec warpedNoise_13
+        ((lambda p_14
+          ((let m_15
+            ((*
+              ((vec2 (u_time : float)
+                ((- (0. : float) (u_time : float)) : float))
+               : (vec 2))
+              (0.5 : float))
+             : (vec 2))
+            ((let x_16
+              ((app (fractalNoise_11 : ((vec 2) -> float))
+                ((+ (p_14 : (vec 2)) (m_15 : (vec 2))) : (vec 2)))
+               : float)
+              ((let y_17
+                ((app (fractalNoise_11 : ((vec 2) -> float))
+                  ((+
+                    ((+ (p_14 : (vec 2))
+                      ((vec2 ((index (m_15 : (vec 2)) 1) : float)
+                        ((index (m_15 : (vec 2)) 0) : float))
+                       : (vec 2)))
+                     : (vec 2))
+                    (x_16 : float))
+                   : (vec 2)))
+                 : float)
+                ((let z_18
+                  ((app (fractalNoise_11 : ((vec 2) -> float))
+                    ((+
+                      ((- ((- (p_14 : (vec 2)) (m_15 : (vec 2))) : (vec 2))
+                        (x_16 : float))
+                       : (vec 2))
+                      (y_17 : float))
+                     : (vec 2)))
+                   : float)
+                  ((let warp_19
+                    ((+
+                      ((+ ((vec2 (x_16 : float) (y_17 : float)) : (vec 2))
+                        ((vec2 (y_17 : float) (z_18 : float)) : (vec 2)))
+                       : (vec 2))
+                      ((vec2 (z_18 : float) (x_16 : float)) : (vec 2)))
+                     : (vec 2))
+                    ((let mag_20
+                      ((*
+                        ((length
+                          ((vec3 (x_16 : float) (y_17 : float) (z_18 : float)) :
+                           (vec 3)))
+                         : float)
+                        (0.25 : float))
+                       : float)
+                      ((app (fractalNoise_11 : ((vec 2) -> float))
+                        ((+ ((+ (p_14 : (vec 2)) (warp_19 : (vec 2))) : (vec 2))
+                          (mag_20 : float))
+                         : (vec 2)))
+                       : float))
+                     : float))
+                   : float))
+                 : float))
+               : float))
+             : float))
+           : float))
+         : ((vec 2) -> float)))
+       : ((vec 2) -> float))
+      ((Define Nonrec main
+        ((lambda coord_21
+          ((let uv_22
+            ((/
+              ((- (coord_21 : (vec 2))
+                ((* (u_resolution : (vec 2)) (0.5 : float)) : (vec 2)))
+               : (vec 2))
+              ((index (u_resolution : (vec 2)) 1) : float))
+             : (vec 2))
+            ((let n_23
+              ((app (warpedNoise_13 : ((vec 2) -> float))
+                ((* (uv_22 : (vec 2)) (6. : float)) : (vec 2)))
+               : float)
+              ((let n2_24
+                ((app (warpedNoise_13 : ((vec 2) -> float))
+                  ((- ((* (uv_22 : (vec 2)) (6. : float)) : (vec 2))
+                    (0.02 : float))
+                   : (vec 2)))
+                 : float)
+                ((let bump_25
+                  ((*
+                    ((/
+                      ((max ((- (n2_24 : float) (n_23 : float)) : float)
+                        (0. : float))
+                       : float)
+                      (0.02 : float))
+                     : float)
+                    (0.7071 : float))
+                   : float)
+                  ((let bump2_26
+                    ((*
+                      ((/
+                        ((max ((- (n_23 : float) (n2_24 : float)) : float)
+                          (0. : float))
+                         : float)
+                        (0.02 : float))
+                       : float)
+                      (0.7071 : float))
+                     : float)
+                    ((let b1_27
+                      ((+ ((* (bump_25 : float) (bump_25 : float)) : float)
+                        ((* ((pow (bump_25 : float) (4. : float)) : float)
+                          (0.5 : float))
+                         : float))
+                       : float)
+                      ((let b2_28
+                        ((+ ((* (bump2_26 : float) (bump2_26 : float)) : float)
+                          ((* ((pow (bump2_26 : float) (4. : float)) : float)
+                            (0.5 : float))
+                           : float))
+                         : float)
+                        ((let base_col_29
+                          ((+
+                            ((*
+                              ((*
+                                ((vec3 (1. : float) (0.7 : float) (0.6 : float))
+                                 : (vec 3))
+                                ((vec3 (b1_27 : float)
+                                  ((*
+                                    ((+ (b1_27 : float) (b2_28 : float)) : float)
+                                    (0.4 : float))
+                                   : float)
+                                  (b2_28 : float))
+                                 : (vec 3)))
+                               : (vec 3))
+                              (0.3 : float))
+                             : (vec 3))
+                            (0.5 : float))
+                           : (vec 3))
+                          ((let col_30
+                            ((* ((* (n_23 : float) (n_23 : float)) : float)
+                              (base_col_29 : (vec 3)))
+                             : (vec 3))
+                            ((let spot1_dist_31
+                              ((length
+                                ((- (uv_22 : (vec 2)) (0.65 : float)) : (vec 2)))
+                               : float)
+                              ((let spot2_dist_32
+                                ((length
+                                  ((+ (uv_22 : (vec 2)) (0.5 : float)) : (vec 2)))
+                                 : float)
+                                ((let spot_logic_33
+                                  ((+
+                                    ((*
+                                      ((vec3 (0.8 : float) (0.4 : float)
+                                        (1. : float))
+                                       : (vec 3))
+                                      (0.35 : float))
+                                     : (vec 3))
+                                    ((*
+                                      ((+
+                                        ((*
+                                          ((vec3 (1. : float) (0.5 : float)
+                                            (0.2 : float))
+                                           : (vec 3))
+                                          ((smoothstep (0. : float) (1. : float)
+                                            ((- (1. : float)
+                                              (spot1_dist_31 : float))
+                                             : float))
+                                           : float))
+                                         : (vec 3))
+                                        ((*
+                                          ((vec3 (0.2 : float) (0.4 : float)
+                                            (1. : float))
+                                           : (vec 3))
+                                          ((smoothstep (0. : float) (1. : float)
+                                            ((- (1. : float)
+                                              (spot2_dist_32 : float))
+                                             : float))
+                                           : float))
+                                         : (vec 3)))
+                                       : (vec 3))
+                                      (5. : float))
+                                     : (vec 3)))
+                                   : (vec 3))
+                                  ((let final_col_34
+                                    ((* (col_30 : (vec 3))
+                                      (spot_logic_33 : (vec 3)))
+                                     : (vec 3))
+                                    ((sqrt
+                                      ((max (final_col_34 : (vec 3))
+                                        (0. : float))
+                                       : (vec 3)))
+                                     : (vec 3)))
+                                   : (vec 3)))
+                                 : (vec 3)))
+                               : (vec 3)))
+                             : (vec 3)))
+                           : (vec 3)))
+                         : (vec 3)))
+                       : (vec 3)))
+                     : (vec 3)))
+                   : (vec 3)))
+                 : (vec 3)))
+               : (vec 3)))
+             : (vec 3)))
+           : (vec 3)))
+         : ((vec 2) -> (vec 3))))
+       : ((vec 2) -> (vec 3)))))
+
+    === specialize params (warped_noise.glml) ===
     (Program
      (((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Define Nonrec smoothNoise_0

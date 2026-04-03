@@ -132,11 +132,12 @@ let rec lower_ty (ty : ty) : ty =
 
 (* TODO: Some fundamental changes might be needed to support
    higher ordered functions in structs/variants *)
-let placeholder_atom_for_ty (ty : ty) : Anf.atom Compiler_error.t =
+let placeholder_atom_for_ty (loc : Lexer.loc) (ty : ty) : Anf.atom Compiler_error.t =
+  let pure desc = Ok ({ desc; ty; loc } : atom) in
   match ty with
-  | TyFloat -> Ok (Float 0.0)
-  | TyInt -> Ok (Int 0)
-  | TyBool -> Ok (Bool false)
+  | TyFloat -> pure (Float 0.0)
+  | TyInt -> pure (Int 0)
+  | TyBool -> pure (Bool false)
   | _ -> Err.fail "cannot create atom placeholder" ~d:[%message (ty : ty)]
 ;;
 
@@ -243,10 +244,11 @@ let rec lower_term (tenv : type_env) (term : Tail_call.term) : term Compiler_err
          |> List.concat_map ~f:(fun (c, arg_tys) ->
            if String.equal c ctor
            then List.map args ~f:Compiler_error.return
-           else List.map arg_tys ~f:placeholder_atom_for_ty)
+           else List.map arg_tys ~f:(placeholder_atom_for_ty term.loc))
          |> Compiler_error.all
        in
-       pure (Record (ty_name, Anf.Int tag :: flat_atoms))
+       let tag_atom : atom = { desc = Int tag; ty = TyInt; loc = term.loc } in
+       pure (Record (ty_name, tag_atom :: flat_atoms))
      | Some (RecordDecl _) | None ->
        Err.fail "unknown variant type" ~d:[%message (ty_name : string)])
   | Match _ -> Err.fail "match should be handled in lower_anf"
@@ -333,9 +335,10 @@ and lower_variant_match
         Ok [ Glsl.Default, body ]
     in
     let tag_v = Utils.fresh "_lv_tag" in
+    let tag_v_atom : atom = { desc = Var tag_v; ty = TyVariant ty_name; loc } in
     let tag_term : term = { desc = Field (scrut, "tag"); ty = TyInt; loc } in
     let switch_term : term =
-      { desc = Switch (Var tag_v, switch_cases @ default_cases); ty = result_ty; loc }
+      { desc = Switch (tag_v_atom, switch_cases @ default_cases); ty = result_ty; loc }
     in
     Ok ({ desc = Let (tag_v, tag_term, k switch_term); ty = result_ty; loc } : anf)
 
@@ -441,17 +444,22 @@ and lower_float_match
       List.fold_right tl ~init:(Ok default_anf) ~f:(fun (f_val, case_body) acc ->
         let%bind acc = acc in
         let cmp_v = Utils.fresh "_lv_cmp" in
+        let cmp_v_atom : atom = { desc = Var cmp_v; ty = TyBool; loc } in
         let cmp_term : term =
-          { desc = Bop (Glsl.Eq, scrut, Float f_val); ty = TyBool; loc }
+          let f_val : atom = { desc = Float f_val; ty = TyFloat; loc } in
+          { desc = Bop (Glsl.Eq, scrut, f_val); ty = TyBool; loc }
         in
-        let if_term : term = { desc = If (Var cmp_v, case_body, acc); ty; loc } in
+        let if_term : term = { desc = If (cmp_v_atom, case_body, acc); ty; loc } in
         Ok
           ({ desc = Let (cmp_v, cmp_term, { desc = Return if_term; ty; loc }); ty; loc }
            : anf))
     in
+    (* TODO: Dedup from above *)
     let cmp_v = Utils.fresh "_lv_cmp" in
-    let cmp_term : term = { desc = Bop (Glsl.Eq, scrut, Float f); ty = TyBool; loc } in
-    let if_term : term = { desc = If (Var cmp_v, body, inner_else); ty; loc } in
+    let cmp_v_atom : atom = { desc = Var cmp_v; ty = TyBool; loc } in
+    let f : atom = { desc = Float f; ty = TyFloat; loc } in
+    let cmp_term : term = { desc = Bop (Glsl.Eq, scrut, f); ty = TyBool; loc } in
+    let if_term : term = { desc = If (cmp_v_atom, body, inner_else); ty; loc } in
     Ok ({ desc = Let (cmp_v, cmp_term, k if_term); ty; loc } : anf)
 
 and lower_match

@@ -1,8 +1,15 @@
-type atom =
+type atom_desc =
   | Var of string
   | Float of float
   | Int of int
   | Bool of bool
+[@@deriving sexp_of]
+
+type atom =
+  { desc : atom_desc
+  ; ty : Monomorphize.ty
+  ; loc : Lexer.loc
+  }
 [@@deriving sexp_of]
 
 type term_desc =

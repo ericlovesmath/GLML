@@ -13,11 +13,11 @@ let make_lets (bindings : bindings) (loc : Lexer.loc) (body : anf) : anf =
 
 (** Coerce an atom to float if it is int-typed. *)
 let coerce_atom (env : ty String.Map.t) (loc : Lexer.loc) (a : atom) : atom * bindings =
-  match a with
-  | Int i -> Float (Float.of_int i), []
+  match a.desc with
+  | Int i -> { a with desc = Float (Float.of_int i) }, []
   | Var v when equal_ty (Map.find_exn env v) TyInt ->
     let v = Utils.fresh "pf" in
-    Var v, [ v, { desc = App ("float", [ a ]); ty = TyFloat; loc } ]
+    { a with desc = Var v }, [ v, { desc = App ("float", [ a ]); ty = TyFloat; loc } ]
   | _ -> a, []
 ;;
 
