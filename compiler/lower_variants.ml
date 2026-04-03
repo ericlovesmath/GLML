@@ -141,20 +141,6 @@ let placeholder_atom_for_ty (loc : Lexer.loc) (ty : ty) : Anf.atom Compiler_erro
   | _ -> Err.fail "cannot create atom placeholder" ~d:[%message (ty : ty)]
 ;;
 
-let find_ctor_info (tenv : type_env) (ctor : string)
-  : (string * int * (string * ty list) list) Compiler_error.t
-  =
-  Map.to_alist tenv
-  |> List.find_map ~f:(fun (ty_name, decl) ->
-    match decl with
-    | RecordDecl _ -> None
-    | VariantDecl ctors ->
-      ctors
-      |> List.findi ~f:(fun _ (c, _) -> String.equal c ctor)
-      |> Option.map ~f:(fun (i, _) -> ty_name, i, ctors))
-  |> Err.of_option "unknown ctor" ~d:[%message (ctor : string)]
-;;
-
 let find_tag (ctors : (string * ty list) list) (ctor : string) : int Compiler_error.t =
   ctors
   |> List.findi ~f:(fun _ (c, _) -> String.equal c ctor)
@@ -289,15 +275,16 @@ and lower_variant_match
   : anf Compiler_error.t
   =
   let result_ty = lower_ty result_ty in
-  (* Find the first PatCtor to discover the variant type *)
-  let%bind first_ctor =
-    List.find_map cases ~f:(fun (pat, _) ->
-      match pat with
-      | Stlc.PatCtor (c, _) -> Some c
-      | _ -> None)
-    |> Err.of_option "lower_variant_match: no PatCtor found"
+  let%bind ty_name =
+    match scrut.ty with
+    | TyVariant name -> Ok name
+    | _ -> Err.fail "unreachable: scrut is not a variant" ~loc
   in
-  let%bind ty_name, _, ctors = find_ctor_info tenv first_ctor in
+  let%bind ctors =
+    match Map.find tenv ty_name with
+    | Some (VariantDecl ctors) -> Ok ctors
+    | _ -> Err.fail "unreachable: scrut name is not a variant declration" ~loc
+  in
   let lower_case ctor vars body =
     let%bind lowered = lower_anf tenv body in
     prepend_var_decls ~scrut ~loc ~ctors ctor vars lowered

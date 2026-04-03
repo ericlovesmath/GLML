@@ -1751,3 +1751,126 @@ let%expect_test "regression - polymorphic variant type in function" =
     }
     |}]
 ;;
+
+let%expect_test "parametrized variants in functions (explicitly annotated)" =
+  test
+    {|
+    #extern vec2 u_resolution
+    #extern float u_time
+
+    type option['a] = Some of 'a | None
+
+    let unwrap opt default =
+      match opt with
+      | Some x -> x
+      | None -> default
+
+    let main (coord : vec2) =
+      let x = unwrap (Some true) false in
+      let y = unwrap (Some 5) 5 in
+      [ 0, 0, 0 ]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct v_option_bool {
+        int tag;
+        bool Some_0;
+    };
+    struct v_option_int {
+        int tag;
+        int Some_0;
+    };
+    uniform vec2 u_resolution;
+    uniform float u_time;
+    int unwrap_0_v_option_int_to_int_to_int_19(v_option_int opt_1, int default_2) {
+        int _lv_tag_23 = opt_1.tag;
+        switch (_lv_tag_23) {
+            case 0: {
+                int x_3 = opt_1.Some_0;
+                return x_3;
+                break;
+            }
+            default: {
+                return default_2;
+                break;
+            }
+        }
+    }
+    bool unwrap_0_v_option_bool_to_bool_to_bool_20(v_option_bool opt_1, bool default_2) {
+        int _lv_tag_24 = opt_1.tag;
+        switch (_lv_tag_24) {
+            case 0: {
+                bool x_3 = opt_1.Some_0;
+                return x_3;
+                break;
+            }
+            default: {
+                return default_2;
+                break;
+            }
+        }
+    }
+    vec3 main_pure(vec2 coord_4) {
+        v_option_bool anf_21 = v_option_bool(0, true);
+        bool x_5 = unwrap_0_v_option_bool_to_bool_to_bool_20(anf_21, false);
+        v_option_int anf_22 = v_option_int(0, 5);
+        int y_6 = unwrap_0_v_option_int_to_int_to_int_19(anf_22, 5);
+        return vec3(0., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    type box['a] = { value: 'a }
+
+    let f (b : box['a]) = let a = b.value in a
+
+    let main (coord: vec2) : vec3 =
+      let a = f { value = 1.0 } in
+      let b = if f { value = true } then 1 else 2 in
+      [a, b, 0]
+    |};
+  [%expect {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct r_box_float {
+        float value;
+    };
+    struct r_box_bool {
+        bool value;
+    };
+    bool f_0_r_box_bool_to_bool_13(r_box_bool b_1) {
+        bool a_2 = b_1.value;
+        return a_2;
+    }
+    float f_0_r_box_float_to_float_14(r_box_float b_1) {
+        float a_2 = b_1.value;
+        return a_2;
+    }
+    vec3 main_pure(vec2 coord_3) {
+        r_box_float anf_15 = r_box_float(1.);
+        float a_4 = f_0_r_box_float_to_float_14(anf_15);
+        r_box_bool anf_16 = r_box_bool(true);
+        bool anf_17 = f_0_r_box_bool_to_bool_13(anf_16);
+        int b_5 = 0;
+        if (anf_17) {
+            b_5 = 1;
+        } else {
+            b_5 = 2;
+        }
+        float pf_18 = float(b_5);
+        return vec3(a_4, pf_18, 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
