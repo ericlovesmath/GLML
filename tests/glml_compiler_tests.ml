@@ -1836,7 +1836,8 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
       let b = if f { value = true } then 1 else 2 in
       [a, b, 0]
     |};
-  [%expect {|
+  [%expect
+    {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
@@ -1867,6 +1868,59 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
         }
         float pf_18 = float(b_5);
         return vec3(a_4, pf_18, 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "phantom parameters, sort of" =
+  test
+    {|
+    type tagged['tag, 'value] = { data: 'value }
+
+    let add (l : tagged['a, 'b]) (r : tagged['a, 'b]) = l
+
+    let main (uv: vec2) : vec3 =
+      let a : tagged[int, float] = { data = 1.0 } in
+      let b : tagged[bool, float] = { data = 2.0 } in
+      let c = add a b in
+      [a.data, b.data, 0.0]
+    |};
+  [%expect
+    {|
+    [typecheck] at 9:15-9:20: type mismatch
+      ty: int
+      ty': bool
+      |
+    9 |       let c = add a b in
+      |               ^^^^^
+    |}]
+;;
+
+let%expect_test "removal of term that is does not resolve to a concrete type" =
+  test
+    {|
+    type option['a] = Some of 'a | None
+
+    let unwrap opt default =
+      match opt with
+      | Some x -> x
+      | None -> default
+
+    let main (coord : vec2) =
+      let y = unwrap None None in
+      [ 0, 0, 0 ]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 main_pure(vec2 coord_4) {
+        return vec3(0., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
