@@ -127,9 +127,6 @@ header a:hover {
     display: none;
   }
 
-  .monaco-editor .accessibilityHelpButton {
-    display: none !important;
-  }
 }
 
 .pane-header {
@@ -146,6 +143,16 @@ header a:hover {
 #glsl-output {
   flex: 1;
   min-height: 0;
+}
+
+#glml-input .cm-editor,
+#glsl-output .cm-editor {
+  height: 100%;
+}
+
+#glml-input .cm-scroller,
+#glsl-output .cm-scroller {
+  overflow: auto;
 }
 
 #compile-btn {
