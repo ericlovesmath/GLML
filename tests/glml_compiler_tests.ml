@@ -1415,7 +1415,7 @@ let%expect_test "bool match" =
     vec3 main_pure(vec2 coord_0) {
         float x_1 = 0.;
         if (b) {
-            bool __2 = b;
+            bool _x_2 = b;
             x_1 = 0.;
         } else {
             x_1 = 1.;
@@ -1458,7 +1458,7 @@ let%expect_test "int match" =
                 break;
             }
             default: {
-                int __2 = n;
+                int _x_2 = n;
                 x_1 = 2.;
                 break;
             }
@@ -1538,7 +1538,7 @@ let%expect_test "float match" =
             if (_lv_cmp_4) {
                 c_1 = 1.;
             } else {
-                float __2 = x;
+                float _x_2 = x;
                 c_1 = 2.;
             }
         }
@@ -1574,7 +1574,7 @@ let%expect_test "float match" =
             if (_lv_cmp_3) {
                 return vec3(0., 1., 0.);
             } else {
-                float __1 = x;
+                float _x_1 = x;
                 return vec3(0., 0., 1.);
             }
         }
@@ -1909,7 +1909,7 @@ let%expect_test "parametrized variants" =
                 break;
             }
             default: {
-                int __4 = r_1.Err_0;
+                int _x_4 = r_1.Err_0;
                 return default_2;
                 break;
             }
@@ -2029,7 +2029,7 @@ let%expect_test "regression - polymorphic variant type in function" =
         int _lv_tag_14 = o_1.tag;
         switch (_lv_tag_14) {
             case 0: {
-                float __2 = o_1.Some_0;
+                float _x_2 = o_1.Some_0;
                 return true;
                 break;
             }
