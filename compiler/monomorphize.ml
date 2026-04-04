@@ -547,13 +547,13 @@ let rec resolve_spec (env : env) (acc : acc) (name : string) (concrete_ty : Type
     (* Register in spec_map FIRST as cycle guard for recursive functions *)
     let acc = { acc with spec_map = add_spec acc.spec_map name concrete_ty spec_name } in
     let sub = subst ~poly:entry.poly_type ~concrete:concrete_ty in
-    let%bind sub =
-      Typecheck.solve_scheme_constrs
+    let%bind body =
+      Typecheck.instantiate_scheme
         ~structs:env.structs_for_constrs
         entry.poly_constrs
+        entry.poly_bind
         sub
     in
-    let body = Typecheck.subst_term sub entry.poly_bind in
     let body =
       rewrite_term ~type_poly_env:env.type_poly_env ~poly_names:env.poly_names body
     in
@@ -636,13 +636,13 @@ and rewrite_refs (env : env) (acc : acc) (t : Typecheck.term)
             ~f:(fun acc_r concrete_ty ->
               let%bind acc, specs_rev = acc_r in
               let sub = subst ~poly:bind.ty ~concrete:concrete_ty in
-              let%bind sub =
-                Typecheck.solve_scheme_constrs
+              let%bind spec_bind =
+                Typecheck.instantiate_scheme
                   ~structs:env.structs_for_constrs
                   constrs
+                  bind
                   sub
               in
-              let spec_bind = Typecheck.subst_term sub bind in
               let spec_bind =
                 rewrite_term
                   ~type_poly_env:env.type_poly_env
