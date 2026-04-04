@@ -11,12 +11,22 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - Add builtin GLSL function callers or GLSL extern libraries
 - Add user definable constrained functions?
 - Copy pasting doesn't seem to work in vim mode, maybe its the ctrl+enter runner?
-- Vim mode some keys are wrong, like enter
 - uintBitsToFloat instead of fat structs to represent variants, instead storing as uvec4 in raw bits
-- Add match support for non variants, as well as fallthrough cases and `when` clauses
 - Validate if extern variables are in a constant term on output, which might not be possible?
-- Pairs and static arrays
+- Tuples and static arrays
 - Vectors can't be toplevel constants right now
+- `when` clause for match statements
+- matching on `vec`s, `mat`s and `struct`s
+- Nested destructing
+- Destructing in `let` bindings
+- `mat` should be exactly a `vec` of `vec`s, not a new form which makes it ambigious and prevents non-float vecs
+- add types to new passes like `specialize_params`, also do some general refactoring?
+- Pathtracing example
+- Potentially some kind of recursive types like `type list['a] = Nil | Cons of 'a * list['a]`
+- Passing constraints to mono is a bit weird, they should concertize that in `typecheck` step
+- Merging specialize and mono passes since they interplay like they're supposed to be the same pass
+- Type aliases
+- Mutual recursion
 
 ## Remaining Tasks
 
@@ -33,7 +43,7 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - Better benchmarking tests
 - Better pipeline tests
 - Buffer passing (e.g. for Game of Life)
-- Example of rendering clouds
+- Example of rendering clouds (volumetric rendering)
 - Add sliders in playground to change values
 - Update blog posts
 - Set up vim/treesitter plugsin
@@ -49,6 +59,9 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - Do I separate camera and make it specific like a 3D ShaderToy for Raymarching in the web playground?
 - Write Nix derivation for Javascript and OCaml bindings
 - Emit on compilation what data needs to be passed from host
+- Indexing vectors by arbitrary terms?
+- Differentiate int and float division explicitly
+- Have `int <: float` be a true subtype (currently can't assign `let (x : option[float) = Some 5`)
 
 ## Resources
 
