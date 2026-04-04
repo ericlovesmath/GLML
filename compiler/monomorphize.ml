@@ -7,6 +7,273 @@ module Err = Compiler_error.Pass (struct
     let name = "monomorphize"
   end)
 
+(* ===== Helpers absorbed from specialize_params ===== *)
+
+let rec mangle_ty (ty : Typecheck.ty) : string =
+  match ty with
+  | TyFloat -> "float"
+  | TyInt -> "int"
+  | TyBool -> "bool"
+  | TyVec n -> "vec" ^ Int.to_string n
+  | TyMat (x, y) -> "mat" ^ Int.to_string x ^ "x" ^ Int.to_string y
+  | TyRecord (s, []) -> s
+  | TyRecord (s, args) -> "r_" ^ String.concat ~sep:"_" (s :: List.map args ~f:mangle_ty)
+  | TyVariant (s, []) -> s
+  | TyVariant (s, args) -> "v_" ^ String.concat ~sep:"_" (s :: List.map args ~f:mangle_ty)
+  | TyVar v -> "tv" ^ v
+  | TyArrow (a, b) -> mangle_ty a ^ "_to_" ^ mangle_ty b
+;;
+
+let rec is_concrete (ty : Typecheck.ty) : bool =
+  match ty with
+  | TyVar _ -> false
+  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ -> true
+  | TyVariant (_, args) -> List.for_all args ~f:is_concrete
+  | TyRecord (_, args) -> List.for_all args ~f:is_concrete
+  | TyArrow (a, b) -> is_concrete a && is_concrete b
+;;
+
+let rec collect_from_ty
+          ~(type_poly_env : Typecheck.type_decl String.Map.t)
+          (ty : Typecheck.ty)
+  : [ `Record of string * Typecheck.ty list | `Variant of string * Typecheck.ty list ]
+      list
+  =
+  match ty with
+  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVar _ -> []
+  | TyArrow (a, b) -> collect_from_ty ~type_poly_env a @ collect_from_ty ~type_poly_env b
+  | TyRecord (_, []) | TyVariant (_, []) -> []
+  | TyRecord (name, args) when not (is_concrete (TyRecord (name, args))) -> []
+  | TyVariant (name, args) when not (is_concrete (TyVariant (name, args))) -> []
+  | TyRecord (name, args) ->
+    let deps_from_args = List.concat_map args ~f:(collect_from_ty ~type_poly_env) in
+    let deps_from_fields =
+      match Map.find type_poly_env name with
+      | Some (RecordDecl (params, fields)) ->
+        let sub = List.zip_exn params args in
+        List.concat_map fields ~f:(fun (_, fty) ->
+          collect_from_ty ~type_poly_env (Typecheck.subst_ty sub fty))
+      | _ -> []
+    in
+    deps_from_args @ deps_from_fields @ [ `Record (name, args) ]
+  | TyVariant (name, args) ->
+    let deps_from_args = List.concat_map args ~f:(collect_from_ty ~type_poly_env) in
+    let deps_from_ctors =
+      match Map.find type_poly_env name with
+      | Some (VariantDecl (params, ctors)) ->
+        let sub = List.zip_exn params args in
+        List.concat_map ctors ~f:(fun (_, tys) ->
+          List.concat_map tys ~f:(fun fty ->
+            collect_from_ty ~type_poly_env (Typecheck.subst_ty sub fty)))
+      | _ -> []
+    in
+    deps_from_args @ deps_from_ctors @ [ `Variant (name, args) ]
+;;
+
+let collect_from_term
+      ~(type_poly_env : Typecheck.type_decl String.Map.t)
+      (t : Typecheck.term)
+  : [ `Record of string * Typecheck.ty list | `Variant of string * Typecheck.ty list ]
+      list
+  =
+  let rec walk (t : Typecheck.term) =
+    let from_ty = collect_from_ty ~type_poly_env t.ty in
+    let from_desc =
+      match t.desc with
+      | Var _ | Float _ | Int _ | Bool _ -> []
+      | Vec (_, ts) | Mat (_, _, ts) | Builtin (_, ts) | Record (_, ts) ->
+        List.concat_map ts ~f:walk
+      | Lam (_, body) -> walk body
+      | App (f, x) -> walk f @ walk x
+      | Let (_, _, _, bind, body) -> walk bind @ walk body
+      | If (c, t, e) -> walk c @ walk t @ walk e
+      | Bop (_, l, r) -> walk l @ walk r
+      | Index (t, _) | Field (t, _) -> walk t
+      | Variant (_, _, args) -> List.concat_map args ~f:walk
+      | Match (scrutinee, cases) ->
+        walk scrutinee @ List.concat_map cases ~f:(fun (_, body) -> walk body)
+    in
+    from_ty @ from_desc
+  in
+  walk t
+;;
+
+let collect_from_top
+      ~(type_poly_env : Typecheck.type_decl String.Map.t)
+      (top : Typecheck.top)
+  : [ `Record of string * Typecheck.ty list | `Variant of string * Typecheck.ty list ]
+      list
+  =
+  match top.desc with
+  | TypeDef (_, RecordDecl (params, _)) when not (List.is_empty params) -> []
+  | TypeDef (_, VariantDecl (params, _)) when not (List.is_empty params) -> []
+  | TypeDef (_, RecordDecl (_, fields)) ->
+    List.concat_map fields ~f:(fun (_, fty) -> collect_from_ty ~type_poly_env fty)
+  | TypeDef (_, VariantDecl (_, ctors)) ->
+    List.concat_map ctors ~f:(fun (_, tys) ->
+      List.concat_map tys ~f:(collect_from_ty ~type_poly_env))
+  | Extern _ -> []
+  | Define (_, _, bind) ->
+    collect_from_ty ~type_poly_env top.ty @ collect_from_term ~type_poly_env bind
+;;
+
+let dedup_tagged_instances
+      (instances :
+        [ `Record of string * Typecheck.ty list | `Variant of string * Typecheck.ty list ]
+          list)
+  : [ `Record of string * Typecheck.ty list | `Variant of string * Typecheck.ty list ]
+      list
+  =
+  let eq a b =
+    match a, b with
+    | `Record (n, args), `Record (n', args') ->
+      String.equal n n' && List.equal Typecheck.equal_ty args args'
+    | `Variant (n, args), `Variant (n', args') ->
+      String.equal n n' && List.equal Typecheck.equal_ty args args'
+    | _, _ -> false
+  in
+  List.fold instances ~init:[] ~f:(fun acc inst ->
+    if List.exists acc ~f:(eq inst) then acc else inst :: acc)
+  |> List.rev
+;;
+
+let specialize_struct
+      ~(type_poly_env : Typecheck.type_decl String.Map.t)
+      ~(loc : Lexer.loc)
+      (name : string)
+      (args : Typecheck.ty list)
+  : Typecheck.top
+  =
+  let params, fields =
+    match Map.find_exn type_poly_env name with
+    | RecordDecl (params, fields) -> params, fields
+    | _ -> failwith "specialize_struct on non record"
+  in
+  let sub = List.zip_exn params args in
+  let specialized_fields =
+    List.map fields ~f:(Tuple2.map_snd ~f:(Typecheck.subst_ty sub))
+  in
+  let mangled = mangle_ty (TyRecord (name, args)) in
+  { desc = TypeDef (mangled, RecordDecl ([], specialized_fields))
+  ; ty = TyRecord (mangled, [])
+  ; loc
+  ; scheme_constrs = []
+  }
+;;
+
+let specialize_variant
+      ~(type_poly_env : Typecheck.type_decl String.Map.t)
+      ~(loc : Lexer.loc)
+      (name : string)
+      (args : Typecheck.ty list)
+  : Typecheck.top
+  =
+  let params, ctors =
+    match Map.find_exn type_poly_env name with
+    | VariantDecl (params, ctors) -> params, ctors
+    | _ -> assert false
+  in
+  let sub = List.zip_exn params args in
+  let specialized_ctors =
+    List.map ctors ~f:(Tuple2.map_snd ~f:(List.map ~f:(Typecheck.subst_ty sub)))
+  in
+  let mangled = mangle_ty (TyVariant (name, args)) in
+  { desc = TypeDef (mangled, VariantDecl ([], specialized_ctors))
+  ; ty = TyVariant (mangled, [])
+  ; loc
+  ; scheme_constrs = []
+  }
+;;
+
+let rec rewrite_ty ~(type_poly_env : Typecheck.type_decl String.Map.t) (ty : Typecheck.ty)
+  : Typecheck.ty
+  =
+  match ty with
+  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVar _ -> ty
+  | TyArrow (a, b) -> TyArrow (rewrite_ty ~type_poly_env a, rewrite_ty ~type_poly_env b)
+  | TyRecord (_, []) -> ty
+  | TyRecord (name, args)
+    when is_concrete (TyRecord (name, args))
+         &&
+         match Map.find type_poly_env name with
+         | Some (RecordDecl _) -> true
+         | _ -> false -> TyRecord (mangle_ty (TyRecord (name, args)), [])
+  | TyRecord (name, args) -> TyRecord (name, List.map args ~f:(rewrite_ty ~type_poly_env))
+  | TyVariant (_, []) -> ty
+  | TyVariant (name, args)
+    when is_concrete (TyVariant (name, args))
+         &&
+         match Map.find type_poly_env name with
+         | Some (VariantDecl _) -> true
+         | _ -> false -> TyVariant (mangle_ty (TyVariant (name, args)), [])
+  | TyVariant (name, args) ->
+    TyVariant (name, List.map args ~f:(rewrite_ty ~type_poly_env))
+;;
+
+let maybe_mangle_name
+      ~(type_poly_env : Typecheck.type_decl String.Map.t)
+      ~fallback
+      (ty : Typecheck.ty)
+  : string
+  =
+  match ty with
+  | TyRecord (n, args)
+    when (not (List.is_empty args))
+         && is_concrete ty
+         &&
+         match Map.find type_poly_env n with
+         | Some (RecordDecl _) -> true
+         | _ -> false -> mangle_ty (TyRecord (n, args))
+  | TyVariant (n, args)
+    when (not (List.is_empty args))
+         && is_concrete ty
+         &&
+         match Map.find type_poly_env n with
+         | Some (VariantDecl _) -> true
+         | _ -> false -> mangle_ty (TyVariant (n, args))
+  | _ -> fallback
+;;
+
+let rec rewrite_term
+          ~(type_poly_env : Typecheck.type_decl String.Map.t)
+          ?(poly_names = String.Set.empty)
+          (t : Typecheck.term)
+  : Typecheck.term
+  =
+  let rewrite = rewrite_term ~type_poly_env ~poly_names in
+  let ty =
+    match t.desc with
+    | Var v when Set.mem poly_names v -> t.ty
+    | _ -> rewrite_ty ~type_poly_env t.ty
+  in
+  let desc : Typecheck.term_desc =
+    match t.desc with
+    | Var _ | Float _ | Int _ | Bool _ -> t.desc
+    | Vec (n, ts) -> Vec (n, List.map ts ~f:rewrite)
+    | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:rewrite)
+    | Lam (v, body) -> Lam (v, rewrite body)
+    | App (f, x) -> App (rewrite f, rewrite x)
+    | Let (recur, v, constrs, bind, body) ->
+      Let (recur, v, constrs, rewrite bind, rewrite body)
+    | If (c, t, e) -> If (rewrite c, rewrite t, rewrite e)
+    | Bop (op, l, r) -> Bop (op, rewrite l, rewrite r)
+    | Index (t, i) -> Index (rewrite t, i)
+    | Builtin (b, ts) -> Builtin (b, List.map ts ~f:rewrite)
+    | Record (name, ts) ->
+      let new_name = maybe_mangle_name ~type_poly_env ~fallback:name t.ty in
+      Record (new_name, List.map ts ~f:rewrite)
+    | Field (t, f) -> Field (rewrite t, f)
+    | Variant (ty_name, ctor, args) ->
+      let new_ty_name = maybe_mangle_name ~type_poly_env ~fallback:ty_name t.ty in
+      Variant (new_ty_name, ctor, List.map args ~f:rewrite)
+    | Match (scrutinee, cases) ->
+      Match (rewrite scrutinee, List.map cases ~f:(fun (pat, body) -> pat, rewrite body))
+  in
+  { t with ty; desc }
+;;
+
+(* ===== Monomorphize-specific helpers ===== *)
+
 let rec subst ~(poly : Typecheck.ty) ~(concrete : Typecheck.ty)
   : (string * Typecheck.ty) list
   =
@@ -25,7 +292,6 @@ let rec subst ~(poly : Typecheck.ty) ~(concrete : Typecheck.ty)
   | _, _ -> []
 ;;
 
-(** term deriving Foldable Generically, basically *)
 let rec fold_term ~(f : 'a -> Typecheck.term -> 'a) (acc : 'a) (t : Typecheck.term) : 'a =
   let acc = f acc t in
   match t.desc with
@@ -44,7 +310,6 @@ let rec fold_term ~(f : 'a -> Typecheck.term -> 'a) (acc : 'a) (t : Typecheck.te
     List.fold cases ~init:acc ~f:(fun acc (_, body) -> fold_term ~f acc body)
 ;;
 
-(** Collect all concrete types a variable is used at in a term *)
 let collect_var_usages (name : string) (t : Typecheck.term) : Typecheck.ty list =
   fold_term
     ~f:(fun acc t ->
@@ -56,7 +321,6 @@ let collect_var_usages (name : string) (t : Typecheck.term) : Typecheck.ty list 
   |> List.stable_dedup ~compare:(fun a b -> if Typecheck.equal_ty a b then 0 else 1)
 ;;
 
-(** Map over match cases, applying [f] to each body unless [var] is already bound by the pattern *)
 let map_cases_capture_avoiding
       ~(var : string)
       ~(f : Typecheck.term -> Typecheck.term)
@@ -69,7 +333,6 @@ let map_cases_capture_avoiding
     else pat, f body)
 ;;
 
-(** Capture-avoiding variable substitution. Rewrites [Var name] to [Var new_name] when [pred t] holds. *)
 let rec subst_var
           ~(name : string)
           ~(new_name : string)
@@ -107,7 +370,6 @@ let rename_var (src : string) (dst : string) =
   subst_var ~name:src ~new_name:dst ~pred:(Fun.const true)
 ;;
 
-(** Read-only info about a polymorphic definition *)
 type poly_def =
   { poly_type : Typecheck.ty
   ; poly_bind : Typecheck.term
@@ -116,21 +378,25 @@ type poly_def =
   ; poly_constrs : Typecheck.constr list
   }
 
-type poly_env = poly_def String.Map.t
-
-(** Tracks which specializations have been generated: poly_name -> [(concrete_ty, spec_name)] *)
 type spec_map = (Typecheck.ty * string) list String.Map.t
 
-(** Collect all (poly_name, concrete_ty) pairs where name is in poly_env and ty has no tyvars *)
-let collect_poly_refs (poly_env : poly_env) (t : Typecheck.term)
+type state =
+  { type_poly_env : Typecheck.type_decl String.Map.t
+  ; structs_for_constrs : (string list * (string * Typecheck.ty) list) String.Map.t
+  ; poly_names : String.Set.t
+  ; poly_fn_env : poly_def String.Map.t ref
+  ; spec_map : spec_map ref
+  ; output_tops : Typecheck.top list ref
+  }
+
+let collect_poly_refs (poly_fn_env : poly_def String.Map.t) (t : Typecheck.term)
   : (string * Typecheck.ty) list
   =
   let refs =
     fold_term
       ~f:(fun acc t ->
         match t.desc with
-        | Var v when Map.mem poly_env v && Specialize_params.is_concrete t.ty ->
-          (v, t.ty) :: acc
+        | Var v when Map.mem poly_fn_env v && is_concrete t.ty -> (v, t.ty) :: acc
         | _ -> acc)
       []
       t
@@ -155,49 +421,34 @@ let add_spec (env : spec_map) (name : string) (ty : Typecheck.ty) (spec_name : s
   Map.set env ~key:name ~data:((ty, spec_name) :: specs)
 ;;
 
-(** Resolve (or look up) a specialization for [name] at [concrete_ty].
-    Returns updated spec_map, the specialized name, and any new top-level defs
-    in dependency order. *)
-let rec resolve_spec
-          (poly_env : poly_env)
-          (env : spec_map)
-          (sp_env : Specialize_params.env)
-          (spec_structs : (string list * (string * Typecheck.ty) list) String.Map.t)
-          (name : string)
-          (concrete_ty : Typecheck.ty)
-  : spec_map * string * Typecheck.top list
-  =
-  match find_spec env name concrete_ty with
-  | Some spec_name -> env, spec_name, []
+let rec resolve_spec (st : state) (name : string) (concrete_ty : Typecheck.ty) : string =
+  match find_spec !(st.spec_map) name concrete_ty with
+  | Some spec_name -> spec_name
   | None ->
-    let entry = Map.find_exn poly_env name in
-    let spec_name = Utils.fresh (name ^ "_" ^ Specialize_params.mangle_ty concrete_ty) in
-    let spec_map = add_spec env name concrete_ty spec_name in
+    let entry = Map.find_exn !(st.poly_fn_env) name in
+    let spec_name = Utils.fresh (name ^ "_" ^ mangle_ty concrete_ty) in
+    st.spec_map := add_spec !(st.spec_map) name concrete_ty spec_name;
     let sub = subst ~poly:entry.poly_type ~concrete:concrete_ty in
     let sub =
-      Typecheck.solve_scheme_constrs ~structs:spec_structs entry.poly_constrs sub
+      Typecheck.solve_scheme_constrs
+        ~structs:st.structs_for_constrs
+        entry.poly_constrs
+        sub
       |> Compiler_error.ok_exn
     in
     let body = Typecheck.subst_term sub entry.poly_bind in
-    let body = Specialize_params.rewrite_term ~env:sp_env body in
-    (* For recursive functions, rename self-references *)
+    let body =
+      rewrite_term ~type_poly_env:st.type_poly_env ~poly_names:st.poly_names body
+    in
     let body =
       match entry.poly_recur with
       | Rec _ -> rename_var name spec_name body
       | Nonrec -> body
     in
-    (* Resolve transitive poly refs in the specialized body *)
-    let refs = collect_poly_refs poly_env body in
-    let env, dep_defs =
-      List.fold refs ~init:(spec_map, []) ~f:(fun (env, defs) (dep_name, dep_ty) ->
-        let spec_map, _, new_defs =
-          resolve_spec poly_env env sp_env spec_structs dep_name dep_ty
-        in
-        spec_map, defs @ new_defs)
-    in
-    (* Rewrite references in the body *)
-    let env, body, inner_defs = rewrite_refs poly_env env sp_env spec_structs body in
-    let concrete_ty = Specialize_params.rewrite_ty ~env:sp_env concrete_ty in
+    let refs = collect_poly_refs !(st.poly_fn_env) body in
+    List.iter refs ~f:(fun (dep_name, dep_ty) -> ignore (resolve_spec st dep_name dep_ty));
+    let body = rewrite_refs st body in
+    let concrete_ty = rewrite_ty ~type_poly_env:st.type_poly_env concrete_ty in
     let top : Typecheck.top =
       { desc = Define (entry.poly_recur, spec_name, body)
       ; ty = concrete_ty
@@ -205,76 +456,52 @@ let rec resolve_spec
       ; scheme_constrs = []
       }
     in
-    env, spec_name, dep_defs @ inner_defs @ [ top ]
+    st.output_tops := !(st.output_tops) @ [ top ];
+    spec_name
 
-(** Rewrite references to polymorphic functions with their specialized names.
-    For top-level poly refs, delegates to [resolve_spec] if not yet resolved.
-    For inner poly lets, specializes locally. *)
-and rewrite_refs
-      (poly_env : poly_env)
-      (env : spec_map)
-      (sp_env : Specialize_params.env)
-      (spec_structs : (string list * (string * Typecheck.ty) list) String.Map.t)
-      (t : Typecheck.term)
-  : spec_map * Typecheck.term * Typecheck.top list
-  =
-  let (desc : Typecheck.term_desc), env, defs =
+and rewrite_refs (st : state) (t : Typecheck.term) : Typecheck.term =
+  let desc : Typecheck.term_desc =
     match t.desc with
     | Var v ->
-      (match Map.find poly_env v with
-       | Some _ when Specialize_params.is_concrete t.ty ->
-         let env, spec_name, defs =
-           resolve_spec poly_env env sp_env spec_structs v t.ty
-         in
-         Var spec_name, env, defs
-       | _ -> t.desc, env, [])
-    | Float _ | Int _ | Bool _ -> t.desc, env, []
-    | Vec (n, ts) ->
-      let env, ts, defs = rewrite_refs_list poly_env env sp_env spec_structs ts in
-      Vec (n, ts), env, defs
-    | Mat (n, m, ts) ->
-      let env, ts, defs = rewrite_refs_list poly_env env sp_env spec_structs ts in
-      Mat (n, m, ts), env, defs
-    | Lam (v, body) ->
-      let env, body, defs = rewrite_refs poly_env env sp_env spec_structs body in
-      Lam (v, body), env, defs
-    | App (f, x) ->
-      let env, f, defs1 = rewrite_refs poly_env env sp_env spec_structs f in
-      let env, x, defs2 = rewrite_refs poly_env env sp_env spec_structs x in
-      App (f, x), env, defs1 @ defs2
-    | Let (recur, v, constrs, bind, body) when not (Specialize_params.is_concrete bind.ty)
-      ->
+      (match Map.find !(st.poly_fn_env) v with
+       | Some _ when is_concrete t.ty ->
+         let spec_name = resolve_spec st v t.ty in
+         Var spec_name
+       | _ -> t.desc)
+    | Float _ | Int _ | Bool _ -> t.desc
+    | Vec (n, ts) -> Vec (n, List.map ts ~f:(rewrite_refs st))
+    | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:(rewrite_refs st))
+    | Lam (v, body) -> Lam (v, rewrite_refs st body)
+    | App (f, x) -> App (rewrite_refs st f, rewrite_refs st x)
+    | Let (recur, v, constrs, bind, body) when not (is_concrete bind.ty) ->
       (* Specialization for inner polymorphic lets *)
       let usages = collect_var_usages v body in
       if List.is_empty usages
-      then (
-        (* Dead code, just rewrite body *)
-        let env, body, defs = rewrite_refs poly_env env sp_env spec_structs body in
-        body.desc, env, defs)
+      then (rewrite_refs st body).desc
       else (
-        let env, specs, defs1 =
-          List.fold usages ~init:(env, [], []) ~f:(fun (env, specs, defs) concrete_ty ->
+        let specs =
+          List.map usages ~f:(fun concrete_ty ->
             let sub = subst ~poly:bind.ty ~concrete:concrete_ty in
             let sub =
-              Typecheck.solve_scheme_constrs ~structs:spec_structs constrs sub
+              Typecheck.solve_scheme_constrs ~structs:st.structs_for_constrs constrs sub
               |> Compiler_error.ok_exn
             in
             let spec_bind = Typecheck.subst_term sub bind in
-            let spec_bind = Specialize_params.rewrite_term ~env:sp_env spec_bind in
-            let spec_name =
-              Utils.fresh (v ^ "_" ^ Specialize_params.mangle_ty concrete_ty)
+            let spec_bind =
+              rewrite_term
+                ~type_poly_env:st.type_poly_env
+                ~poly_names:st.poly_names
+                spec_bind
             in
-            let env, spec_bind, new_defs =
-              rewrite_refs poly_env env sp_env spec_structs spec_bind
-            in
+            let spec_name = Utils.fresh (v ^ "_" ^ mangle_ty concrete_ty) in
+            let spec_bind = rewrite_refs st spec_bind in
             let spec_bind =
               match recur with
               | Rec _ -> rename_var v spec_name spec_bind
               | Nonrec -> spec_bind
             in
-            env, specs @ [ spec_name, spec_bind, concrete_ty ], defs @ new_defs)
+            spec_name, spec_bind, concrete_ty)
         in
-        (* Rewrite body replacing [Var v] with appropriate spec name *)
         let body' =
           List.fold specs ~init:body ~f:(fun b (spec_name, _, concrete_ty) ->
             subst_var
@@ -283,73 +510,39 @@ and rewrite_refs
               ~pred:(fun t -> Typecheck.equal_ty t.ty concrete_ty)
               b)
         in
-        let env, body', defs2 = rewrite_refs poly_env env sp_env spec_structs body' in
-        (* Wrap in nested lets *)
-        ( (List.fold_right specs ~init:body' ~f:(fun (spec_name, spec_bind, _) acc ->
-             ({ desc = Let (recur, spec_name, [], spec_bind, acc)
-              ; ty = acc.ty
-              ; loc = t.loc
-              }
-              : Typecheck.term)))
-            .desc
-        , env
-        , defs1 @ defs2 ))
+        let body' = rewrite_refs st body' in
+        (List.fold_right specs ~init:body' ~f:(fun (spec_name, spec_bind, _) acc ->
+           ({ desc = Let (recur, spec_name, [], spec_bind, acc)
+            ; ty = acc.ty
+            ; loc = t.loc
+            }
+            : Typecheck.term)))
+          .desc)
     | Let (recur, v, constrs, bind, body) ->
-      let env, bind, defs1 = rewrite_refs poly_env env sp_env spec_structs bind in
-      let env, body, defs2 = rewrite_refs poly_env env sp_env spec_structs body in
-      Let (recur, v, constrs, bind, body), env, defs1 @ defs2
-    | If (c, t, e) ->
-      let env, c, defs1 = rewrite_refs poly_env env sp_env spec_structs c in
-      let env, t, defs2 = rewrite_refs poly_env env sp_env spec_structs t in
-      let env, e, defs3 = rewrite_refs poly_env env sp_env spec_structs e in
-      If (c, t, e), env, defs1 @ defs2 @ defs3
-    | Bop (op, l, r) ->
-      let env, l, defs1 = rewrite_refs poly_env env sp_env spec_structs l in
-      let env, r, defs2 = rewrite_refs poly_env env sp_env spec_structs r in
-      Bop (op, l, r), env, defs1 @ defs2
-    | Index (t, i) ->
-      let env, t, defs = rewrite_refs poly_env env sp_env spec_structs t in
-      Index (t, i), env, defs
-    | Builtin (b, ts) ->
-      let env, ts, defs = rewrite_refs_list poly_env env sp_env spec_structs ts in
-      Builtin (b, ts), env, defs
+      Let (recur, v, constrs, rewrite_refs st bind, rewrite_refs st body)
+    | If (c, t, e) -> If (rewrite_refs st c, rewrite_refs st t, rewrite_refs st e)
+    | Bop (op, l, r) -> Bop (op, rewrite_refs st l, rewrite_refs st r)
+    | Index (t, i) -> Index (rewrite_refs st t, i)
+    | Builtin (b, ts) -> Builtin (b, List.map ts ~f:(rewrite_refs st))
     | Record (s, ts) ->
-      let env, ts, defs = rewrite_refs_list poly_env env sp_env spec_structs ts in
-      Record (s, ts), env, defs
-    | Field (t, f) ->
-      let env, t, defs = rewrite_refs poly_env env sp_env spec_structs t in
-      Field (t, f), env, defs
+      let new_name = maybe_mangle_name ~type_poly_env:st.type_poly_env ~fallback:s t.ty in
+      Record (new_name, List.map ts ~f:(rewrite_refs st))
+    | Field (t, f) -> Field (rewrite_refs st t, f)
     | Variant (ty_name, ctor, args) ->
-      let env, args, defs = rewrite_refs_list poly_env env sp_env spec_structs args in
-      Variant (ty_name, ctor, args), env, defs
+      let new_ty_name =
+        maybe_mangle_name ~type_poly_env:st.type_poly_env ~fallback:ty_name t.ty
+      in
+      Variant (new_ty_name, ctor, List.map args ~f:(rewrite_refs st))
     | Match (scrutinee, cases) ->
-      let env, scrutinee, defs1 =
-        rewrite_refs poly_env env sp_env spec_structs scrutinee
-      in
-      let env, cases_rev, defs2 =
-        List.fold cases ~init:(env, [], []) ~f:(fun (env, acc, defs) (pat, body) ->
-          let env, body, new_defs = rewrite_refs poly_env env sp_env spec_structs body in
-          env, (pat, body) :: acc, defs @ new_defs)
-      in
-      Match (scrutinee, List.rev cases_rev), env, defs1 @ defs2
+      Match
+        ( rewrite_refs st scrutinee
+        , List.map cases ~f:(fun (pat, body) -> pat, rewrite_refs st body) )
   in
-  let ty = Specialize_params.rewrite_ty ~env:sp_env t.ty in
-  env, { t with desc; ty }, defs
-
-and rewrite_refs_list
-      (poly_env : poly_env)
-      (env : spec_map)
-      (sp_env : Specialize_params.env)
-      (spec_structs : (string list * (string * Typecheck.ty) list) String.Map.t)
-      (ts : Typecheck.term list)
-  =
-  let spec_map, ts_rev, defs =
-    List.fold ts ~init:(env, [], []) ~f:(fun (spec_map, acc, defs) t ->
-      let spec_map, t, new_defs = rewrite_refs poly_env spec_map sp_env spec_structs t in
-      spec_map, t :: acc, defs @ new_defs)
-  in
-  spec_map, List.rev ts_rev, defs
+  let ty = rewrite_ty ~type_poly_env:st.type_poly_env t.ty in
+  { t with desc; ty }
 ;;
+
+(* ===== Output types ===== *)
 
 type ty =
   | TyFloat
@@ -451,6 +644,8 @@ type top =
 let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
 
 type t = Program of top list [@@deriving sexp_of]
+
+(* ===== Conversion from Typecheck types ===== *)
 
 let rec ty_of (t : Typecheck.ty) : ty Compiler_error.t =
   match t with
@@ -571,68 +766,129 @@ let top_of_tc (t : Typecheck.top) : top Compiler_error.t =
   Ok { desc; ty; loc = t.loc }
 ;;
 
-let build_spec_structs (Program tops : Typecheck.t) (sp_env : Specialize_params.env)
-  : (string list * (string * Typecheck.ty) list) String.Map.t
-  =
-  let from_program =
+let monomorphize (program : Typecheck.t) : t Compiler_error.t =
+  let (Program tops) = program in
+  (* Build state *)
+  let poly_type_tops =
+    List.filter_map tops ~f:(fun top ->
+      match top.desc with
+      | TypeDef (name, (RecordDecl (params, _) as decl)) when not (List.is_empty params)
+        -> Some (name, decl, top.loc)
+      | TypeDef (name, (VariantDecl (params, _) as decl)) when not (List.is_empty params)
+        -> Some (name, decl, top.loc)
+      | _ -> None)
+  in
+  let type_poly_env =
+    poly_type_tops
+    |> List.map ~f:(fun (name, decl, _) -> name, decl)
+    |> String.Map.of_alist_exn
+  in
+  let type_poly_locs =
+    poly_type_tops
+    |> List.map ~f:(fun (name, _, loc) -> name, loc)
+    |> String.Map.of_alist_exn
+  in
+  let structs_for_constrs =
     List.filter_map tops ~f:(fun top ->
       match top.desc with
       | TypeDef (name, RecordDecl (params, fields)) -> Some (name, (params, fields))
       | _ -> None)
+    |> String.Map.of_alist_exn
   in
-  (* Also include original parametrized record decls from sp_env so that
-     solve_scheme_constrs can resolve FieldAccess constraints that reference
-     the un-mangled struct name (e.g. "box" instead of "r_box_float"). *)
-  let from_sp_env =
-    Map.to_alist sp_env
-    |> List.filter_map ~f:(fun (name, decl) ->
-      match decl with
-      | Typecheck.RecordDecl (params, fields) -> Some (name, (params, fields))
-      | Typecheck.VariantDecl _ -> None)
+  let poly_names =
+    tops
+    |> List.filter_map ~f:(fun top ->
+      match top.desc with
+      | Define (_, v, _) when not (is_concrete top.ty) -> Some v
+      | _ -> None)
+    |> String.Set.of_list
   in
-  from_program @ from_sp_env |> String.Map.of_alist_exn
-;;
-
-let monomorphize ~(sp_env : Specialize_params.env) (program : Typecheck.t)
-  : t Compiler_error.t
-  =
-  let (Program tops) = program in
-  let spec_structs = build_spec_structs program sp_env in
-  let _, _, tops =
-    List.fold
-      tops
-      ~init:(String.Map.empty, String.Map.empty, [])
-      ~f:(fun (poly_env, env, acc) (top : Typecheck.top) ->
-        match top.desc with
-        (* Polymorphic case: register in poly_env, emit nothing *)
-        | Define (recur, v, bind) when not (Specialize_params.is_concrete top.ty) ->
-          let entry =
-            { poly_type = top.ty
-            ; poly_bind = bind
-            ; poly_recur = recur
-            ; poly_loc = top.loc
-            ; poly_constrs = top.scheme_constrs
-            }
-          in
-          let poly_env = Map.set poly_env ~key:v ~data:entry in
-          poly_env, env, acc
-        (* Monomorphic case: resolve poly refs, rewrite, emit *)
-        | Define (recur, v, bind) ->
-          let refs = collect_poly_refs poly_env bind in
-          let env, ref_defs =
-            List.fold refs ~init:(env, []) ~f:(fun (env, defs) (name, ty) ->
-              let env, _, new_defs =
-                resolve_spec poly_env env sp_env spec_structs name ty
-              in
-              env, defs @ new_defs)
-          in
-          let env, bind, inner_defs =
-            rewrite_refs poly_env env sp_env spec_structs bind
-          in
-          let top : Typecheck.top = { top with desc = Define (recur, v, bind) } in
-          poly_env, env, acc @ ref_defs @ inner_defs @ [ top ]
-        | Extern _ | TypeDef _ -> poly_env, env, acc @ [ top ])
+  let st =
+    { type_poly_env
+    ; structs_for_constrs
+    ; poly_names
+    ; poly_fn_env = ref String.Map.empty
+    ; spec_map = ref String.Map.empty
+    ; output_tops = ref []
+    }
   in
-  let%map tops = Compiler_error.all (List.map tops ~f:top_of_tc) in
+  (* Emit concrete TypeDef tops for all parametrized type instantiations *)
+  let instances =
+    List.concat_map tops ~f:(collect_from_top ~type_poly_env) |> dedup_tagged_instances
+  in
+  (* Rewrite field/ctor types in a specialized TypeDef top *)
+  let rewrite_spec_typedef (top : Typecheck.top) : Typecheck.top =
+    match top.desc with
+    | TypeDef (name, RecordDecl (params, fields)) ->
+      let fields =
+        List.map fields ~f:(fun (fn, fty) -> fn, rewrite_ty ~type_poly_env fty)
+      in
+      { top with desc = TypeDef (name, RecordDecl (params, fields)) }
+    | TypeDef (name, VariantDecl (params, ctors)) ->
+      let ctors =
+        List.map ctors ~f:(fun (cn, tys) ->
+          cn, List.map tys ~f:(rewrite_ty ~type_poly_env))
+      in
+      { top with desc = TypeDef (name, VariantDecl (params, ctors)) }
+    | _ -> top
+  in
+  let spec_type_tops =
+    List.filter_map instances ~f:(function
+      | `Record (name, args) when Map.mem type_poly_env name ->
+        let loc = Map.find_exn type_poly_locs name in
+        Some (specialize_struct ~type_poly_env ~loc name args |> rewrite_spec_typedef)
+      | `Variant (name, args) when Map.mem type_poly_env name ->
+        let loc = Map.find_exn type_poly_locs name in
+        Some (specialize_variant ~type_poly_env ~loc name args |> rewrite_spec_typedef)
+      | _ -> None)
+  in
+  st.output_tops := spec_type_tops;
+  (* Process tops *)
+  List.iter tops ~f:(fun top ->
+    match top.desc with
+    (* Skip poly TypeDef templates — already handled previous *)
+    | TypeDef (name, _) when Map.mem type_poly_env name -> ()
+    | Extern _ ->
+      let top = { top with ty = rewrite_ty ~type_poly_env top.ty } in
+      st.output_tops := !(st.output_tops) @ [ top ]
+    (* Concrete TypeDef: rewrite field/ctor types *)
+    | TypeDef (name, RecordDecl (params, fields)) ->
+      let fields =
+        List.map fields ~f:(fun (fn, fty) -> fn, rewrite_ty ~type_poly_env fty)
+      in
+      let ty = rewrite_ty ~type_poly_env top.ty in
+      st.output_tops
+      := !(st.output_tops)
+         @ [ { top with ty; desc = TypeDef (name, RecordDecl (params, fields)) } ]
+    | TypeDef (name, VariantDecl (params, ctors)) ->
+      let ctors =
+        List.map ctors ~f:(fun (cn, tys) ->
+          cn, List.map tys ~f:(rewrite_ty ~type_poly_env))
+      in
+      let ty = rewrite_ty ~type_poly_env top.ty in
+      st.output_tops
+      := !(st.output_tops)
+         @ [ { top with ty; desc = TypeDef (name, VariantDecl (params, ctors)) } ]
+    (* Poly Define: register in poly_fn_env, don't emit *)
+    | Define (recur, v, bind) when not (is_concrete top.ty) ->
+      let entry =
+        { poly_type = top.ty
+        ; poly_bind = bind
+        ; poly_recur = recur
+        ; poly_loc = top.loc
+        ; poly_constrs = top.scheme_constrs
+        }
+      in
+      st.poly_fn_env := Map.set !(st.poly_fn_env) ~key:v ~data:entry
+    (* Concrete Define: resolve poly refs, rewrite, emit *)
+    | Define (recur, v, bind) ->
+      let refs = collect_poly_refs !(st.poly_fn_env) bind in
+      List.iter refs ~f:(fun (name, ty) -> ignore (resolve_spec st name ty));
+      let bind = rewrite_refs st bind in
+      let ty = rewrite_ty ~type_poly_env top.ty in
+      st.output_tops
+      := !(st.output_tops) @ [ { top with ty; desc = Define (recur, v, bind) } ]);
+  (* Lower Typecheck types to Monomorphize types *)
+  let%map tops = Compiler_error.all (List.map !(st.output_tops) ~f:top_of_tc) in
   Program tops
 ;;

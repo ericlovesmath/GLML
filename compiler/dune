@@ -12,7 +12,6 @@
    stlc
    uniquify
    typecheck
-   specialize_params
    monomorphize
    uncurry
    lambda_lift

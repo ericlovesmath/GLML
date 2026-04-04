@@ -7,7 +7,6 @@ module Passes : sig
     | Stlc
     | Uniquify
     | Typecheck
-    | Specialize_params
     | Monomorphize
     | Uncurry
     | Lambda_lift
