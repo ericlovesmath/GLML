@@ -75,7 +75,7 @@ const inputView = new EditorView({
           key: "Ctrl-Enter",
           mac: "Cmd-Enter",
           run: () => {
-            compile(inputView.state.doc.toString());
+            glmlReady(() => compile(inputView.state.doc.toString()));
             return true;
           },
         },
@@ -95,6 +95,19 @@ function setContent(view: EditorView, text: string): void {
   view.dispatch({
     changes: { from: 0, to: view.state.doc.length, insert: text },
   });
+}
+
+function glmlReady(cb: () => void): void {
+  if (window.glml) {
+    cb();
+  } else {
+    const check = setInterval(() => {
+      if (window.glml) {
+        clearInterval(check);
+        cb();
+      }
+    }, 50);
+  }
 }
 
 function compile(source: string): void {
@@ -121,11 +134,11 @@ for (const [name] of EXAMPLES) {
 SELECT.addEventListener("change", () => {
   const source = EXAMPLES[SELECT.selectedIndex][1];
   setContent(inputView, source);
-  compile(source);
+  glmlReady(() => compile(source));
 });
 
 COMPILE.addEventListener("click", () => {
-  compile(inputView.state.doc.toString());
+  glmlReady(() => compile(inputView.state.doc.toString()));
 });
 
 const savedVim = localStorage.getItem("vimMode") === "true";
@@ -145,4 +158,4 @@ VIM_TOGGLE.addEventListener("change", () => {
   }
 });
 
-compile(EXAMPLES[0][1]);
+glmlReady(() => compile(EXAMPLES[0][1]));
