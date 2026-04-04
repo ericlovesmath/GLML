@@ -5,6 +5,8 @@ import { Compartment } from "@codemirror/state";
 import { vim, getCM } from "@replit/codemirror-vim";
 import { initRenderer, compileAndLinkGLSL } from "./renderer";
 import { EXAMPLES } from "./examples";
+import { glmlExtension } from "./glml-language";
+import { glslExtension } from "./glsl-language";
 
 const ERROR_OUT = document.getElementById("error-output") as HTMLDivElement;
 const COMPILE = document.getElementById("compile-btn") as HTMLButtonElement;
@@ -20,7 +22,7 @@ initRenderer(canvas);
 const darkTheme = EditorView.theme(
   {
     "&": {
-      backgroundColor: "#16162a",
+      backgroundColor: "#1e1e2e",
       color: "#cdd6f4",
       height: "100%",
     },
@@ -31,8 +33,8 @@ const darkTheme = EditorView.theme(
       fontSize: "13px",
     },
     ".cm-gutters": {
-      backgroundColor: "#16162a",
-      color: "#585b70",
+      backgroundColor: "#1e1e2e",
+      color: "#45475a",
       border: "none",
     },
     ".cm-activeLineGutter": {
@@ -41,7 +43,7 @@ const darkTheme = EditorView.theme(
     },
     ".cm-activeLine": { backgroundColor: "#313244" },
     ".cm-selectionBackground, ::selection": {
-      backgroundColor: "#45475a !important",
+      backgroundColor: "#585b70 !important",
     },
     ".cm-cursor": { borderLeftColor: "#f5c2e7" },
   },
@@ -64,6 +66,7 @@ const inputView = new EditorView({
   extensions: [
     basicSetup,
     darkTheme,
+    ...glmlExtension,
     vimCompartment.of([]),
     vimStatusListener,
     keymap.of([
@@ -82,7 +85,7 @@ const inputView = new EditorView({
 
 const outputView = new EditorView({
   doc: "",
-  extensions: [basicSetup, darkTheme, EditorView.editable.of(false)],
+  extensions: [basicSetup, darkTheme, ...glslExtension, EditorView.editable.of(false)],
   parent: document.getElementById("glsl-output")!,
 });
 
