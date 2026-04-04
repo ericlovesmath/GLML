@@ -7,7 +7,139 @@ module Err = Compiler_error.Pass (struct
     let name = "monomorphize"
   end)
 
-(* ===== Helpers ===== *)
+(* ===== Helper types ===== *)
+
+type poly_def =
+  { poly_type : Typecheck.ty
+  ; poly_bind : Typecheck.term
+  ; poly_recur : recur
+  ; poly_loc : Lexer.loc
+  ; poly_constrs : Typecheck.constr list
+  }
+
+type spec_map = (Typecheck.ty * string) list String.Map.t
+
+(* Read-only context. Built once before processing *)
+type env =
+  { type_poly_env : Typecheck.type_decl String.Map.t
+  ; structs_for_constrs : (string list * (string * Typecheck.ty) list) String.Map.t
+  ; poly_names : String.Set.t
+  ; poly_fn_env : poly_def String.Map.t
+  }
+
+(* Write accumulator. [all_tops_rev] holds both specializations and
+   concrete tops in reverse program order, so that [List.rev all_tops_rev]
+   gives the correct declaration order. *)
+type acc =
+  { spec_map : spec_map
+  ; all_tops_rev : Typecheck.top list
+  }
+
+(* ===== Output types ===== *)
+
+(* TODO: Move types to top *)
+type ty =
+  | TyFloat
+  | TyInt
+  | TyBool
+  | TyVec of int
+  | TyMat of int * int
+  | TyArrow of ty * ty
+  | TyRecord of string
+  | TyVariant of string
+[@@deriving equal]
+
+let rec sexp_of_ty = function
+  | TyFloat -> Atom "float"
+  | TyInt -> Atom "int"
+  | TyBool -> Atom "bool"
+  | TyVec i -> List [ Atom "vec"; Atom (Int.to_string i) ]
+  | TyMat (x, y) -> List [ Atom "mat"; Atom (Int.to_string x); Atom (Int.to_string y) ]
+  | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
+  | TyRecord s -> Atom s
+  | TyVariant s -> Atom s
+;;
+
+type type_decl =
+  | RecordDecl of (string * ty) list
+  | VariantDecl of (string * ty list) list
+[@@deriving sexp_of]
+
+type term_desc =
+  | Var of string
+  | Float of float
+  | Int of int
+  | Bool of bool
+  | Vec of int * term list
+  | Mat of int * int * term list
+  | Lam of string * term
+  | App of term * term
+  | Let of recur * string * term * term
+  | If of term * term * term
+  | Bop of Glsl.binary_op * term * term
+  | Index of term * int
+  | Builtin of Glsl.builtin * term list
+  | Record of string * term list
+  | Field of term * string
+  | Variant of string * string * term list
+  | Match of term * (Stlc.pat * term) list
+
+and term =
+  { desc : term_desc
+  ; ty : ty
+  ; loc : Lexer.loc
+  }
+
+let rec sexp_of_term_desc : term_desc -> Sexp.t = function
+  | Var v -> Atom v
+  | Float f -> Atom (Float.to_string f)
+  | Int i -> Atom (Int.to_string i)
+  | Bool b -> Atom (Bool.to_string b)
+  | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_term)
+  | Mat (x, y, ts) ->
+    List
+      (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
+       :: List.map ts ~f:sexp_of_term)
+  | Lam (v, body) -> List [ Atom "lambda"; Atom v; sexp_of_term body ]
+  | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
+  | Let (Rec n, v, bind, body) ->
+    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
+    List [ Atom "let"; rec_tag; Atom v; sexp_of_term bind; sexp_of_term body ]
+  | Let (Nonrec, v, bind, body) ->
+    List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
+  | If (c, t, e) -> List [ Atom "if"; sexp_of_term c; sexp_of_term t; sexp_of_term e ]
+  | Bop (op, l, r) ->
+    List [ Atom (Glsl.string_of_binary_op op); sexp_of_term l; sexp_of_term r ]
+  | Index (t, i) -> List [ Atom "index"; sexp_of_term t; Atom (Int.to_string i) ]
+  | Builtin (b, ts) ->
+    List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
+  | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_term)
+  | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
+  | Variant (ty_name, ctor, args) ->
+    List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_term)
+  | Match (scrutinee, cases) ->
+    let sexp_of_case (pat, body) = List [ Stlc.sexp_of_pat pat; sexp_of_term body ] in
+    List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
+
+and sexp_of_term t = List [ sexp_of_term_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
+
+type top_desc =
+  | Define of recur * string * term
+  | Extern of string
+  | TypeDef of string * type_decl
+[@@deriving sexp_of]
+
+type top =
+  { desc : top_desc
+  ; ty : ty
+  ; loc : Lexer.loc
+  }
+
+let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
+
+type t = Program of top list [@@deriving sexp_of]
+
+(* ===== Param Specialization Helpers ===== *)
 
 let rec mangle_ty (ty : Typecheck.ty) : string =
   match ty with
@@ -370,31 +502,7 @@ let rename_var (src : string) (dst : string) =
   subst_var ~name:src ~new_name:dst ~pred:(Fun.const true)
 ;;
 
-type poly_def =
-  { poly_type : Typecheck.ty
-  ; poly_bind : Typecheck.term
-  ; poly_recur : recur
-  ; poly_loc : Lexer.loc
-  ; poly_constrs : Typecheck.constr list
-  }
-
-type spec_map = (Typecheck.ty * string) list String.Map.t
-
-(* Read-only context. Built once before processing *)
-type env =
-  { type_poly_env : Typecheck.type_decl String.Map.t
-  ; structs_for_constrs : (string list * (string * Typecheck.ty) list) String.Map.t
-  ; poly_names : String.Set.t
-  ; poly_fn_env : poly_def String.Map.t
-  }
-
-(* Write accumulator. [all_tops_rev] holds both specializations and
-   concrete tops in reverse program order, so that [List.rev all_tops_rev]
-   gives the correct declaration order. *)
-type acc =
-  { spec_map : spec_map
-  ; all_tops_rev : Typecheck.top list
-  }
+(* ==== Env and Acc ==== *)
 
 let collect_poly_refs (poly_fn_env : poly_def String.Map.t) (t : Typecheck.term)
   : (string * Typecheck.ty) list
@@ -569,8 +677,8 @@ and rewrite_refs (env : env) (acc : acc) (t : Typecheck.term)
             .desc ))
     | Let (recur, v, constrs, bind, body) ->
       let%bind acc, bind = rewrite_refs env acc bind in
-      let%map acc, body = rewrite_refs env acc body in
-      acc, Let (recur, v, constrs, bind, body)
+      let%bind acc, body = rewrite_refs env acc body in
+      Ok (acc, Let (recur, v, constrs, bind, body))
     | If (c, t, e) ->
       let%bind acc, c = rewrite_refs env acc c in
       let%bind acc, t = rewrite_refs env acc t in
@@ -615,110 +723,6 @@ and rewrite_refs (env : env) (acc : acc) (t : Typecheck.term)
   let%map acc, desc = inner in
   acc, { t with desc; ty }
 ;;
-
-(* ===== Output types ===== *)
-
-(* TODO: Move types to top *)
-type ty =
-  | TyFloat
-  | TyInt
-  | TyBool
-  | TyVec of int
-  | TyMat of int * int
-  | TyArrow of ty * ty
-  | TyRecord of string
-  | TyVariant of string
-[@@deriving equal]
-
-let rec sexp_of_ty = function
-  | TyFloat -> Atom "float"
-  | TyInt -> Atom "int"
-  | TyBool -> Atom "bool"
-  | TyVec i -> List [ Atom "vec"; Atom (Int.to_string i) ]
-  | TyMat (x, y) -> List [ Atom "mat"; Atom (Int.to_string x); Atom (Int.to_string y) ]
-  | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
-  | TyRecord s -> Atom s
-  | TyVariant s -> Atom s
-;;
-
-type type_decl =
-  | RecordDecl of (string * ty) list
-  | VariantDecl of (string * ty list) list
-[@@deriving sexp_of]
-
-type term_desc =
-  | Var of string
-  | Float of float
-  | Int of int
-  | Bool of bool
-  | Vec of int * term list
-  | Mat of int * int * term list
-  | Lam of string * term
-  | App of term * term
-  | Let of recur * string * term * term
-  | If of term * term * term
-  | Bop of Glsl.binary_op * term * term
-  | Index of term * int
-  | Builtin of Glsl.builtin * term list
-  | Record of string * term list
-  | Field of term * string
-  | Variant of string * string * term list
-  | Match of term * (Stlc.pat * term) list
-
-and term =
-  { desc : term_desc
-  ; ty : ty
-  ; loc : Lexer.loc
-  }
-
-let rec sexp_of_term_desc : term_desc -> Sexp.t = function
-  | Var v -> Atom v
-  | Float f -> Atom (Float.to_string f)
-  | Int i -> Atom (Int.to_string i)
-  | Bool b -> Atom (Bool.to_string b)
-  | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_term)
-  | Mat (x, y, ts) ->
-    List
-      (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
-       :: List.map ts ~f:sexp_of_term)
-  | Lam (v, body) -> List [ Atom "lambda"; Atom v; sexp_of_term body ]
-  | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
-  | Let (Rec n, v, bind, body) ->
-    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
-    List [ Atom "let"; rec_tag; Atom v; sexp_of_term bind; sexp_of_term body ]
-  | Let (Nonrec, v, bind, body) ->
-    List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
-  | If (c, t, e) -> List [ Atom "if"; sexp_of_term c; sexp_of_term t; sexp_of_term e ]
-  | Bop (op, l, r) ->
-    List [ Atom (Glsl.string_of_binary_op op); sexp_of_term l; sexp_of_term r ]
-  | Index (t, i) -> List [ Atom "index"; sexp_of_term t; Atom (Int.to_string i) ]
-  | Builtin (b, ts) ->
-    List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
-  | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_term)
-  | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
-  | Variant (ty_name, ctor, args) ->
-    List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_term)
-  | Match (scrutinee, cases) ->
-    let sexp_of_case (pat, body) = List [ Stlc.sexp_of_pat pat; sexp_of_term body ] in
-    List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
-
-and sexp_of_term t = List [ sexp_of_term_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
-
-type top_desc =
-  | Define of recur * string * term
-  | Extern of string
-  | TypeDef of string * type_decl
-[@@deriving sexp_of]
-
-type top =
-  { desc : top_desc
-  ; ty : ty
-  ; loc : Lexer.loc
-  }
-
-let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
-
-type t = Program of top list [@@deriving sexp_of]
 
 (* ===== Conversion from Typecheck types ===== *)
 
