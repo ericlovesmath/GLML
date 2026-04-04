@@ -20,7 +20,7 @@ type ty =
   | TyRecord of string * ty list
   | TyVariant of string * ty list
   | TyVar of string
-[@@deriving equal]
+[@@deriving equal, compare]
 
 let rec sexp_of_ty = function
   | TyFloat -> Atom "float"

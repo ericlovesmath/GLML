@@ -11,7 +11,7 @@ type ty =
   | TyRecord of string * ty list
   | TyVariant of string * ty list
   | TyVar of string
-[@@deriving sexp_of, equal]
+[@@deriving sexp_of, equal, compare]
 
 type type_decl =
   | RecordDecl of string list * (string * ty) list

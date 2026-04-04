@@ -37,7 +37,6 @@ type acc =
 
 (* ===== Output types ===== *)
 
-(* TODO: Move types to top *)
 type ty =
   | TyFloat
   | TyInt
@@ -141,6 +140,25 @@ type t = Program of top list [@@deriving sexp_of]
 
 (* ===== Param Specialization Helpers ===== *)
 
+let rec fold_term ~(f : 'a -> Typecheck.term -> 'a) (acc : 'a) (t : Typecheck.term) : 'a =
+  let fold = fold_term ~f in
+  let acc = f acc t in
+  match t.desc with
+  | Var _ | Float _ | Int _ | Bool _ -> acc
+  | Vec (_, ts) | Mat (_, _, ts) | Builtin (_, ts) | Record (_, ts) ->
+    List.fold ts ~init:acc ~f:fold
+  | Lam (_, body) -> fold acc body
+  | App (fn, x) -> fold (fold acc fn) x
+  | Let (_, _, _, bind, body) -> fold (fold acc bind) body
+  | If (c, t, e) -> fold (fold (fold acc c) t) e
+  | Bop (_, l, r) -> fold (fold acc l) r
+  | Index (t, _) | Field (t, _) -> fold acc t
+  | Variant (_, _, args) -> List.fold args ~init:acc ~f:fold
+  | Match (scrutinee, cases) ->
+    let acc = fold acc scrutinee in
+    List.fold cases ~init:acc ~f:(fun acc (_, body) -> fold acc body)
+;;
+
 let rec mangle_ty (ty : Typecheck.ty) : string =
   match ty with
   | TyFloat -> "float"
@@ -165,11 +183,13 @@ let rec is_concrete (ty : Typecheck.ty) : bool =
   | TyArrow (a, b) -> is_concrete a && is_concrete b
 ;;
 
+(** Tagged parametrized instances, where [name * [Left of record | Right of struct]] *)
+type param = string * (Typecheck.ty list, Typecheck.ty list) Either.t [@@deriving compare]
+
 let rec collect_from_ty
           ~(type_poly_env : Typecheck.type_decl String.Map.t)
           (ty : Typecheck.ty)
-  : [ `Record of string * Typecheck.ty list | `Variant of string * Typecheck.ty list ]
-      list
+  : param list
   =
   match ty with
   | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVar _ -> []
@@ -187,7 +207,7 @@ let rec collect_from_ty
           collect_from_ty ~type_poly_env (Typecheck.subst_ty sub fty))
       | _ -> []
     in
-    deps_from_args @ deps_from_fields @ [ `Record (name, args) ]
+    deps_from_args @ deps_from_fields @ [ name, First args ]
   | TyVariant (name, args) ->
     let deps_from_args = List.concat_map args ~f:(collect_from_ty ~type_poly_env) in
     let deps_from_ctors =
@@ -199,42 +219,21 @@ let rec collect_from_ty
             collect_from_ty ~type_poly_env (Typecheck.subst_ty sub fty)))
       | _ -> []
     in
-    deps_from_args @ deps_from_ctors @ [ `Variant (name, args) ]
+    deps_from_args @ deps_from_ctors @ [ name, Second args ]
 ;;
 
 let collect_from_term
       ~(type_poly_env : Typecheck.type_decl String.Map.t)
       (t : Typecheck.term)
-  : [ `Record of string * Typecheck.ty list | `Variant of string * Typecheck.ty list ]
-      list
+  : param list
   =
-  let rec walk (t : Typecheck.term) =
-    let from_ty = collect_from_ty ~type_poly_env t.ty in
-    let from_desc =
-      match t.desc with
-      | Var _ | Float _ | Int _ | Bool _ -> []
-      | Vec (_, ts) | Mat (_, _, ts) | Builtin (_, ts) | Record (_, ts) ->
-        List.concat_map ts ~f:walk
-      | Lam (_, body) -> walk body
-      | App (f, x) -> walk f @ walk x
-      | Let (_, _, _, bind, body) -> walk bind @ walk body
-      | If (c, t, e) -> walk c @ walk t @ walk e
-      | Bop (_, l, r) -> walk l @ walk r
-      | Index (t, _) | Field (t, _) -> walk t
-      | Variant (_, _, args) -> List.concat_map args ~f:walk
-      | Match (scrutinee, cases) ->
-        walk scrutinee @ List.concat_map cases ~f:(fun (_, body) -> walk body)
-    in
-    from_ty @ from_desc
-  in
-  walk t
+  fold_term ~f:(fun acc t -> acc @ collect_from_ty ~type_poly_env t.ty) [] t
 ;;
 
 let collect_from_top
       ~(type_poly_env : Typecheck.type_decl String.Map.t)
       (top : Typecheck.top)
-  : [ `Record of string * Typecheck.ty list | `Variant of string * Typecheck.ty list ]
-      list
+  : param list
   =
   match top.desc with
   | TypeDef (_, RecordDecl (params, _)) when not (List.is_empty params) -> []
@@ -247,26 +246,6 @@ let collect_from_top
   | Extern _ -> []
   | Define (_, _, bind) ->
     collect_from_ty ~type_poly_env top.ty @ collect_from_term ~type_poly_env bind
-;;
-
-let dedup_tagged_instances
-      (instances :
-        [ `Record of string * Typecheck.ty list | `Variant of string * Typecheck.ty list ]
-          list)
-  : [ `Record of string * Typecheck.ty list | `Variant of string * Typecheck.ty list ]
-      list
-  =
-  let eq a b =
-    match a, b with
-    | `Record (n, args), `Record (n', args') ->
-      String.equal n n' && List.equal Typecheck.equal_ty args args'
-    | `Variant (n, args), `Variant (n', args') ->
-      String.equal n n' && List.equal Typecheck.equal_ty args args'
-    | _, _ -> false
-  in
-  List.fold instances ~init:[] ~f:(fun acc inst ->
-    if List.exists acc ~f:(eq inst) then acc else inst :: acc)
-  |> List.rev
 ;;
 
 let specialize_struct
@@ -422,24 +401,6 @@ let rec subst ~(poly : Typecheck.ty) ~(concrete : Typecheck.ty)
     List.concat_map (List.zip_exn args args') ~f:(fun (a, a') ->
       subst ~poly:a ~concrete:a')
   | _, _ -> []
-;;
-
-let rec fold_term ~(f : 'a -> Typecheck.term -> 'a) (acc : 'a) (t : Typecheck.term) : 'a =
-  let acc = f acc t in
-  match t.desc with
-  | Var _ | Float _ | Int _ | Bool _ -> acc
-  | Vec (_, ts) | Mat (_, _, ts) | Builtin (_, ts) | Record (_, ts) ->
-    List.fold ts ~init:acc ~f:(fold_term ~f)
-  | Lam (_, body) -> fold_term ~f acc body
-  | App (fn, x) -> fold_term ~f (fold_term ~f acc fn) x
-  | Let (_, _, _, bind, body) -> fold_term ~f (fold_term ~f acc bind) body
-  | If (c, t, e) -> fold_term ~f (fold_term ~f (fold_term ~f acc c) t) e
-  | Bop (_, l, r) -> fold_term ~f (fold_term ~f acc l) r
-  | Index (t, _) | Field (t, _) -> fold_term ~f acc t
-  | Variant (_, _, args) -> List.fold args ~init:acc ~f:(fold_term ~f)
-  | Match (scrutinee, cases) ->
-    let acc = fold_term ~f acc scrutinee in
-    List.fold cases ~init:acc ~f:(fun acc (_, body) -> fold_term ~f acc body)
 ;;
 
 let collect_var_usages (name : string) (t : Typecheck.term) : Typecheck.ty list =
@@ -901,7 +862,9 @@ let monomorphize (program : Typecheck.t) : t Compiler_error.t =
   let env = { type_poly_env; structs_for_constrs; poly_names; poly_fn_env } in
   (* Emit concrete TypeDef tops for all parametrized type instantiations *)
   let instances =
-    List.concat_map tops ~f:(collect_from_top ~type_poly_env) |> dedup_tagged_instances
+    tops
+    |> List.concat_map ~f:(collect_from_top ~type_poly_env)
+    |> List.stable_dedup ~compare:compare_param
   in
   let rewrite_spec_typedef (top : Typecheck.top) : Typecheck.top =
     match top.desc with
@@ -920,10 +883,10 @@ let monomorphize (program : Typecheck.t) : t Compiler_error.t =
   in
   let spec_type_tops =
     List.filter_map instances ~f:(function
-      | `Record (name, args) when Map.mem type_poly_env name ->
+      | name, First args when Map.mem type_poly_env name ->
         let loc = Map.find_exn type_poly_locs name in
         Some (specialize_struct ~type_poly_env ~loc name args |> rewrite_spec_typedef)
-      | `Variant (name, args) when Map.mem type_poly_env name ->
+      | name, Second args when Map.mem type_poly_env name ->
         let loc = Map.find_exn type_poly_locs name in
         Some (specialize_variant ~type_poly_env ~loc name args |> rewrite_spec_typedef)
       | _ -> None)
