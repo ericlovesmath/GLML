@@ -1,7 +1,7 @@
 import { inject } from "@vercel/analytics";
 import { EditorView, basicSetup } from "codemirror";
 import { keymap } from "@codemirror/view";
-import { Compartment } from "@codemirror/state";
+import { Compartment, Prec } from "@codemirror/state";
 import { vim, getCM } from "@replit/codemirror-vim";
 import { initRenderer, compileAndLinkGLSL } from "./renderer";
 import { EXAMPLES } from "./examples";
@@ -38,10 +38,10 @@ const darkTheme = EditorView.theme(
       border: "none",
     },
     ".cm-activeLineGutter": {
-      backgroundColor: "#313244",
+      backgroundColor: "transparent",
       color: "#b4befe",
     },
-    ".cm-activeLine": { backgroundColor: "#313244" },
+    ".cm-activeLine": { backgroundColor: "transparent" },
     ".cm-selectionBackground, ::selection": {
       backgroundColor: "#585b70 !important",
     },
@@ -69,16 +69,18 @@ const inputView = new EditorView({
     ...glmlExtension,
     vimCompartment.of([]),
     vimStatusListener,
-    keymap.of([
-      {
-        key: "Ctrl-Enter",
-        mac: "Cmd-Enter",
-        run: () => {
-          compile(inputView.state.doc.toString());
-          return true;
+    Prec.highest(
+      keymap.of([
+        {
+          key: "Ctrl-Enter",
+          mac: "Cmd-Enter",
+          run: () => {
+            compile(inputView.state.doc.toString());
+            return true;
+          },
         },
-      },
-    ]),
+      ]),
+    ),
   ],
   parent: document.getElementById("glml-input")!,
 });
