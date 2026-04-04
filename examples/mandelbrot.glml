@@ -1,38 +1,37 @@
 #extern vec2 u_resolution
 #extern float u_time
 
-// Normalizes coordinates to [-1, 1] and handles aspect ratio
-let get_uv coord =
-  let top = 2.0 * coord - u_resolution in
-  let bot = #min(u_resolution.0, u_resolution.1) in
-  top / bot
+type option['a] = Some of 'a | None
 
 // Recursive Mandelbrot function
-// zx, zy: Current state
-// cx, cy: Constant location
-// i: Iteration counter (float to avoid casting)
-let rec mandel zx zy cx cy i =
-  if #length([zx, zy]) > 2. || i > 150. then
-    i
-  else
-    let next_zx = zx * zx - zy * zy + cx in
-    let next_zy = 2.0 * zx * zy + cy in
-    mandel next_zx next_zy cx cy (i + 1.0)
+// [c] is a vec2 that represents the complex valued location of interest
+// [mandelbrot] returns the iteration count (or None if exceeded maximum)
+let mandelbrot c =
+  let rec mandel z i =
+    if i > 150 then
+      None
+    else if #length(z) > 2 then
+      Some (i / 150.)
+    else
+      let zx = z.0 * z.0 - z.1 * z.1 in
+      let zy = 2 * z.0 * z.1 in
+      let z' = [zx, zy] + c in
+      mandel z' (i + 1)
+  in
+  mandel [0, 0] 0
 
 let main (coord : vec2) =
-  let uv = get_uv coord in
+  let uv =
+    let top = 2 * coord - u_resolution in
+    let bot = #min(u_resolution.0, u_resolution.1) in
+    top / bot
+  in
 
-  // Coordinates for the Seahorse Valley, zooming in and out
+  // Zooming mandelbrot set in Seahorse Valley
   let zoom = #exp(#sin(u_time * 0.4) * 4.5 + 3.5) in
-  let cx = -0.7453 + uv.0 / zoom in
-  let cy = 0.1127 + uv.1 / zoom in
+  let seahorse_valley = [-0.7453, 0.1127] + uv / zoom in
 
-  // Mandelbrot starting at <0., 0.>
-  let iter = mandel 0.0 0.0 cx cy 0.0 in
-
-  if iter > 149.0 then
-    // Points inside the set are black
-    [ 0.0, 0.0, 0.0 ]
-  else
-    let n = iter / 150.0 in
-    #sin(n * [10.0, 20.0, 30.0] + u_time) * 0.5 + 0.5
+  // Use iteration count as color, black if iteration count exceeded
+  match mandelbrot seahorse_valley with
+  | None -> [ 0, 0, 0 ]
+  | Some n -> #sin(n * [10, 20, 30] + u_time) * 0.5 + 0.5

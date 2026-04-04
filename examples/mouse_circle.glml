@@ -4,14 +4,14 @@
 
 // Normalizes coordinates to [-1, 1]
 let get_uv coord =
-  let top = 2.0 * coord - u_resolution in
+  let top = 2 * coord - u_resolution in
   let bot = #min(u_resolution.0, u_resolution.1) in
   top / bot
 
 let main (coord : vec2) =
   let uv = get_uv coord in
-  let mouseUV = (2.0 * u_mouse - u_resolution) / u_resolution.1 in
-  let radius = #sin(u_time * 2.0) * 0.1 + 0.15 in
+  let mouseUV = (2 * u_mouse - u_resolution) / u_resolution.1 in
+  let radius = #sin(u_time * 2) * 0.1 + 0.15 in
   if #distance(uv, mouseUV) < radius
     then [ 0.0, 0.0, 0.5 ]
     else [ 0.5, 0.5, 1.0 ]

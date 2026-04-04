@@ -1,21 +1,21 @@
 #extern vec2 u_resolution
 #extern float u_time
 
+let size = 5
+
 // Normalizes coordinates to [-1, 1]
 let get_uv coord =
-  let top = 2.0 * coord - u_resolution in
+  let top = 2 * coord - u_resolution in
   let bot = #min(u_resolution.0, u_resolution.1) in
   top / bot
 
 let main (coord : vec2) =
   let uv = get_uv coord in
-  let size = 5.0 in
 
-  let cx = #floor(uv.0 * size + u_time * 2.0) in
-  let cy = #floor(uv.1 * size) in
-  let checker_sum = cx + cy in
+  let c = #floor(uv * size + [2 * u_time, 0]) in
+  let checker_sum = c.0 + c.1 in
 
-  let is_even = checker_sum - #floor(checker_sum / 2.0) * 2.0 in
+  let is_even = checker_sum - #floor(checker_sum / 2) * 2 in
 
   if is_even < 0.5
     then [ 0.2, 0.2, 0.2 ]
