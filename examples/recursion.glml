@@ -3,7 +3,7 @@
 
 // Normalizes coordinates to [-1, 1]
 let get_uv (coord : vec2) =
-  let top = 2.0 * coord - u_resolution in
+  let top = 2 * coord - u_resolution in
   let bot = #min(u_resolution.0, u_resolution.1) in
   top / bot
 
@@ -11,7 +11,7 @@ let get_uv (coord : vec2) =
 let rotate (angle : float) =
   let s = #sin(angle) in
   let c = #cos(angle) in
-  [[c, -1. * s], [s, c]]
+  [[c, -s], [s, c]]
 
 // Euclidean GCD
 let rec gcd a b =
@@ -24,8 +24,8 @@ let main (coord : vec2) =
   let uv = get_uv coord in
   let uv = rotate u_time * uv in
 
-  let x = #abs(uv.0 * #sin(u_time * 2.) * 2.) in
-  let y = #abs(uv.1 * #sin(u_time * 2.) * 2.) in
+  let x = #abs(uv.0 * #sin(u_time * 2) * 2) in
+  let y = #abs(uv.1 * #sin(u_time * 2) * 2) in
 
   let res = gcd x y in
-  [ res, res * 0.5, 1.0 - res ]
+  [ res, res * 0.5, 1 - res ]

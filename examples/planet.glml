@@ -2,6 +2,8 @@
 #extern float u_time
 #extern vec2 u_mouse
 
+type option['a] = Some of 'a | None
+
 let rotate (p : vec2) (angle : float) =
   let s = #sin(angle) in
   let c = #cos(angle) in
@@ -11,7 +13,7 @@ let rotate (p : vec2) (angle : float) =
 let noise3d (p : vec3) =
   let i = #floor(p) in
   let f = #fract(p) in
-  let u = f * f * (3.0 - 2.0 * f) in
+  let u = f * f * (3 - 2 * f) in
 
   // Simple hash-based noise for terrain
   let hash (p : vec3) =
@@ -40,16 +42,17 @@ let noise3d (p : vec3) =
 
 // Fractal Brownian Motion for rough terrain
 let fbm (p : vec3) =
-  noise3d (p * 1.0) * 0.5
-  + noise3d (p * 2.0) * 0.25
-  + noise3d (p * 4.0) * 0.125
-  + noise3d (p * 8.0) * 0.0625
+  noise3d (p * 1) * 0.5
+  + noise3d (p * 2) * 0.25
+  + noise3d (p * 4) * 0.125
+  + noise3d (p * 8) * 0.0625
+  + noise3d (p * 16) * 0.03125
 
 // SDF: sphere with terrain displacement
 let sdPlanet (p : vec3) (radius : float) =
   let len = #length(p) in
   let dir = p / len in
-  let terrain = fbm (dir * 3.0) * 0.4 in
+  let terrain = fbm (dir * 3) * 0.4 in
   len - radius - terrain
 
 let map (p : vec3) = sdPlanet p 1.5
@@ -66,21 +69,21 @@ let getNormal (p : vec3) =
   #normalize([dx, dy, dz])
 
 // Raymarching loop
-let march (ro : vec3) (rd : vec3) =
-  let rec march (t : float) (steps : int) =
-    if steps > 120 then t
+let march (ro : vec3) (rd : vec3) : option[float] =
+  let rec march (t : float) (steps : int) : option[float] =
+    if steps > 120 then None
     else
       let d = map (ro + rd * t) in
-      if d < 0.0005 then t
-      else if t > 50.0 then 50.1
+      if d < 0.0005 then Some t
+      else if t > 50.0 then None
       else march (t + d * 0.8) (steps + 1)
   in
   march 0.0 0
 
 let main (coord : vec2) =
   let res_min = #min(u_resolution.0, u_resolution.1) in
-  let uv = (coord * 2.0 - u_resolution) / res_min in
-  let mouseUV = (u_mouse * 2.0 - u_resolution) / res_min in
+  let uv = (coord * 2 - u_resolution) / res_min in
+  let mouseUV = (u_mouse * 2 - u_resolution) / res_min in
 
   // Mouse rotation
   let rotate_by_mouse ray = 
@@ -98,9 +101,9 @@ let main (coord : vec2) =
   // March the ray
   let t = march ro rd in
 
-  if t > 50.0 then
-    [0, 0, 0]
-  else
+  match t with
+  | None -> [0, 0, 0]
+  | Some t ->
     // Hit the planet — compute shading
     let hitPos = ro + rd * t in
     let n = getNormal hitPos in
@@ -112,7 +115,7 @@ let main (coord : vec2) =
     let dir = hitPos / #length(hitPos) in
     let rawHeight = fbm (dir * 3.0) in
     let seaLevel = 0.35 in
-    let h_norm = #clamp((rawHeight - seaLevel) / (1.0 - seaLevel), 0.0, 1.0) in
+    let h_norm = #clamp((rawHeight - seaLevel) / (1 - seaLevel), 0, 1) in
 
     // Color palette
     let deepColor = [0.02, 0.05, 0.2] in
@@ -133,5 +136,4 @@ let main (coord : vec2) =
     let rim = fresnel * fresnel * fresnel * 0.4 in
     let atmoColor = [0.3, 0.5, 1.0] in
 
-    baseColor * (diff * 0.9 + ambient) +  atmoColor * rim
-
+    baseColor * (diff * 0.9 + ambient) + atmoColor * rim
