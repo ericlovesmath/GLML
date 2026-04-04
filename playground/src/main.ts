@@ -1,121 +1,143 @@
 import { inject } from "@vercel/analytics";
-import type * as Monaco from "monaco-editor/esm/vs/editor/editor.api";
+import { EditorView, basicSetup } from "codemirror";
+import { keymap } from "@codemirror/view";
+import { Compartment } from "@codemirror/state";
+import { vim, getCM } from "@replit/codemirror-vim";
 import { initRenderer, compileAndLinkGLSL } from "./renderer";
 import { EXAMPLES } from "./examples";
 
 const ERROR_OUT = document.getElementById("error-output") as HTMLDivElement;
 const COMPILE = document.getElementById("compile-btn") as HTMLButtonElement;
 const SELECT = document.getElementById("example-select") as HTMLSelectElement;
+const VIM_TOGGLE = document.getElementById("vim-toggle") as HTMLInputElement;
+const VIM_STATUS = document.getElementById("vim-status")!;
 
 inject();
 
-async function main(): Promise<void> {
-  const canvas = document.getElementById("gl-canvas") as HTMLCanvasElement;
-  initRenderer(canvas);
+const canvas = document.getElementById("gl-canvas") as HTMLCanvasElement;
+initRenderer(canvas);
 
-  const [
-    monaco,
-    { registerCatppuccin, registerGLML, registerGLSL },
-    { initVimMode },
-  ] = await Promise.all([
-    import("monaco-editor/esm/vs/editor/editor.api"),
-    import("./monaco-extensions"),
-    import("monaco-vim"),
-  ]);
-
-  registerCatppuccin();
-  registerGLML();
-  registerGLSL();
-
-  const EDITOR_OPTIONS: Monaco.editor.IStandaloneEditorConstructionOptions = {
-    theme: "catppuccin",
-    minimap: { enabled: false },
-    fontSize: 13,
-    fontFamily:
-      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-    lineNumbers: "on",
-    scrollBeyondLastLine: false,
-    automaticLayout: true,
-  };
-
-  const inputEditor = monaco.editor.create(
-    document.getElementById("glml-input")!,
-    {
-      ...EDITOR_OPTIONS,
-      language: "glml",
+const darkTheme = EditorView.theme(
+  {
+    "&": {
+      backgroundColor: "#16162a",
+      color: "#cdd6f4",
+      height: "100%",
     },
-  );
-
-  const outputEditor = monaco.editor.create(
-    document.getElementById("glsl-output")!,
-    {
-      ...EDITOR_OPTIONS,
-      language: "glsl",
-      readOnly: true,
+    ".cm-scroller": {
+      overflow: "auto",
+      fontFamily:
+        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+      fontSize: "13px",
     },
-  );
+    ".cm-gutters": {
+      backgroundColor: "#16162a",
+      color: "#585b70",
+      border: "none",
+    },
+    ".cm-activeLineGutter": {
+      backgroundColor: "#313244",
+      color: "#b4befe",
+    },
+    ".cm-activeLine": { backgroundColor: "#313244" },
+    ".cm-selectionBackground, ::selection": {
+      backgroundColor: "#45475a !important",
+    },
+    ".cm-cursor": { borderLeftColor: "#f5c2e7" },
+  },
+  { dark: true },
+);
 
-  function compile(source: string): void {
-    const result = window.glml.compile(source);
-    if (result.glsl !== null) {
-      outputEditor.setValue(result.glsl);
-      ERROR_OUT.textContent = "";
+const vimCompartment = new Compartment();
 
-      const glsl_error = compileAndLinkGLSL(result.glsl);
-      if (glsl_error !== null) {
-        ERROR_OUT.textContent = "WebGL: " + glsl_error;
-      }
-    } else {
-      outputEditor.setValue("");
-      ERROR_OUT.textContent = result.error ?? "Unknown error";
-    }
+const vimStatusListener = EditorView.updateListener.of((update) => {
+  if (!VIM_TOGGLE.checked) return;
+  const cm = getCM(update.view);
+  if (cm?.state?.vim) {
+    const mode: string = cm.state.vim.mode ?? "normal";
+    VIM_STATUS.textContent = "-- " + mode.toUpperCase() + " --";
   }
+});
 
-  for (const [name] of EXAMPLES) {
-    const opt = document.createElement("option");
-    opt.textContent = name;
-    SELECT.appendChild(opt);
-  }
+const inputView = new EditorView({
+  doc: EXAMPLES[0][1],
+  extensions: [
+    basicSetup,
+    darkTheme,
+    vimCompartment.of([]),
+    vimStatusListener,
+    keymap.of([
+      {
+        key: "Ctrl-Enter",
+        mac: "Cmd-Enter",
+        run: () => {
+          compile(inputView.state.doc.toString());
+          return true;
+        },
+      },
+    ]),
+  ],
+  parent: document.getElementById("glml-input")!,
+});
 
-  SELECT.addEventListener("change", () => {
-    const source = EXAMPLES[SELECT.selectedIndex][1];
-    inputEditor.setValue(source);
-    compile(source);
+const outputView = new EditorView({
+  doc: "",
+  extensions: [basicSetup, darkTheme, EditorView.editable.of(false)],
+  parent: document.getElementById("glsl-output")!,
+});
+
+function setContent(view: EditorView, text: string): void {
+  view.dispatch({
+    changes: { from: 0, to: view.state.doc.length, insert: text },
   });
-
-  COMPILE.addEventListener("click", () => {
-    compile(inputEditor.getValue());
-  });
-
-  inputEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () =>
-    compile(inputEditor.getValue()),
-  );
-
-  const VIM_TOGGLE = document.getElementById("vim-toggle") as HTMLInputElement;
-  const VIM_STATUS = document.getElementById("vim-status")!;
-  const savedVim = localStorage.getItem("vimMode") === "true";
-  VIM_TOGGLE.checked = savedVim;
-  let vimMode: ReturnType<typeof initVimMode> | null = savedVim
-    ? initVimMode(inputEditor, VIM_STATUS)
-    : null;
-
-  VIM_TOGGLE.addEventListener("change", () => {
-    localStorage.setItem("vimMode", VIM_TOGGLE.checked ? "true" : "false");
-    if (VIM_TOGGLE.checked) {
-      vimMode = initVimMode(inputEditor, VIM_STATUS);
-    } else {
-      vimMode?.dispose();
-      vimMode = null;
-      VIM_STATUS.textContent = "";
-    }
-  });
-
-  inputEditor.setValue(EXAMPLES[0][1]);
-  compile(EXAMPLES[0][1]);
 }
 
-if (document.readyState === "complete") {
-  main().catch(console.error);
-} else {
-  window.addEventListener("load", () => main().catch(console.error));
+function compile(source: string): void {
+  const result = window.glml.compile(source);
+  if (result.glsl !== null) {
+    setContent(outputView, result.glsl);
+    ERROR_OUT.textContent = "";
+    const glsl_error = compileAndLinkGLSL(result.glsl);
+    if (glsl_error !== null) {
+      ERROR_OUT.textContent = "WebGL: " + glsl_error;
+    }
+  } else {
+    setContent(outputView, "");
+    ERROR_OUT.textContent = result.error ?? "Unknown error";
+  }
 }
+
+for (const [name] of EXAMPLES) {
+  const opt = document.createElement("option");
+  opt.textContent = name;
+  SELECT.appendChild(opt);
+}
+
+SELECT.addEventListener("change", () => {
+  const source = EXAMPLES[SELECT.selectedIndex][1];
+  setContent(inputView, source);
+  compile(source);
+});
+
+COMPILE.addEventListener("click", () => {
+  compile(inputView.state.doc.toString());
+});
+
+const savedVim = localStorage.getItem("vimMode") === "true";
+VIM_TOGGLE.checked = savedVim;
+
+if (savedVim) {
+  inputView.dispatch({ effects: vimCompartment.reconfigure(vim()) });
+}
+
+VIM_TOGGLE.addEventListener("change", () => {
+  localStorage.setItem("vimMode", VIM_TOGGLE.checked ? "true" : "false");
+  if (VIM_TOGGLE.checked) {
+    inputView.dispatch({ effects: vimCompartment.reconfigure(vim()) });
+  } else {
+    inputView.dispatch({ effects: vimCompartment.reconfigure([]) });
+    VIM_STATUS.textContent = "";
+  }
+});
+
+compile(EXAMPLES[0][1]);
