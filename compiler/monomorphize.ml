@@ -25,105 +25,86 @@ let rec subst ~(poly : Typecheck.ty) ~(concrete : Typecheck.ty)
   | _, _ -> []
 ;;
 
+(** term deriving Foldable Generically, basically *)
+let rec fold_term ~(f : 'a -> Typecheck.term -> 'a) (acc : 'a) (t : Typecheck.term) : 'a =
+  let acc = f acc t in
+  match t.desc with
+  | Var _ | Float _ | Int _ | Bool _ -> acc
+  | Vec (_, ts) | Mat (_, _, ts) | Builtin (_, ts) | Record (_, ts) ->
+    List.fold ts ~init:acc ~f:(fold_term ~f)
+  | Lam (_, body) -> fold_term ~f acc body
+  | App (fn, x) -> fold_term ~f (fold_term ~f acc fn) x
+  | Let (_, _, _, bind, body) -> fold_term ~f (fold_term ~f acc bind) body
+  | If (c, t, e) -> fold_term ~f (fold_term ~f (fold_term ~f acc c) t) e
+  | Bop (_, l, r) -> fold_term ~f (fold_term ~f acc l) r
+  | Index (t, _) | Field (t, _) -> fold_term ~f acc t
+  | Variant (_, _, args) -> List.fold args ~init:acc ~f:(fold_term ~f)
+  | Match (scrutinee, cases) ->
+    let acc = fold_term ~f acc scrutinee in
+    List.fold cases ~init:acc ~f:(fun acc (_, body) -> fold_term ~f acc body)
+;;
+
 (** Collect all concrete types a variable is used at in a term *)
 let collect_var_usages (name : string) (t : Typecheck.term) : Typecheck.ty list =
-  let rec walk (acc : Typecheck.ty list) (t : Typecheck.term) : Typecheck.ty list =
-    let acc =
+  fold_term
+    ~f:(fun acc t ->
       match t.desc with
       | Var v when String.equal v name -> t.ty :: acc
-      | _ -> acc
-    in
-    match t.desc with
-    | Var _ | Float _ | Int _ | Bool _ -> acc
-    | Vec (_, ts) | Mat (_, _, ts) | Builtin (_, ts) | Record (_, ts) ->
-      List.fold ts ~init:acc ~f:walk
-    | Lam (_, body) -> walk acc body
-    | App (f, x) -> walk (walk acc f) x
-    | Let (_, _, _, bind, body) -> walk (walk acc bind) body
-    | If (c, t, e) -> walk (walk (walk acc c) t) e
-    | Bop (_, l, r) -> walk (walk acc l) r
-    | Index (t, _) | Field (t, _) -> walk acc t
-    | Variant (_, _, args) -> List.fold args ~init:acc ~f:walk
-    | Match (scrutinee, cases) ->
-      let acc = walk acc scrutinee in
-      List.fold cases ~init:acc ~f:(fun acc (_, body) -> walk acc body)
-  in
-  let usages = walk [] t in
-  List.stable_dedup usages ~compare:(fun a b -> if Typecheck.equal_ty a b then 0 else 1)
+      | _ -> acc)
+    []
+    t
+  |> List.stable_dedup ~compare:(fun a b -> if Typecheck.equal_ty a b then 0 else 1)
 ;;
 
-(** Rename variable references from old_name to new_name *)
-let rec rename_var (src : string) (dst : string) (t : Typecheck.term) : Typecheck.term =
-  let rename = rename_var src dst in
-  let desc : Typecheck.term_desc =
-    match t.desc with
-    | Var v when String.equal v src -> Var dst
-    | Var _ | Float _ | Int _ | Bool _ -> t.desc
-    | Vec (n, ts) -> Vec (n, List.map ts ~f:rename)
-    | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:rename)
-    | Lam (v, body) -> if String.equal v src then t.desc else Lam (v, rename body)
-    | App (f, x) -> App (rename f, rename x)
-    | Let (recur, v, constrs, bind, body) ->
-      let bind = rename bind in
-      let body = if String.equal v src then body else rename body in
-      Let (recur, v, constrs, bind, body)
-    | If (c, t, e) -> If (rename c, rename t, rename e)
-    | Bop (op, l, r) -> Bop (op, rename l, rename r)
-    | Index (t, i) -> Index (rename t, i)
-    | Builtin (b, ts) -> Builtin (b, List.map ts ~f:rename)
-    | Record (s, ts) -> Record (s, List.map ts ~f:rename)
-    | Field (t, f) -> Field (rename t, f)
-    | Variant (ty_name, ctor, args) -> Variant (ty_name, ctor, List.map args ~f:rename)
-    | Match (scrutinee, cases) ->
-      Match
-        ( rename scrutinee
-        , List.map cases ~f:(fun (pat, body) ->
-            let vars = Stlc.pat_bound_vars pat in
-            if List.mem vars src ~equal:String.equal then pat, body else pat, rename body)
-        )
-  in
-  { t with desc }
+(** Map over match cases, applying [f] to each body unless [var] is already bound by the pattern *)
+let map_cases_capture_avoiding
+      ~(var : string)
+      ~(f : Typecheck.term -> Typecheck.term)
+      (cases : (Stlc.pat * Typecheck.term) list)
+  : (Stlc.pat * Typecheck.term) list
+  =
+  List.map cases ~f:(fun (pat, body) ->
+    if List.mem (Stlc.pat_bound_vars pat) var ~equal:String.equal
+    then pat, body
+    else pat, f body)
 ;;
 
-(** Replace references to [name] that have a specific type with [new_name] *)
-let rec rewrite_var_at_type
-          (name : string)
-          (new_name : string)
-          (target_ty : Typecheck.ty)
+(** Capture-avoiding variable substitution. Rewrites [Var name] to [Var new_name] when [pred t] holds. *)
+let rec subst_var
+          ~(name : string)
+          ~(new_name : string)
+          ~(pred : Typecheck.term -> bool)
           (t : Typecheck.term)
   : Typecheck.term
   =
-  let rewrite = rewrite_var_at_type name new_name target_ty in
+  let subst = subst_var ~name ~new_name ~pred in
   let desc : Typecheck.term_desc =
     match t.desc with
-    | Var v when String.equal v name && Typecheck.equal_ty t.ty target_ty -> Var new_name
+    | Var v when String.equal v name && pred t -> Var new_name
     | Var _ | Float _ | Int _ | Bool _ -> t.desc
-    | Vec (n, ts) -> Vec (n, List.map ts ~f:rewrite)
-    | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:rewrite)
-    | Lam (v, body) -> if String.equal v name then t.desc else Lam (v, rewrite body)
-    | App (f, x) -> App (rewrite f, rewrite x)
+    | Vec (n, ts) -> Vec (n, List.map ts ~f:subst)
+    | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:subst)
+    | Lam (v, body) -> if String.equal v name then t.desc else Lam (v, subst body)
+    | App (f, x) -> App (subst f, subst x)
     | Let (recur, v, constrs, bind, body) ->
-      let bind = rewrite bind in
-      let body = if String.equal v name then body else rewrite body in
+      let bind = subst bind in
+      let body = if String.equal v name then body else subst body in
       Let (recur, v, constrs, bind, body)
-    | If (c, t, e) -> If (rewrite c, rewrite t, rewrite e)
-    | Bop (op, l, r) -> Bop (op, rewrite l, rewrite r)
-    | Index (t, i) -> Index (rewrite t, i)
-    | Builtin (b, ts) -> Builtin (b, List.map ts ~f:rewrite)
-    | Record (s, ts) -> Record (s, List.map ts ~f:rewrite)
-    | Field (t, f) -> Field (rewrite t, f)
-    | Variant (ty_name, ctor, args) -> Variant (ty_name, ctor, List.map args ~f:rewrite)
+    | If (c, t, e) -> If (subst c, subst t, subst e)
+    | Bop (op, l, r) -> Bop (op, subst l, subst r)
+    | Index (t, i) -> Index (subst t, i)
+    | Builtin (b, ts) -> Builtin (b, List.map ts ~f:subst)
+    | Record (s, ts) -> Record (s, List.map ts ~f:subst)
+    | Field (t, f) -> Field (subst t, f)
+    | Variant (ty_name, ctor, args) -> Variant (ty_name, ctor, List.map args ~f:subst)
     | Match (scrutinee, cases) ->
-      (* TODO: This pattern on matches seems pretty common, maybe factor out *)
-      Match
-        ( rewrite scrutinee
-        , List.map cases ~f:(fun (pat, body) ->
-            let vars = Stlc.pat_bound_vars pat in
-            if List.mem vars name ~equal:String.equal
-            then pat, body
-            else pat, rewrite body) )
+      Match (subst scrutinee, map_cases_capture_avoiding ~var:name ~f:subst cases)
   in
   { t with desc }
+;;
+
+let rename_var (src : string) (dst : string) =
+  subst_var ~name:src ~new_name:dst ~pred:(Fun.const true)
 ;;
 
 (** Read-only info about a polymorphic definition *)
@@ -144,30 +125,16 @@ type spec_map = (Typecheck.ty * string) list String.Map.t
 let collect_poly_refs (poly_env : poly_env) (t : Typecheck.term)
   : (string * Typecheck.ty) list
   =
-  let rec walk acc (t : Typecheck.term) =
-    (* TODO: Refactor this is kind of sad and foldy *)
-    let acc =
-      match t.desc with
-      | Var v when Map.mem poly_env v && Specialize_params.is_concrete t.ty ->
-        (v, t.ty) :: acc
-      | _ -> acc
-    in
-    match t.desc with
-    | Var _ | Float _ | Int _ | Bool _ -> acc
-    | Vec (_, ts) | Mat (_, _, ts) | Builtin (_, ts) | Record (_, ts) ->
-      List.fold ts ~init:acc ~f:walk
-    | Lam (_, body) -> walk acc body
-    | App (f, x) -> walk (walk acc f) x
-    | Let (_, _, _, bind, body) -> walk (walk acc bind) body
-    | If (c, t, e) -> walk (walk (walk acc c) t) e
-    | Bop (_, l, r) -> walk (walk acc l) r
-    | Index (t, _) | Field (t, _) -> walk acc t
-    | Variant (_, _, args) -> List.fold args ~init:acc ~f:walk
-    | Match (scrutinee, cases) ->
-      let acc = walk acc scrutinee in
-      List.fold cases ~init:acc ~f:(fun acc (_, body) -> walk acc body)
+  let refs =
+    fold_term
+      ~f:(fun acc t ->
+        match t.desc with
+        | Var v when Map.mem poly_env v && Specialize_params.is_concrete t.ty ->
+          (v, t.ty) :: acc
+        | _ -> acc)
+      []
+      t
   in
-  let refs = walk [] t in
   List.stable_dedup refs ~compare:(fun (n1, t1) (n2, t2) ->
     let c = String.compare n1 n2 in
     if c <> 0 then c else if Typecheck.equal_ty t1 t2 then 0 else 1)
@@ -310,7 +277,11 @@ and rewrite_refs
         (* Rewrite body replacing [Var v] with appropriate spec name *)
         let body' =
           List.fold specs ~init:body ~f:(fun b (spec_name, _, concrete_ty) ->
-            rewrite_var_at_type v spec_name concrete_ty b)
+            subst_var
+              ~name:v
+              ~new_name:spec_name
+              ~pred:(fun t -> Typecheck.equal_ty t.ty concrete_ty)
+              b)
         in
         let env, body', defs2 = rewrite_refs poly_env env sp_env spec_structs body' in
         (* Wrap in nested lets *)
