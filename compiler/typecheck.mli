@@ -1,3 +1,4 @@
+open Core
 open Stlc
 
 type ty =
@@ -89,18 +90,17 @@ type substitution = (string * ty) list
 (** Applies a [substitution] to a [ty] (incredibly descriptive comment) *)
 val subst_ty : substitution -> ty -> ty
 
-(** Applies a [substitution] to all type annotations in a typed [term].
-    Used by [Monomorphize] to instantiate polymorphic bindings at concrete types. *)
-val subst_term : substitution -> term -> term
-
-(** Given a scheme's deferred constraints and a substitution mapping its tyvars
-    to concrete types, applies [substitution], then solves the remaining constraints.
-    Used by [Monomorphize] after instantiate polymorphic bindings. *)
-val solve_scheme_constrs
-  :  ?structs:(string list * (string * ty) list) Core.String.Map.t
+(** Instantiates a polymorphic scheme at a concrete type.
+    Given a polymorphic term, its deferred scheme constraints, and a substitution
+    mapping its type variables to concrete types, validates the constraints then
+    applies the substitution to all type annotations in the term.
+    Used by [Monomorphize] to specialize polymorphic bindings. *)
+val instantiate_scheme
+  :  ?structs:(string list * (string * ty) list) String.Map.t
   -> constr list
+  -> term
   -> substitution
-  -> substitution Compiler_error.t
+  -> term Compiler_error.t
 
 (** Typechecker using Hindley-Milner extended with GLSL-specific constraints.
 

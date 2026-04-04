@@ -452,19 +452,17 @@ let solve structs (constrs : constr list) : (substitution * constr list) Compile
 ;;
 
 (** Solve scheme constraints given an initial substitution from monomorphization.
-    Applies the sub to constraints, solves, and combines substitutions. *)
-let solve_scheme_constrs
-      ?(structs = String.Map.empty)
-      (constrs : constr list)
-      (sub : substitution)
-  : substitution Compiler_error.t
-  =
-  if List.is_empty constrs
-  then return sub
-  else (
-    let constrs = subst_constraints sub constrs in
-    let%bind sub', _ = solve structs constrs in
-    return (List.map sub ~f:(fun (v, t) -> v, subst_ty sub' t) @ sub'))
+    Applies the sub to constraints, solves, and combines substitutions, then applies *)
+let instantiate_scheme ?(structs = String.Map.empty) constrs term sub =
+  let%map sub =
+    if List.is_empty constrs
+    then return sub
+    else (
+      let constrs = subst_constraints sub constrs in
+      let%map sub', _ = solve structs constrs in
+      List.map sub ~f:(fun (v, t) -> v, subst_ty sub' t) @ sub')
+  in
+  subst_term sub term
 ;;
 
 (** Value restriction check for generalization. *)
