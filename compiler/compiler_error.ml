@@ -1,9 +1,6 @@
 open Core
 open Sexplib.Sexp
 
-(* TODO: Refactor this whole file :P *)
-(* TODO: Function to take in raw glml string and underline [loc] *)
-
 type pos =
   { i : int
   ; line : int
