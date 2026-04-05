@@ -26,8 +26,19 @@ let coerce_atoms env loc atoms =
   atoms, List.concat binds
 ;;
 
-(* TODO: I feel like the logic of this file can all be replaced with just
-   "check if we have an int and type is defined as a float" or something? *)
+(* TODO: We thread the [struct_env] and I thought that we can avoid all that
+   by just using the new typed [atom]s, and just casting [Int _]'s that have
+   the type of [float]. This doesn't actually work though because if we use an
+   int in a float context for structs, the typechecker tags it as an int type.
+   There's almost certainly something I can change in the typechecker to fix this
+   that should be minor, but I can't be bothered rn.
+
+   There might be an issue since we do some insane [Bop] case handling as well...
+   maybe this would actually be more elegant if we force the typechecker to label
+   it as a float somehow?
+
+   This would actually make the code better since we can avoid the sad match
+   that we do in [promote_term] that isn't actually exhaustive *)
 let rec promote_anf
           (struct_env : ty list String.Map.t)
           (env : ty String.Map.t)
