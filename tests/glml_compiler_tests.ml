@@ -2233,3 +2233,136 @@ let%expect_test "removal of term that is does not resolve to a concrete type" =
     }
     |}]
 ;;
+
+let%expect_test "field access in let binding (unannotated)" =
+  (* Regression tests for over-generalization of let-bound variables *)
+  test
+    {|
+    type box['a] = { value: 'a }
+    let f b = let a = b.value in a
+    let main (coord: vec2) : vec3 = [f { value = 1.0 }, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct r_box_float {
+        float value;
+    };
+    float f_0_r_box_float_to_float_10(r_box_float b_1) {
+        float a_2 = b_1.value;
+        return a_2;
+    }
+    vec3 main_pure(vec2 coord_3) {
+        r_box_float anf_11 = r_box_float(1.);
+        float anf_12 = f_0_r_box_float_to_float_10(anf_11);
+        return vec3(anf_12, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+  |}];
+  (* Polymorphic usage *)
+  test
+    {|
+    type box['a] = { value: 'a }
+    let f b = let a = b.value in a
+    let main (coord: vec2) : vec3 =
+      let x = f { value = 1.0 } in
+      let y = if f { value = true } then 1 else 2 in
+      [x, y, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct r_box_float {
+        float value;
+    };
+    struct r_box_bool {
+        bool value;
+    };
+    bool f_0_r_box_bool_to_bool_16(r_box_bool b_1) {
+        bool a_2 = b_1.value;
+        return a_2;
+    }
+    float f_0_r_box_float_to_float_17(r_box_float b_1) {
+        float a_2 = b_1.value;
+        return a_2;
+    }
+    vec3 main_pure(vec2 coord_3) {
+        r_box_float anf_18 = r_box_float(1.);
+        float x_4 = f_0_r_box_float_to_float_17(anf_18);
+        r_box_bool anf_19 = r_box_bool(true);
+        bool anf_20 = f_0_r_box_bool_to_bool_16(anf_19);
+        int y_5 = 0;
+        if (anf_20) {
+            y_5 = 1;
+        } else {
+            y_5 = 2;
+        }
+        float pf_21 = float(y_5);
+        return vec3(x_4, pf_21, 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+  |}];
+  (* [let x = b.value in x * 2.0 — x]'s type constrained to float through Broadcast *)
+  test
+    {|
+    type box['a] = { value: 'a }
+    let scale b = let x = b.value in x * 2.0
+    let main (coord: vec2) : vec3 = [scale { value = 1.0 }, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct r_box_float {
+        float value;
+    };
+    float scale_0_r_box_float_to_float_12(r_box_float b_1) {
+        float x_2 = b_1.value;
+        return (x_2 * 2.);
+    }
+    vec3 main_pure(vec2 coord_3) {
+        r_box_float anf_13 = r_box_float(1.);
+        float anf_14 = scale_0_r_box_float_to_float_12(anf_13);
+        return vec3(anf_14, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+  |}];
+  (* Same test with IndexAccess *)
+  test
+    {|
+    let get_x v = let x = v.0 in x
+    let main (coord: vec2) : vec3 = [get_x coord, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    float get_x_0_vec2_to_float_9(vec2 v_1) {
+        float x_2 = v_1[0];
+        return x_2;
+    }
+    vec3 main_pure(vec2 coord_3) {
+        float anf_10 = get_x_0_vec2_to_float_9(coord_3);
+        return vec3(anf_10, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;

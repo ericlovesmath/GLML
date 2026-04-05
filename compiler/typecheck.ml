@@ -276,7 +276,23 @@ let generalize (ctx : context) (deferred : constr list) (ty : ty)
   let ftv_ty = ftv_of_ty ty in
   let ftv_deferred_all = String.Set.union_list (List.map deferred ~f:ftv_of_constraint) in
   let ftv_ctx = ftv_of_context ctx in
-  let generalizable = Set.diff (Set.union ftv_ty ftv_deferred_all) ftv_ctx in
+  (* If a constraint links a non-generalizable var to other vars, those become
+     non-generalizable too. This prevents over-generalizing let-bindings whose
+     types are constrained by context variables (like FieldAccess / IndexAccess) *)
+  let non_generalizable =
+    let rec go non_gen =
+      let non_gen' =
+        deferred
+        |> List.map ~f:ftv_of_constraint
+        |> List.filter ~f:(Fn.non (Set.are_disjoint non_gen))
+        |> String.Set.union_list
+        |> Set.union non_gen
+      in
+      if Set.equal non_gen non_gen' then non_gen else go non_gen'
+    in
+    go ftv_ctx
+  in
+  let generalizable = Set.diff (Set.union ftv_ty ftv_deferred_all) non_generalizable in
   let scheme_constrs, remaining =
     List.partition_tf deferred ~f:(fun c ->
       Set.is_subset (ftv_of_constraint c) ~of_:generalizable)
