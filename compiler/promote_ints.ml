@@ -26,41 +26,29 @@ let coerce_atoms env loc atoms =
   atoms, List.concat binds
 ;;
 
-(* TODO: We thread the [struct_env] and I thought that we can avoid all that
-   by just using the new typed [atom]s, and just casting [Int _]'s that have
-   the type of [float]. This doesn't actually work though because if we use an
-   int in a float context for structs, the typechecker tags it as an int type.
-   There's almost certainly something I can change in the typechecker to fix this
-   that should be minor, but I can't be bothered rn.
-
-   There might be an issue since we do some insane [Bop] case handling as well...
-   maybe this would actually be more elegant if we force the typechecker to label
-   it as a float somehow?
+(* TODO: There might be an issue since we do some insane [Bop] case handling as
+   well... maybe this would actually be more elegant if we force the typechecker
+   to label it as a float somehow? Then we can avoid passing [env] around.
 
    This would actually make the code better since we can avoid the sad match
    that we do in [promote_term] that isn't actually exhaustive *)
-let rec promote_anf
-          (struct_env : ty list String.Map.t)
-          (env : ty String.Map.t)
-          (anf : anf)
-  : anf
-  =
+let rec promote_anf (env : ty String.Map.t) (anf : anf) : anf =
   match anf.desc with
   | Let (v, bind, tl) ->
-    let bind, binds = promote_term struct_env env bind in
+    let bind, binds = promote_term env bind in
     let env = Map.set env ~key:v ~data:bind.ty in
-    let tl = promote_anf struct_env env tl in
+    let tl = promote_anf env tl in
     make_lets binds anf.loc { anf with desc = Let (v, bind, tl) }
   | Return term ->
-    let term, binds = promote_term struct_env env term in
+    let term, binds = promote_term env term in
     make_lets binds anf.loc { anf with desc = Return term }
   | While (cond, body, tl) ->
-    let cond, binds = promote_term struct_env env cond in
-    let body = promote_anf struct_env env body in
-    let after = promote_anf struct_env env tl in
+    let cond, binds = promote_term env cond in
+    let body = promote_anf env body in
+    let after = promote_anf env tl in
     make_lets binds anf.loc { anf with desc = While (cond, body, after) }
   | Set (v, a, tl) ->
-    let tl = promote_anf struct_env env tl in
+    let tl = promote_anf env tl in
     let a, binds =
       match Map.find env v with
       | Some TyFloat -> coerce_atom env anf.loc a
@@ -69,9 +57,7 @@ let rec promote_anf
     make_lets binds anf.loc { anf with desc = Set (v, a, tl) }
   | Continue -> anf
 
-and promote_term (struct_env : ty list String.Map.t) (env : ty String.Map.t) (term : term)
-  : term * bindings
-  =
+and promote_term (env : ty String.Map.t) (term : term) : term * bindings =
   let loc = term.loc in
   match term.desc, term.ty with
   | Atom a, TyFloat ->
@@ -97,40 +83,32 @@ and promote_term (struct_env : ty list String.Map.t) (env : ty String.Map.t) (te
     let atoms, binds = coerce_atoms env loc atoms in
     { term with desc = Builtin (f, atoms) }, binds
   | Record (s, atoms), _ ->
-    (match Map.find struct_env s with
-     | None -> term, []
-     | Some field_tys ->
-       let atoms, binds =
-         List.map2_exn atoms field_tys ~f:(fun atom field_ty ->
-           match field_ty with
-           | TyFloat -> coerce_atom env loc atom
-           | _ -> atom, [])
-         |> List.unzip
-       in
-       { term with desc = Record (s, atoms) }, List.concat binds)
+    let atoms, binds =
+      atoms
+      |> List.map ~f:(fun a ->
+        if equal_ty a.ty TyFloat then coerce_atom env loc a else a, [])
+      |> List.unzip
+      |> Tuple2.map_snd ~f:List.concat
+    in
+    { term with desc = Record (s, atoms) }, binds
   | If (c, t, e), _ ->
-    let promote = promote_anf struct_env env in
+    let promote = promote_anf env in
     { term with desc = If (c, promote t, promote e) }, []
   | Switch (tag, cases), _ ->
-    let desc =
-      Switch (tag, List.map cases ~f:(fun (l, b) -> l, promote_anf struct_env env b))
-    in
+    let desc = Switch (tag, List.map cases ~f:(fun (l, b) -> l, promote_anf env b)) in
     { term with desc }, []
   | _, _ -> term, []
 ;;
 
-let promote_top (struct_env : ty list String.Map.t) (env : ty String.Map.t) (top : top)
-  : top
-  =
+let promote_top (env : ty String.Map.t) (top : top) : top =
   match top.desc with
   | Define ({ args; body; _ } as d) ->
     let env =
       List.fold args ~init:env ~f:(fun acc (v, ty) -> Map.set acc ~key:v ~data:ty)
     in
-    let body = promote_anf struct_env env body in
+    let body = promote_anf env body in
     { top with desc = Define { d with body } }
-  | Const (name, body) ->
-    { top with desc = Const (name, promote_anf struct_env env body) }
+  | Const (name, body) -> { top with desc = Const (name, promote_anf env body) }
   | Extern _ | TypeDef _ -> top
 ;;
 
@@ -143,12 +121,5 @@ let promote (Program tops : t) : t =
       | Define { name; _ } -> Map.set acc ~key:name ~data:top.ty
       | TypeDef _ -> acc)
   in
-  let struct_env =
-    List.fold tops ~init:String.Map.empty ~f:(fun acc top ->
-      match top.desc with
-      | TypeDef (name, RecordDecl fields) ->
-        Map.set acc ~key:name ~data:(List.map fields ~f:snd)
-      | _ -> acc)
-  in
-  Program (List.map tops ~f:(promote_top struct_env global_env))
+  Program (List.map tops ~f:(promote_top global_env))
 ;;
