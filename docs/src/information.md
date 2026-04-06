@@ -27,6 +27,10 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - Merging specialize and mono passes since they interplay like they're supposed to be the same pass
 - Type aliases
 - Mutual recursion
+- Make logo with GLML
+- Add a guide or overview to playground
+- Export to shadertoy?
+- Refactor Makefile if needed to shared playground build files, since we rebuild playground on serve
 
 ## Remaining Tasks
 
