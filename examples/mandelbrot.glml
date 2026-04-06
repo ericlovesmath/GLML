@@ -5,13 +5,14 @@ type option['a] = Some of 'a | None
 
 // Recursive Mandelbrot function
 // [c] is a vec2 that represents the complex valued location of interest
-// [mandelbrot] returns the iteration count (or None if exceeded maximum)
+// [mandelbrot] returns a smoothed iteration count (or None if exceeded max)
 let mandelbrot c =
   let rec mandel z i =
     if i > 150 then
       None
-    else if #length(z) > 2 then
-      Some (i / 150.)
+    else if #length(z) > 4 then
+      let nu = #log2(#log2(#length(z))) in
+      Some ((i - nu) / 150)
     else
       let zx = z.0 * z.0 - z.1 * z.1 in
       let zy = 2 * z.0 * z.1 in
