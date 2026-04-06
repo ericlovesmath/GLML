@@ -420,10 +420,10 @@ let%expect_test "structs" =
     vec3 main_pure(vec2 u_3) {
         point p_4 = point(1., 2.);
         color c_5 = make_red_0(p_4);
-        float anf_11 = c_5.r;
-        float anf_12 = c_5.g;
-        float anf_13 = c_5.b;
-        return vec3(anf_11, anf_12, anf_13);
+        float anf_16 = c_5.r;
+        float anf_17 = c_5.g;
+        float anf_18 = c_5.b;
+        return vec3(anf_16, anf_17, anf_18);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -475,10 +475,10 @@ let%expect_test "structs" =
     vec3 main_pure(vec2 u_3) {
         point p_4 = point(1., 2.);
         color c_5 = make_red_0(p_4);
-        float anf_10 = c_5.r;
-        float anf_11 = c_5.g;
-        float anf_12 = c_5.b;
-        return vec3(anf_10, anf_11, anf_12);
+        float anf_18 = c_5.r;
+        float anf_19 = c_5.g;
+        float anf_20 = c_5.b;
+        return vec3(anf_18, anf_19, anf_20);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -541,20 +541,20 @@ let%expect_test "nested structs" =
     segment make_seg_0(float u_1) {
         segment s_2 = segment(point(0., 0.), point(0., 0.));
         if (true) {
-            point anf_9 = point(0., 0.);
-            point anf_10 = point(1., 1.);
-            s_2 = segment(anf_9, anf_10);
+            point anf_17 = point(0., 0.);
+            point anf_18 = point(1., 1.);
+            s_2 = segment(anf_17, anf_18);
         } else {
-            point anf_11 = point(1., 1.);
-            point anf_12 = point(0., 0.);
-            s_2 = segment(anf_11, anf_12);
+            point anf_19 = point(1., 1.);
+            point anf_20 = point(0., 0.);
+            s_2 = segment(anf_19, anf_20);
         }
         return s_2;
     }
     vec3 main_pure(vec2 u_3) {
         segment seg_4 = make_seg_0(1.);
-        point anf_13 = seg_4.end;
-        float c_5 = anf_13.x;
+        point anf_21 = seg_4.end;
+        float c_5 = anf_21.x;
         return vec3(c_5, c_5, c_5);
     }
     void main() {
@@ -839,12 +839,12 @@ let%expect_test "variants and matching" =
         float Rect_1;
     };
     float area_0(shape s_1) {
-        int _lv_tag_20 = s_1.tag;
-        switch (_lv_tag_20) {
+        int _lv_tag_23 = s_1.tag;
+        switch (_lv_tag_23) {
             case 0: {
                 float r_2 = s_1.Circle_0;
-                float anf_16 = (3.14159 * r_2);
-                return (anf_16 * r_2);
+                float anf_19 = (3.14159 * r_2);
+                return (anf_19 * r_2);
                 break;
             }
             case 1: {
@@ -860,12 +860,12 @@ let%expect_test "variants and matching" =
         }
     }
     vec3 main_pure(vec2 coord_5) {
-        shape anf_17 = shape(0, 2., 0., 0.);
-        float a_6 = area_0(anf_17);
-        shape anf_18 = shape(1, 0., 3., 4.);
-        float b_7 = area_0(anf_18);
-        shape anf_19 = shape(2, 0., 0., 0.);
-        float c_8 = area_0(anf_19);
+        shape anf_20 = shape(0, 2., 0., 0.);
+        float a_6 = area_0(anf_20);
+        shape anf_21 = shape(1, 0., 3., 4.);
+        float b_7 = area_0(anf_21);
+        shape anf_22 = shape(2, 0., 0., 0.);
+        float c_8 = area_0(anf_22);
         return vec3(a_6, b_7, c_8);
     }
     void main() {
@@ -901,9 +901,9 @@ let%expect_test "variant match in let binding" =
     };
     vec3 main_pure(vec2 coord_0) {
         opt x_1 = opt(0, 5.);
-        int _lv_tag_5 = x_1.tag;
+        int _lv_tag_6 = x_1.tag;
         float v_2 = 0.;
-        switch (_lv_tag_5) {
+        switch (_lv_tag_6) {
             case 0: {
                 float f_3 = x_1.Some_0;
                 v_2 = f_3;
@@ -1111,9 +1111,9 @@ let%expect_test "int promotion edge cases" =
     };
     vec3 main_pure(vec2 u_0) {
         point p_1 = point(1., 2.);
-        float anf_4 = p_1.x;
-        float anf_5 = p_1.y;
-        return vec3(anf_4, anf_5, 0.);
+        float anf_6 = p_1.x;
+        float anf_7 = p_1.y;
+        return vec3(anf_6, anf_7, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1140,11 +1140,11 @@ let%expect_test "int promotion edge cases" =
     };
     vec3 main_pure(vec2 u_0) {
         int a_1 = 3;
-        float pf_7 = float(a_1);
-        point p_2 = point(pf_7, 0.);
-        float anf_5 = p_2.x;
-        float anf_6 = p_2.y;
-        return vec3(anf_5, anf_6, 0.);
+        float pf_9 = float(a_1);
+        point p_2 = point(pf_9, 0.);
+        float anf_7 = p_2.x;
+        float anf_8 = p_2.y;
+        return vec3(anf_7, anf_8, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1170,9 +1170,9 @@ let%expect_test "int promotion edge cases" =
     };
     vec3 main_pure(vec2 u_0) {
         r_pair_bool p_1 = r_pair_bool(true, 2.);
-        float anf_5 = p_1.snd;
         float anf_6 = p_1.snd;
-        return vec3(anf_5, anf_6, 0.);
+        float anf_7 = p_1.snd;
+        return vec3(anf_6, anf_7, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1198,11 +1198,11 @@ let%expect_test "int promotion edge cases" =
         float Gray_0;
     };
     vec3 main_pure(vec2 u_0) {
-        color anf_3 = color(0, 1.);
-        int _lv_tag_4 = anf_3.tag;
-        switch (_lv_tag_4) {
+        color anf_4 = color(0, 1.);
+        int _lv_tag_5 = anf_4.tag;
+        switch (_lv_tag_5) {
             case 0: {
-                float v_1 = anf_3.Gray_0;
+                float v_1 = anf_4.Gray_0;
                 return vec3(v_1, v_1, v_1);
                 break;
             }

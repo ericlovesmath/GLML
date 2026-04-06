@@ -833,13 +833,17 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
              match List.Assoc.find fields ~equal:String.equal name with
              | Some arg ->
                let%bind arg, constrs = gen_term structs variants ctx arg in
-               let field_constr =
+               let arg, field_constrs =
                  match ty with
-                 (* Concrete field allows coercion via promote_ints *)
-                 | TyFloat -> constr (HasClass (Comparable, arg.ty))
-                 | _ -> constr (Eq (arg.ty, ty))
+                 | TyFloat ->
+                   let coerce_ty = fresh_tyvar () in
+                   ( { arg with ty = coerce_ty }
+                   , [ constr (HasClass (Comparable, arg.ty))
+                     ; constr (Broadcast (arg.ty, TyFloat, coerce_ty))
+                     ] )
+                 | _ -> arg, [ constr (Eq (arg.ty, ty)) ]
                in
-               return (arg :: acc, (field_constr :: constrs) @ acc_constrs)
+               return (arg :: acc, field_constrs @ constrs @ acc_constrs)
              | None ->
                Err.fail "(unreachable) missing field" ~loc ~d:[%message (name : string)])
        in
@@ -878,14 +882,17 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
           ~f:(fun acc arg expected_ty ->
             let%bind acc_args, acc_constrs = acc in
             let%bind arg, constrs = gen_term structs variants ctx arg in
-            let arg_constr =
+            let arg, arg_constrs =
               match expected_ty with
               | TyFloat ->
-                (* Concrete float ctor arg allows coercion via promote_ints *)
-                constr (HasClass (Comparable, arg.ty))
-              | _ -> constr (Eq (arg.ty, expected_ty))
+                let coerce_ty = fresh_tyvar () in
+                ( { arg with ty = coerce_ty }
+                , [ constr (HasClass (Comparable, arg.ty))
+                  ; constr (Broadcast (arg.ty, TyFloat, coerce_ty))
+                  ] )
+              | _ -> arg, [ constr (Eq (arg.ty, expected_ty)) ]
             in
-            return (arg :: acc_args, (arg_constr :: constrs) @ acc_constrs))
+            return (arg :: acc_args, arg_constrs @ constrs @ acc_constrs))
       in
       make
         (Variant (variant_name, ctor, List.rev args))
