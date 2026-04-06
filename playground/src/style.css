@@ -256,6 +256,46 @@ header a:hover {
   display: none;
 }
 
+.export-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+#export-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #aaa;
+  display: flex;
+  align-items: center;
+}
+
+#export-btn:hover {
+  color: #e0e0e0;
+}
+
+#export-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: #2a2a4a;
+  color: #cdd6f4;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+#export-popover.visible {
+  opacity: 1;
+}
+
 #vim-status input {
   background: transparent;
   border: none;
