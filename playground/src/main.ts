@@ -1,8 +1,9 @@
+import LZString from "lz-string";
 import { inject } from "@vercel/analytics";
 import { EditorView, basicSetup } from "codemirror";
 import { keymap } from "@codemirror/view";
 import { Compartment, Prec } from "@codemirror/state";
-import { vim, getCM } from "@replit/codemirror-vim";
+import { vim, getCM, Vim } from "@replit/codemirror-vim";
 import { initRenderer, compileAndLinkGLSL } from "./renderer";
 import { EXAMPLES } from "./examples";
 import { glmlExtension } from "./glml-language";
@@ -10,6 +11,10 @@ import { glslExtension } from "./glsl-language";
 
 const ERROR_OUT = document.getElementById("error-output") as HTMLDivElement;
 const COMPILE = document.getElementById("compile-btn") as HTMLButtonElement;
+const EXPORT = document.getElementById("export-btn") as HTMLButtonElement;
+const EXPORT_POPOVER = document.getElementById(
+  "export-popover",
+) as HTMLSpanElement;
 const SELECT = document.getElementById("example-select") as HTMLSelectElement;
 const VIM_TOGGLE = document.getElementById("vim-toggle") as HTMLInputElement;
 const VIM_STATUS = document.getElementById("vim-status")!;
@@ -61,8 +66,14 @@ const vimStatusListener = EditorView.updateListener.of((update) => {
   }
 });
 
+const hashCode = (() => {
+  const hash = window.location.hash.slice(1);
+  if (!hash) return null;
+  return LZString.decompressFromEncodedURIComponent(hash) || null;
+})();
+
 const inputView = new EditorView({
-  doc: EXAMPLES[0][1],
+  doc: hashCode ?? EXAMPLES[0][1],
   extensions: [
     basicSetup,
     darkTheme,
@@ -79,6 +90,14 @@ const inputView = new EditorView({
             return true;
           },
         },
+        {
+          key: "Ctrl-s",
+          mac: "Cmd-s",
+          run: () => {
+            glmlReady(() => compile(inputView.state.doc.toString()));
+            return true;
+          },
+        },
       ]),
     ),
   ],
@@ -87,7 +106,12 @@ const inputView = new EditorView({
 
 const outputView = new EditorView({
   doc: "",
-  extensions: [basicSetup, darkTheme, ...glslExtension, EditorView.editable.of(false)],
+  extensions: [
+    basicSetup,
+    darkTheme,
+    ...glslExtension,
+    EditorView.editable.of(false),
+  ],
   parent: document.getElementById("glsl-output")!,
 });
 
@@ -109,6 +133,10 @@ function glmlReady(cb: () => void): void {
     }, 50);
   }
 }
+
+Vim.defineEx("write", "w", () => {
+  glmlReady(() => compile(inputView.state.doc.toString()));
+});
 
 function compile(source: string): void {
   const result = window.glml.compile(source);
@@ -141,6 +169,23 @@ COMPILE.addEventListener("click", () => {
   glmlReady(() => compile(inputView.state.doc.toString()));
 });
 
+let popoverTimer: ReturnType<typeof setTimeout> | null = null;
+
+EXPORT.addEventListener("click", () => {
+  const code = inputView.state.doc.toString();
+  const compressed = LZString.compressToEncodedURIComponent(code);
+  window.location.hash = compressed;
+  const url = window.location.href;
+  navigator.clipboard.writeText(url).then(() => {
+    EXPORT_POPOVER.classList.add("visible");
+    if (popoverTimer !== null) clearTimeout(popoverTimer);
+    popoverTimer = setTimeout(() => {
+      EXPORT_POPOVER.classList.remove("visible");
+      popoverTimer = null;
+    }, 1500);
+  });
+});
+
 const savedVim = localStorage.getItem("vimMode") === "true";
 VIM_TOGGLE.checked = savedVim;
 
@@ -158,4 +203,4 @@ VIM_TOGGLE.addEventListener("change", () => {
   }
 });
 
-glmlReady(() => compile(EXAMPLES[0][1]));
+glmlReady(() => compile(hashCode ?? EXAMPLES[0][1]));
