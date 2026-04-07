@@ -35,7 +35,7 @@ let patch (Program funcs : t) : t Compiler_error.t =
             ( None
             , TyVec 3
             , "color"
-            , App ("main_pure", [ Swizzle (Var "gl_FragCoord", "xy") ]) )
+            , Some (App ("main_pure", [ Swizzle (Var "gl_FragCoord", "xy") ])) )
         ; Set
             ( Var "fragColor"
             , App

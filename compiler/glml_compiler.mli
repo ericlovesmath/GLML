@@ -14,6 +14,7 @@ module Passes : sig
     | Tail_call
     | Lower_variants
     | Promote_ints
+    | Remove_placeholder
     | Translate
     | Patch_main
   [@@deriving sexp_of, enumerate, string]

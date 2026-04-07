@@ -6,12 +6,14 @@ type atom_desc =
   | Float of float
   | Int of int
   | Bool of bool
+  | Temp
 
 let sexp_of_atom_desc = function
   | Var v -> Atom v
   | Float f -> Atom (Float.to_string f)
   | Int i -> Atom (Int.to_string i)
   | Bool b -> Atom (Bool.to_string b)
+  | Temp -> Atom "<temp>"
 ;;
 
 type atom =

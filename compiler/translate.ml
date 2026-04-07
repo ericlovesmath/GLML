@@ -15,14 +15,13 @@ let to_glsl_ty (ty : Monomorphize.ty) : ty Compiler_error.t =
   | TyBool -> Ok TyBool
   | TyVec n -> Ok (TyVec n)
   | TyMat (x, y) -> Ok (TyMat (x, y))
-  | TyRecord s -> Ok (TyStruct s)
-  | TyVariant _ ->
-    Err.fail "variant types shouldn't exist" ~d:[%message (ty : Monomorphize.ty)]
+  | TyRecord s
+  | TyVariant s -> Ok (TyStruct s)
   | TyArrow _ ->
     Err.fail "arrow types should not be translated" ~d:[%message (ty : Monomorphize.ty)]
 ;;
 
-let to_glsl_atom (a : Anf.atom) : term =
+let to_glsl_atom (a : Remove_placeholder.atom) : term =
   match a.desc with
   | Var v -> Var v
   | Float f -> Float f
@@ -30,7 +29,7 @@ let to_glsl_atom (a : Anf.atom) : term =
   | Bool b -> Bool b
 ;;
 
-let to_glsl_term (t : Lower_variants.term) : term Compiler_error.t =
+let to_glsl_term (t : Remove_placeholder.term) : term Compiler_error.t =
   match t.desc with
   | Atom a -> Ok (to_glsl_atom a)
   | Bop (op, l, r) -> Ok (Bop (op, to_glsl_atom l, to_glsl_atom r))
@@ -49,45 +48,17 @@ let to_glsl_term (t : Lower_variants.term) : term Compiler_error.t =
   | Field (a, f) -> Ok (Swizzle (to_glsl_atom a, f))
   | App (f, args) -> Ok (App (f, List.map args ~f:to_glsl_atom))
   | If _ ->
-    Err.fail "should be handled in [tr_block]" ~d:[%message (t : Lower_variants.term)]
+    Err.fail "should be handled in [tr_block]" ~d:[%message (t : Remove_placeholder.term)]
   | Switch _ ->
     Err.fail
       "should be handled in [translate_block]"
-      ~d:[%message (t : Lower_variants.term)]
-;;
-
-let rec placeholder_value_for_ty (env : record_env) (ty : Monomorphize.ty)
-  : term Compiler_error.t
-  =
-  match ty with
-  | TyFloat -> Ok (Float 0.0)
-  | TyInt -> Ok (Int 0)
-  | TyBool -> Ok (Bool false)
-  | TyVec n -> Ok (App ([%string "vec%{n#Int}"], [ Float 0.0 ]))
-  | TyMat (x, y) ->
-    let ty =
-      if x = y then [%string "mat%{x#Int}"] else [%string "mat%{x#Int}x%{y#Int}"]
-    in
-    Ok (App (ty, [ Float 0.0 ]))
-  | TyRecord s ->
-    let%bind fields = Map.find_or_error env s |> Err.of_or_error in
-    let%bind fields =
-      fields
-      |> List.map ~f:snd
-      |> List.map ~f:(placeholder_value_for_ty env)
-      |> Compiler_error.all
-    in
-    Ok (App (s, fields))
-  | TyVariant _ ->
-    Err.fail "variant types should not exist" ~d:[%message (ty : Monomorphize.ty)]
-  | TyArrow _ ->
-    Err.fail "arrow types should not be in tail" ~d:[%message (ty : Monomorphize.ty)]
+      ~d:[%message (t : Remove_placeholder.term)]
 ;;
 
 let translate_return
-      (translate_sub : Lower_variants.anf -> stmt list Compiler_error.t)
+      (translate_sub : Remove_placeholder.anf -> stmt list Compiler_error.t)
       (k : term -> stmt)
-      (t : Lower_variants.term)
+      (t : Remove_placeholder.term)
   : stmt list Compiler_error.t
   =
   match t.desc with
@@ -112,22 +83,20 @@ let translate_return
 let rec translate_let
           (env : record_env)
           (v : string)
-          (bind : Lower_variants.term)
+          (bind : Remove_placeholder.term)
           (ty : ty)
           (tail : stmt list)
   : stmt list Compiler_error.t
   =
   match bind.desc with
   | If (c, t, e) ->
-    let%bind placeholder = placeholder_value_for_ty env bind.ty in
     let%bind t = translate_set env v t in
     let%bind e = translate_set env v e in
     Ok
-      (Decl (None, ty, v, placeholder)
+      (Decl (None, ty, v, None)
        :: IfStmt (to_glsl_atom c, Block t, Some (Block e))
        :: tail)
   | Switch (tag, cases) ->
-    let%bind placeholder = placeholder_value_for_ty env bind.ty in
     let%bind cases =
       cases
       |> List.map ~f:(fun (label, case) ->
@@ -135,12 +104,12 @@ let rec translate_let
         label, stmts @ [ Break ])
       |> Compiler_error.all
     in
-    Ok (Decl (None, ty, v, placeholder) :: SwitchStmt (to_glsl_atom tag, cases) :: tail)
+    Ok (Decl (None, ty, v, None) :: SwitchStmt (to_glsl_atom tag, cases) :: tail)
   | _ ->
     let%map bind = to_glsl_term bind in
-    Decl (None, ty, v, bind) :: tail
+    Decl (None, ty, v, Some bind) :: tail
 
-and translate_set (env : record_env) (var : string) (anf : Lower_variants.anf)
+and translate_set (env : record_env) (var : string) (anf : Remove_placeholder.anf)
   : stmt list Compiler_error.t
   =
   match anf.desc with
@@ -148,6 +117,11 @@ and translate_set (env : record_env) (var : string) (anf : Lower_variants.anf)
     let%bind ty = to_glsl_ty term.ty in
     let%bind tail = translate_set env var body in
     translate_let env v term ty tail
+  | Placeholder (v, body) ->
+    let%bind ty = to_glsl_ty anf.ty in
+    let placeholder = Decl (None, ty, v, None) in
+    let%bind tail = translate_set env var body in
+    Ok (placeholder :: tail)
   | Return t -> translate_return (translate_set env var) (fun t -> Set (Var var, t)) t
   | While (cond, body, tail) ->
     let%bind cond = to_glsl_term cond in
@@ -159,7 +133,7 @@ and translate_set (env : record_env) (var : string) (anf : Lower_variants.anf)
     Set (Var v, to_glsl_atom a) :: tail
   | Continue -> Ok [ Continue ]
 
-and translate_block (env : record_env) (anf : Lower_variants.anf)
+and translate_block (env : record_env) (anf : Remove_placeholder.anf)
   : stmt list Compiler_error.t
   =
   match anf.desc with
@@ -167,6 +141,11 @@ and translate_block (env : record_env) (anf : Lower_variants.anf)
     let%bind ty = to_glsl_ty bind.ty in
     let%bind tail = translate_block env body in
     translate_let env v bind ty tail
+  | Placeholder (v, body) ->
+    let%bind ty = to_glsl_ty anf.ty in
+    let placeholder = Decl (None, ty, v, None) in
+    let%bind tail = translate_block env body in
+    Ok (placeholder :: tail)
   | Return t -> translate_return (translate_block env) (fun t -> Return (Some t)) t
   | While (cond, body, tail) ->
     let%bind cond = to_glsl_term cond in
@@ -179,7 +158,7 @@ and translate_block (env : record_env) (anf : Lower_variants.anf)
   | Continue -> Ok [ Continue ]
 ;;
 
-let translate (Program tops : Lower_variants.t) : Glsl.t Compiler_error.t =
+let translate (Program tops : Remove_placeholder.t) : Glsl.t Compiler_error.t =
   let%bind env =
     tops
     |> List.filter_map ~f:(fun top ->
@@ -192,7 +171,7 @@ let translate (Program tops : Lower_variants.t) : Glsl.t Compiler_error.t =
   in
   let%bind tops =
     tops
-    |> List.map ~f:(fun (top : Lower_variants.top) ->
+    |> List.map ~f:(fun (top : Remove_placeholder.top) ->
       let loc = top.loc in
       match top.desc with
       | Define { name; args; body; ret_ty } ->
@@ -229,7 +208,7 @@ let translate (Program tops : Lower_variants.t) : Glsl.t Compiler_error.t =
         Err.fail
           "VariantDecl should have been lowered"
           ~loc
-          ~d:[%message (top : Lower_variants.top)])
+          ~d:[%message (top : Remove_placeholder.top)])
     |> Compiler_error.all
   in
   Ok (Program tops)

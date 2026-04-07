@@ -15,6 +15,7 @@ module Passes = struct
       | Tail_call
       | Lower_variants
       | Promote_ints
+      | Remove_placeholder
       | Translate
       | Patch_main
     [@@deriving compare, sexp, enumerate, string ~capitalize:"lower sentence case"]
@@ -51,6 +52,8 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   trace Lower_variants (Lower_variants.sexp_of_t t);
   let t = Promote_ints.promote t in
   trace Promote_ints (Lower_variants.sexp_of_t t);
+  let t = Remove_placeholder.remove t in
+  trace Remove_placeholder (Remove_placeholder.sexp_of_t t);
   let%bind glsl = Translate.translate t in
   trace Translate (Glsl.sexp_of_t glsl);
   let%bind glsl = Patch_main.patch glsl in

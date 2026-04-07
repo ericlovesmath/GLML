@@ -3,7 +3,6 @@ type atom_desc =
   | Float of float
   | Int of int
   | Bool of bool
-  | Temp
 [@@deriving sexp_of]
 
 type atom =
@@ -24,8 +23,7 @@ type term_desc =
   | If of atom * anf * anf
   | Record of string * atom list
   | Field of atom * string
-  | Variant of string * string * atom list
-  | Match of atom * (Stlc.pat * anf) list
+  | Switch of atom * (Glsl.switch_case * anf) list
 [@@deriving sexp_of]
 
 and term =
@@ -37,7 +35,11 @@ and term =
 
 and anf_desc =
   | Let of string * term * anf
+  | Placeholder of string * anf
   | Return of term
+  | While of term * anf * anf
+  | Set of string * atom * anf
+  | Continue
 [@@deriving sexp_of]
 
 and anf =
@@ -50,7 +52,6 @@ and anf =
 type top_desc =
   | Define of
       { name : string
-      ; recur : Stlc.recur
       ; args : (string * Monomorphize.ty) list
       ; body : anf
       ; ret_ty : Monomorphize.ty
@@ -69,6 +70,5 @@ type top =
 
 type t = Program of top list [@@deriving sexp_of]
 
-(** Converts [t] to A-normal form, updating the [type map] to account for
-    the new created variables. Variables are named in the form [anf_num]. *)
-val to_anf : Lambda_lift.t -> t
+(** Removes [Temp] placeholder values and replaces them with proper terms *)
+val remove : Lower_variants.t -> t

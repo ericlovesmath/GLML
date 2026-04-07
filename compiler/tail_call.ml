@@ -118,8 +118,6 @@ type t = Program of top list
 
 let sexp_of_t (Program tops) = List (Atom "Program" :: List.map tops ~f:sexp_of_top)
 
-type type_env = Monomorphize.type_decl String.Map.t
-
 let rec of_term (t : Anf.term) : term =
   let pure desc : term = { desc; ty = t.ty; loc = t.loc } in
   match t.desc with
@@ -142,67 +140,6 @@ and of_anf (anf : Anf.anf) : anf =
   match anf.desc with
   | Let (v, bind, tail) -> pure (Let (v, of_term bind, of_anf tail))
   | Return tail -> pure (Return (of_term tail))
-;;
-
-let placeholder_anf_for_ty (tenv : type_env) (ty : Monomorphize.ty) (loc : Lexer.loc)
-  : anf Compiler_error.t
-  =
-  let atom (desc : atom_desc) = ({ desc; ty; loc } : atom) in
-  let make ?(env = []) desc = Ok (({ desc; ty; loc } : term), env) in
-  let rec build (ty : Monomorphize.ty) : (term * (string * term) list) Compiler_error.t =
-    match ty with
-    | TyInt -> make (Atom (atom (Int 0)))
-    | TyFloat -> make (Atom (atom (Float 0.0)))
-    | TyBool -> make (Atom (atom (Bool false)))
-    | TyVec n -> make (Vec (n, List.init n ~f:(Fn.const (atom (Float 0.0)))))
-    | TyMat (n, m) ->
-      make (Mat (n, m, List.init (n * m) ~f:(Fn.const (atom (Float 0.0)))))
-    | TyRecord s ->
-      (match Map.find tenv s with
-       | Some (RecordDecl fields) ->
-         let%bind fields =
-           Compiler_error.all (List.map fields ~f:(fun (_, f_ty) -> build f_ty))
-         in
-         let args, nested_bindings =
-           List.fold_right
-             fields
-             ~init:([], [])
-             ~f:(fun (t, bindings) (args, all_bindings) ->
-               match t.desc with
-               | Atom a -> a :: args, bindings @ all_bindings
-               | _ ->
-                 let name = Utils.fresh "_tco_struct" in
-                 atom (Var name) :: args, bindings @ [ name, t ] @ all_bindings)
-         in
-         make ~env:nested_bindings (Record (s, args))
-       | Some (VariantDecl _) | None ->
-         Err.fail "unknown struct type" ~d:[%message (s : string)])
-    | TyVariant s ->
-      (match Map.find tenv s with
-       | Some (VariantDecl ((first_ctor, first_arg_tys) :: _)) ->
-         let%bind arg_terms = Compiler_error.all (List.map first_arg_tys ~f:build) in
-         let args, nested_bindings =
-           List.fold_right
-             arg_terms
-             ~init:([], [])
-             ~f:(fun (t, bindings) (args, all_bindings) ->
-               match t.desc with
-               | Atom a -> a :: args, bindings @ all_bindings
-               | _ ->
-                 let name = Utils.fresh "_tco_variant" in
-                 atom (Var name) :: args, bindings @ [ name, t ] @ all_bindings)
-         in
-         make ~env:nested_bindings (Variant (s, first_ctor, args))
-       | Some (VariantDecl []) | Some (RecordDecl _) | None ->
-         Err.fail "unknown variant type" ~d:[%message (s : string)])
-    | TyArrow _ ->
-      Err.fail "unexpected arrow in tail" ~d:[%message (ty : Monomorphize.ty)]
-  in
-  let%map term, bindings = build ty in
-  List.fold_right
-    bindings
-    ~init:({ desc = Return term; ty; loc } : anf)
-    ~f:(fun (v, t) acc -> ({ desc = Let (v, t, acc); ty; loc = acc.loc } : anf))
 ;;
 
 let contains_call (t : Anf.term) (v : string) : bool =
@@ -271,7 +208,7 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : strin
   patch anf
 ;;
 
-let remove_rec_top (tenv : type_env) (top : Anf.top) : top Compiler_error.t =
+let remove_rec_top (top : Anf.top) : top Compiler_error.t =
   let atom desc : atom = { desc; ty = top.ty; loc = top.loc } in
   let pure desc = Ok { desc; ty = top.ty; loc = top.loc } in
   match top.desc with
@@ -283,14 +220,25 @@ let remove_rec_top (tenv : type_env) (top : Anf.top) : top Compiler_error.t =
   | Define { name; recur = Rec limit; args; body; ret_ty } ->
     let loc = body.loc in
     let iter = Utils.fresh "_iter" in
-    let while_cond : term = { desc = Bop (Lt, atom (Var iter), atom (Int limit)); ty = top.ty; loc } in
+    let while_cond : term =
+      { desc = Bop (Lt, atom (Var iter), atom (Int limit)); ty = top.ty; loc }
+    in
     let%bind while_body = patch_tail_anf body name iter (List.map ~f:fst args) in
-    let%bind while_after = placeholder_anf_for_ty tenv ret_ty body.loc in
+    let while_after =
+      let ty = ret_ty in
+      let loc = body.loc in
+      let atom desc = ({ desc; ty; loc } : atom) in
+      let make desc = ({ desc; ty; loc } : term) in
+      let term = make (Atom (atom Temp)) in
+      ({ desc = Return term; ty; loc } : anf)
+    in
     let while_anf : anf =
       { desc = While (while_cond, while_body, while_after); ty = top.ty; loc }
     in
     let body : anf =
-      { desc = Let (iter, { desc = Atom (atom (Int 0)); ty = Monomorphize.TyInt; loc }, while_anf)
+      { desc =
+          Let
+            (iter, { desc = Atom (atom (Int 0)); ty = Monomorphize.TyInt; loc }, while_anf)
       ; ty = top.ty
       ; loc
       }
@@ -299,15 +247,6 @@ let remove_rec_top (tenv : type_env) (top : Anf.top) : top Compiler_error.t =
 ;;
 
 let remove_rec (Program t : Anf.t) : t Compiler_error.t =
-  let%bind tenv =
-    t
-    |> List.filter_map ~f:(fun top ->
-      match top.desc with
-      | TypeDef (s, decl) -> Some (s, decl)
-      | Define _ | Extern _ | Const _ -> None)
-    |> String.Map.of_alist_or_error
-    |> Err.of_or_error
-  in
-  let%map tops = Compiler_error.all (List.map ~f:(remove_rec_top tenv) t) in
+  let%map tops = Compiler_error.all (List.map ~f:remove_rec_top t) in
   Program tops
 ;;
