@@ -151,8 +151,14 @@ let remove_atom (atom : Anf.atom) : atom * bindings =
   let pure desc : atom = { desc; ty = atom.ty; loc = atom.loc } in
   match atom.desc with
   | Temp ->
-    let name = Utils.fresh "_tmp" in
-    pure (Var name), [ name, atom.ty ]
+    (match atom.ty with
+     | TyFloat -> pure (Float 0.0), []
+     | TyInt -> pure (Int 0), []
+     | TyBool -> pure (Bool false), []
+     | TyVec _ | TyMat _ | TyRecord _ | TyVariant _ ->
+       let name = Utils.fresh "_tmp" in
+       pure (Var name), [ name, atom.ty ]
+     | TyArrow _ -> failwith "no placeholders for arrow types")
   | Var v -> pure (Var v), []
   | Float f -> pure (Float f), []
   | Int i -> pure (Int i), []
