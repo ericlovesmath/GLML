@@ -329,14 +329,14 @@ let%expect_test "lambda lifting" =
     {|
     let apply_f (f : float -> float) (x : float) = f x
     let main (u : vec2) =
-      [ apply_f (fun (x : float) -> x + 1.0) 10.0, 0.0, 0.0 ]
+      [ apply_f (fun x -> x + 1) 10.0, 0.0, 0.0 ]
     |};
   [%expect
     {|
-    [lambda_lift] at 4:18-4:44: first-class anon functions are unsupported
+    [lambda_lift] at 4:18-4:32: first-class anon functions are unsupported
       |
-    4 |       [ apply_f (fun (x : float) -> x + 1.0) 10.0, 0.0, 0.0 ]
-      |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    4 |       [ apply_f (fun x -> x + 1) 10.0, 0.0, 0.0 ]
+      |                  ^^^^^^^^^^^^^^
     |}]
 ;;
 
@@ -464,7 +464,7 @@ let%expect_test "structs" =
         float b;
     };
     color make_red_0(point p_1) {
-        color col_2 = color(0., 0., 0.);
+        color col_2;
         if (true) {
             col_2 = color(1., 0., 0.);
         } else {
@@ -539,7 +539,7 @@ let%expect_test "nested structs" =
         point end;
     };
     segment make_seg_0(float u_1) {
-        segment s_2 = segment(point(0., 0.), point(0., 0.));
+        segment s_2;
         if (true) {
             point anf_17 = point(0., 0.);
             point anf_18 = point(1., 1.);
@@ -902,7 +902,7 @@ let%expect_test "variant match in let binding" =
     vec3 main_pure(vec2 coord_0) {
         opt x_1 = opt(0, 5.);
         int _lv_tag_6 = x_1.tag;
-        float v_2 = 0.;
+        float v_2;
         switch (_lv_tag_6) {
             case 0: {
                 float f_3 = x_1.Some_0;
@@ -1413,7 +1413,7 @@ let%expect_test "bool match" =
     out vec4 fragColor;
     uniform bool b;
     vec3 main_pure(vec2 coord_0) {
-        float x_1 = 0.;
+        float x_1;
         if (b) {
             bool _x_2 = b;
             x_1 = 0.;
@@ -1447,7 +1447,7 @@ let%expect_test "int match" =
     out vec4 fragColor;
     uniform int n;
     vec3 main_pure(vec2 coord_0) {
-        float x_1 = 0.;
+        float x_1;
         switch (n) {
             case 0: {
                 x_1 = 0.;
@@ -1530,7 +1530,7 @@ let%expect_test "float match" =
     uniform float x;
     vec3 main_pure(vec2 coord_0) {
         bool _lv_cmp_5 = (x == 1.);
-        float c_1 = 0.;
+        float c_1;
         if (_lv_cmp_5) {
             c_1 = 0.;
         } else {
@@ -1989,7 +1989,7 @@ let%expect_test "regression - polymorphic struct type in function" =
         float a_3 = f_0_r_box_float_to_float_16(anf_17);
         r_box_bool anf_18 = r_box_bool(true);
         bool anf_19 = f_0_r_box_bool_to_bool_15(anf_18);
-        int b_4 = 0;
+        int b_4;
         if (anf_19) {
             b_4 = 1;
         } else {
@@ -2042,7 +2042,7 @@ let%expect_test "regression - polymorphic variant type in function" =
     vec3 main_pure(vec2 coord_3) {
         v_option_float anf_12 = v_option_float(0, 1.);
         bool anf_13 = is_some_0_v_option_float_to_bool_11(anf_12);
-        float b_4 = 0.;
+        float b_4;
         if (anf_13) {
             b_4 = 1.;
         } else {
@@ -2165,7 +2165,7 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
         float a_4 = f_0_r_box_float_to_float_14(anf_15);
         r_box_bool anf_16 = r_box_bool(true);
         bool anf_17 = f_0_r_box_bool_to_bool_13(anf_16);
-        int b_5 = 0;
+        int b_5;
         if (anf_17) {
             b_5 = 1;
         } else {
@@ -2298,7 +2298,7 @@ let%expect_test "field access in let binding (unannotated)" =
         float x_4 = f_0_r_box_float_to_float_17(anf_18);
         r_box_bool anf_19 = r_box_bool(true);
         bool anf_20 = f_0_r_box_bool_to_bool_16(anf_19);
-        int y_5 = 0;
+        int y_5;
         if (anf_20) {
             y_5 = 1;
         } else {
@@ -2311,7 +2311,7 @@ let%expect_test "field access in let binding (unannotated)" =
         vec3 color = main_pure(gl_FragCoord.xy);
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
     }
-  |}];
+    |}];
   (* [let x = b.value in x * 2.0 — x]'s type constrained to float through Broadcast *)
   test
     {|
@@ -2359,6 +2359,49 @@ let%expect_test "field access in let binding (unannotated)" =
     vec3 main_pure(vec2 coord_3) {
         float anf_10 = get_x_0_vec2_to_float_9(coord_3);
         return vec3(anf_10, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "regression - placeholder structs and variants in tail position" =
+  test
+    {|
+    type box['a] = { v: 'a }
+    let main (coord: vec2) : vec3 =
+      let rec f x = if x then { v = [1, 1, 1] } else f true in
+      (f false).v
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct r_box_vec3 {
+        vec3 v;
+    };
+    r_box_vec3 f_1_9(bool x_2) {
+        int _iter_12 = 0;
+        while ((_iter_12 < 1000)) {
+            if (x_2) {
+                vec3 anf_10 = vec3(1., 1., 1.);
+                return r_box_vec3(anf_10);
+            } else {
+                x_2 = true;
+                int _iter_inc_13 = (_iter_12 + 1);
+                _iter_12 = _iter_inc_13;
+                continue;
+            }
+        }
+        r_box_vec3 _tmp_14;
+        return _tmp_14;
+    }
+    vec3 main_pure(vec2 coord_0) {
+        r_box_vec3 anf_11 = f_1_9(false);
+        return anf_11.v;
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
