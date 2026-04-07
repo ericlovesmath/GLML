@@ -5,6 +5,8 @@ open Sexplib.Sexp
 open Monomorphize
 open Tail_call
 
+(* TODO: Add type for lower_variants to remove variants *)
+
 module Err = Compiler_error.Pass (struct
     let name = "lower_variants"
   end)
@@ -28,6 +30,8 @@ and term =
   ; loc : Lexer.loc
   }
 
+(** TODO: Since we added Temp type in [anf], we should not need to use [set] anymore for lowering.
+    This may also apply in the while loop case of [tail call] *)
 and anf_desc =
   | Let of string * term * anf
   | Return of term
@@ -130,17 +134,6 @@ let rec lower_ty (ty : ty) : ty =
   | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ -> ty
 ;;
 
-(* TODO: Some fundamental changes might be needed to support
-   higher ordered functions in structs/variants *)
-let placeholder_atom_for_ty (loc : Lexer.loc) (ty : ty) : Anf.atom Compiler_error.t =
-  let pure desc = Ok ({ desc; ty; loc } : atom) in
-  match ty with
-  | TyFloat -> pure (Float 0.0)
-  | TyInt -> pure (Int 0)
-  | TyBool -> pure (Bool false)
-  | _ -> Err.fail "cannot create atom placeholder" ~d:[%message (ty : ty)]
-;;
-
 let find_tag (ctors : (string * ty list) list) (ctor : string) : int Compiler_error.t =
   ctors
   |> List.findi ~f:(fun _ (c, _) -> String.equal c ctor)
@@ -226,11 +219,12 @@ let rec lower_term (tenv : type_env) (term : Tail_call.term) : term Compiler_err
               ~d:[%message (ctor : string) (ty_name : string)]
        in
        let%bind flat_atoms =
+         let placeholder ty = Ok ({ desc = Temp; ty; loc = term.loc } : atom) in
          ctors
          |> List.concat_map ~f:(fun (c, arg_tys) ->
            if String.equal c ctor
            then List.map args ~f:Compiler_error.return
-           else List.map arg_tys ~f:(placeholder_atom_for_ty term.loc))
+           else List.map arg_tys ~f:placeholder)
          |> Compiler_error.all
        in
        let tag_atom : atom = { desc = Int tag; ty = TyInt; loc = term.loc } in

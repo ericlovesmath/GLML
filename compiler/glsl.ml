@@ -157,7 +157,7 @@ type switch_case =
   | Default
 
 type stmt =
-  | Decl of qualifier option * ty * string * term
+  | Decl of qualifier option * ty * string * term option
   | Set of term * term
   | Return of term option
   | Expr of term
@@ -173,7 +173,8 @@ let rec sexp_of_stmt (s : stmt) : Sexp.t =
   match s with
   | Decl (qual, ty, name, t) ->
     let qual = Option.sexp_of_t (fun q -> Atom (string_of_qualifier q)) qual in
-    List (Atom "set" :: qual :: [ Atom (string_of_ty ty); Atom name; sexp_of_term t ])
+    let t = Option.sexp_of_t sexp_of_term t in
+    List (Atom "set" :: qual :: [ Atom (string_of_ty ty); Atom name; t ])
   | Set (lhs, rhs) -> List [ Atom "set"; sexp_of_term lhs; sexp_of_term rhs ]
   | Return (Some t) -> List [ Atom "return"; sexp_of_term t ]
   | Return None -> List [ Atom "return" ]
@@ -215,13 +216,17 @@ let indent s =
 
 let rec string_of_stmt = function
   | Decl (qual, ty, name, t) ->
-    let t = string_of_term t in
+    let set_t =
+      match t with
+      | None -> ""
+      | Some t -> " = " ^ string_of_term t
+    in
     let ty = string_of_ty ty in
     (match qual with
-     | None -> [%string "%{ty} %{name} = %{t};"]
+     | None -> [%string "%{ty} %{name}%{set_t};"]
      | Some q ->
        let q = string_of_qualifier q in
-       [%string "%{q} %{ty} %{name} = %{t};"])
+       [%string "%{q} %{ty} %{name}%{set_t};"])
   | Set (lhs, rhs) ->
     let lhs = string_of_term lhs in
     let rhs = string_of_term rhs in

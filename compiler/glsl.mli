@@ -81,7 +81,7 @@ type switch_case =
   | Default
 
 type stmt =
-  | Decl of qualifier option * ty * string * term
+  | Decl of qualifier option * ty * string * term option
   | Set of term * term
   | Return of term option
   | Expr of term
