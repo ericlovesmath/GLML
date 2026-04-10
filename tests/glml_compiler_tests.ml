@@ -320,10 +320,9 @@ let%expect_test "lambda lifting" =
     |};
   [%expect
     {|
-    [lambda_lift] at 4:7-4:8: first-class functions are not supported
-      |
-    4 |       f
-      |       ^
+    [patch_main]: unexpected type of main
+      t: (Function (name main) (desc ()) (params (((TyVec 2) u_0))) (ret_type TyFloat)
+     (body ((set () DFn_float_float f_1 ((DFn_float_float 0))) (return f_1))))
     |}];
   test
     {|
@@ -333,10 +332,27 @@ let%expect_test "lambda lifting" =
     |};
   [%expect
     {|
-    [lambda_lift] at 4:18-4:32: first-class anon functions are unsupported
-      |
-    4 |       [ apply_f (fun x -> x + 1) 10.0, 0.0, 0.0 ]
-      |                  ^^^^^^^^^^^^^^
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_float_float {
+        int tag;
+    };
+    float dapply_float_float(DFn_float_float dfn_11, float da_12) {
+        return (da_12 + 1.);
+    }
+    float apply_f_0(DFn_float_float f_1, float x_2) {
+        return dapply_float_float(f_1, x_2);
+    }
+    vec3 main_pure(vec2 u_3) {
+        DFn_float_float anf_13 = DFn_float_float(0);
+        float anf_14 = apply_f_0(anf_13, 10.);
+        return vec3(anf_14, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
     |}]
 ;;
 
@@ -2402,6 +2418,354 @@ let%expect_test "regression - placeholder structs and variants in tail position"
     vec3 main_pure(vec2 coord_0) {
         r_box_vec3 anf_11 = f_1_9(false);
         return anf_11.v;
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "defunctionalization" =
+  (* Named function reference as higher-order argument *)
+  test
+    {|
+    let apply (f : float -> float) (x : float) = f x
+    let double (n : float) = n * 2.0
+    let main (pos : vec2) = let r = apply double (pos.0) in [ r, r, r ]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_float_float {
+        int tag;
+    };
+    float double_3(float n_4) {
+        return (n_4 * 2.);
+    }
+    float dapply_float_float(DFn_float_float dfn_13, float da_14) {
+        return double_3(da_14);
+    }
+    float apply_0(DFn_float_float f_1, float x_2) {
+        return dapply_float_float(f_1, x_2);
+    }
+    vec3 main_pure(vec2 pos_5) {
+        DFn_float_float anf_15 = DFn_float_float(0);
+        float anf_16 = pos_5[0];
+        float r_6 = apply_0(anf_15, anf_16);
+        return vec3(r_6, r_6, r_6);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* Lambda in argument position *)
+  test
+    {|
+    let apply (f : float -> float) (x : float) = f x
+    let main (pos : vec2) =
+      let r = apply (fun (y : float) -> y + 1.0) (pos.0) in
+      [ r, r, r ]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_float_float {
+        int tag;
+    };
+    float dapply_float_float(DFn_float_float dfn_12, float da_13) {
+        return (da_13 + 1.);
+    }
+    float apply_0(DFn_float_float f_1, float x_2) {
+        return dapply_float_float(f_1, x_2);
+    }
+    vec3 main_pure(vec2 pos_3) {
+        DFn_float_float anf_14 = DFn_float_float(0);
+        float anf_15 = pos_3[0];
+        float r_4 = apply_0(anf_14, anf_15);
+        return vec3(r_4, r_4, r_4);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* Lambda capturing a free variable (closure) *)
+  test
+    {|
+    let apply (f : float -> float) (x : float) = f x
+    let main (pos : vec2) =
+      let px = pos.0 in
+      let r = apply (fun (y : float) -> px + y) (pos.1) in
+      [ r, r, r ]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_float_float {
+        int tag;
+        float lctor_13_0;
+    };
+    float dapply_float_float(DFn_float_float dfn_14, float da_15) {
+        float px_4 = dfn_14.lctor_13_0;
+        return (px_4 + da_15);
+    }
+    float apply_0(DFn_float_float f_1, float x_2) {
+        return dapply_float_float(f_1, x_2);
+    }
+    vec3 main_pure(vec2 pos_3) {
+        float px_4 = pos_3[0];
+        DFn_float_float anf_16 = DFn_float_float(0, px_4);
+        float anf_17 = pos_3[1];
+        float r_5 = apply_0(anf_16, anf_17);
+        return vec3(r_5, r_5, r_5);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* Multiple lambdas of the same type *)
+  test
+    {|
+    let apply (f : float -> float) (x : float) = f x
+    let double (n : float) = n * 2.0
+    let triple (n : float) = n * 3.0
+    let main (pos : vec2) =
+      let a = apply double (pos.0) in
+      let b = apply triple (pos.1) in
+      [ a, b, 0.0 ]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_float_float {
+        int tag;
+    };
+    float double_3(float n_4) {
+        return (n_4 * 2.);
+    }
+    float triple_5(float n_6) {
+        return (n_6 * 3.);
+    }
+    float dapply_float_float(DFn_float_float dfn_21, float da_22) {
+        int _lv_tag_27 = dfn_21.tag;
+        switch (_lv_tag_27) {
+            case 0: {
+                return double_3(da_22);
+                break;
+            }
+            default: {
+                return triple_5(da_22);
+                break;
+            }
+        }
+    }
+    float apply_0(DFn_float_float f_1, float x_2) {
+        return dapply_float_float(f_1, x_2);
+    }
+    vec3 main_pure(vec2 pos_7) {
+        DFn_float_float anf_23 = DFn_float_float(0);
+        float anf_24 = pos_7[0];
+        float a_8 = apply_0(anf_23, anf_24);
+        DFn_float_float anf_25 = DFn_float_float(1);
+        float anf_26 = pos_7[1];
+        float b_9 = apply_0(anf_25, anf_26);
+        return vec3(a_8, b_9, 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* Test 5: Lambda stored in let binding, used as value *)
+  test
+    {|
+    let apply (f : float -> float) (x : float) = f x
+    let main (pos : vec2) =
+      let scale = fun (y : float) -> y * pos.0 in
+      let r = apply scale (pos.1) in
+      [ r, r, r ]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_float_float {
+        int tag;
+        vec2 lctor_13_0;
+    };
+    float dapply_float_float(DFn_float_float dfn_14, float da_15) {
+        vec2 pos_3 = dfn_14.lctor_13_0;
+        float anf_16 = pos_3[0];
+        return (da_15 * anf_16);
+    }
+    float apply_0(DFn_float_float f_1, float x_2) {
+        return dapply_float_float(f_1, x_2);
+    }
+    vec3 main_pure(vec2 pos_3) {
+        DFn_float_float scale_4 = DFn_float_float(0, pos_3);
+        float anf_17 = pos_3[1];
+        float r_6 = apply_0(scale_4, anf_17);
+        return vec3(r_6, r_6, r_6);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* Test 6: Three named functions of the same type (3-case switch) *)
+  test
+    {|
+    let apply (f : float -> float) (x : float) = f x
+    let double (n : float) = n * 2.0
+    let triple (n : float) = n * 3.0
+    let quadruple (n : float) = n * 4.0
+    let main (pos : vec2) =
+      let a = apply double (pos.0) in
+      let b = apply triple (pos.1) in
+      let c = apply quadruple (pos.0) in
+      [ a, b, c ]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_float_float {
+        int tag;
+    };
+    float double_3(float n_4) {
+        return (n_4 * 2.);
+    }
+    float triple_5(float n_6) {
+        return (n_6 * 3.);
+    }
+    float quadruple_7(float n_8) {
+        return (n_8 * 4.);
+    }
+    float dapply_float_float(DFn_float_float dfn_29, float da_30) {
+        int _lv_tag_37 = dfn_29.tag;
+        switch (_lv_tag_37) {
+            case 0: {
+                return double_3(da_30);
+                break;
+            }
+            case 1: {
+                return triple_5(da_30);
+                break;
+            }
+            default: {
+                return quadruple_7(da_30);
+                break;
+            }
+        }
+    }
+    float apply_0(DFn_float_float f_1, float x_2) {
+        return dapply_float_float(f_1, x_2);
+    }
+    vec3 main_pure(vec2 pos_9) {
+        DFn_float_float anf_31 = DFn_float_float(0);
+        float anf_32 = pos_9[0];
+        float a_10 = apply_0(anf_31, anf_32);
+        DFn_float_float anf_33 = DFn_float_float(1);
+        float anf_34 = pos_9[1];
+        float b_11 = apply_0(anf_33, anf_34);
+        DFn_float_float anf_35 = DFn_float_float(2);
+        float anf_36 = pos_9[0];
+        float c_12 = apply_0(anf_35, anf_36);
+        return vec3(a_10, b_11, c_12);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* Test 7: HOF with binary function type (DFn_float_float_float) *)
+  test
+    {|
+    let apply2 (f : float -> float -> float) (x : float) (y : float) = f x y
+    let add (a : float) (b : float) = a + b
+    let main (pos : vec2) =
+      let r = apply2 add (pos.0) (pos.1) in
+      [ r, r, r ]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_float_float_float {
+        int tag;
+    };
+    float add_4(float a_5, float b_6) {
+        return (a_5 + b_6);
+    }
+    float dapply_float_float_float(DFn_float_float_float dfn_18, float da_19, float da_20) {
+        return add_4(da_19, da_20);
+    }
+    float apply2_0(DFn_float_float_float f_1, float x_2, float y_3) {
+        return dapply_float_float_float(f_1, x_2, y_3);
+    }
+    vec3 main_pure(vec2 pos_7) {
+        DFn_float_float_float anf_21 = DFn_float_float_float(0);
+        float anf_22 = pos_7[0];
+        float anf_23 = pos_7[1];
+        float r_8 = apply2_0(anf_21, anf_22, anf_23);
+        return vec3(r_8, r_8, r_8);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+  |}];
+  (* map! *)
+  test
+    {|
+    let map f v = [(f (v.0)), (f (v.1)), (f (v.2))]
+    let double (x : float) = x * 2
+    let main (uv : vec2) =
+      let color = map double [0, 1, 2] in
+      [0, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_float_float {
+        int tag;
+    };
+    float double_3(float x_4) {
+        return (x_4 * 2.);
+    }
+    float dapply_float_float(DFn_float_float dfn_23, float da_24) {
+        return double_3(da_24);
+    }
+    vec3 map_0_float_to_float_to_vec3_to_vec3_21(DFn_float_float f_1, vec3 v_2) {
+        float anf_25 = v_2[0];
+        float anf_26 = dapply_float_float(f_1, anf_25);
+        float anf_27 = v_2[1];
+        float anf_28 = dapply_float_float(f_1, anf_27);
+        float anf_29 = v_2[2];
+        float anf_30 = dapply_float_float(f_1, anf_29);
+        return vec3(anf_26, anf_28, anf_30);
+    }
+    vec3 main_pure(vec2 uv_5) {
+        DFn_float_float anf_31 = DFn_float_float(0);
+        vec3 anf_32 = vec3(0., 1., 2.);
+        vec3 color_6 = map_0_float_to_float_to_vec3_to_vec3_21(anf_31, anf_32);
+        return vec3(0., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

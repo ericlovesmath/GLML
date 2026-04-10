@@ -14,6 +14,7 @@
    typecheck
    monomorphize
    uncurry
+   defunctionalize
    lambda_lift
    anf
    tail_call
