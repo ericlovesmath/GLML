@@ -9,6 +9,7 @@ module Passes : sig
     | Typecheck
     | Monomorphize
     | Uncurry
+    | Defunctionalize
     | Lambda_lift
     | Anf
     | Tail_call
