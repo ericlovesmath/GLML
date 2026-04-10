@@ -143,6 +143,7 @@ header a:hover {
 #glsl-output {
   flex: 1;
   min-height: 0;
+  min-width: 0;
 }
 
 #glml-input .cm-editor,
@@ -182,6 +183,7 @@ header a:hover {
   position: relative;
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
 }
 
