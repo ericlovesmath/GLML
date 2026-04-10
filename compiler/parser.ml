@@ -421,10 +421,11 @@ and term_postfix_p =
       in
       { desc; loc = Lexer.merge_loc t.loc loc }
   in
-  let term_arg_p =
+  let term_arg_base_p =
     (* NOTE: intentionally excludes signed literals to avoid cases like [f -5] *)
     term_atom_p <|> term_unsigned_number_p <|> between `Paren term_p <??> "term_arg"
   in
+  let term_arg_p = postfix_chain term_arg_base_p dot_op_p in
   let app_op_p =
     term_arg_p
     >>| fun (a : term) (t : term) ->
@@ -539,6 +540,25 @@ let%expect_test "term parse tests" =
     (let (rec 1000) f (: 'a) (lambda (x ('b)) (app f x)) f)
     (let f (: float) (lambda (x (float)) x) f)
     |}]
+;;
+
+let%expect_test "regression test, dot access in function arguments" =
+  let test = test sexp_of_term term_p in
+  test "f uv.0";
+  test "f uv.0 uv.1";
+  test "(f uv).0";
+  test "f v.x";
+  test "f v.x.y";
+  test "f v.x g.0";
+  [%expect
+    {|
+    (app f (index uv 0))
+    (app (app f (index uv 0)) (index uv 1))
+    (index (app f uv) 0)
+    (app f (. v x))
+    (app f (. (. v x) y))
+    (app (app f (. v x)) (index g 0))
+  |}]
 ;;
 
 let%expect_test "regression test, sequential non-parenthesized terms" =
