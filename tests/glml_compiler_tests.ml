@@ -2716,3 +2716,114 @@ let%expect_test "defunctionalization" =
     }
     |}]
 ;;
+
+let%expect_test "defunctionalization - returning closures" =
+  test
+    {|
+    let add (x : float) (y : float) = x + y
+    let addn (n : float) = fun (x : float) -> add n x
+    let main (coord : vec2) =
+      let f = addn 0. in
+      let r = f 1. in
+      [r, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_float_float {
+        int tag;
+        float lctor_16_0;
+    };
+    float dapply_float_float(DFn_float_float dfn_17, float da_18) {
+        float ca_15 = dfn_17.lctor_16_0;
+        return addn_3(ca_15, da_18);
+    }
+    float add_0(float x_1, float y_2) {
+        return (x_1 + y_2);
+    }
+    float addn_3(float n_4, float x_5) {
+        return add_0(n_4, x_5);
+    }
+    vec3 main_pure(vec2 coord_6) {
+        DFn_float_float f_7 = DFn_float_float(0, 0.);
+        float r_8 = dapply_float_float(f_7, 1.);
+        return vec3(r_8, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    let main (coord : vec2) =
+      let addn (n : float) = fun (x : float) -> n + x in
+      let f = addn 0. in
+      let r = f 1. in
+      [r, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_float_float {
+        int tag;
+        float lctor_11_0;
+    };
+    float dapply_float_float(DFn_float_float dfn_12, float da_13) {
+        float ca_9 = dfn_12.lctor_11_0;
+        return (ca_9 + da_13);
+    }
+    float addn_1_14(float n_2, float x_3) {
+        return (n_2 + x_3);
+    }
+    vec3 main_pure(vec2 coord_0) {
+        DFn_float_float f_4 = DFn_float_float(0, 0.);
+        float r_5 = dapply_float_float(f_4, 1.);
+        return vec3(r_5, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    let addn (n : float) = fun (x : float) -> n + x
+    let main (coord : vec2) =
+      let f = addn 1. in
+      let g = f in
+      let r = g 2. in
+      [r, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_float_float {
+        int tag;
+        float lctor_12_0;
+    };
+    float dapply_float_float(DFn_float_float dfn_13, float da_14) {
+        float ca_11 = dfn_13.lctor_12_0;
+        return addn_0(ca_11, da_14);
+    }
+    float addn_0(float n_1, float x_2) {
+        return (n_1 + x_2);
+    }
+    vec3 main_pure(vec2 coord_3) {
+        DFn_float_float f_4 = DFn_float_float(0, 1.);
+        DFn_float_float g_5 = f_4;
+        float r_6 = dapply_float_float(g_5, 2.);
+        return vec3(r_6, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
