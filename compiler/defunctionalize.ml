@@ -609,46 +609,78 @@ let rewrite_top (globals : String.Set.t) (reg : registry) (top : Uncurry.top)
   | Extern _ -> reg, top, false
 ;;
 
+let rec global_refs_of (globals : String.Set.t) (term : Uncurry.term) : String.Set.t =
+  let go = global_refs_of globals in
+  let union_many ts = List.fold ts ~init:String.Set.empty ~f:Set.union in
+  match term.desc with
+  | Var v -> if Set.mem globals v then String.Set.singleton v else String.Set.empty
+  | Float _ | Int _ | Bool _ -> String.Set.empty
+  | App (f, args) -> union_many (go f :: List.map args ~f:go)
+  | Lam (_, t) | Index (t, _) | Field (t, _) -> go t
+  | Let (_, _, bind, body) -> Set.union (go bind) (go body)
+  | If (c, t, e) -> union_many [ go c; go t; go e ]
+  | Bop (_, l, r) -> Set.union (go l) (go r)
+  | Vec (_, ts) | Builtin (_, ts) | Record (_, ts) | Variant (_, _, ts) | Mat (_, _, ts)
+    -> union_many (List.map ts ~f:go)
+  | Match (scrut, cases) ->
+    union_many (go scrut :: List.map cases ~f:(fun (_, body) -> go body))
+;;
+
 let defunctionalize (Program tops : Uncurry.t) : Uncurry.t Compiler_error.t =
   let globals = collect_globals tops in
+  (* Snapshot the call graph before rewriting, [rewrite_top] transforms closures into
+     Variant constructors, which erases direct function references from bodies. *)
+  let orig_call_graph =
+    List.filter_map tops ~f:(fun (top : Uncurry.top) ->
+      match top.desc with
+      | Define (_, name, body) -> Some (name, global_refs_of globals body)
+      | _ -> None)
+    |> String.Map.of_alist_exn
+  in
   let reg, tagged_tops =
     List.fold_map tops ~init:String.Map.empty ~f:(fun reg top ->
       let reg, top, is_hof = rewrite_top globals reg top in
       reg, (top, is_hof))
   in
-  (* Names of functions referenced as HOF values, dapply_ calls them directly,
-     so they must be emitted before dapply_. *)
-  let before_apply_names =
-    Map.data reg
-    |> List.concat_map ~f:(fun info ->
-      List.filter_map info.entries ~f:(function
-        | GlobalEntry e -> Some e.fn_name
-        | LambdaEntry _ -> None))
-    |> String.Set.of_list
+  (* Globals that dapply_ functions call directly *)
+  let direct_before_names =
+    Map.fold reg ~init:String.Set.empty ~f:(fun ~key:_ ~data:info acc ->
+      List.fold info.entries ~init:acc ~f:(fun acc -> function
+        | GlobalEntry e -> Set.add acc e.fn_name
+        | LambdaEntry e -> Set.union acc (global_refs_of globals e.body)))
+  in
+  (* Every function [dapply_] depends on *)
+  let rec transitive_close visited worklist =
+    match Set.min_elt worklist with
+    | None -> visited
+    | Some name ->
+      let visited = Set.add visited name in
+      let deps =
+        Map.find orig_call_graph name |> Option.value ~default:String.Set.empty
+      in
+      let worklist = Set.remove worklist name |> Set.union (Set.diff deps visited) in
+      transitive_close visited worklist
+  in
+  let before_apply_names = transitive_close String.Set.empty direct_before_names in
+  let is_before_apply (top : Uncurry.top) =
+    match top.desc with
+    | Define (_, name, _) -> Set.mem before_apply_names name
+    | _ -> false
   in
   let typedef_tops = Map.data reg |> List.map ~f:gen_typedef in
   let apply_fn_tops = Map.data reg |> List.map ~f:gen_apply_fn in
-  (* Non-HOF functions referenced as HOF values, must precede dapply_ *)
+  (* Functions dapply_ calls must come before it; HOF consumers call dapply_ so must
+     come after it; everything else (externs, main, unrelated functions) goes last. *)
   let before_tops =
     List.filter_map tagged_tops ~f:(fun (top, _) ->
-      match top.desc with
-      | Define (_, name, _) when Set.mem before_apply_names name -> Some top
-      | _ -> None)
+      Option.some_if (is_before_apply top) top)
   in
-  (* HOF consumers (have DFn_ params, call dapply_), must follow dapply_ *)
   let after_tops =
-    List.filter_map tagged_tops ~f:(fun (top, is_hof) ->
-      if is_hof then Some top else None)
+    List.filter_map tagged_tops ~f:(fun (top, is_hof) -> Option.some_if is_hof top)
   in
-  (* Everything else (typedefs, externs, main, non-HOF non-referenced funcs) *)
   let rest_tops =
     List.filter_map tagged_tops ~f:(fun (top, is_hof) ->
-      let in_before =
-        match top.desc with
-        | Define (_, name, _) -> Set.mem before_apply_names name
-        | _ -> false
-      in
-      if in_before || is_hof then None else Some top)
+      Option.some_if (not (is_before_apply top || is_hof)) top)
   in
   Ok (Program (typedef_tops @ before_tops @ apply_fn_tops @ after_tops @ rest_tops))
 ;;
