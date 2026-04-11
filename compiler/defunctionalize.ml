@@ -59,6 +59,13 @@ type fn_type_info =
 
 type registry = fn_type_info String.Map.t
 
+type ctx =
+  { globals : String.Set.t
+  ; lift_only : String.Set.t
+  ; lift_only_bodies : ((string * ty) list * Uncurry.term) String.Map.t
+  ; env : ty String.Map.t
+  }
+
 let entry_loc = function
   | LambdaEntry e -> e.loc
   | GlobalEntry e -> e.loc
@@ -193,22 +200,6 @@ let rec is_used_as_value (var_name : string) (t : Uncurry.term) : bool =
       && is_used_as_value var_name body)
 ;;
 
-(** Retype function-typed params to their corresponding variant types. Returns updated params
-    and an env mapping changed param names to their new types. *)
-let retype_params params =
-  let params' =
-    List.map params ~f:(fun (v, ty) ->
-      v, if is_fn_ty ty then TyVariant ("DFn_" ^ mangle_ty ty) else ty)
-  in
-  let env =
-    List.zip_exn params params'
-    |> List.filter_map ~f:(fun ((v, old_ty), (_, new_ty)) ->
-      if equal_ty old_ty new_ty then None else Some (v, new_ty))
-    |> String.Map.of_alist_exn
-  in
-  params', env
-;;
-
 let get_or_create_info (reg : registry) (ty : ty) : registry * fn_type_info =
   let key = mangle_ty ty in
   match Map.find reg key with
@@ -219,26 +210,46 @@ let get_or_create_info (reg : registry) (ty : ty) : registry * fn_type_info =
       { arrow_ty = ty
       ; arg_tys
       ; ret_ty
-      ; variant_name = "DFn_" ^ key
-      ; apply_name = "dapply_" ^ key
+      ; variant_name = Utils.fresh "DFn"
+      ; apply_name = Utils.fresh "dapply"
       ; entries = []
       }
     in
     Map.set reg ~key ~data:info, info
 ;;
 
+(** Retype function-typed params to their corresponding variant types. Returns updated
+    registry, updated params, and an env mapping changed param names to their new types. *)
+let retype_params (reg : registry) params =
+  let reg, params' =
+    List.fold_map params ~init:reg ~f:(fun reg (v, ty) ->
+      if is_fn_ty ty
+      then (
+        let reg, info = get_or_create_info reg ty in
+        reg, (v, TyVariant info.variant_name))
+      else reg, (v, ty))
+  in
+  let env =
+    List.zip_exn params params'
+    |> List.filter_map ~f:(fun ((v, old_ty), (_, new_ty)) ->
+      if equal_ty old_ty new_ty then None else Some (v, new_ty))
+    |> String.Map.of_alist_exn
+  in
+  reg, params', env
+;;
+
 let add_lambda_entry (reg : registry) (ty : ty) params body captured loc
-  : registry * string
+  : registry * fn_type_info * string
   =
   let reg, info = get_or_create_info reg ty in
   let ctor_name = Utils.fresh "lctor" in
   let entry = LambdaEntry { ctor_name; params; body; captured; loc } in
   let info = { info with entries = info.entries @ [ entry ] } in
-  Map.set reg ~key:(mangle_ty ty) ~data:info, ctor_name
+  Map.set reg ~key:(mangle_ty ty) ~data:info, info, ctor_name
 ;;
 
 let add_global_entry (reg : registry) (ty : ty) (fn_name : string) (loc : Lexer.loc)
-  : registry * string
+  : registry * fn_type_info * string
   =
   let reg, info = get_or_create_info reg ty in
   match
@@ -246,12 +257,12 @@ let add_global_entry (reg : registry) (ty : ty) (fn_name : string) (loc : Lexer.
       | GlobalEntry e -> String.equal e.fn_name fn_name
       | _ -> false)
   with
-  | Some (GlobalEntry e) -> reg, e.ctor_name
+  | Some (GlobalEntry e) -> reg, info, e.ctor_name
   | _ ->
     let ctor_name = Utils.fresh ("gctor_" ^ fn_name) in
     let entry = GlobalEntry { ctor_name; fn_name; loc } in
     let info = { info with entries = info.entries @ [ entry ] } in
-    Map.set reg ~key:(mangle_ty ty) ~data:info, ctor_name
+    Map.set reg ~key:(mangle_ty ty) ~data:info, info, ctor_name
 ;;
 
 let gen_typedef info : Uncurry.top =
@@ -319,31 +330,23 @@ let gen_apply_fn info : Uncurry.top =
   }
 ;;
 
-let rec rewrite_term
-          (globals : String.Set.t)
-          (lift_only : String.Set.t)
-          (lift_only_bodies : ((string * ty) list * Uncurry.term) String.Map.t)
-          (env : ty String.Map.t)
-          (call_head : bool)
-          (reg : registry)
-          (t : Uncurry.term)
+let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurry.term)
   : registry * Uncurry.term
   =
-  let rw reg t = rewrite_term globals lift_only lift_only_bodies env false reg t in
-  let rw_call reg t = rewrite_term globals lift_only lift_only_bodies env true reg t in
+  let rw reg t = rewrite_term ctx false reg t in
+  let rw_call reg t = rewrite_term ctx true reg t in
   let rw_list reg ts = List.fold_map ts ~init:reg ~f:rw in
   match t.desc with
   | Var v ->
     if (not call_head) && is_fn_ty t.ty
     then (
-      match Map.find env v with
+      match Map.find ctx.env v with
       | Some new_ty -> reg, { t with ty = new_ty }
-      | None when Set.mem globals v ->
-        let reg, ctor_name = add_global_entry reg t.ty v t.loc in
-        let variant_name = "DFn_" ^ mangle_ty t.ty in
+      | None when Set.mem ctx.globals v ->
+        let reg, info, ctor_name = add_global_entry reg t.ty v t.loc in
         ( reg
-        , ({ desc = Variant (variant_name, ctor_name, [])
-           ; ty = TyVariant variant_name
+        , ({ desc = Variant (info.variant_name, ctor_name, [])
+           ; ty = TyVariant info.variant_name
            ; loc = t.loc
            }
            : term) )
@@ -352,7 +355,7 @@ let rec rewrite_term
   | App (f, args) ->
     let reg, args = rw_list reg args in
     (match f.desc with
-     | Var v when Set.mem globals v ->
+     | Var v when Set.mem ctx.globals v ->
        (* Global function: call by name, globals retain their name through lambda_lift *)
        if is_fn_ty t.ty
        then (
@@ -371,22 +374,21 @@ let rec rewrite_term
          let body : Uncurry.term =
            { desc = App (f, all_call_args); ty = final_ret_ty; loc = t.loc }
          in
-         let reg, ctor_name =
+         let reg, info, ctor_name =
            add_lambda_entry reg t.ty remaining_params body captured_arg_vars t.loc
          in
-         let variant_name = "DFn_" ^ mangle_ty t.ty in
          ( reg
-         , { desc = Variant (variant_name, ctor_name, args)
-           ; ty = TyVariant variant_name
+         , { desc = Variant (info.variant_name, ctor_name, args)
+           ; ty = TyVariant info.variant_name
            ; loc = t.loc
            } ))
        else reg, { t with desc = App (f, args) }
-     | Var v when Set.mem lift_only v ->
+     | Var v when Set.mem ctx.lift_only v ->
        (* lift_only function: lambda_lift will rename it, so inline the body instead of
           calling by name. We stored the params/body when we processed the let-binding. *)
        if is_fn_ty t.ty
        then (
-         match Map.find lift_only_bodies v with
+         match Map.find ctx.lift_only_bodies v with
          | Some (fn_params, fn_body) ->
            let n_applied = List.length args in
            let applied_params = List.take fn_params n_applied in
@@ -407,25 +409,24 @@ let rec rewrite_term
              @ List.zip_exn (List.map remaining_params_orig ~f:fst) remaining_arg_vars
            in
            let body = subst_vars subs fn_body in
-           let reg, ctor_name =
+           let reg, info, ctor_name =
              add_lambda_entry reg t.ty remaining_params body captured_arg_vars t.loc
            in
-           let variant_name = "DFn_" ^ mangle_ty t.ty in
            ( reg
-           , { desc = Variant (variant_name, ctor_name, args)
-             ; ty = TyVariant variant_name
+           , { desc = Variant (info.variant_name, ctor_name, args)
+             ; ty = TyVariant info.variant_name
              ; loc = t.loc
              } )
          | None -> reg, { t with desc = App (f, args) })
        else reg, { t with desc = App (f, args) }
      | _ when is_fn_ty f.ty ->
-       let arg_tys, ret_ty = flatten_arrow f.ty in
-       let variant_name = "DFn_" ^ mangle_ty f.ty in
-       let apply_name = "dapply_" ^ mangle_ty f.ty in
+       let reg, info = get_or_create_info reg f.ty in
        let reg, f = rw reg f in
-       let apply_ty = build_arrow_ty (TyVariant variant_name :: arg_tys) ret_ty in
+       let apply_ty =
+         build_arrow_ty (TyVariant info.variant_name :: info.arg_tys) info.ret_ty
+       in
        let apply_var : Uncurry.term =
-         { desc = Var apply_name; ty = apply_ty; loc = f.loc }
+         { desc = Var info.apply_name; ty = apply_ty; loc = f.loc }
        in
        reg, { t with desc = App (apply_var, f :: args) }
      | _ ->
@@ -434,26 +435,27 @@ let rec rewrite_term
   | Lam (params, body) ->
     (* Lam in value position (defunctionalize) *)
     let param_names = List.map params ~f:fst in
-    let excluded = Set.union globals (String.Set.of_list param_names) in
-    let captured_raw = free_vars_of globals excluded body in
+    let excluded = Set.union ctx.globals (String.Set.of_list param_names) in
+    let captured_raw = free_vars_of ctx.globals excluded body in
     let captured =
       List.map captured_raw ~f:(fun (name, ty) ->
-        name, Map.find env name |> Option.value ~default:ty)
+        name, Map.find ctx.env name |> Option.value ~default:ty)
     in
-    let env_for_body = List.fold param_names ~init:env ~f:Map.remove in
-    let lift_only_for_body = Set.diff lift_only (String.Set.of_list param_names) in
-    let reg, body =
-      rewrite_term globals lift_only_for_body lift_only_bodies env_for_body false reg body
+    let ctx_for_body =
+      { ctx with
+        env = List.fold param_names ~init:ctx.env ~f:Map.remove
+      ; lift_only = Set.diff ctx.lift_only (String.Set.of_list param_names)
+      }
     in
-    let reg, ctor_name = add_lambda_entry reg t.ty params body captured t.loc in
-    let variant_name = "DFn_" ^ mangle_ty t.ty in
+    let reg, body = rewrite_term ctx_for_body false reg body in
+    let reg, info, ctor_name = add_lambda_entry reg t.ty params body captured t.loc in
     let payload =
       List.map captured ~f:(fun (name, ty) ->
         ({ desc = Var name; ty; loc = t.loc } : term))
     in
     ( reg
-    , ({ desc = Variant (variant_name, ctor_name, payload)
-       ; ty = TyVariant variant_name
+    , ({ desc = Variant (info.variant_name, ctor_name, payload)
+       ; ty = TyVariant info.variant_name
        ; loc = t.loc
        }
        : term) )
@@ -466,59 +468,49 @@ let rec rewrite_term
     if is_value
     then (
       (* Lambda used as a value (defunctionalize) *)
-      let reg, variant_term =
-        rewrite_term globals lift_only lift_only_bodies env false reg lam_term
-      in
-      let env = Map.set env ~key:v ~data:variant_term.ty in
-      let reg, rest =
-        rewrite_term globals lift_only lift_only_bodies env false reg rest
-      in
+      let reg, variant_term = rewrite_term ctx false reg lam_term in
+      let ctx = { ctx with env = Map.set ctx.env ~key:v ~data:variant_term.ty } in
+      let reg, rest = rewrite_term ctx false reg rest in
       reg, { t with desc = Let (recur, v, variant_term, rest) })
     else (
       (* Lambda only directly called (rewrite params/body, leave for Lambda_lift) *)
-      let params, param_env = retype_params lparams in
+      let reg, params, param_env = retype_params reg lparams in
       let env_for_body =
         Map.merge_skewed
           param_env
-          (List.fold (List.map lparams ~f:fst) ~init:env ~f:Map.remove)
+          (List.fold (List.map lparams ~f:fst) ~init:ctx.env ~f:Map.remove)
           ~combine:(fun ~key:_ v1 _ -> v1)
       in
       let lift_only_for_body =
-        let lo = Set.diff lift_only (String.Set.of_list (List.map lparams ~f:fst)) in
+        let lo = Set.diff ctx.lift_only (String.Set.of_list (List.map lparams ~f:fst)) in
         (* Recursive bindings can call themselves (treat as direct call) *)
         match recur with
         | Rec _ -> Set.add lo v
         | Nonrec -> lo
       in
-      let reg, lbody' =
-        rewrite_term
-          globals
-          lift_only_for_body
-          lift_only_bodies
-          env_for_body
-          false
-          reg
-          lbody
+      let ctx_for_body =
+        { ctx with env = env_for_body; lift_only = lift_only_for_body }
       in
+      let reg, lbody' = rewrite_term ctx_for_body false reg lbody in
       let lam_ty = build_arrow_ty (List.map params ~f:snd) lbody'.ty in
       let lam_term = { lam_term with desc = Lam (params, lbody'); ty = lam_ty } in
-      let lift_only = Set.add lift_only v in
-      (* Store this function's params and body so partial applications can inline it,
-         avoiding the lambda_lift renaming issue. *)
-      let lift_only_bodies = Map.set lift_only_bodies ~key:v ~data:(params, lbody') in
-      let reg, rest =
-        rewrite_term globals lift_only lift_only_bodies env false reg rest
+      let ctx =
+        { ctx with
+          lift_only = Set.add ctx.lift_only v
+        ; lift_only_bodies = Map.set ctx.lift_only_bodies ~key:v ~data:(params, lbody')
+        }
       in
+      let reg, rest = rewrite_term ctx false reg rest in
       reg, { t with desc = Let (recur, v, lam_term, rest) })
   | Let (recur, v, bind, body) ->
     let orig_bind_ty = bind.ty in
     let reg, bind = rw reg bind in
-    let env =
+    let ctx =
       if is_fn_ty orig_bind_ty && not (is_fn_ty bind.ty)
-      then Map.set env ~key:v ~data:bind.ty
-      else env
+      then { ctx with env = Map.set ctx.env ~key:v ~data:bind.ty }
+      else ctx
     in
-    let reg, body = rewrite_term globals lift_only lift_only_bodies env false reg body in
+    let reg, body = rewrite_term ctx false reg body in
     reg, { t with desc = Let (recur, v, bind, body) }
   | If (c, t, e) ->
     let reg, c = rw reg c in
@@ -555,11 +547,13 @@ let rec rewrite_term
     let reg, cases =
       List.fold_map cases ~init:reg ~f:(fun reg (pat, body) ->
         let bound = Stlc.pat_bound_vars pat in
-        let env = List.fold bound ~init:env ~f:Map.remove in
-        let lift_only = Set.diff lift_only (String.Set.of_list bound) in
-        let reg, body =
-          rewrite_term globals lift_only lift_only_bodies env false reg body
+        let case_ctx =
+          { ctx with
+            env = List.fold bound ~init:ctx.env ~f:Map.remove
+          ; lift_only = Set.diff ctx.lift_only (String.Set.of_list bound)
+          }
         in
+        let reg, body = rewrite_term case_ctx false reg body in
         reg, (pat, body))
     in
     reg, { t with desc = Match (scrut, cases) }
@@ -569,41 +563,48 @@ let rec rewrite_term
 let rewrite_top (globals : String.Set.t) (reg : registry) (top : Uncurry.top)
   : registry * Uncurry.top * bool
   =
+  let ctx_base =
+    { globals
+    ; lift_only = String.Set.empty
+    ; lift_only_bodies = String.Map.empty
+    ; env = String.Map.empty
+    }
+  in
   match top.desc with
   | Define (recur, name, ({ desc = Lam (params, body); _ } as lam)) ->
-    let params, env = retype_params params in
+    let reg, params, env = retype_params reg params in
     let is_hof_consumer = not (Map.is_empty env) in
-    let reg, body =
-      rewrite_term globals String.Set.empty String.Map.empty env false reg body
-    in
+    let ctx = { ctx_base with env } in
+    let reg, body = rewrite_term ctx false reg body in
     let lam_ty = build_arrow_ty (List.map params ~f:snd) body.ty in
     let lam' = { lam with desc = Lam (params, body); ty = lam_ty } in
     let top' = { top with desc = Define (recur, name, lam'); ty = lam_ty } in
     reg, top', is_hof_consumer
   | Define (recur, name, term) ->
-    let reg, term =
-      rewrite_term
-        globals
-        String.Set.empty
-        String.Map.empty
-        String.Map.empty
-        false
-        reg
-        term
-    in
+    let reg, term = rewrite_term ctx_base false reg term in
     reg, { top with desc = Define (recur, name, term) }, false
   | TypeDef (name, RecordDecl fields) ->
-    let fields =
-      List.map fields ~f:(fun (field_name, ty) ->
-        field_name, if is_fn_ty ty then TyVariant ("DFn_" ^ mangle_ty ty) else ty)
+    let reg, fields =
+      List.fold_map fields ~init:reg ~f:(fun reg (field_name, ty) ->
+        if is_fn_ty ty
+        then (
+          let reg, info = get_or_create_info reg ty in
+          reg, (field_name, TyVariant info.variant_name))
+        else reg, (field_name, ty))
     in
     reg, { top with desc = TypeDef (name, RecordDecl fields) }, false
   | TypeDef (name, VariantDecl ctors) ->
-    let ctors =
-      List.map ctors ~f:(fun (ctor_name, arg_tys) ->
-        ( ctor_name
-        , List.map arg_tys ~f:(fun ty ->
-            if is_fn_ty ty then TyVariant ("DFn_" ^ mangle_ty ty) else ty) ))
+    let reg, ctors =
+      List.fold_map ctors ~init:reg ~f:(fun reg (ctor_name, arg_tys) ->
+        let reg, arg_tys =
+          List.fold_map arg_tys ~init:reg ~f:(fun reg ty ->
+            if is_fn_ty ty
+            then (
+              let reg, info = get_or_create_info reg ty in
+              reg, TyVariant info.variant_name)
+            else reg, ty)
+        in
+        reg, (ctor_name, arg_tys))
     in
     reg, { top with desc = TypeDef (name, VariantDecl ctors) }, false
   | Extern _ -> reg, top, false
