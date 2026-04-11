@@ -2736,15 +2736,15 @@ let%expect_test "defunctionalization - returning closures" =
         int tag;
         float lctor_16_0;
     };
-    float dapply_float_float(DFn_float_float dfn_17, float da_18) {
-        float ca_15 = dfn_17.lctor_16_0;
-        return addn_3(ca_15, da_18);
-    }
     float add_0(float x_1, float y_2) {
         return (x_1 + y_2);
     }
     float addn_3(float n_4, float x_5) {
         return add_0(n_4, x_5);
+    }
+    float dapply_float_float(DFn_float_float dfn_17, float da_18) {
+        float ca_15 = dfn_17.lctor_16_0;
+        return addn_3(ca_15, da_18);
     }
     vec3 main_pure(vec2 coord_6) {
         DFn_float_float f_7 = DFn_float_float(0, 0.);
@@ -2808,12 +2808,12 @@ let%expect_test "defunctionalization - returning closures" =
         int tag;
         float lctor_12_0;
     };
+    float addn_0(float n_1, float x_2) {
+        return (n_1 + x_2);
+    }
     float dapply_float_float(DFn_float_float dfn_13, float da_14) {
         float ca_11 = dfn_13.lctor_12_0;
         return addn_0(ca_11, da_14);
-    }
-    float addn_0(float n_1, float x_2) {
-        return (n_1 + x_2);
     }
     vec3 main_pure(vec2 coord_3) {
         DFn_float_float f_4 = DFn_float_float(0, 1.);
