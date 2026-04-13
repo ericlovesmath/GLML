@@ -859,13 +859,21 @@ let defunctionalize (Program tops : Uncurry.t) : Uncurry.t Compiler_error.t =
         | false, true -> bnh, bh, top :: at, rt
         | false, false -> bnh, bh, at, top :: rt)
   in
+  (* Original TypeDef tops must appear before any generated code that references them *)
+  let rest_typedef_tops, rest_non_typedef_tops =
+    List.partition_tf rest_tops ~f:(fun top ->
+      match top.desc with
+      | TypeDef _ -> true
+      | _ -> false)
+  in
   Ok
     (Program
-       (typedef_tops
+       (rest_typedef_tops
+        @ typedef_tops
         @ before_tops_non_hof
         @ level0_apply_tops
         @ before_tops_hof
         @ higher_apply_tops
         @ after_tops
-        @ rest_tops))
+        @ rest_non_typedef_tops))
 ;;
