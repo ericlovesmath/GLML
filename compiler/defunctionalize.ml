@@ -55,9 +55,17 @@ type fn_type_info =
   ; variant_name : string
   ; apply_name : string
   ; entries : fn_entry list
+  ; level : int
   }
 
-type registry = fn_type_info String.Map.t
+(** [by_arrow]: [mangle_ty ty] => level-0 canonical DFn
+    [by_variant]: [variant_name] => all DFns *)
+type registry =
+  { by_arrow : fn_type_info String.Map.t
+  ; by_variant : fn_type_info String.Map.t
+  }
+
+let empty_registry = { by_arrow = String.Map.empty; by_variant = String.Map.empty }
 
 type ctx =
   { globals : String.Set.t
@@ -166,45 +174,42 @@ let rec subst_vars (subs : (string * string) list) (t : Uncurry.term) : Uncurry.
 
 (* TODO: SO sad *)
 let rec is_used_as_value (var_name : string) (t : Uncurry.term) : bool =
+  let is_used = is_used_as_value var_name in
   match t.desc with
   | Var v -> String.equal v var_name
   | Float _ | Int _ | Bool _ -> false
   | App (f, args) ->
     let f_used =
       match f.desc with
-      | Var v when String.equal v var_name ->
-        false (* direct call head = not value position *)
-      | _ -> is_used_as_value var_name f
+      (* direct call head = not value position *)
+      | Var v when String.equal v var_name -> false
+      | _ -> is_used f
     in
-    f_used || List.exists args ~f:(is_used_as_value var_name)
-  | Vec (_, ts) | Builtin (_, ts) -> List.exists ts ~f:(is_used_as_value var_name)
-  | Mat (_, _, ts) -> List.exists ts ~f:(is_used_as_value var_name)
+    f_used || List.exists args ~f:is_used
+  | Vec (_, ts) | Builtin (_, ts) -> List.exists ts ~f:is_used
+  | Mat (_, _, ts) -> List.exists ts ~f:is_used
   | Lam (params, body) ->
     if List.exists params ~f:(fun (v, _) -> String.equal v var_name)
     then false
-    else is_used_as_value var_name body
+    else is_used body
   | Let (_, v, bind, body) ->
-    is_used_as_value var_name bind
-    || if String.equal v var_name then false else is_used_as_value var_name body
-  | If (c, t, e) ->
-    is_used_as_value var_name c
-    || is_used_as_value var_name t
-    || is_used_as_value var_name e
-  | Bop (_, l, r) -> is_used_as_value var_name l || is_used_as_value var_name r
-  | Index (t, _) -> is_used_as_value var_name t
-  | Record (_, ts) -> List.exists ts ~f:(is_used_as_value var_name)
-  | Field (t, _) -> is_used_as_value var_name t
-  | Variant (_, _, args) -> List.exists args ~f:(is_used_as_value var_name)
+    is_used bind || if String.equal v var_name then false else is_used body
+  | If (c, t, e) -> is_used c || is_used t || is_used e
+  | Bop (_, l, r) -> is_used l || is_used r
+  | Index (t, _) -> is_used t
+  | Record (_, ts) -> List.exists ts ~f:is_used
+  | Field (t, _) -> is_used t
+  | Variant (_, _, args) -> List.exists args ~f:is_used
   | Match (scrut, cases) ->
-    is_used_as_value var_name scrut
+    is_used scrut
     || List.exists cases ~f:(fun (pat, body) ->
       (not (List.mem (Stlc.pat_bound_vars pat) var_name ~equal:String.equal))
-      && is_used_as_value var_name body)
+      && is_used body)
 ;;
 
 let get_or_create_info (reg : registry) (ty : ty) : registry * fn_type_info =
   let key = mangle_ty ty in
-  match Map.find reg key with
+  match Map.find reg.by_arrow key with
   | Some info -> reg, info
   | None ->
     let arg_tys, ret_ty = flatten_arrow ty in
@@ -215,9 +220,21 @@ let get_or_create_info (reg : registry) (ty : ty) : registry * fn_type_info =
       ; variant_name = Utils.fresh "DFn"
       ; apply_name = Utils.fresh "dapply"
       ; entries = []
+      ; level = 0
       }
     in
-    Map.set reg ~key ~data:info, info
+    ( { by_arrow = Map.set reg.by_arrow ~key ~data:info
+      ; by_variant = Map.set reg.by_variant ~key:info.variant_name ~data:info
+      }
+    , info )
+;;
+
+let dfn_level_of reg = function
+  | TyVariant vname ->
+    (match Map.find reg.by_variant vname with
+     | Some info -> Some info.level
+     | None -> None)
+  | _ -> None
 ;;
 
 (** Retype function-typed params to their corresponding variant types. Returns updated
@@ -243,11 +260,44 @@ let retype_params (reg : registry) params =
 let add_lambda_entry (reg : registry) (ty : ty) params body captured loc
   : registry * fn_type_info * string
   =
-  let reg, info = get_or_create_info reg ty in
+  let reg, canonical_info = get_or_create_info reg ty in
+  let max_captured_level =
+    List.fold captured ~init:(-1) ~f:(fun acc (_, cty) ->
+      match dfn_level_of reg cty with
+      | Some lvl -> max acc lvl
+      | None -> acc)
+  in
+  let target_level = max_captured_level + 1 in
+  let reg, info =
+    if target_level = 0
+    then reg, canonical_info
+    else (
+      (* Create a fresh DFn type for this level (prevent recursive DFn) *)
+      let info =
+        { canonical_info with
+          variant_name = Utils.fresh "DFn"
+        ; apply_name = Utils.fresh "dapply"
+        ; entries = []
+        ; level = target_level
+        }
+      in
+      ( { reg with by_variant = Map.set reg.by_variant ~key:info.variant_name ~data:info }
+      , info ))
+  in
   let ctor_name = Utils.fresh "lctor" in
   let entry = LambdaEntry { ctor_name; params; body; captured; loc } in
   let info = { info with entries = info.entries @ [ entry ] } in
-  Map.set reg ~key:(mangle_ty ty) ~data:info, info, ctor_name
+  let reg =
+    if target_level = 0
+    then
+      (* Update both maps so future get_or_create_info sees accumulated entries *)
+      { by_arrow = Map.set reg.by_arrow ~key:(mangle_ty ty) ~data:info
+      ; by_variant = Map.set reg.by_variant ~key:info.variant_name ~data:info
+      }
+    else
+      { reg with by_variant = Map.set reg.by_variant ~key:info.variant_name ~data:info }
+  in
+  reg, info, ctor_name
 ;;
 
 let add_global_entry (reg : registry) (ty : ty) (fn_name : string) (loc : Lexer.loc)
@@ -264,7 +314,12 @@ let add_global_entry (reg : registry) (ty : ty) (fn_name : string) (loc : Lexer.
     let ctor_name = Utils.fresh ("gctor_" ^ fn_name) in
     let entry = GlobalEntry { ctor_name; fn_name; loc } in
     let info = { info with entries = info.entries @ [ entry ] } in
-    Map.set reg ~key:(mangle_ty ty) ~data:info, info, ctor_name
+    let key = mangle_ty ty in
+    ( { by_arrow = Map.set reg.by_arrow ~key ~data:info
+      ; by_variant = Map.set reg.by_variant ~key:info.variant_name ~data:info
+      }
+    , info
+    , ctor_name )
 ;;
 
 let gen_typedef info : Uncurry.top =
@@ -451,6 +506,12 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
      | _ when is_fn_ty f.ty ->
        let reg, info = get_or_create_info reg f.ty in
        let reg, f = rw reg f in
+       (* Resolve actual DFn info based on the rewritten type of [f] *)
+       let actual_info =
+         match f.ty with
+         | TyVariant vname -> Map.find reg.by_variant vname |> Option.value ~default:info
+         | _ -> info
+       in
        if is_fn_ty t.ty
        then (
          (* Partial application of a first-class function value, create a new closure *)
@@ -458,19 +519,15 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
          let n_provided = List.length args in
          let remaining_arg_tys = List.drop info.arg_tys n_provided in
          let cap_fn_var = Utils.fresh "ca" in
-         let cap_fn = cap_fn_var, TyVariant info.variant_name in
+         let cap_fn = cap_fn_var, f.ty in
          let cap_arg_vars = List.map args ~f:(fun arg -> Utils.fresh "ca", arg.ty) in
          let rem_arg_vars = List.map remaining_arg_tys ~f:(fun _ -> Utils.fresh "ra") in
          let rem_params = List.zip_exn rem_arg_vars remaining_arg_tys in
-         let apply_ty =
-           build_arrow_ty (TyVariant info.variant_name :: info.arg_tys) info.ret_ty
-         in
+         let apply_ty = build_arrow_ty (f.ty :: info.arg_tys) info.ret_ty in
          let apply_var : term =
-           { desc = Var info.apply_name; ty = apply_ty; loc = f.loc }
+           { desc = Var actual_info.apply_name; ty = apply_ty; loc = f.loc }
          in
-         let cap_fn_term : term =
-           { desc = Var cap_fn_var; ty = TyVariant info.variant_name; loc = t.loc }
-         in
+         let cap_fn_term : term = { desc = Var cap_fn_var; ty = f.ty; loc = t.loc } in
          let cap_arg_terms : term list =
            List.map cap_arg_vars ~f:(fun (name, ty) ->
              ({ desc = Var name; ty; loc = t.loc } : term))
@@ -496,11 +553,9 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
            ; loc = t.loc
            } ))
        else (
-         let apply_ty =
-           build_arrow_ty (TyVariant info.variant_name :: info.arg_tys) info.ret_ty
-         in
+         let apply_ty = build_arrow_ty (f.ty :: info.arg_tys) info.ret_ty in
          let apply_var : Uncurry.term =
-           { desc = Var info.apply_name; ty = apply_ty; loc = f.loc }
+           { desc = Var actual_info.apply_name; ty = apply_ty; loc = f.loc }
          in
          reg, { t with desc = App (apply_var, f :: args) })
      | _ ->
@@ -740,13 +795,13 @@ let defunctionalize (Program tops : Uncurry.t) : Uncurry.t Compiler_error.t =
     |> String.Set.of_list
   in
   let reg, tagged_tops =
-    List.fold_map tops ~init:String.Map.empty ~f:(fun reg top ->
+    List.fold_map tops ~init:empty_registry ~f:(fun reg top ->
       let reg, top, is_hof = rewrite_top globals global_arities closure_globals reg top in
       reg, (top, is_hof))
   in
   (* Globals that dapply_ functions call directly *)
   let direct_before_names =
-    Map.fold reg ~init:String.Set.empty ~f:(fun ~key:_ ~data:info acc ->
+    Map.fold reg.by_variant ~init:String.Set.empty ~f:(fun ~key:_ ~data:info acc ->
       List.fold info.entries ~init:acc ~f:(fun acc -> function
         | GlobalEntry e -> Set.add acc e.fn_name
         | LambdaEntry e -> Set.union acc (global_refs_of globals e.body)))
@@ -769,23 +824,48 @@ let defunctionalize (Program tops : Uncurry.t) : Uncurry.t Compiler_error.t =
     | Define (_, name, _) -> Set.mem before_apply_names name
     | _ -> false
   in
-  (* TODO: This [List.rev_map] is pretty fragile ordering, but I think its right, but need
-     to check to make sure emitted GLSL actually has correct dependency order, maybe add
-     a topological sort sanity check? *)
-  let typedef_tops = Map.data reg |> List.rev_map ~f:gen_typedef in
-  let apply_fn_tops = Map.data reg |> List.rev_map ~f:gen_apply_fn in
-  (* Functions dapply_ calls must come before it; HOF consumers call dapply_ so must
-     come after it; everything else (externs, main, unrelated functions) goes last. *)
-  let before_tops =
-    List.filter_map tagged_tops ~f:(fun (top, _) ->
-      Option.some_if (is_before_apply top) top)
+  (* Sort all DFn infos by level so level-N types/apply-fns come after level-(N-1) ones.
+     Filter out canonical infos that had no direct entries (only served as a template for
+     higher-level DFns). *)
+  let sorted_infos =
+    Map.data reg.by_variant
+    |> List.filter ~f:(fun i -> not (List.is_empty i.entries))
+    |> List.sort ~compare:(fun a b -> Int.compare a.level b.level)
   in
-  let after_tops =
-    List.filter_map tagged_tops ~f:(fun (top, is_hof) -> Option.some_if is_hof top)
+  let typedef_tops = List.map sorted_infos ~f:gen_typedef in
+  let level0_apply_tops, higher_apply_tops =
+    sorted_infos
+    |> List.partition_map ~f:(fun i ->
+      let top = gen_apply_fn i in
+      if i.level = 0 then First top else Second top)
   in
-  let rest_tops =
-    List.filter_map tagged_tops ~f:(fun (top, is_hof) ->
-      Option.some_if (not (is_before_apply top || is_hof)) top)
+  (* TODO: Mental hierarchy for sorting, although we should probably do a proper topo sort
+
+     1. Functions dapply_ calls must come before it
+     2. HOF consumers call dapply_ so must come after it
+     3. everything else (externs, main, unrelated functions) goes last
+     4. level-0 dapplys come first
+     5. HOF consumers that are needed by level-1+ dapplys (before_tops_hof) come after
+     6. level-1+ dapplys come last of the apply group
+     7. Non-HOF before_tops come before level-0 dapplys *)
+  let before_tops_non_hof, before_tops_hof, after_tops, rest_tops =
+    List.fold_right
+      tagged_tops
+      ~init:([], [], [], [])
+      ~f:(fun (top, is_hof) (bnh, bh, at, rt) ->
+        match is_before_apply top, is_hof with
+        | true, false -> top :: bnh, bh, at, rt
+        | true, true -> bnh, top :: bh, at, rt
+        | false, true -> bnh, bh, top :: at, rt
+        | false, false -> bnh, bh, at, top :: rt)
   in
-  Ok (Program (typedef_tops @ before_tops @ apply_fn_tops @ after_tops @ rest_tops))
+  Ok
+    (Program
+       (typedef_tops
+        @ before_tops_non_hof
+        @ level0_apply_tops
+        @ before_tops_hof
+        @ higher_apply_tops
+        @ after_tops
+        @ rest_tops))
 ;;
