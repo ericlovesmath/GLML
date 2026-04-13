@@ -3,6 +3,7 @@ import { inject } from "@vercel/analytics";
 import { EditorView, basicSetup } from "codemirror";
 import { keymap } from "@codemirror/view";
 import { Compartment, Prec } from "@codemirror/state";
+import { toggleLineComment } from "@codemirror/commands";
 import { vim, getCM, Vim } from "@replit/codemirror-vim";
 import { initRenderer, compileAndLinkGLSL } from "./renderer";
 import { EXAMPLES } from "./examples";
@@ -75,10 +76,10 @@ const hashCode = (() => {
 const inputView = new EditorView({
   doc: hashCode ?? EXAMPLES[0][1],
   extensions: [
+    vimCompartment.of([]),
     basicSetup,
     darkTheme,
     ...glmlExtension,
-    vimCompartment.of([]),
     vimStatusListener,
     Prec.highest(
       keymap.of([
@@ -137,6 +138,16 @@ function glmlReady(cb: () => void): void {
 Vim.defineEx("write", "w", () => {
   glmlReady(() => compile(inputView.state.doc.toString()));
 });
+
+// gcc in normal mode / gc in visual mode: toggle line comments
+Vim.defineAction("toggleComment", (cm) => {
+  toggleLineComment(cm.cm6);
+  if (cm.state.vim?.visualMode) {
+    Vim.exitVisualMode(cm);
+  }
+});
+Vim.mapCommand("gcc", "action", "toggleComment", {}, { context: "normal" });
+Vim.mapCommand("gc", "action", "toggleComment", {}, { context: "visual" });
 
 function compile(source: string): void {
   const result = window.glml.compile(source);
