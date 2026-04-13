@@ -15,8 +15,7 @@ let to_glsl_ty (ty : Monomorphize.ty) : ty Compiler_error.t =
   | TyBool -> Ok TyBool
   | TyVec n -> Ok (TyVec n)
   | TyMat (x, y) -> Ok (TyMat (x, y))
-  | TyRecord s
-  | TyVariant s -> Ok (TyStruct s)
+  | TyRecord s | TyVariant s -> Ok (TyStruct s)
   | TyArrow _ ->
     Err.fail "arrow types should not be translated" ~d:[%message (ty : Monomorphize.ty)]
 ;;
@@ -186,11 +185,59 @@ let translate (Program tops : Remove_placeholder.t) : Glsl.t Compiler_error.t =
         let%bind body = translate_block env body in
         Ok (Function { name; desc = None; params; ret_type; body })
       | Const (name, body) ->
-        (match body.desc with
-         | Return { desc = Atom a; _ } ->
-           let%map ty = to_glsl_ty top.ty in
-           Global (Const, ty, name, Some (to_glsl_atom a))
-         | _ ->
+        (* TODO: This is INCORRECT but temporarily lives here while we fix
+           toplevel consts, if we have intermediate bindings this does not handle it,
+           but this works enough to support the generated [DFn(...)] structs to
+           be folded into one line... this really needs to be improved in some way.
+
+           We HAVE to fix this to have real toplevel variables, especially the kinds
+           that aren't normally supported by GLSL like results of function calls.
+
+           Maybe ANF form was a mistake for our language. *)
+        let subst_atom subs (a : Remove_placeholder.atom) =
+          match a.desc with
+          | Var v ->
+            (match List.Assoc.find subs v ~equal:String.equal with
+             | Some a -> a
+             | None -> a)
+          | _ -> a
+        in
+        let subst_term subs (t : Remove_placeholder.term) =
+          let sa = subst_atom subs in
+          let desc =
+            match t.desc with
+            | Atom a -> Remove_placeholder.Atom (sa a)
+            | Bop (op, l, r) -> Bop (op, sa l, sa r)
+            | Vec (n, ts) -> Vec (n, List.map ts ~f:sa)
+            | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:sa)
+            | Index (a, i) -> Index (sa a, i)
+            | Builtin (b, ts) -> Builtin (b, List.map ts ~f:sa)
+            | App (f, ts) -> App (f, List.map ts ~f:sa)
+            | Record (s, ts) -> Record (s, List.map ts ~f:sa)
+            | Field (a, f) -> Field (sa a, f)
+            | If _ | Switch _ -> t.desc
+          in
+          { t with desc }
+        in
+        let rec eval_const subs (anf : Remove_placeholder.anf) =
+          match anf.desc with
+          | Return t -> Some (subst_term subs t)
+          | Let (v, { desc = Atom a; _ }, rest) -> eval_const ((v, a) :: subs) rest
+          | _ -> None
+        in
+        (match eval_const [] body with
+         | Some t ->
+           (match t.desc with
+            | If _ | Switch _ ->
+              Err.fail
+                "top-level constant must be atomic"
+                ~loc
+                ~d:[%message (name : string)]
+            | _ ->
+              let%bind ty = to_glsl_ty top.ty in
+              let%bind glsl_t = to_glsl_term t in
+              Ok (Global (Const, ty, name, Some glsl_t)))
+         | None ->
            Err.fail "top-level constant must be atomic" ~loc ~d:[%message (name : string)])
       | Extern v ->
         let%map ty = to_glsl_ty top.ty in
