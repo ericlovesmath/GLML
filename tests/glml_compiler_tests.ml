@@ -3024,3 +3024,122 @@ let%expect_test "defunctionalization - partial application of first-class functi
     }
     |}]
 ;;
+
+let%expect_test "toplevel let-wrapped lambdas + partial application" =
+  (* let-binding wrapping a lambda at the top level *)
+  test
+    {|
+    let inc =
+      let x = 1 in
+      fun y -> x + y
+
+    let main (uv : vec2) = [inc 1, 1, 1]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_11 {
+        int tag;
+        int lctor_12_0;
+    };
+    int dapply_10(DFn_11 dfn_13, int da_14) {
+        int x_1 = dfn_13.lctor_12_0;
+        return (x_1 + da_14);
+    }
+    const DFn_11 inc_0_int_to_int_9 = DFn_11(0, 1);
+    vec3 main_pure(vec2 uv_3) {
+        int anf_15 = dapply_10(inc_0_int_to_int_9, 1);
+        float pf_16 = float(anf_15);
+        return vec3(pf_16, 1., 1.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* Called with float argument *)
+  test
+    {|
+    let inc =
+      let x = 1 in
+      fun y -> x + y
+
+    let main (uv : vec2) = [inc 1.0, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_11 {
+        int tag;
+        int lctor_12_0;
+    };
+    float dapply_10(DFn_11 dfn_13, float da_14) {
+        int x_1 = dfn_13.lctor_12_0;
+        float pf_16 = float(x_1);
+        return (pf_16 + da_14);
+    }
+    const DFn_11 inc_0_float_to_float_9 = DFn_11(0, 1);
+    vec3 main_pure(vec2 uv_3) {
+        float anf_15 = dapply_10(inc_0_float_to_float_9, 1.);
+        return vec3(anf_15, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    let add_one =
+      let k = 1 in
+      fun x -> x + k
+
+    let scale =
+      let s = 2.0 in
+      fun x -> x * s
+
+    let main (uv : vec2) = [scale (add_one 3.0), 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_20 {
+        int tag;
+        int lctor_21_0;
+        float lctor_22_0;
+    };
+    float dapply_19(DFn_20 dfn_23, float da_24) {
+        int _lv_tag_27 = dfn_23.tag;
+        switch (_lv_tag_27) {
+            case 0: {
+                int k_1 = dfn_23.lctor_21_0;
+                float pf_28 = float(k_1);
+                return (da_24 + pf_28);
+                break;
+            }
+            default: {
+                float s_4 = dfn_23.lctor_22_0;
+                return (da_24 * s_4);
+                break;
+            }
+        }
+    }
+    const DFn_20 add_one_0_float_to_float_17 = DFn_20(0, 1, 0.);
+    const DFn_20 scale_3_float_to_float_18 = DFn_20(1, 0, 2.);
+    vec3 main_pure(vec2 uv_6) {
+        float anf_25 = dapply_19(add_one_0_float_to_float_17, 3.);
+        float anf_26 = dapply_19(scale_3_float_to_float_18, anf_25);
+        return vec3(anf_26, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;

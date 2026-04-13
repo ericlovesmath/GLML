@@ -490,7 +490,8 @@ let rec is_value (t : Stlc.term) : bool =
   | Record fields -> List.for_all fields ~f:(fun (_, t) -> is_value t)
   | Variant (_, args) -> List.for_all args ~f:is_value
   | Field (t, _) | Index (t, _) -> is_value t
-  | App _ | Let _ | If _ | Bop _ | Builtin _ | Match _ -> false
+  | Let (_, _, _, _, body) -> is_value body
+  | App _ | If _ | Bop _ | Builtin _ | Match _ -> false
 ;;
 
 let rec resolve_stlc_ty (variants : 'a String.Map.t) (t : Stlc.ty) : ty =

@@ -62,6 +62,7 @@ type registry = fn_type_info String.Map.t
 type ctx =
   { globals : String.Set.t
   ; global_arities : int String.Map.t
+  ; closure_globals : String.Set.t
   ; lift_only : String.Set.t
   ; lift_only_bodies : ((string * ty) list * Uncurry.term) String.Map.t
   ; env : ty String.Map.t
@@ -358,7 +359,19 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
     (match f.desc with
      | Var v when Set.mem ctx.globals v ->
        (* Global function: call by name, globals retain their name through lambda_lift *)
-       if is_fn_ty t.ty
+       if Set.mem ctx.closure_globals v
+       then (
+         (* Evaluates to a closure value, so we route through [dapply] instead of calling by name *)
+         let reg, info = get_or_create_info reg f.ty in
+         let apply_ty =
+           build_arrow_ty (TyVariant info.variant_name :: info.arg_tys) info.ret_ty
+         in
+         let apply_var : term =
+           { desc = Var info.apply_name; ty = apply_ty; loc = f.loc }
+         in
+         let f = { f with ty = TyVariant info.variant_name } in
+         reg, { t with desc = App (apply_var, f :: args); ty = info.ret_ty })
+       else if is_fn_ty t.ty
        then (
          let f_arity =
            Map.find ctx.global_arities v
@@ -624,6 +637,7 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
 let rewrite_top
       (globals : String.Set.t)
       (global_arities : int String.Map.t)
+      (closure_globals : String.Set.t)
       (reg : registry)
       (top : Uncurry.top)
   : registry * Uncurry.top * bool
@@ -631,6 +645,7 @@ let rewrite_top
   let ctx_base =
     { globals
     ; global_arities
+    ; closure_globals
     ; lift_only = String.Set.empty
     ; lift_only_bodies = String.Map.empty
     ; env = String.Map.empty
@@ -643,12 +658,12 @@ let rewrite_top
     let ctx = { ctx_base with env } in
     let reg, body = rewrite_term ctx false reg body in
     let lam_ty = build_arrow_ty (List.map params ~f:snd) body.ty in
-    let lam' = { lam with desc = Lam (params, body); ty = lam_ty } in
-    let top' = { top with desc = Define (recur, name, lam'); ty = lam_ty } in
-    reg, top', is_hof_consumer
+    let lam = { lam with desc = Lam (params, body); ty = lam_ty } in
+    let top = { top with desc = Define (recur, name, lam); ty = lam_ty } in
+    reg, top, is_hof_consumer
   | Define (recur, name, term) ->
     let reg, term = rewrite_term ctx_base false reg term in
-    reg, { top with desc = Define (recur, name, term) }, false
+    reg, { top with desc = Define (recur, name, term); ty = term.ty }, false
   | TypeDef (name, RecordDecl fields) ->
     let reg, fields =
       List.fold_map fields ~init:reg ~f:(fun reg (field_name, ty) ->
@@ -714,9 +729,19 @@ let defunctionalize (Program tops : Uncurry.t) : Uncurry.t Compiler_error.t =
       | _ -> None)
     |> String.Map.of_alist_exn
   in
+  (* Globals whose RHS is not a direct lambda but evaluates to a function value.
+     These are now closure values. *)
+  let closure_globals =
+    List.filter_map tops ~f:(fun (top : Uncurry.top) ->
+      match top.desc with
+      | Define (_, _, { desc = Lam _; _ }) -> None
+      | Define (_, name, term) when is_fn_ty term.ty -> Some name
+      | _ -> None)
+    |> String.Set.of_list
+  in
   let reg, tagged_tops =
     List.fold_map tops ~init:String.Map.empty ~f:(fun reg top ->
-      let reg, top, is_hof = rewrite_top globals global_arities reg top in
+      let reg, top, is_hof = rewrite_top globals global_arities closure_globals reg top in
       reg, (top, is_hof))
   in
   (* Globals that dapply_ functions call directly *)
