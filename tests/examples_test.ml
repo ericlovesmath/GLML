@@ -486,11 +486,11 @@ let%expect_test "compile examples" =
 
     === defunctionalize (2d_sdf_variants.glml) ===
     (Program
-     (((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-      ((Extern u_time) : float)
-      ((TypeDef shape
+     (((TypeDef shape
         (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
        : shape)
+      ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+      ((Extern u_time) : float)
       ((Define Nonrec sdf_0
         (lambda ((s_1 shape) (p_2 (vec 2)))
          (match s_1 ((Circle r_3) (- (length p_2) r_3))
@@ -533,11 +533,12 @@ let%expect_test "compile examples" =
        : ((vec 2) -> (vec 3)))))
 
     === lambda lift (2d_sdf_variants.glml) ===
-    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
+    (Program
      ((TypeDef shape
        (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
       : shape)
+     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
      ((Define Nonrec (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
         (match s_1 ((Circle r_3) (- (length p_2) r_3))
@@ -581,11 +582,12 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === anf (2d_sdf_variants.glml) ===
-    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
+    (Program
      ((TypeDef shape
        (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
       : shape)
+     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
      ((Define Nonrec (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
         (return
@@ -661,11 +663,12 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === tail call (2d_sdf_variants.glml) ===
-    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
+    (Program
      ((TypeDef shape
        (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
       : shape)
+     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
      ((Define (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
         (return
@@ -740,11 +743,12 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === lower variants (2d_sdf_variants.glml) ===
-    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
+    (Program
      ((TypeDef shape
        (RecordDecl ((tag int) (Circle_0 float) (Rect_0 float) (Rect_1 float))))
       : shape)
+     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
      ((Define (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
         (let _lv_tag_155 (. s_1 tag)
@@ -825,11 +829,12 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === promote ints (2d_sdf_variants.glml) ===
-    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
+    (Program
      ((TypeDef shape
        (RecordDecl ((tag int) (Circle_0 float) (Rect_0 float) (Rect_1 float))))
       : shape)
+     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
      ((Define (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
         (let _lv_tag_155 (. s_1 tag)
@@ -910,11 +915,12 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === remove placeholder (2d_sdf_variants.glml) ===
-    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
+    (Program
      ((TypeDef shape
        (RecordDecl ((tag int) (Circle_0 float) (Rect_0 float) (Rect_1 float))))
       : shape)
+     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
      ((Define (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
         (let _lv_tag_155 (. s_1 tag)
@@ -996,10 +1002,10 @@ let%expect_test "compile examples" =
 
     === translate (2d_sdf_variants.glml) ===
     (Program
-     ((Global Uniform (TyVec 2) u_resolution ())
-      (Global Uniform (TyVec 2) u_mouse ()) (Global Uniform TyFloat u_time ())
-      (Struct shape
+     ((Struct shape
        ((TyInt tag) (TyFloat Circle_0) (TyFloat Rect_0) (TyFloat Rect_1)))
+      (Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform (TyVec 2) u_mouse ()) (Global Uniform TyFloat u_time ())
       (Function (name sdf_0) (desc ())
        (params (((TyStruct shape) s_1) ((TyVec 2) p_2))) (ret_type TyFloat)
        (body
@@ -1078,10 +1084,10 @@ let%expect_test "compile examples" =
     === patch main (2d_sdf_variants.glml) ===
     (Program
      ((Global Out (TyVec 4) fragColor ())
-      (Global Uniform (TyVec 2) u_resolution ())
-      (Global Uniform (TyVec 2) u_mouse ()) (Global Uniform TyFloat u_time ())
       (Struct shape
        ((TyInt tag) (TyFloat Circle_0) (TyFloat Rect_0) (TyFloat Rect_1)))
+      (Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform (TyVec 2) u_mouse ()) (Global Uniform TyFloat u_time ())
       (Function (name sdf_0) (desc ())
        (params (((TyStruct shape) s_1) ((TyVec 2) p_2))) (ret_type TyFloat)
        (body
