@@ -510,16 +510,6 @@ let rec resolve_stlc_ty (variants : 'a String.Map.t) (t : Stlc.ty) : ty =
   | TyVar v -> TyVar v
 ;;
 
-(** Build a function type from lambda param annotations and a return type. *)
-let rec build_function_type variants (term : Stlc.term) (ret_ty : ty) : ty =
-  match term.desc with
-  | Lam (_, Some param_ty, body) ->
-    TyArrow (resolve_stlc_ty variants param_ty, build_function_type variants body ret_ty)
-  | Lam (_, None, body) ->
-    TyArrow (fresh_tyvar (), build_function_type variants body ret_ty)
-  | _ -> ret_ty
-;;
-
 (* TODO; There has to be a way that doesn't involving passing 4 million params *)
 (** Infer the type of a binding (used between top-level Define and inner Let).
     Returns [substituted term * resolved type * new context * scheme constraints * remaining constraints] *)
@@ -538,11 +528,7 @@ let rec infer_binding
   let ty_v_opt =
     match recur with
     | Nonrec -> None
-    | Rec _ ->
-      Some
-        (match return_ty with
-         | None -> fresh_tyvar ()
-         | Some ret_ty -> build_function_type variants bind_stlc ret_ty)
+    | Rec _ -> Some (Option.value return_ty ~default:(fresh_tyvar ()))
   in
   let ctx_gen =
     match ty_v_opt with
@@ -558,8 +544,7 @@ let rec infer_binding
       | Some ty_v -> constr (Eq (ty_v, bind.ty)) :: constrs_bind
     in
     match recur, return_ty with
-    | Nonrec, Some ret_ty ->
-      constr (Eq (build_function_type variants bind_stlc ret_ty, bind.ty)) :: rec_constrs
+    | Nonrec, Some full_ty -> constr (Eq (full_ty, bind.ty)) :: rec_constrs
     | _ -> rec_constrs
   in
   let%bind sub_bind, deferred = solve structs constrs in

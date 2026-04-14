@@ -373,18 +373,18 @@ let%expect_test "recursive functions" =
     precision highp float;
     out vec4 fragColor;
     int fact_0(int n_1, int acc_2) {
-        int _iter_15 = 0;
-        while ((_iter_15 < 1000)) {
-            bool anf_12 = (n_1 == 0);
-            if (anf_12) {
+        int _iter_16 = 0;
+        while ((_iter_16 < 1000)) {
+            bool anf_13 = (n_1 == 0);
+            if (anf_13) {
                 return acc_2;
             } else {
-                int anf_13 = (n_1 - 1);
-                int anf_14 = (acc_2 * n_1);
-                n_1 = anf_13;
-                acc_2 = anf_14;
-                int _iter_inc_16 = (_iter_15 + 1);
-                _iter_15 = _iter_inc_16;
+                int anf_14 = (n_1 - 1);
+                int anf_15 = (acc_2 * n_1);
+                n_1 = anf_14;
+                acc_2 = anf_15;
+                int _iter_inc_17 = (_iter_16 + 1);
+                _iter_16 = _iter_inc_17;
                 continue;
             }
         }
@@ -3182,6 +3182,64 @@ let%expect_test "regression - no recursive DFn structs from partial application"
         DFn_13 f_4_float_to_vec3_11 = DFn_13(0);
         DFn_18 a_6 = DFn_18(0, f_4_float_to_vec3_11);
         return vec3(0., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "return type annotation for function-returning functions" =
+  (* palette: 4 params, return type is (float -> vec3) *)
+  test
+    {|
+    let palette (a : vec3) (b : vec3) (c : vec3) (d : vec3) : (float -> vec3) =
+      fun t -> a + b * #cos(6.28318 * (c * t + d))
+    let main (coord : vec2) : vec3 = palette [0.,0.,0.] [0.,0.,0.] [0.,0.,0.] [0.,0.,0.] 0.
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 palette_0(vec3 a_1, vec3 b_2, vec3 c_3, vec3 d_4, float t_5) {
+        vec3 anf_20 = (c_3 * t_5);
+        vec3 anf_21 = (anf_20 + d_4);
+        vec3 anf_22 = (6.28318 * anf_21);
+        vec3 anf_23 = cos(anf_22);
+        vec3 anf_24 = (b_2 * anf_23);
+        return (a_1 + anf_24);
+    }
+    vec3 main_pure(vec2 coord_6) {
+        vec3 anf_25 = vec3(0., 0., 0.);
+        vec3 anf_26 = vec3(0., 0., 0.);
+        vec3 anf_27 = vec3(0., 0., 0.);
+        vec3 anf_28 = vec3(0., 0., 0.);
+        return palette_0(anf_25, anf_26, anf_27, anf_28, 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* simple: one param, return type is (float -> float) *)
+  test
+    {|
+    let add (x : float) : (float -> float) = fun y -> x + y
+    let main (coord : vec2) : vec3 = let r = add 1. 2. in [r, r, r]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    float add_0(float x_1, float y_2) {
+        return (x_1 + y_2);
+    }
+    vec3 main_pure(vec2 coord_3) {
+        float r_4 = add_0(1., 2.);
+        return vec3(r_4, r_4, r_4);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
