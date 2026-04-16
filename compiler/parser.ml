@@ -648,7 +648,7 @@ let top_record_p =
               let%bind f_ty = ty_p in
               return (f_id, f_ty)))
       in
-      return (TypeDef (id, RecordDecl (ty_params, fields))))
+      return (TypeDef (id, ty_params, RecordDecl fields)))
    <??> "top_record")
     st
 ;;
@@ -668,12 +668,23 @@ let top_variant_p =
        let%bind _ = optional (tok BAR) in
        sep_by1 (tok BAR) ctor_p
      in
-     return (TypeDef (id, VariantDecl (ty_params, ctors))))
+     return (TypeDef (id, ty_params, VariantDecl ctors)))
   <??> "top_variant"
 ;;
 
+let top_alias_p =
+  with_top_loc
+    (let%bind _ = tok TYPE in
+     let%bind id = ident_p in
+     let%bind ty_params = ty_params_p in
+     let%bind _ = tok EQ in
+     let%bind ty = ty_p in
+     return (TypeDef (id, ty_params, AliasDecl ty)))
+  <??> "top_alias"
+;;
+
 let glml_p =
-  many1 (top_let_p <|> top_extern_p <|> top_record_p <|> top_variant_p)
+  many1 (top_let_p <|> top_extern_p <|> top_record_p <|> top_variant_p <|> top_alias_p)
   >>| fun tops -> Program tops
 ;;
 
@@ -699,15 +710,34 @@ let%expect_test "glml parse tests" =
   [%expect
     {|
     (Program
-     ((Extern float u_time) (TypeDef point (RecordDecl () ((x float) (y int))))
-      (TypeDef point (RecordDecl (a b) ((x 'a) (y 'b))))
-      (TypeDef shape (VariantDecl () ((Circle (int float)) (Triangle ()))))
-      (TypeDef either (VariantDecl (a b) ((Left ('a)) (Right ('b)))))
+     ((Extern float u_time) (TypeDef point (RecordDecl ((x float) (y int))))
+      (TypeDef "point[a, b]" (RecordDecl ((x 'a) (y 'b))))
+      (TypeDef shape (VariantDecl ((Circle (int float)) (Triangle ()))))
+      (TypeDef "either[a, b]" (VariantDecl ((Left ('a)) (Right ('b)))))
       (Define Nonrec a_struct (record (x 0.) (y 0)))
       (Define Nonrec toplevel (+ 1 2)) (Define Nonrec main (+ 1 2))
       (Define Nonrec f (lambda (x (bool)) (lambda (y (bool)) (&& x y))))
       (Define Nonrec main (lambda (u ((vec 2))) (+ (app f (vec2 1 2)) u)))
       (Define (Rec 1000) g (: (float -> float)) (lambda (x (float)) (app g x)))))
+    |}]
+;;
+
+let%expect_test "type alias parsing" =
+  let test = test sexp_of_t glml_p in
+  test
+    {|
+    type color = vec3
+    type scalar = float
+    type parameterized['a] = 'a
+    let main (uv : vec2) : color = [0.0, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    (Program
+     ((TypeDef color (AliasDecl (vec 3))) (TypeDef scalar (AliasDecl float))
+      (TypeDef parameterized[a] (AliasDecl 'a))
+      (Define Nonrec main (: ((vec 2) -> color))
+       (lambda (uv ((vec 2))) (vec3 0. 0. 0.)))))
     |}]
 ;;
 

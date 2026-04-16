@@ -20,10 +20,10 @@ type ty =
   | TyApp of string * ty list
 [@@deriving sexp_of, equal]
 
-(* TODO: Move params [string list] to [TypeDef] in [top_desc]? *)
 type type_decl =
-  | RecordDecl of string list * (string * ty) list
-  | VariantDecl of string list * (string * ty list) list
+  | RecordDecl of (string * ty) list
+  | VariantDecl of (string * ty list) list
+  | AliasDecl of ty
 [@@deriving sexp_of]
 
 type recur =
@@ -61,7 +61,8 @@ and term =
 type top_desc =
   | Define of recur * string * ty option * term
   | Extern of ty * string
-  | TypeDef of string * type_decl
+  (* TypeDef (var, params, type) *)
+  | TypeDef of string * string list * type_decl
 [@@deriving sexp_of]
 
 type top =

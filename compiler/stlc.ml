@@ -48,8 +48,9 @@ let rec sexp_of_ty = function
 ;;
 
 type type_decl =
-  | RecordDecl of string list * (string * ty) list
-  | VariantDecl of string list * (string * ty list) list
+  | RecordDecl of (string * ty) list
+  | VariantDecl of (string * ty list) list
+  | AliasDecl of ty
 [@@deriving sexp_of]
 
 type recur =
@@ -139,7 +140,7 @@ and sexp_of_term t = sexp_of_term_desc t.desc
 type top_desc =
   | Define of recur * string * ty option * term
   | Extern of ty * string
-  | TypeDef of string * type_decl
+  | TypeDef of string * string list * type_decl
 
 type top =
   { desc : top_desc
@@ -157,7 +158,10 @@ let sexp_of_top_desc = function
     in
     List (parts @ [ sexp_of_term term ])
   | Extern (ty, v) -> List [ Atom "Extern"; sexp_of_ty ty; Atom v ]
-  | TypeDef (name, decl) -> List [ Atom "TypeDef"; Atom name; sexp_of_type_decl decl ]
+  | TypeDef (name, [], decl) -> List [ Atom "TypeDef"; Atom name; sexp_of_type_decl decl ]
+  | TypeDef (name, params, decl) ->
+    let ty = name ^ "[" ^ String.concat ~sep:", " params ^ "]" in
+    List [ Atom "TypeDef"; Atom ty; sexp_of_type_decl decl ]
 ;;
 
 let sexp_of_top t = sexp_of_top_desc t.desc

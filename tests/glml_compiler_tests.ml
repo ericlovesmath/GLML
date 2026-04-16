@@ -3247,3 +3247,60 @@ let%expect_test "return type annotation for function-returning functions" =
     }
     |}]
 ;;
+
+let%expect_test "non-parametrized type aliases" =
+  test
+    {|
+    type a = int
+    type b = a
+    type c = b
+
+    let f (n : b) : c = n
+    let main (u : vec2) = [0, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    int f_0(int n_1) {
+        return n_1;
+    }
+    vec3 main_pure(vec2 u_2) {
+        return vec3(0., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+  |}];
+  test
+    {|
+    type option['a] = Some of 'a | None
+    type a = option[int]
+    type b = a
+
+    let f (n : a) : b = n
+    let main (u : vec2) = [0, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct v_option_int {
+        int tag;
+        int Some_0;
+    };
+    v_option_int f_0(v_option_int n_1) {
+        return n_1;
+    }
+    vec3 main_pure(vec2 u_2) {
+        return vec3(0., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
