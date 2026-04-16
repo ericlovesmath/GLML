@@ -494,14 +494,38 @@ let rec is_value (t : Stlc.term) : bool =
   | App _ | If _ | Bop _ | Builtin _ | Match _ -> false
 ;;
 
-let rec resolve_stlc_ty (variants : 'a String.Map.t) (t : Stlc.ty) : ty =
+(* TODO: Get rid of that failwith *)
+(* TODO: Unify passing [aliases, variants, structs] together *)
+let rec resolve_stlc_ty
+          (aliases : Stlc.ty String.Map.t)
+          (structs : 'a String.Map.t)
+          (variants : 'b String.Map.t)
+          (t : Stlc.ty)
+  : ty
+  =
+  let resolve = resolve_stlc_ty aliases structs variants in
   match t with
-  | TyName s when Map.mem variants s -> TyVariant (s, [])
-  | TyName s -> TyRecord (s, [])
-  | TyApp (name, args) when Map.mem variants name ->
-    TyVariant (name, List.map args ~f:(resolve_stlc_ty variants))
-  | TyApp (name, args) -> TyRecord (name, List.map args ~f:(resolve_stlc_ty variants))
-  | TyArrow (l, r) -> TyArrow (resolve_stlc_ty variants l, resolve_stlc_ty variants r)
+  | TyName s ->
+    (match Map.find aliases s with
+     | Some alias -> resolve alias
+     | None ->
+       if Map.mem variants s
+       then TyVariant (s, [])
+       else if Map.mem structs s
+       then TyRecord (s, [])
+       else failwith ("typecheck: unknown type name " ^ s))
+  | TyApp (name, args) ->
+    (match Map.find aliases name with
+     | Some (TyName name) -> resolve (TyApp (name, args))
+     | Some _ -> failwith "typecheck: alias expected to be a typename for parametrized"
+     | None ->
+       let args = List.map args ~f:resolve in
+       if Map.mem variants name
+       then TyVariant (name, args)
+       else if Map.mem structs name
+       then TyRecord (name, args)
+       else failwith "typecheck: alias not a variant or record")
+  | TyArrow (l, r) -> TyArrow (resolve l, resolve r)
   | TyFloat -> TyFloat
   | TyInt -> TyInt
   | TyBool -> TyBool
@@ -514,6 +538,7 @@ let rec resolve_stlc_ty (variants : 'a String.Map.t) (t : Stlc.ty) : ty =
 (** Infer the type of a binding (used between top-level Define and inner Let).
     Returns [substituted term * resolved type * new context * scheme constraints * remaining constraints] *)
 let rec infer_binding
+          (aliases : Stlc.ty String.Map.t)
           (structs : (string list * (string * ty) list) String.Map.t)
           (variants : (string list * (string * ty list) list) String.Map.t)
           (ctx : context)
@@ -524,7 +549,7 @@ let rec infer_binding
           (return_ty : Stlc.ty option)
   : (term * ty * context * constr list * constr list) Compiler_error.t
   =
-  let return_ty = Option.map return_ty ~f:(resolve_stlc_ty variants) in
+  let return_ty = Option.map return_ty ~f:(resolve_stlc_ty aliases structs variants) in
   let ty_v_opt =
     match recur with
     | Nonrec -> None
@@ -535,7 +560,7 @@ let rec infer_binding
     | None -> ctx
     | Some ty_v -> Map.set ctx ~key:v ~data:([], [], ty_v)
   in
-  let%bind bind, constrs_bind = gen_term structs variants ctx_gen bind_stlc in
+  let%bind bind, constrs_bind = gen_term aliases structs variants ctx_gen bind_stlc in
   let constr desc = { desc; loc } in
   let constrs =
     let rec_constrs =
@@ -562,7 +587,9 @@ let rec infer_binding
   Ok (bind, ty_bind, ctx, scheme_constrs, remaining)
 
 (** Generate typed term and constraints from STLC term. *)
-and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compiler_error.t =
+and gen_term aliases structs variants ctx (t : Stlc.term)
+  : (term * constr list) Compiler_error.t
+  =
   let loc = t.loc in
   let make desc ty constrs = Ok (({ desc; ty; loc } : term), constrs) in
   let constr desc = { desc; loc } in
@@ -581,34 +608,34 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
   | Lam (v, ty_ann, body) ->
     let ty_v =
       match ty_ann with
-      | Some t -> resolve_stlc_ty variants t
+      | Some t -> resolve_stlc_ty aliases structs variants t
       | None -> fresh_tyvar ()
     in
     let ctx = Map.set ctx ~key:v ~data:([], [], ty_v) in
-    let%bind body, constrs = gen_term structs variants ctx body in
+    let%bind body, constrs = gen_term aliases structs variants ctx body in
     make (Lam (v, body)) (TyArrow (ty_v, body.ty)) constrs
   | App (f, x) ->
-    let%bind f, constrs_f = gen_term structs variants ctx f in
-    let%bind x, constrs_x = gen_term structs variants ctx x in
+    let%bind f, constrs_f = gen_term aliases structs variants ctx f in
+    let%bind x, constrs_x = gen_term aliases structs variants ctx x in
     let ret_ty = fresh_tyvar () in
     let constrs = constr (Eq (f.ty, TyArrow (x.ty, ret_ty))) :: (constrs_f @ constrs_x) in
     make (App (f, x)) ret_ty constrs
   | Let (Nonrec, v, return_ty, bind, body) ->
     let%bind bind, _, ctx, scheme_constrs, remaining =
-      infer_binding structs variants ctx loc bind Nonrec v return_ty
+      infer_binding aliases structs variants ctx loc bind Nonrec v return_ty
     in
-    let%bind body, constrs_body = gen_term structs variants ctx body in
+    let%bind body, constrs_body = gen_term aliases structs variants ctx body in
     make (Let (Nonrec, v, scheme_constrs, bind, body)) body.ty (remaining @ constrs_body)
   | Let (Rec n, v, return_ty, bind, body) ->
     let%bind bind, _, ctx, scheme_constrs, remaining =
-      infer_binding structs variants ctx loc bind (Rec n) v return_ty
+      infer_binding aliases structs variants ctx loc bind (Rec n) v return_ty
     in
-    let%bind body, constrs_body = gen_term structs variants ctx body in
+    let%bind body, constrs_body = gen_term aliases structs variants ctx body in
     make (Let (Rec n, v, scheme_constrs, bind, body)) body.ty (remaining @ constrs_body)
   | If (c, t, e) ->
-    let%bind c, constrs_c = gen_term structs variants ctx c in
-    let%bind t, constrs_t = gen_term structs variants ctx t in
-    let%bind e, constrs_e = gen_term structs variants ctx e in
+    let%bind c, constrs_c = gen_term aliases structs variants ctx c in
+    let%bind t, constrs_t = gen_term aliases structs variants ctx t in
+    let%bind e, constrs_e = gen_term aliases structs variants ctx e in
     let constrs =
       constr (Eq (c.ty, TyBool))
       :: constr (Eq (t.ty, e.ty))
@@ -616,8 +643,8 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
     in
     make (If (c, t, e)) t.ty constrs
   | Bop (op, l, r) ->
-    let%bind l, constrs_l = gen_term structs variants ctx l in
-    let%bind r, constrs_r = gen_term structs variants ctx r in
+    let%bind l, constrs_l = gen_term aliases structs variants ctx l in
+    let%bind r, constrs_r = gen_term aliases structs variants ctx r in
     let ret_ty = fresh_tyvar () in
     let op_constrs =
       match op with
@@ -648,13 +675,13 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
     in
     make (Bop (op, l, r)) ret_ty (op_constrs @ constrs_l @ constrs_r)
   | Index (t, i) ->
-    let%bind t, constrs_t = gen_term structs variants ctx t in
+    let%bind t, constrs_t = gen_term aliases structs variants ctx t in
     let ret_ty = fresh_tyvar () in
     make (Index (t, i)) ret_ty (constr (IndexAccess (t.ty, i, ret_ty)) :: constrs_t)
   | Builtin (b, args) ->
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
-        let%bind arg', constrs = gen_term structs variants ctx arg in
+        let%bind arg', constrs = gen_term aliases structs variants ctx arg in
         return (arg' :: acc_args, constrs @ acc_constrs))
     in
     let args = List.rev args in
@@ -766,7 +793,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
   | Vec (n, args) ->
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
-        let%bind arg, constrs = gen_term structs variants ctx arg in
+        let%bind arg, constrs = gen_term aliases structs variants ctx arg in
         return
           ( arg :: acc_args
           , (constr (HasClass (Comparable, arg.ty)) :: constrs) @ acc_constrs ))
@@ -778,7 +805,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
   | Mat (n, m, args) ->
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
-        let%bind arg, constrs = gen_term structs variants ctx arg in
+        let%bind arg, constrs = gen_term aliases structs variants ctx arg in
         return
           ( arg :: acc_args
           , (constr (HasClass (Comparable, arg.ty)) :: constrs) @ acc_constrs ))
@@ -818,7 +845,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
            ~f:(fun (acc, acc_constrs) (name, ty) ->
              match List.Assoc.find fields ~equal:String.equal name with
              | Some arg ->
-               let%bind arg, constrs = gen_term structs variants ctx arg in
+               let%bind arg, constrs = gen_term aliases structs variants ctx arg in
                let arg, field_constrs =
                  match ty with
                  | TyFloat ->
@@ -838,7 +865,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
          (TyRecord (struct_name, type_args))
          constrs_args)
   | Field (t, f) ->
-    let%bind t, constrs_t = gen_term structs variants ctx t in
+    let%bind t, constrs_t = gen_term aliases structs variants ctx t in
     let ret_ty = fresh_tyvar () in
     make (Field (t, f)) ret_ty (constr (FieldAccess (t.ty, f, ret_ty)) :: constrs_t)
   | Variant (ctor, args) ->
@@ -867,7 +894,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
           ~init:(Ok ([], []))
           ~f:(fun acc arg expected_ty ->
             let%bind acc_args, acc_constrs = acc in
-            let%bind arg, constrs = gen_term structs variants ctx arg in
+            let%bind arg, constrs = gen_term aliases structs variants ctx arg in
             let arg, arg_constrs =
               match expected_ty with
               | TyFloat ->
@@ -886,7 +913,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
         constrs_args)
   | Match (scrutinee, cases) ->
     (* TODO: The pattern matching typechecking code sucks so much my god, use Eq constrs? *)
-    let%bind scrutinee, constrs_s = gen_term structs variants ctx scrutinee in
+    let%bind scrutinee, constrs_s = gen_term aliases structs variants ctx scrutinee in
     let ret_ty = fresh_tyvar () in
     let has_catchall =
       List.exists cases ~f:(fun (pat, _) ->
@@ -920,7 +947,7 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
           ~init:([], [])
           ~f:(fun (acc_cases, acc_constrs) (pat, body) ->
             let%bind ctx = ctx_for_pat pat in
-            let%bind body, constrs_body = gen_term structs variants ctx body in
+            let%bind body, constrs_body = gen_term aliases structs variants ctx body in
             return
               ( (pat, body) :: acc_cases
               , (constr (Eq (body.ty, ret_ty)) :: constrs_body) @ acc_constrs ))
@@ -1090,15 +1117,15 @@ and gen_term structs variants ctx (t : Stlc.term) : (term * constr list) Compile
 ;;
 
 let typecheck (Program terms : Stlc.t) : t Compiler_error.t =
-  let%map _, _, _, tops =
+  let%map _, _, _, _, tops =
     List.fold_result
       terms
-      ~init:(String.Map.empty, String.Map.empty, String.Map.empty, [])
-      ~f:(fun (ctx, structs, variants, acc) top ->
+      ~init:(String.Map.empty, String.Map.empty, String.Map.empty, String.Map.empty, [])
+      ~f:(fun (ctx, structs, variants, aliases, acc) top ->
         match top.desc with
         | Define (Rec n, v, return_ty, bind) ->
           let%bind bind, ty, ctx, scheme_constrs, remaining =
-            infer_binding structs variants ctx top.loc bind (Rec n) v return_ty
+            infer_binding aliases structs variants ctx top.loc bind (Rec n) v return_ty
           in
           if not (List.is_empty remaining)
           then
@@ -1110,10 +1137,10 @@ let typecheck (Program terms : Stlc.t) : t Compiler_error.t =
             let top =
               { desc = Define (Rec n, v, bind); ty; loc = top.loc; scheme_constrs }
             in
-            Ok (ctx, structs, variants, top :: acc))
+            Ok (ctx, structs, variants, aliases, top :: acc))
         | Define (Nonrec, v, return_ty, bind) ->
           let%bind bind, ty, ctx, scheme_constrs, remaining =
-            infer_binding structs variants ctx top.loc bind Nonrec v return_ty
+            infer_binding aliases structs variants ctx top.loc bind Nonrec v return_ty
           in
           if not (List.is_empty remaining)
           then
@@ -1125,15 +1152,16 @@ let typecheck (Program terms : Stlc.t) : t Compiler_error.t =
             let top =
               { desc = Define (Nonrec, v, bind); ty; loc = top.loc; scheme_constrs }
             in
-            Ok (ctx, structs, variants, top :: acc))
+            Ok (ctx, structs, variants, aliases, top :: acc))
         | Extern (ty, v) ->
-          let ty = resolve_stlc_ty variants ty in
+          let ty = resolve_stlc_ty aliases structs variants ty in
           let ctx = Map.set ctx ~key:v ~data:([], [], ty) in
           let top = { desc = Extern v; ty; loc = top.loc; scheme_constrs = [] } in
-          Ok (ctx, structs, variants, top :: acc)
-        | TypeDef (name, Stlc.RecordDecl (params, fields)) ->
+          Ok (ctx, structs, variants, aliases, top :: acc)
+        | TypeDef (name, params, RecordDecl fields) ->
           let fields =
-            List.map fields ~f:(fun (f, ty) -> f, resolve_stlc_ty variants ty)
+            List.map fields ~f:(fun (f, ty) ->
+              f, resolve_stlc_ty aliases structs variants ty)
           in
           let structs = Map.set structs ~key:name ~data:(params, fields) in
           let top =
@@ -1143,11 +1171,11 @@ let typecheck (Program terms : Stlc.t) : t Compiler_error.t =
             ; scheme_constrs = []
             }
           in
-          Ok (ctx, structs, variants, top :: acc)
-        | TypeDef (name, Stlc.VariantDecl (params, ctors)) ->
+          Ok (ctx, structs, variants, aliases, top :: acc)
+        | TypeDef (name, params, VariantDecl ctors) ->
           let ctors =
             List.map ctors ~f:(fun (c, tys) ->
-              c, List.map tys ~f:(resolve_stlc_ty variants))
+              c, List.map tys ~f:(resolve_stlc_ty aliases structs variants))
           in
           let variants = Map.set variants ~key:name ~data:(params, ctors) in
           let param_tyvars = List.map params ~f:(fun p -> TyVar p) in
@@ -1158,7 +1186,26 @@ let typecheck (Program terms : Stlc.t) : t Compiler_error.t =
             ; scheme_constrs = []
             }
           in
-          Ok (ctx, structs, variants, top :: acc))
+          Ok (ctx, structs, variants, aliases, top :: acc)
+        | TypeDef (name, _, AliasDecl ty) ->
+          let rec occurs_in ty =
+            let check_alias s =
+              Map.find aliases s |> Option.value_map ~default:false ~f:occurs_in
+            in
+            match ty with
+            | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVar _ -> false
+            | TyName s -> String.equal s name || check_alias s
+            | TyApp (s, args) ->
+              String.equal s name || check_alias s || List.exists args ~f:occurs_in
+            | TyArrow (l, r) -> occurs_in l || occurs_in r
+          in
+          if occurs_in ty
+          then
+            Err.fail
+              "type alias cycle detected"
+              ~loc:top.loc
+              ~d:[%message (name : string)]
+          else Ok (ctx, structs, variants, Map.set aliases ~key:name ~data:ty, acc))
   in
   Program (List.rev tops)
 ;;

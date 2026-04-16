@@ -29,7 +29,7 @@ let%expect_test "compile examples" =
      ((Extern (vec 2) u_resolution) (Extern (vec 2) u_mouse)
       (Extern float u_time)
       (TypeDef shape
-       (VariantDecl () ((Circle (float)) (Rect (float float)) (Empty ()))))
+       (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
       (Define Nonrec sdf
        (lambda (s (shape))
         (lambda (p ((vec 2)))
@@ -71,7 +71,7 @@ let%expect_test "compile examples" =
      ((Extern (vec 2) u_resolution) (Extern (vec 2) u_mouse)
       (Extern float u_time)
       (TypeDef shape
-       (VariantDecl () ((Circle (float)) (Rect (float float)) (Empty ()))))
+       (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
       (Define Nonrec sdf_0
        (lambda (s_1 (shape))
         (lambda (p_2 ((vec 2)))
@@ -1607,7 +1607,7 @@ let%expect_test "compile examples" =
     === stlc (mandelbrot.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time)
-      (TypeDef option (VariantDecl (a) ((Some ('a)) (None ()))))
+      (TypeDef option[a] (VariantDecl ((Some ('a)) (None ()))))
       (Define Nonrec mandelbrot
        (lambda (c ())
         (let (rec 1000) mandel
@@ -1634,7 +1634,7 @@ let%expect_test "compile examples" =
     === uniquify (mandelbrot.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time)
-      (TypeDef option (VariantDecl (a) ((Some ('a)) (None ()))))
+      (TypeDef option[a] (VariantDecl ((Some ('a)) (None ()))))
       (Define Nonrec mandelbrot_0
        (lambda (c_1 ())
         (let (rec 1000) mandel_2
@@ -2987,7 +2987,7 @@ let%expect_test "compile examples" =
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time)
       (Extern (vec 2) u_mouse)
-      (TypeDef option (VariantDecl (a) ((Some ('a)) (None ()))))
+      (TypeDef option[a] (VariantDecl ((Some ('a)) (None ()))))
       (Define Nonrec rotate
        (lambda (p ((vec 2)))
         (lambda (angle (float))
@@ -3109,7 +3109,7 @@ let%expect_test "compile examples" =
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time)
       (Extern (vec 2) u_mouse)
-      (TypeDef option (VariantDecl (a) ((Some ('a)) (None ()))))
+      (TypeDef option[a] (VariantDecl ((Some ('a)) (None ()))))
       (Define Nonrec rotate_0
        (lambda (p_1 ((vec 2)))
         (lambda (angle_2 (float))
@@ -7215,7 +7215,7 @@ let%expect_test "compile examples" =
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time)
       (Extern (vec 2) u_mouse)
-      (TypeDef option (VariantDecl (a) ((Some ('a)) (None ()))))
+      (TypeDef option[a] (VariantDecl ((Some ('a)) (None ()))))
       (Define Nonrec rotate
        (lambda (p ((vec 2)))
         (lambda (angle (float))
@@ -7295,7 +7295,7 @@ let%expect_test "compile examples" =
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time)
       (Extern (vec 2) u_mouse)
-      (TypeDef option (VariantDecl (a) ((Some ('a)) (None ()))))
+      (TypeDef option[a] (VariantDecl ((Some ('a)) (None ()))))
       (Define Nonrec rotate_0
        (lambda (p_1 ((vec 2)))
         (lambda (angle_2 (float))
