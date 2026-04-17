@@ -13,21 +13,6 @@ let dup f g x = f (g x) (g x)
 let scene : sdf = dup union constant 0.3
 let main (coord : vec2) = [0, 0, 0]
 ```
-
-```glml
-// [monomorphize]: unexpected TyVar after monomorphization
-// Error goes away when [t] is annotated as float
-let function t =
-  let app_t f = f t in
-  let x = app_t (fun t -> t + 1) in
-  [x, x]
-
-let main (uv : vec2) =
-  // Even when [t] is annotated, [0] can't be passed into [function]
-  let result = function 0.0 in
-  [0, 0, 0]
-```
-
 ```glml
 let add (x : float) (y : float) = x + y
 
@@ -43,6 +28,7 @@ let main (coord : vec2) =
 
 ## Todo Tasks
 
+- `function` keyword, shorthand for matching
 - More Demos: New examples with HOFs, IQ Palette, Beaver Logo
 - Type annotations for arbitrary terms and let bindings
 - Functions in structs and variants
@@ -50,14 +36,14 @@ let main (coord : vec2) =
 - Promotion with ints/floats (true coercion enforced rather than constraint)
 - Type aliases with parameters
 - Curried builtin functions for partial application
-- Auto Lift `f : float -> float` to work over vecs?
+- Auto lift `f : float -> float` to work over vecs?
 - Update GLML screenshot
 - Pipe as syntactic sugar for application
 - Button to show GLSL output on mobile
 - Allow clicking through all passes in GLSL output window
 - Add builtin GLSL function callers or GLSL extern libraries
 - Add user definable constrained functions?
-- uintBitsToFloat instead of fat structs to represent variants, instead storing as uvec4 in raw bits
+- `uintBitsToFloat` instead of fat structs to represent variants, instead storing as uvec4 in raw bits
 - Reuse fields with same type for structs / defunctionalization
 - Tuples and static arrays
 - `when` clause for match statements
@@ -87,7 +73,6 @@ let main (coord : vec2) =
 - Dead code elimination
 - Constant folding/propagation (Sparse conditional constant propagation)
 - Doc strings or emission of helpful comments
-- Read Futhark's monomorphization and defunctionalization code for partial application
 - Better benchmarking tests
 - Better pipeline tests
 - Buffer passing (e.g. for Game of Life)

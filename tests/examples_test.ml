@@ -2423,7 +2423,7 @@ let%expect_test "compile examples" =
       ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Define Nonrec mandelbrot_0_vec2_to_v_option_float_83
         ((lambda c_1
-          ((let (rec 1000) mandel_2_vec2_to_int_to_v_option_float_84
+          ((let (rec 1000) mandel_2
             ((lambda z_3
               ((lambda i_4
                 ((if ((> (i_4 : int) (150 : int)) : bool)
@@ -2458,8 +2458,7 @@ let%expect_test "compile examples" =
                            : (vec 2))
                           ((app
                             ((app
-                              (mandel_2_vec2_to_int_to_v_option_float_84 :
-                               ((vec 2) -> (int -> v_option_float)))
+                              (mandel_2 : ((vec 2) -> (int -> v_option_float)))
                               (z_prime_8 : (vec 2)))
                              : (int -> v_option_float))
                             ((+ (i_4 : int) (1 : int)) : int))
@@ -2472,9 +2471,7 @@ let%expect_test "compile examples" =
                : (int -> v_option_float)))
              : ((vec 2) -> (int -> v_option_float)))
             ((app
-              ((app
-                (mandel_2_vec2_to_int_to_v_option_float_84 :
-                 ((vec 2) -> (int -> v_option_float)))
+              ((app (mandel_2 : ((vec 2) -> (int -> v_option_float)))
                 ((vec2 (0 : int) (0 : int)) : (vec 2)))
                : (int -> v_option_float))
               (0 : int))
@@ -2546,7 +2543,7 @@ let%expect_test "compile examples" =
       ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
       ((Define Nonrec mandelbrot_0_vec2_to_v_option_float_83
         (lambda ((c_1 (vec 2)))
-         (let (rec 1000) mandel_2_vec2_to_int_to_v_option_float_84
+         (let (rec 1000) mandel_2
           (lambda ((z_3 (vec 2)) (i_4 int))
            (if (> i_4 150) (Variant v_option_float None)
             (if (> (length z_3) 4)
@@ -2556,9 +2553,8 @@ let%expect_test "compile examples" =
               (- (* (index z_3 0) (index z_3 0)) (* (index z_3 1) (index z_3 1)))
               (let zy_7 (* (* 2 (index z_3 0)) (index z_3 1))
                (let z_prime_8 (+ (vec2 zx_6 zy_7) c_1)
-                (app mandel_2_vec2_to_int_to_v_option_float_84 z_prime_8
-                 (+ i_4 1))))))))
-          (app mandel_2_vec2_to_int_to_v_option_float_84 (vec2 0 0) 0))))
+                (app mandel_2 z_prime_8 (+ i_4 1))))))))
+          (app mandel_2 (vec2 0 0) 0))))
        : ((vec 2) -> v_option_float))
       ((Define Nonrec main
         (lambda ((coord_9 (vec 2)))
@@ -2582,7 +2578,7 @@ let%expect_test "compile examples" =
        v_option_float)
       ((Define Nonrec mandelbrot_0_vec2_to_v_option_float_83
         (lambda ((c_1 (vec 2)))
-         (let (rec 1000) mandel_2_vec2_to_int_to_v_option_float_84
+         (let (rec 1000) mandel_2
           (lambda ((z_3 (vec 2)) (i_4 int))
            (if (> i_4 150) (Variant v_option_float None)
             (if (> (length z_3) 4)
@@ -2592,9 +2588,8 @@ let%expect_test "compile examples" =
               (- (* (index z_3 0) (index z_3 0)) (* (index z_3 1) (index z_3 1)))
               (let zy_7 (* (* 2 (index z_3 0)) (index z_3 1))
                (let z_prime_8 (+ (vec2 zx_6 zy_7) c_1)
-                (app mandel_2_vec2_to_int_to_v_option_float_84 z_prime_8
-                 (+ i_4 1))))))))
-          (app mandel_2_vec2_to_int_to_v_option_float_84 (vec2 0 0) 0))))
+                (app mandel_2 z_prime_8 (+ i_4 1))))))))
+          (app mandel_2 (vec2 0 0) 0))))
        : ((vec 2) -> v_option_float))
       ((Define Nonrec main
         (lambda ((coord_9 (vec 2)))
@@ -2615,7 +2610,7 @@ let%expect_test "compile examples" =
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((TypeDef v_option_float (VariantDecl ((Some (float)) (None ())))) :
       v_option_float)
-     ((Define (Rec 1000) (name mandel_2_vec2_to_int_to_v_option_float_84_85)
+     ((Define (Rec 1000) (name mandel_2_84)
        (args ((c_1 (vec 2)) (z_3 (vec 2)) (i_4 int)))
        (body
         (if (> i_4 150) (Variant v_option_float None)
@@ -2626,12 +2621,10 @@ let%expect_test "compile examples" =
            (- (* (index z_3 0) (index z_3 0)) (* (index z_3 1) (index z_3 1)))
            (let zy_7 (* (* 2 (index z_3 0)) (index z_3 1))
             (let z_prime_8 (+ (vec2 zx_6 zy_7) c_1)
-             (app mandel_2_vec2_to_int_to_v_option_float_84_85 c_1 z_prime_8
-              (+ i_4 1)))))))))
+             (app mandel_2_84 c_1 z_prime_8 (+ i_4 1)))))))))
       : ((vec 2) -> (int -> v_option_float)))
      ((Define Nonrec (name mandelbrot_0_vec2_to_v_option_float_83)
-       (args ((c_1 (vec 2))))
-       (body (app mandel_2_vec2_to_int_to_v_option_float_84_85 c_1 (vec2 0 0) 0)))
+       (args ((c_1 (vec 2)))) (body (app mandel_2_84 c_1 (vec2 0 0) 0)))
       : ((vec 2) -> v_option_float))
      ((Define Nonrec (name main) (args ((coord_9 (vec 2))))
        (body
@@ -2651,480 +2644,461 @@ let%expect_test "compile examples" =
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((TypeDef v_option_float (VariantDecl ((Some (float)) (None ())))) :
       v_option_float)
-     ((Define (Rec 1000) (name mandel_2_vec2_to_int_to_v_option_float_84_85)
+     ((Define (Rec 1000) (name mandel_2_84)
        (args ((c_1 (vec 2)) (z_3 (vec 2)) (i_4 int)))
        (body
-        (let anf_86 (> i_4 150)
+        (let anf_85 (> i_4 150)
          (return
-          (if anf_86 (return (Variant v_option_float None))
-           (let anf_87 (length z_3)
-            (let anf_88 (> anf_87 4)
+          (if anf_85 (return (Variant v_option_float None))
+           (let anf_86 (length z_3)
+            (let anf_87 (> anf_86 4)
              (return
-              (if anf_88
-               (let anf_89 (length z_3)
-                (let anf_90 (log2 anf_89)
-                 (let nu_5 (log2 anf_90)
-                  (let anf_91 (- i_4 nu_5)
-                   (let anf_92 (/ anf_91 150)
-                    (return (Variant v_option_float Some anf_92)))))))
-               (let anf_93 (index z_3 0)
-                (let anf_94 (index z_3 0)
-                 (let anf_95 (* anf_93 anf_94)
-                  (let anf_96 (index z_3 1)
-                   (let anf_97 (index z_3 1)
-                    (let anf_98 (* anf_96 anf_97)
-                     (let zx_6 (- anf_95 anf_98)
-                      (let anf_99 (index z_3 0)
-                       (let anf_100 (* 2 anf_99)
-                        (let anf_101 (index z_3 1)
-                         (let zy_7 (* anf_100 anf_101)
-                          (let anf_102 (vec2 zx_6 zy_7)
-                           (let z_prime_8 (+ anf_102 c_1)
-                            (let anf_103 (+ i_4 1)
-                             (return
-                              (mandel_2_vec2_to_int_to_v_option_float_84_85 c_1
-                               z_prime_8 anf_103)))))))))))))))))))))))))
+              (if anf_87
+               (let anf_88 (length z_3)
+                (let anf_89 (log2 anf_88)
+                 (let nu_5 (log2 anf_89)
+                  (let anf_90 (- i_4 nu_5)
+                   (let anf_91 (/ anf_90 150)
+                    (return (Variant v_option_float Some anf_91)))))))
+               (let anf_92 (index z_3 0)
+                (let anf_93 (index z_3 0)
+                 (let anf_94 (* anf_92 anf_93)
+                  (let anf_95 (index z_3 1)
+                   (let anf_96 (index z_3 1)
+                    (let anf_97 (* anf_95 anf_96)
+                     (let zx_6 (- anf_94 anf_97)
+                      (let anf_98 (index z_3 0)
+                       (let anf_99 (* 2 anf_98)
+                        (let anf_100 (index z_3 1)
+                         (let zy_7 (* anf_99 anf_100)
+                          (let anf_101 (vec2 zx_6 zy_7)
+                           (let z_prime_8 (+ anf_101 c_1)
+                            (let anf_102 (+ i_4 1)
+                             (return (mandel_2_84 c_1 z_prime_8 anf_102)))))))))))))))))))))))))
       : ((vec 2) -> (int -> v_option_float)))
      ((Define Nonrec (name mandelbrot_0_vec2_to_v_option_float_83)
        (args ((c_1 (vec 2))))
-       (body
-        (let anf_104 (vec2 0 0)
-         (return (mandel_2_vec2_to_int_to_v_option_float_84_85 c_1 anf_104 0)))))
+       (body (let anf_103 (vec2 0 0) (return (mandel_2_84 c_1 anf_103 0)))))
       : ((vec 2) -> v_option_float))
      ((Define Nonrec (name main) (args ((coord_9 (vec 2))))
        (body
-        (let anf_105 (* 2 coord_9)
-         (let top_11 (- anf_105 u_resolution)
-          (let anf_106 (index u_resolution 0)
-           (let anf_107 (index u_resolution 1)
-            (let bot_12 (min anf_106 anf_107)
+        (let anf_104 (* 2 coord_9)
+         (let top_11 (- anf_104 u_resolution)
+          (let anf_105 (index u_resolution 0)
+           (let anf_106 (index u_resolution 1)
+            (let bot_12 (min anf_105 anf_106)
              (let uv_10 (/ top_11 bot_12)
-              (let anf_108 (* u_time 0.4)
-               (let anf_109 (sin anf_108)
-                (let anf_110 (* anf_109 4.5)
-                 (let anf_111 (+ anf_110 3.5)
-                  (let zoom_13 (exp anf_111)
-                   (let anf_112 (vec2 -0.7453 0.1127)
-                    (let anf_113 (/ uv_10 zoom_13)
-                     (let seahorse_valley_14 (+ anf_112 anf_113)
-                      (let anf_114
+              (let anf_107 (* u_time 0.4)
+               (let anf_108 (sin anf_107)
+                (let anf_109 (* anf_108 4.5)
+                 (let anf_110 (+ anf_109 3.5)
+                  (let zoom_13 (exp anf_110)
+                   (let anf_111 (vec2 -0.7453 0.1127)
+                    (let anf_112 (/ uv_10 zoom_13)
+                     (let seahorse_valley_14 (+ anf_111 anf_112)
+                      (let anf_113
                        (mandelbrot_0_vec2_to_v_option_float_83
                         seahorse_valley_14)
                        (return
-                        (match anf_114 ((None) (return (vec3 0 0 0)))
+                        (match anf_113 ((None) (return (vec3 0 0 0)))
                          ((Some n_15)
-                          (let anf_115 (vec3 10 20 30)
-                           (let anf_116 (* n_15 anf_115)
-                            (let anf_117 (+ anf_116 u_time)
-                             (let anf_118 (sin anf_117)
-                              (let anf_119 (* anf_118 0.5)
-                               (return (+ anf_119 0.5)))))))))))))))))))))))))))
+                          (let anf_114 (vec3 10 20 30)
+                           (let anf_115 (* n_15 anf_114)
+                            (let anf_116 (+ anf_115 u_time)
+                             (let anf_117 (sin anf_116)
+                              (let anf_118 (* anf_117 0.5)
+                               (return (+ anf_118 0.5)))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === tail call (mandelbrot.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((TypeDef v_option_float (VariantDecl ((Some (float)) (None ())))) :
       v_option_float)
-     ((Define (name mandel_2_vec2_to_int_to_v_option_float_84_85)
-       (args ((c_1 (vec 2)) (z_3 (vec 2)) (i_4 int)))
+     ((Define (name mandel_2_84) (args ((c_1 (vec 2)) (z_3 (vec 2)) (i_4 int)))
        (body
-        (let _iter_120 0
-         (while (< _iter_120 1000)
-          (let anf_86 (> i_4 150)
+        (let _iter_119 0
+         (while (< _iter_119 1000)
+          (let anf_85 (> i_4 150)
            (return
-            (if anf_86 (return (Variant v_option_float None))
-             (let anf_87 (length z_3)
-              (let anf_88 (> anf_87 4)
+            (if anf_85 (return (Variant v_option_float None))
+             (let anf_86 (length z_3)
+              (let anf_87 (> anf_86 4)
                (return
-                (if anf_88
-                 (let anf_89 (length z_3)
-                  (let anf_90 (log2 anf_89)
-                   (let nu_5 (log2 anf_90)
-                    (let anf_91 (- i_4 nu_5)
-                     (let anf_92 (/ anf_91 150)
-                      (return (Variant v_option_float Some anf_92)))))))
-                 (let anf_93 (index z_3 0)
-                  (let anf_94 (index z_3 0)
-                   (let anf_95 (* anf_93 anf_94)
-                    (let anf_96 (index z_3 1)
-                     (let anf_97 (index z_3 1)
-                      (let anf_98 (* anf_96 anf_97)
-                       (let zx_6 (- anf_95 anf_98)
-                        (let anf_99 (index z_3 0)
-                         (let anf_100 (* 2 anf_99)
-                          (let anf_101 (index z_3 1)
-                           (let zy_7 (* anf_100 anf_101)
-                            (let anf_102 (vec2 zx_6 zy_7)
-                             (let z_prime_8 (+ anf_102 c_1)
-                              (let anf_103 (+ i_4 1)
+                (if anf_87
+                 (let anf_88 (length z_3)
+                  (let anf_89 (log2 anf_88)
+                   (let nu_5 (log2 anf_89)
+                    (let anf_90 (- i_4 nu_5)
+                     (let anf_91 (/ anf_90 150)
+                      (return (Variant v_option_float Some anf_91)))))))
+                 (let anf_92 (index z_3 0)
+                  (let anf_93 (index z_3 0)
+                   (let anf_94 (* anf_92 anf_93)
+                    (let anf_95 (index z_3 1)
+                     (let anf_96 (index z_3 1)
+                      (let anf_97 (* anf_95 anf_96)
+                       (let zx_6 (- anf_94 anf_97)
+                        (let anf_98 (index z_3 0)
+                         (let anf_99 (* 2 anf_98)
+                          (let anf_100 (index z_3 1)
+                           (let zy_7 (* anf_99 anf_100)
+                            (let anf_101 (vec2 zx_6 zy_7)
+                             (let z_prime_8 (+ anf_101 c_1)
+                              (let anf_102 (+ i_4 1)
                                (set c_1 c_1
                                 (set z_3 z_prime_8
-                                 (set i_4 anf_103
-                                  (let _iter_inc_121 (+ _iter_120 1)
-                                   (set _iter_120 _iter_inc_121 continue))))))))))))))))))))))))))
+                                 (set i_4 anf_102
+                                  (let _iter_inc_120 (+ _iter_119 1)
+                                   (set _iter_119 _iter_inc_120 continue))))))))))))))))))))))))))
           (return <temp>)))))
       : ((vec 2) -> (int -> v_option_float)))
      ((Define (name mandelbrot_0_vec2_to_v_option_float_83)
        (args ((c_1 (vec 2))))
-       (body
-        (let anf_104 (vec2 0 0)
-         (return (mandel_2_vec2_to_int_to_v_option_float_84_85 c_1 anf_104 0)))))
+       (body (let anf_103 (vec2 0 0) (return (mandel_2_84 c_1 anf_103 0)))))
       : ((vec 2) -> v_option_float))
      ((Define (name main) (args ((coord_9 (vec 2))))
        (body
-        (let anf_105 (* 2 coord_9)
-         (let top_11 (- anf_105 u_resolution)
-          (let anf_106 (index u_resolution 0)
-           (let anf_107 (index u_resolution 1)
-            (let bot_12 (min anf_106 anf_107)
+        (let anf_104 (* 2 coord_9)
+         (let top_11 (- anf_104 u_resolution)
+          (let anf_105 (index u_resolution 0)
+           (let anf_106 (index u_resolution 1)
+            (let bot_12 (min anf_105 anf_106)
              (let uv_10 (/ top_11 bot_12)
-              (let anf_108 (* u_time 0.4)
-               (let anf_109 (sin anf_108)
-                (let anf_110 (* anf_109 4.5)
-                 (let anf_111 (+ anf_110 3.5)
-                  (let zoom_13 (exp anf_111)
-                   (let anf_112 (vec2 -0.7453 0.1127)
-                    (let anf_113 (/ uv_10 zoom_13)
-                     (let seahorse_valley_14 (+ anf_112 anf_113)
-                      (let anf_114
+              (let anf_107 (* u_time 0.4)
+               (let anf_108 (sin anf_107)
+                (let anf_109 (* anf_108 4.5)
+                 (let anf_110 (+ anf_109 3.5)
+                  (let zoom_13 (exp anf_110)
+                   (let anf_111 (vec2 -0.7453 0.1127)
+                    (let anf_112 (/ uv_10 zoom_13)
+                     (let seahorse_valley_14 (+ anf_111 anf_112)
+                      (let anf_113
                        (mandelbrot_0_vec2_to_v_option_float_83
                         seahorse_valley_14)
                        (return
-                        (match anf_114 ((None) (return (vec3 0 0 0)))
+                        (match anf_113 ((None) (return (vec3 0 0 0)))
                          ((Some n_15)
-                          (let anf_115 (vec3 10 20 30)
-                           (let anf_116 (* n_15 anf_115)
-                            (let anf_117 (+ anf_116 u_time)
-                             (let anf_118 (sin anf_117)
-                              (let anf_119 (* anf_118 0.5)
-                               (return (+ anf_119 0.5)))))))))))))))))))))))))))
+                          (let anf_114 (vec3 10 20 30)
+                           (let anf_115 (* n_15 anf_114)
+                            (let anf_116 (+ anf_115 u_time)
+                             (let anf_117 (sin anf_116)
+                              (let anf_118 (* anf_117 0.5)
+                               (return (+ anf_118 0.5)))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === lower variants (mandelbrot.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((TypeDef v_option_float (RecordDecl ((tag int) (Some_0 float)))) :
       v_option_float)
-     ((Define (name mandel_2_vec2_to_int_to_v_option_float_84_85)
-       (args ((c_1 (vec 2)) (z_3 (vec 2)) (i_4 int)))
+     ((Define (name mandel_2_84) (args ((c_1 (vec 2)) (z_3 (vec 2)) (i_4 int)))
        (body
-        (let _iter_120 0
-         (while (< _iter_120 1000)
-          (let anf_86 (> i_4 150)
+        (let _iter_119 0
+         (while (< _iter_119 1000)
+          (let anf_85 (> i_4 150)
            (return
-            (if anf_86 (return (v_option_float 1 <temp>))
-             (let anf_87 (length z_3)
-              (let anf_88 (> anf_87 4)
+            (if anf_85 (return (v_option_float 1 <temp>))
+             (let anf_86 (length z_3)
+              (let anf_87 (> anf_86 4)
                (return
-                (if anf_88
-                 (let anf_89 (length z_3)
-                  (let anf_90 (log2 anf_89)
-                   (let nu_5 (log2 anf_90)
-                    (let anf_91 (- i_4 nu_5)
-                     (let anf_92 (/ anf_91 150)
-                      (return (v_option_float 0 anf_92)))))))
-                 (let anf_93 (index z_3 0)
-                  (let anf_94 (index z_3 0)
-                   (let anf_95 (* anf_93 anf_94)
-                    (let anf_96 (index z_3 1)
-                     (let anf_97 (index z_3 1)
-                      (let anf_98 (* anf_96 anf_97)
-                       (let zx_6 (- anf_95 anf_98)
-                        (let anf_99 (index z_3 0)
-                         (let anf_100 (* 2 anf_99)
-                          (let anf_101 (index z_3 1)
-                           (let zy_7 (* anf_100 anf_101)
-                            (let anf_102 (vec2 zx_6 zy_7)
-                             (let z_prime_8 (+ anf_102 c_1)
-                              (let anf_103 (+ i_4 1)
+                (if anf_87
+                 (let anf_88 (length z_3)
+                  (let anf_89 (log2 anf_88)
+                   (let nu_5 (log2 anf_89)
+                    (let anf_90 (- i_4 nu_5)
+                     (let anf_91 (/ anf_90 150)
+                      (return (v_option_float 0 anf_91)))))))
+                 (let anf_92 (index z_3 0)
+                  (let anf_93 (index z_3 0)
+                   (let anf_94 (* anf_92 anf_93)
+                    (let anf_95 (index z_3 1)
+                     (let anf_96 (index z_3 1)
+                      (let anf_97 (* anf_95 anf_96)
+                       (let zx_6 (- anf_94 anf_97)
+                        (let anf_98 (index z_3 0)
+                         (let anf_99 (* 2 anf_98)
+                          (let anf_100 (index z_3 1)
+                           (let zy_7 (* anf_99 anf_100)
+                            (let anf_101 (vec2 zx_6 zy_7)
+                             (let z_prime_8 (+ anf_101 c_1)
+                              (let anf_102 (+ i_4 1)
                                (set c_1 c_1
                                 (set z_3 z_prime_8
-                                 (set i_4 anf_103
-                                  (let _iter_inc_121 (+ _iter_120 1)
-                                   (set _iter_120 _iter_inc_121 continue))))))))))))))))))))))))))
+                                 (set i_4 anf_102
+                                  (let _iter_inc_120 (+ _iter_119 1)
+                                   (set _iter_119 _iter_inc_120 continue))))))))))))))))))))))))))
           (return <temp>)))))
       : ((vec 2) -> (int -> v_option_float)))
      ((Define (name mandelbrot_0_vec2_to_v_option_float_83)
        (args ((c_1 (vec 2))))
-       (body
-        (let anf_104 (vec2 0 0)
-         (return (mandel_2_vec2_to_int_to_v_option_float_84_85 c_1 anf_104 0)))))
+       (body (let anf_103 (vec2 0 0) (return (mandel_2_84 c_1 anf_103 0)))))
       : ((vec 2) -> v_option_float))
      ((Define (name main) (args ((coord_9 (vec 2))))
        (body
-        (let anf_105 (* 2 coord_9)
-         (let top_11 (- anf_105 u_resolution)
-          (let anf_106 (index u_resolution 0)
-           (let anf_107 (index u_resolution 1)
-            (let bot_12 (min anf_106 anf_107)
+        (let anf_104 (* 2 coord_9)
+         (let top_11 (- anf_104 u_resolution)
+          (let anf_105 (index u_resolution 0)
+           (let anf_106 (index u_resolution 1)
+            (let bot_12 (min anf_105 anf_106)
              (let uv_10 (/ top_11 bot_12)
-              (let anf_108 (* u_time 0.4)
-               (let anf_109 (sin anf_108)
-                (let anf_110 (* anf_109 4.5)
-                 (let anf_111 (+ anf_110 3.5)
-                  (let zoom_13 (exp anf_111)
-                   (let anf_112 (vec2 -0.7453 0.1127)
-                    (let anf_113 (/ uv_10 zoom_13)
-                     (let seahorse_valley_14 (+ anf_112 anf_113)
-                      (let anf_114
+              (let anf_107 (* u_time 0.4)
+               (let anf_108 (sin anf_107)
+                (let anf_109 (* anf_108 4.5)
+                 (let anf_110 (+ anf_109 3.5)
+                  (let zoom_13 (exp anf_110)
+                   (let anf_111 (vec2 -0.7453 0.1127)
+                    (let anf_112 (/ uv_10 zoom_13)
+                     (let seahorse_valley_14 (+ anf_111 anf_112)
+                      (let anf_113
                        (mandelbrot_0_vec2_to_v_option_float_83
                         seahorse_valley_14)
-                       (let _lv_tag_122 (. anf_114 tag)
+                       (let _lv_tag_121 (. anf_113 tag)
                         (return
-                         (switch _lv_tag_122 (1 (return (vec3 0 0 0)))
+                         (switch _lv_tag_121 (1 (return (vec3 0 0 0)))
                           (default
-                           (let n_15 (. anf_114 Some_0)
-                            (let anf_115 (vec3 10 20 30)
-                             (let anf_116 (* n_15 anf_115)
-                              (let anf_117 (+ anf_116 u_time)
-                               (let anf_118 (sin anf_117)
-                                (let anf_119 (* anf_118 0.5)
-                                 (return (+ anf_119 0.5)))))))))))))))))))))))))))))
+                           (let n_15 (. anf_113 Some_0)
+                            (let anf_114 (vec3 10 20 30)
+                             (let anf_115 (* n_15 anf_114)
+                              (let anf_116 (+ anf_115 u_time)
+                               (let anf_117 (sin anf_116)
+                                (let anf_118 (* anf_117 0.5)
+                                 (return (+ anf_118 0.5)))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === promote ints (mandelbrot.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((TypeDef v_option_float (RecordDecl ((tag int) (Some_0 float)))) :
       v_option_float)
-     ((Define (name mandel_2_vec2_to_int_to_v_option_float_84_85)
-       (args ((c_1 (vec 2)) (z_3 (vec 2)) (i_4 int)))
+     ((Define (name mandel_2_84) (args ((c_1 (vec 2)) (z_3 (vec 2)) (i_4 int)))
        (body
-        (let _iter_120 0
-         (while (< _iter_120 1000)
-          (let anf_86 (> i_4 150)
+        (let _iter_119 0
+         (while (< _iter_119 1000)
+          (let anf_85 (> i_4 150)
            (return
-            (if anf_86 (return (v_option_float 1 <temp>))
-             (let anf_87 (length z_3)
-              (let anf_88 (> anf_87 4.)
+            (if anf_85 (return (v_option_float 1 <temp>))
+             (let anf_86 (length z_3)
+              (let anf_87 (> anf_86 4.)
                (return
-                (if anf_88
-                 (let anf_89 (length z_3)
-                  (let anf_90 (log2 anf_89)
-                   (let nu_5 (log2 anf_90)
-                    (let pf_123 (float i_4)
-                     (let anf_91 (- pf_123 nu_5)
-                      (let anf_92 (/ anf_91 150.)
-                       (return (v_option_float 0 anf_92))))))))
-                 (let anf_93 (index z_3 0)
-                  (let anf_94 (index z_3 0)
-                   (let anf_95 (* anf_93 anf_94)
-                    (let anf_96 (index z_3 1)
-                     (let anf_97 (index z_3 1)
-                      (let anf_98 (* anf_96 anf_97)
-                       (let zx_6 (- anf_95 anf_98)
-                        (let anf_99 (index z_3 0)
-                         (let anf_100 (* 2. anf_99)
-                          (let anf_101 (index z_3 1)
-                           (let zy_7 (* anf_100 anf_101)
-                            (let anf_102 (vec2 zx_6 zy_7)
-                             (let z_prime_8 (+ anf_102 c_1)
-                              (let anf_103 (+ i_4 1)
+                (if anf_87
+                 (let anf_88 (length z_3)
+                  (let anf_89 (log2 anf_88)
+                   (let nu_5 (log2 anf_89)
+                    (let pf_122 (float i_4)
+                     (let anf_90 (- pf_122 nu_5)
+                      (let anf_91 (/ anf_90 150.)
+                       (return (v_option_float 0 anf_91))))))))
+                 (let anf_92 (index z_3 0)
+                  (let anf_93 (index z_3 0)
+                   (let anf_94 (* anf_92 anf_93)
+                    (let anf_95 (index z_3 1)
+                     (let anf_96 (index z_3 1)
+                      (let anf_97 (* anf_95 anf_96)
+                       (let zx_6 (- anf_94 anf_97)
+                        (let anf_98 (index z_3 0)
+                         (let anf_99 (* 2. anf_98)
+                          (let anf_100 (index z_3 1)
+                           (let zy_7 (* anf_99 anf_100)
+                            (let anf_101 (vec2 zx_6 zy_7)
+                             (let z_prime_8 (+ anf_101 c_1)
+                              (let anf_102 (+ i_4 1)
                                (set c_1 c_1
                                 (set z_3 z_prime_8
-                                 (set i_4 anf_103
-                                  (let _iter_inc_121 (+ _iter_120 1)
-                                   (set _iter_120 _iter_inc_121 continue))))))))))))))))))))))))))
+                                 (set i_4 anf_102
+                                  (let _iter_inc_120 (+ _iter_119 1)
+                                   (set _iter_119 _iter_inc_120 continue))))))))))))))))))))))))))
           (return <temp>)))))
       : ((vec 2) -> (int -> v_option_float)))
      ((Define (name mandelbrot_0_vec2_to_v_option_float_83)
        (args ((c_1 (vec 2))))
-       (body
-        (let anf_104 (vec2 0. 0.)
-         (return (mandel_2_vec2_to_int_to_v_option_float_84_85 c_1 anf_104 0)))))
+       (body (let anf_103 (vec2 0. 0.) (return (mandel_2_84 c_1 anf_103 0)))))
       : ((vec 2) -> v_option_float))
      ((Define (name main) (args ((coord_9 (vec 2))))
        (body
-        (let anf_105 (* 2. coord_9)
-         (let top_11 (- anf_105 u_resolution)
-          (let anf_106 (index u_resolution 0)
-           (let anf_107 (index u_resolution 1)
-            (let bot_12 (min anf_106 anf_107)
+        (let anf_104 (* 2. coord_9)
+         (let top_11 (- anf_104 u_resolution)
+          (let anf_105 (index u_resolution 0)
+           (let anf_106 (index u_resolution 1)
+            (let bot_12 (min anf_105 anf_106)
              (let uv_10 (/ top_11 bot_12)
-              (let anf_108 (* u_time 0.4)
-               (let anf_109 (sin anf_108)
-                (let anf_110 (* anf_109 4.5)
-                 (let anf_111 (+ anf_110 3.5)
-                  (let zoom_13 (exp anf_111)
-                   (let anf_112 (vec2 -0.7453 0.1127)
-                    (let anf_113 (/ uv_10 zoom_13)
-                     (let seahorse_valley_14 (+ anf_112 anf_113)
-                      (let anf_114
+              (let anf_107 (* u_time 0.4)
+               (let anf_108 (sin anf_107)
+                (let anf_109 (* anf_108 4.5)
+                 (let anf_110 (+ anf_109 3.5)
+                  (let zoom_13 (exp anf_110)
+                   (let anf_111 (vec2 -0.7453 0.1127)
+                    (let anf_112 (/ uv_10 zoom_13)
+                     (let seahorse_valley_14 (+ anf_111 anf_112)
+                      (let anf_113
                        (mandelbrot_0_vec2_to_v_option_float_83
                         seahorse_valley_14)
-                       (let _lv_tag_122 (. anf_114 tag)
+                       (let _lv_tag_121 (. anf_113 tag)
                         (return
-                         (switch _lv_tag_122 (1 (return (vec3 0. 0. 0.)))
+                         (switch _lv_tag_121 (1 (return (vec3 0. 0. 0.)))
                           (default
-                           (let n_15 (. anf_114 Some_0)
-                            (let anf_115 (vec3 10. 20. 30.)
-                             (let anf_116 (* n_15 anf_115)
-                              (let anf_117 (+ anf_116 u_time)
-                               (let anf_118 (sin anf_117)
-                                (let anf_119 (* anf_118 0.5)
-                                 (return (+ anf_119 0.5)))))))))))))))))))))))))))))
+                           (let n_15 (. anf_113 Some_0)
+                            (let anf_114 (vec3 10. 20. 30.)
+                             (let anf_115 (* n_15 anf_114)
+                              (let anf_116 (+ anf_115 u_time)
+                               (let anf_117 (sin anf_116)
+                                (let anf_118 (* anf_117 0.5)
+                                 (return (+ anf_118 0.5)))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === remove placeholder (mandelbrot.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((TypeDef v_option_float (RecordDecl ((tag int) (Some_0 float)))) :
       v_option_float)
-     ((Define (name mandel_2_vec2_to_int_to_v_option_float_84_85)
-       (args ((c_1 (vec 2)) (z_3 (vec 2)) (i_4 int)))
+     ((Define (name mandel_2_84) (args ((c_1 (vec 2)) (z_3 (vec 2)) (i_4 int)))
        (body
-        (let _iter_120 0
-         (while (< _iter_120 1000)
-          (let anf_86 (> i_4 150)
+        (let _iter_119 0
+         (while (< _iter_119 1000)
+          (let anf_85 (> i_4 150)
            (return
-            (if anf_86 (return (v_option_float 1 0.))
-             (let anf_87 (length z_3)
-              (let anf_88 (> anf_87 4.)
+            (if anf_85 (return (v_option_float 1 0.))
+             (let anf_86 (length z_3)
+              (let anf_87 (> anf_86 4.)
                (return
-                (if anf_88
-                 (let anf_89 (length z_3)
-                  (let anf_90 (log2 anf_89)
-                   (let nu_5 (log2 anf_90)
-                    (let pf_123 (float i_4)
-                     (let anf_91 (- pf_123 nu_5)
-                      (let anf_92 (/ anf_91 150.)
-                       (return (v_option_float 0 anf_92))))))))
-                 (let anf_93 (index z_3 0)
-                  (let anf_94 (index z_3 0)
-                   (let anf_95 (* anf_93 anf_94)
-                    (let anf_96 (index z_3 1)
-                     (let anf_97 (index z_3 1)
-                      (let anf_98 (* anf_96 anf_97)
-                       (let zx_6 (- anf_95 anf_98)
-                        (let anf_99 (index z_3 0)
-                         (let anf_100 (* 2. anf_99)
-                          (let anf_101 (index z_3 1)
-                           (let zy_7 (* anf_100 anf_101)
-                            (let anf_102 (vec2 zx_6 zy_7)
-                             (let z_prime_8 (+ anf_102 c_1)
-                              (let anf_103 (+ i_4 1)
+                (if anf_87
+                 (let anf_88 (length z_3)
+                  (let anf_89 (log2 anf_88)
+                   (let nu_5 (log2 anf_89)
+                    (let pf_122 (float i_4)
+                     (let anf_90 (- pf_122 nu_5)
+                      (let anf_91 (/ anf_90 150.)
+                       (return (v_option_float 0 anf_91))))))))
+                 (let anf_92 (index z_3 0)
+                  (let anf_93 (index z_3 0)
+                   (let anf_94 (* anf_92 anf_93)
+                    (let anf_95 (index z_3 1)
+                     (let anf_96 (index z_3 1)
+                      (let anf_97 (* anf_95 anf_96)
+                       (let zx_6 (- anf_94 anf_97)
+                        (let anf_98 (index z_3 0)
+                         (let anf_99 (* 2. anf_98)
+                          (let anf_100 (index z_3 1)
+                           (let zy_7 (* anf_99 anf_100)
+                            (let anf_101 (vec2 zx_6 zy_7)
+                             (let z_prime_8 (+ anf_101 c_1)
+                              (let anf_102 (+ i_4 1)
                                (set c_1 c_1
                                 (set z_3 z_prime_8
-                                 (set i_4 anf_103
-                                  (let _iter_inc_121 (+ _iter_120 1)
-                                   (set _iter_120 _iter_inc_121 continue))))))))))))))))))))))))))
-          (placeholder _tmp_124 (return _tmp_124))))))
+                                 (set i_4 anf_102
+                                  (let _iter_inc_120 (+ _iter_119 1)
+                                   (set _iter_119 _iter_inc_120 continue))))))))))))))))))))))))))
+          (placeholder _tmp_123 (return _tmp_123))))))
       : ((vec 2) -> (int -> v_option_float)))
      ((Define (name mandelbrot_0_vec2_to_v_option_float_83)
        (args ((c_1 (vec 2))))
-       (body
-        (let anf_104 (vec2 0. 0.)
-         (return (mandel_2_vec2_to_int_to_v_option_float_84_85 c_1 anf_104 0)))))
+       (body (let anf_103 (vec2 0. 0.) (return (mandel_2_84 c_1 anf_103 0)))))
       : ((vec 2) -> v_option_float))
      ((Define (name main) (args ((coord_9 (vec 2))))
        (body
-        (let anf_105 (* 2. coord_9)
-         (let top_11 (- anf_105 u_resolution)
-          (let anf_106 (index u_resolution 0)
-           (let anf_107 (index u_resolution 1)
-            (let bot_12 (min anf_106 anf_107)
+        (let anf_104 (* 2. coord_9)
+         (let top_11 (- anf_104 u_resolution)
+          (let anf_105 (index u_resolution 0)
+           (let anf_106 (index u_resolution 1)
+            (let bot_12 (min anf_105 anf_106)
              (let uv_10 (/ top_11 bot_12)
-              (let anf_108 (* u_time 0.4)
-               (let anf_109 (sin anf_108)
-                (let anf_110 (* anf_109 4.5)
-                 (let anf_111 (+ anf_110 3.5)
-                  (let zoom_13 (exp anf_111)
-                   (let anf_112 (vec2 -0.7453 0.1127)
-                    (let anf_113 (/ uv_10 zoom_13)
-                     (let seahorse_valley_14 (+ anf_112 anf_113)
-                      (let anf_114
+              (let anf_107 (* u_time 0.4)
+               (let anf_108 (sin anf_107)
+                (let anf_109 (* anf_108 4.5)
+                 (let anf_110 (+ anf_109 3.5)
+                  (let zoom_13 (exp anf_110)
+                   (let anf_111 (vec2 -0.7453 0.1127)
+                    (let anf_112 (/ uv_10 zoom_13)
+                     (let seahorse_valley_14 (+ anf_111 anf_112)
+                      (let anf_113
                        (mandelbrot_0_vec2_to_v_option_float_83
                         seahorse_valley_14)
-                       (let _lv_tag_122 (. anf_114 tag)
+                       (let _lv_tag_121 (. anf_113 tag)
                         (return
-                         (switch _lv_tag_122 (1 (return (vec3 0. 0. 0.)))
+                         (switch _lv_tag_121 (1 (return (vec3 0. 0. 0.)))
                           (default
-                           (let n_15 (. anf_114 Some_0)
-                            (let anf_115 (vec3 10. 20. 30.)
-                             (let anf_116 (* n_15 anf_115)
-                              (let anf_117 (+ anf_116 u_time)
-                               (let anf_118 (sin anf_117)
-                                (let anf_119 (* anf_118 0.5)
-                                 (return (+ anf_119 0.5)))))))))))))))))))))))))))))
+                           (let n_15 (. anf_113 Some_0)
+                            (let anf_114 (vec3 10. 20. 30.)
+                             (let anf_115 (* n_15 anf_114)
+                              (let anf_116 (+ anf_115 u_time)
+                               (let anf_117 (sin anf_116)
+                                (let anf_118 (* anf_117 0.5)
+                                 (return (+ anf_118 0.5)))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === lift consts (mandelbrot.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((TypeDef v_option_float (RecordDecl ((tag int) (Some_0 float)))) :
       v_option_float)
-     ((Define (name mandel_2_vec2_to_int_to_v_option_float_84_85)
-       (args ((c_1 (vec 2)) (z_3 (vec 2)) (i_4 int)))
+     ((Define (name mandel_2_84) (args ((c_1 (vec 2)) (z_3 (vec 2)) (i_4 int)))
        (body
-        (let _iter_120 0
-         (while (< _iter_120 1000)
-          (let anf_86 (> i_4 150)
+        (let _iter_119 0
+         (while (< _iter_119 1000)
+          (let anf_85 (> i_4 150)
            (return
-            (if anf_86 (return (v_option_float 1 0.))
-             (let anf_87 (length z_3)
-              (let anf_88 (> anf_87 4.)
+            (if anf_85 (return (v_option_float 1 0.))
+             (let anf_86 (length z_3)
+              (let anf_87 (> anf_86 4.)
                (return
-                (if anf_88
-                 (let anf_89 (length z_3)
-                  (let anf_90 (log2 anf_89)
-                   (let nu_5 (log2 anf_90)
-                    (let pf_123 (float i_4)
-                     (let anf_91 (- pf_123 nu_5)
-                      (let anf_92 (/ anf_91 150.)
-                       (return (v_option_float 0 anf_92))))))))
-                 (let anf_93 (index z_3 0)
-                  (let anf_94 (index z_3 0)
-                   (let anf_95 (* anf_93 anf_94)
-                    (let anf_96 (index z_3 1)
-                     (let anf_97 (index z_3 1)
-                      (let anf_98 (* anf_96 anf_97)
-                       (let zx_6 (- anf_95 anf_98)
-                        (let anf_99 (index z_3 0)
-                         (let anf_100 (* 2. anf_99)
-                          (let anf_101 (index z_3 1)
-                           (let zy_7 (* anf_100 anf_101)
-                            (let anf_102 (vec2 zx_6 zy_7)
-                             (let z_prime_8 (+ anf_102 c_1)
-                              (let anf_103 (+ i_4 1)
+                (if anf_87
+                 (let anf_88 (length z_3)
+                  (let anf_89 (log2 anf_88)
+                   (let nu_5 (log2 anf_89)
+                    (let pf_122 (float i_4)
+                     (let anf_90 (- pf_122 nu_5)
+                      (let anf_91 (/ anf_90 150.)
+                       (return (v_option_float 0 anf_91))))))))
+                 (let anf_92 (index z_3 0)
+                  (let anf_93 (index z_3 0)
+                   (let anf_94 (* anf_92 anf_93)
+                    (let anf_95 (index z_3 1)
+                     (let anf_96 (index z_3 1)
+                      (let anf_97 (* anf_95 anf_96)
+                       (let zx_6 (- anf_94 anf_97)
+                        (let anf_98 (index z_3 0)
+                         (let anf_99 (* 2. anf_98)
+                          (let anf_100 (index z_3 1)
+                           (let zy_7 (* anf_99 anf_100)
+                            (let anf_101 (vec2 zx_6 zy_7)
+                             (let z_prime_8 (+ anf_101 c_1)
+                              (let anf_102 (+ i_4 1)
                                (set c_1 c_1
                                 (set z_3 z_prime_8
-                                 (set i_4 anf_103
-                                  (let _iter_inc_121 (+ _iter_120 1)
-                                   (set _iter_120 _iter_inc_121 continue))))))))))))))))))))))))))
-          (placeholder _tmp_124 (return _tmp_124))))))
+                                 (set i_4 anf_102
+                                  (let _iter_inc_120 (+ _iter_119 1)
+                                   (set _iter_119 _iter_inc_120 continue))))))))))))))))))))))))))
+          (placeholder _tmp_123 (return _tmp_123))))))
       : ((vec 2) -> (int -> v_option_float)))
      ((Define (name mandelbrot_0_vec2_to_v_option_float_83)
        (args ((c_1 (vec 2))))
-       (body
-        (let anf_104 (vec2 0. 0.)
-         (return (mandel_2_vec2_to_int_to_v_option_float_84_85 c_1 anf_104 0)))))
+       (body (let anf_103 (vec2 0. 0.) (return (mandel_2_84 c_1 anf_103 0)))))
       : ((vec 2) -> v_option_float))
      ((Define (name main) (args ((coord_9 (vec 2))))
        (body
-        (let anf_105 (* 2. coord_9)
-         (let top_11 (- anf_105 u_resolution)
-          (let anf_106 (index u_resolution 0)
-           (let anf_107 (index u_resolution 1)
-            (let bot_12 (min anf_106 anf_107)
+        (let anf_104 (* 2. coord_9)
+         (let top_11 (- anf_104 u_resolution)
+          (let anf_105 (index u_resolution 0)
+           (let anf_106 (index u_resolution 1)
+            (let bot_12 (min anf_105 anf_106)
              (let uv_10 (/ top_11 bot_12)
-              (let anf_108 (* u_time 0.4)
-               (let anf_109 (sin anf_108)
-                (let anf_110 (* anf_109 4.5)
-                 (let anf_111 (+ anf_110 3.5)
-                  (let zoom_13 (exp anf_111)
-                   (let anf_112 (vec2 -0.7453 0.1127)
-                    (let anf_113 (/ uv_10 zoom_13)
-                     (let seahorse_valley_14 (+ anf_112 anf_113)
-                      (let anf_114
+              (let anf_107 (* u_time 0.4)
+               (let anf_108 (sin anf_107)
+                (let anf_109 (* anf_108 4.5)
+                 (let anf_110 (+ anf_109 3.5)
+                  (let zoom_13 (exp anf_110)
+                   (let anf_111 (vec2 -0.7453 0.1127)
+                    (let anf_112 (/ uv_10 zoom_13)
+                     (let seahorse_valley_14 (+ anf_111 anf_112)
+                      (let anf_113
                        (mandelbrot_0_vec2_to_v_option_float_83
                         seahorse_valley_14)
-                       (let _lv_tag_122 (. anf_114 tag)
+                       (let _lv_tag_121 (. anf_113 tag)
                         (return
-                         (switch _lv_tag_122 (1 (return (vec3 0. 0. 0.)))
+                         (switch _lv_tag_121 (1 (return (vec3 0. 0. 0.)))
                           (default
-                           (let n_15 (. anf_114 Some_0)
-                            (let anf_115 (vec3 10. 20. 30.)
-                             (let anf_116 (* n_15 anf_115)
-                              (let anf_117 (+ anf_116 u_time)
-                               (let anf_118 (sin anf_117)
-                                (let anf_119 (* anf_118 0.5)
-                                 (return (+ anf_119 0.5)))))))))))))))))))))))))))))
+                           (let n_15 (. anf_113 Some_0)
+                            (let anf_114 (vec3 10. 20. 30.)
+                             (let anf_115 (* n_15 anf_114)
+                              (let anf_116 (+ anf_115 u_time)
+                               (let anf_117 (sin anf_116)
+                                (let anf_118 (* anf_117 0.5)
+                                 (return (+ anf_118 0.5)))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === translate (mandelbrot.glml) ===
@@ -3132,73 +3106,73 @@ let%expect_test "compile examples" =
      ((Global Uniform (TyVec 2) u_resolution ())
       (Global Uniform TyFloat u_time ())
       (Struct v_option_float ((TyInt tag) (TyFloat Some_0)))
-      (Function (name mandel_2_vec2_to_int_to_v_option_float_84_85) (desc ())
+      (Function (name mandel_2_84) (desc ())
        (params (((TyVec 2) c_1) ((TyVec 2) z_3) (TyInt i_4)))
        (ret_type (TyStruct v_option_float))
        (body
-        ((set () int _iter_120 (0))
-         (while (< _iter_120 1000)
-          (Block (set () bool anf_86 ((> i_4 150)))
-           (if anf_86 (Block (return (v_option_float 1 0.)))
-            (Block (set () float anf_87 ((length z_3)))
-             (set () bool anf_88 ((> anf_87 4.)))
-             (if anf_88
-              (Block (set () float anf_89 ((length z_3)))
-               (set () float anf_90 ((log2 anf_89)))
-               (set () float nu_5 ((log2 anf_90)))
-               (set () float pf_123 ((float i_4)))
-               (set () float anf_91 ((- pf_123 nu_5)))
-               (set () float anf_92 ((/ anf_91 150.)))
-               (return (v_option_float 0 anf_92)))
-              (Block (set () float anf_93 ((index z_3 0)))
-               (set () float anf_94 ((index z_3 0)))
-               (set () float anf_95 ((* anf_93 anf_94)))
+        ((set () int _iter_119 (0))
+         (while (< _iter_119 1000)
+          (Block (set () bool anf_85 ((> i_4 150)))
+           (if anf_85 (Block (return (v_option_float 1 0.)))
+            (Block (set () float anf_86 ((length z_3)))
+             (set () bool anf_87 ((> anf_86 4.)))
+             (if anf_87
+              (Block (set () float anf_88 ((length z_3)))
+               (set () float anf_89 ((log2 anf_88)))
+               (set () float nu_5 ((log2 anf_89)))
+               (set () float pf_122 ((float i_4)))
+               (set () float anf_90 ((- pf_122 nu_5)))
+               (set () float anf_91 ((/ anf_90 150.)))
+               (return (v_option_float 0 anf_91)))
+              (Block (set () float anf_92 ((index z_3 0)))
+               (set () float anf_93 ((index z_3 0)))
+               (set () float anf_94 ((* anf_92 anf_93)))
+               (set () float anf_95 ((index z_3 1)))
                (set () float anf_96 ((index z_3 1)))
-               (set () float anf_97 ((index z_3 1)))
-               (set () float anf_98 ((* anf_96 anf_97)))
-               (set () float zx_6 ((- anf_95 anf_98)))
-               (set () float anf_99 ((index z_3 0)))
-               (set () float anf_100 ((* 2. anf_99)))
-               (set () float anf_101 ((index z_3 1)))
-               (set () float zy_7 ((* anf_100 anf_101)))
-               (set () vec2 anf_102 ((vec2 zx_6 zy_7)))
-               (set () vec2 z_prime_8 ((+ anf_102 c_1)))
-               (set () int anf_103 ((+ i_4 1))) (set c_1 c_1) (set z_3 z_prime_8)
-               (set i_4 anf_103) (set () int _iter_inc_121 ((+ _iter_120 1)))
-               (set _iter_120 _iter_inc_121) continue))))))
-         (set () v_option_float _tmp_124 ()) (return _tmp_124))))
+               (set () float anf_97 ((* anf_95 anf_96)))
+               (set () float zx_6 ((- anf_94 anf_97)))
+               (set () float anf_98 ((index z_3 0)))
+               (set () float anf_99 ((* 2. anf_98)))
+               (set () float anf_100 ((index z_3 1)))
+               (set () float zy_7 ((* anf_99 anf_100)))
+               (set () vec2 anf_101 ((vec2 zx_6 zy_7)))
+               (set () vec2 z_prime_8 ((+ anf_101 c_1)))
+               (set () int anf_102 ((+ i_4 1))) (set c_1 c_1) (set z_3 z_prime_8)
+               (set i_4 anf_102) (set () int _iter_inc_120 ((+ _iter_119 1)))
+               (set _iter_119 _iter_inc_120) continue))))))
+         (set () v_option_float _tmp_123 ()) (return _tmp_123))))
       (Function (name mandelbrot_0_vec2_to_v_option_float_83) (desc ())
        (params (((TyVec 2) c_1))) (ret_type (TyStruct v_option_float))
        (body
-        ((set () vec2 anf_104 ((vec2 0. 0.)))
-         (return (mandel_2_vec2_to_int_to_v_option_float_84_85 c_1 anf_104 0)))))
+        ((set () vec2 anf_103 ((vec2 0. 0.)))
+         (return (mandel_2_84 c_1 anf_103 0)))))
       (Function (name main) (desc ()) (params (((TyVec 2) coord_9)))
        (ret_type (TyVec 3))
        (body
-        ((set () vec2 anf_105 ((* 2. coord_9)))
-         (set () vec2 top_11 ((- anf_105 u_resolution)))
-         (set () float anf_106 ((index u_resolution 0)))
-         (set () float anf_107 ((index u_resolution 1)))
-         (set () float bot_12 ((min anf_106 anf_107)))
+        ((set () vec2 anf_104 ((* 2. coord_9)))
+         (set () vec2 top_11 ((- anf_104 u_resolution)))
+         (set () float anf_105 ((index u_resolution 0)))
+         (set () float anf_106 ((index u_resolution 1)))
+         (set () float bot_12 ((min anf_105 anf_106)))
          (set () vec2 uv_10 ((/ top_11 bot_12)))
-         (set () float anf_108 ((* u_time 0.4)))
-         (set () float anf_109 ((sin anf_108)))
-         (set () float anf_110 ((* anf_109 4.5)))
-         (set () float anf_111 ((+ anf_110 3.5)))
-         (set () float zoom_13 ((exp anf_111)))
-         (set () vec2 anf_112 ((vec2 -0.7453 0.1127)))
-         (set () vec2 anf_113 ((/ uv_10 zoom_13)))
-         (set () vec2 seahorse_valley_14 ((+ anf_112 anf_113)))
-         (set () v_option_float anf_114
+         (set () float anf_107 ((* u_time 0.4)))
+         (set () float anf_108 ((sin anf_107)))
+         (set () float anf_109 ((* anf_108 4.5)))
+         (set () float anf_110 ((+ anf_109 3.5)))
+         (set () float zoom_13 ((exp anf_110)))
+         (set () vec2 anf_111 ((vec2 -0.7453 0.1127)))
+         (set () vec2 anf_112 ((/ uv_10 zoom_13)))
+         (set () vec2 seahorse_valley_14 ((+ anf_111 anf_112)))
+         (set () v_option_float anf_113
           ((mandelbrot_0_vec2_to_v_option_float_83 seahorse_valley_14)))
-         (set () int _lv_tag_122 ((. anf_114 tag)))
-         (switch _lv_tag_122 (1 (return (vec3 0. 0. 0.)) break)
-          (default (set () float n_15 ((. anf_114 Some_0)))
-           (set () vec3 anf_115 ((vec3 10. 20. 30.)))
-           (set () vec3 anf_116 ((* n_15 anf_115)))
-           (set () vec3 anf_117 ((+ anf_116 u_time)))
-           (set () vec3 anf_118 ((sin anf_117)))
-           (set () vec3 anf_119 ((* anf_118 0.5))) (return (+ anf_119 0.5))
+         (set () int _lv_tag_121 ((. anf_113 tag)))
+         (switch _lv_tag_121 (1 (return (vec3 0. 0. 0.)) break)
+          (default (set () float n_15 ((. anf_113 Some_0)))
+           (set () vec3 anf_114 ((vec3 10. 20. 30.)))
+           (set () vec3 anf_115 ((* n_15 anf_114)))
+           (set () vec3 anf_116 ((+ anf_115 u_time)))
+           (set () vec3 anf_117 ((sin anf_116)))
+           (set () vec3 anf_118 ((* anf_117 0.5))) (return (+ anf_118 0.5))
            break)))))))
 
     === patch main (mandelbrot.glml) ===
@@ -3207,73 +3181,73 @@ let%expect_test "compile examples" =
       (Global Uniform (TyVec 2) u_resolution ())
       (Global Uniform TyFloat u_time ())
       (Struct v_option_float ((TyInt tag) (TyFloat Some_0)))
-      (Function (name mandel_2_vec2_to_int_to_v_option_float_84_85) (desc ())
+      (Function (name mandel_2_84) (desc ())
        (params (((TyVec 2) c_1) ((TyVec 2) z_3) (TyInt i_4)))
        (ret_type (TyStruct v_option_float))
        (body
-        ((set () int _iter_120 (0))
-         (while (< _iter_120 1000)
-          (Block (set () bool anf_86 ((> i_4 150)))
-           (if anf_86 (Block (return (v_option_float 1 0.)))
-            (Block (set () float anf_87 ((length z_3)))
-             (set () bool anf_88 ((> anf_87 4.)))
-             (if anf_88
-              (Block (set () float anf_89 ((length z_3)))
-               (set () float anf_90 ((log2 anf_89)))
-               (set () float nu_5 ((log2 anf_90)))
-               (set () float pf_123 ((float i_4)))
-               (set () float anf_91 ((- pf_123 nu_5)))
-               (set () float anf_92 ((/ anf_91 150.)))
-               (return (v_option_float 0 anf_92)))
-              (Block (set () float anf_93 ((index z_3 0)))
-               (set () float anf_94 ((index z_3 0)))
-               (set () float anf_95 ((* anf_93 anf_94)))
+        ((set () int _iter_119 (0))
+         (while (< _iter_119 1000)
+          (Block (set () bool anf_85 ((> i_4 150)))
+           (if anf_85 (Block (return (v_option_float 1 0.)))
+            (Block (set () float anf_86 ((length z_3)))
+             (set () bool anf_87 ((> anf_86 4.)))
+             (if anf_87
+              (Block (set () float anf_88 ((length z_3)))
+               (set () float anf_89 ((log2 anf_88)))
+               (set () float nu_5 ((log2 anf_89)))
+               (set () float pf_122 ((float i_4)))
+               (set () float anf_90 ((- pf_122 nu_5)))
+               (set () float anf_91 ((/ anf_90 150.)))
+               (return (v_option_float 0 anf_91)))
+              (Block (set () float anf_92 ((index z_3 0)))
+               (set () float anf_93 ((index z_3 0)))
+               (set () float anf_94 ((* anf_92 anf_93)))
+               (set () float anf_95 ((index z_3 1)))
                (set () float anf_96 ((index z_3 1)))
-               (set () float anf_97 ((index z_3 1)))
-               (set () float anf_98 ((* anf_96 anf_97)))
-               (set () float zx_6 ((- anf_95 anf_98)))
-               (set () float anf_99 ((index z_3 0)))
-               (set () float anf_100 ((* 2. anf_99)))
-               (set () float anf_101 ((index z_3 1)))
-               (set () float zy_7 ((* anf_100 anf_101)))
-               (set () vec2 anf_102 ((vec2 zx_6 zy_7)))
-               (set () vec2 z_prime_8 ((+ anf_102 c_1)))
-               (set () int anf_103 ((+ i_4 1))) (set c_1 c_1) (set z_3 z_prime_8)
-               (set i_4 anf_103) (set () int _iter_inc_121 ((+ _iter_120 1)))
-               (set _iter_120 _iter_inc_121) continue))))))
-         (set () v_option_float _tmp_124 ()) (return _tmp_124))))
+               (set () float anf_97 ((* anf_95 anf_96)))
+               (set () float zx_6 ((- anf_94 anf_97)))
+               (set () float anf_98 ((index z_3 0)))
+               (set () float anf_99 ((* 2. anf_98)))
+               (set () float anf_100 ((index z_3 1)))
+               (set () float zy_7 ((* anf_99 anf_100)))
+               (set () vec2 anf_101 ((vec2 zx_6 zy_7)))
+               (set () vec2 z_prime_8 ((+ anf_101 c_1)))
+               (set () int anf_102 ((+ i_4 1))) (set c_1 c_1) (set z_3 z_prime_8)
+               (set i_4 anf_102) (set () int _iter_inc_120 ((+ _iter_119 1)))
+               (set _iter_119 _iter_inc_120) continue))))))
+         (set () v_option_float _tmp_123 ()) (return _tmp_123))))
       (Function (name mandelbrot_0_vec2_to_v_option_float_83) (desc ())
        (params (((TyVec 2) c_1))) (ret_type (TyStruct v_option_float))
        (body
-        ((set () vec2 anf_104 ((vec2 0. 0.)))
-         (return (mandel_2_vec2_to_int_to_v_option_float_84_85 c_1 anf_104 0)))))
+        ((set () vec2 anf_103 ((vec2 0. 0.)))
+         (return (mandel_2_84 c_1 anf_103 0)))))
       (Function (name main_pure) (desc ()) (params (((TyVec 2) coord_9)))
        (ret_type (TyVec 3))
        (body
-        ((set () vec2 anf_105 ((* 2. coord_9)))
-         (set () vec2 top_11 ((- anf_105 u_resolution)))
-         (set () float anf_106 ((index u_resolution 0)))
-         (set () float anf_107 ((index u_resolution 1)))
-         (set () float bot_12 ((min anf_106 anf_107)))
+        ((set () vec2 anf_104 ((* 2. coord_9)))
+         (set () vec2 top_11 ((- anf_104 u_resolution)))
+         (set () float anf_105 ((index u_resolution 0)))
+         (set () float anf_106 ((index u_resolution 1)))
+         (set () float bot_12 ((min anf_105 anf_106)))
          (set () vec2 uv_10 ((/ top_11 bot_12)))
-         (set () float anf_108 ((* u_time 0.4)))
-         (set () float anf_109 ((sin anf_108)))
-         (set () float anf_110 ((* anf_109 4.5)))
-         (set () float anf_111 ((+ anf_110 3.5)))
-         (set () float zoom_13 ((exp anf_111)))
-         (set () vec2 anf_112 ((vec2 -0.7453 0.1127)))
-         (set () vec2 anf_113 ((/ uv_10 zoom_13)))
-         (set () vec2 seahorse_valley_14 ((+ anf_112 anf_113)))
-         (set () v_option_float anf_114
+         (set () float anf_107 ((* u_time 0.4)))
+         (set () float anf_108 ((sin anf_107)))
+         (set () float anf_109 ((* anf_108 4.5)))
+         (set () float anf_110 ((+ anf_109 3.5)))
+         (set () float zoom_13 ((exp anf_110)))
+         (set () vec2 anf_111 ((vec2 -0.7453 0.1127)))
+         (set () vec2 anf_112 ((/ uv_10 zoom_13)))
+         (set () vec2 seahorse_valley_14 ((+ anf_111 anf_112)))
+         (set () v_option_float anf_113
           ((mandelbrot_0_vec2_to_v_option_float_83 seahorse_valley_14)))
-         (set () int _lv_tag_122 ((. anf_114 tag)))
-         (switch _lv_tag_122 (1 (return (vec3 0. 0. 0.)) break)
-          (default (set () float n_15 ((. anf_114 Some_0)))
-           (set () vec3 anf_115 ((vec3 10. 20. 30.)))
-           (set () vec3 anf_116 ((* n_15 anf_115)))
-           (set () vec3 anf_117 ((+ anf_116 u_time)))
-           (set () vec3 anf_118 ((sin anf_117)))
-           (set () vec3 anf_119 ((* anf_118 0.5))) (return (+ anf_119 0.5))
+         (set () int _lv_tag_121 ((. anf_113 tag)))
+         (switch _lv_tag_121 (1 (return (vec3 0. 0. 0.)) break)
+          (default (set () float n_15 ((. anf_113 Some_0)))
+           (set () vec3 anf_114 ((vec3 10. 20. 30.)))
+           (set () vec3 anf_115 ((* n_15 anf_114)))
+           (set () vec3 anf_116 ((+ anf_115 u_time)))
+           (set () vec3 anf_117 ((sin anf_116)))
+           (set () vec3 anf_118 ((* anf_117 0.5))) (return (+ anf_118 0.5))
            break)))))
       (Function (name main) (desc ()) (params ()) (ret_type TyVoid)
        (body
@@ -3289,84 +3263,84 @@ let%expect_test "compile examples" =
         int tag;
         float Some_0;
     };
-    v_option_float mandel_2_vec2_to_int_to_v_option_float_84_85(vec2 c_1, vec2 z_3, int i_4) {
-        int _iter_120 = 0;
-        while ((_iter_120 < 1000)) {
-            bool anf_86 = (i_4 > 150);
-            if (anf_86) {
+    v_option_float mandel_2_84(vec2 c_1, vec2 z_3, int i_4) {
+        int _iter_119 = 0;
+        while ((_iter_119 < 1000)) {
+            bool anf_85 = (i_4 > 150);
+            if (anf_85) {
                 return v_option_float(1, 0.);
             } else {
-                float anf_87 = length(z_3);
-                bool anf_88 = (anf_87 > 4.);
-                if (anf_88) {
-                    float anf_89 = length(z_3);
-                    float anf_90 = log2(anf_89);
-                    float nu_5 = log2(anf_90);
-                    float pf_123 = float(i_4);
-                    float anf_91 = (pf_123 - nu_5);
-                    float anf_92 = (anf_91 / 150.);
-                    return v_option_float(0, anf_92);
+                float anf_86 = length(z_3);
+                bool anf_87 = (anf_86 > 4.);
+                if (anf_87) {
+                    float anf_88 = length(z_3);
+                    float anf_89 = log2(anf_88);
+                    float nu_5 = log2(anf_89);
+                    float pf_122 = float(i_4);
+                    float anf_90 = (pf_122 - nu_5);
+                    float anf_91 = (anf_90 / 150.);
+                    return v_option_float(0, anf_91);
                 } else {
+                    float anf_92 = z_3[0];
                     float anf_93 = z_3[0];
-                    float anf_94 = z_3[0];
-                    float anf_95 = (anf_93 * anf_94);
+                    float anf_94 = (anf_92 * anf_93);
+                    float anf_95 = z_3[1];
                     float anf_96 = z_3[1];
-                    float anf_97 = z_3[1];
-                    float anf_98 = (anf_96 * anf_97);
-                    float zx_6 = (anf_95 - anf_98);
-                    float anf_99 = z_3[0];
-                    float anf_100 = (2. * anf_99);
-                    float anf_101 = z_3[1];
-                    float zy_7 = (anf_100 * anf_101);
-                    vec2 anf_102 = vec2(zx_6, zy_7);
-                    vec2 z_prime_8 = (anf_102 + c_1);
-                    int anf_103 = (i_4 + 1);
+                    float anf_97 = (anf_95 * anf_96);
+                    float zx_6 = (anf_94 - anf_97);
+                    float anf_98 = z_3[0];
+                    float anf_99 = (2. * anf_98);
+                    float anf_100 = z_3[1];
+                    float zy_7 = (anf_99 * anf_100);
+                    vec2 anf_101 = vec2(zx_6, zy_7);
+                    vec2 z_prime_8 = (anf_101 + c_1);
+                    int anf_102 = (i_4 + 1);
                     c_1 = c_1;
                     z_3 = z_prime_8;
-                    i_4 = anf_103;
-                    int _iter_inc_121 = (_iter_120 + 1);
-                    _iter_120 = _iter_inc_121;
+                    i_4 = anf_102;
+                    int _iter_inc_120 = (_iter_119 + 1);
+                    _iter_119 = _iter_inc_120;
                     continue;
                 }
             }
         }
-        v_option_float _tmp_124;
-        return _tmp_124;
+        v_option_float _tmp_123;
+        return _tmp_123;
     }
     v_option_float mandelbrot_0_vec2_to_v_option_float_83(vec2 c_1) {
-        vec2 anf_104 = vec2(0., 0.);
-        return mandel_2_vec2_to_int_to_v_option_float_84_85(c_1, anf_104, 0);
+        vec2 anf_103 = vec2(0., 0.);
+        return mandel_2_84(c_1, anf_103, 0);
     }
     vec3 main_pure(vec2 coord_9) {
-        vec2 anf_105 = (2. * coord_9);
-        vec2 top_11 = (anf_105 - u_resolution);
-        float anf_106 = u_resolution[0];
-        float anf_107 = u_resolution[1];
-        float bot_12 = min(anf_106, anf_107);
+        vec2 anf_104 = (2. * coord_9);
+        vec2 top_11 = (anf_104 - u_resolution);
+        float anf_105 = u_resolution[0];
+        float anf_106 = u_resolution[1];
+        float bot_12 = min(anf_105, anf_106);
         vec2 uv_10 = (top_11 / bot_12);
-        float anf_108 = (u_time * 0.4);
-        float anf_109 = sin(anf_108);
-        float anf_110 = (anf_109 * 4.5);
-        float anf_111 = (anf_110 + 3.5);
-        float zoom_13 = exp(anf_111);
-        vec2 anf_112 = vec2(-0.7453, 0.1127);
-        vec2 anf_113 = (uv_10 / zoom_13);
-        vec2 seahorse_valley_14 = (anf_112 + anf_113);
-        v_option_float anf_114 = mandelbrot_0_vec2_to_v_option_float_83(seahorse_valley_14);
-        int _lv_tag_122 = anf_114.tag;
-        switch (_lv_tag_122) {
+        float anf_107 = (u_time * 0.4);
+        float anf_108 = sin(anf_107);
+        float anf_109 = (anf_108 * 4.5);
+        float anf_110 = (anf_109 + 3.5);
+        float zoom_13 = exp(anf_110);
+        vec2 anf_111 = vec2(-0.7453, 0.1127);
+        vec2 anf_112 = (uv_10 / zoom_13);
+        vec2 seahorse_valley_14 = (anf_111 + anf_112);
+        v_option_float anf_113 = mandelbrot_0_vec2_to_v_option_float_83(seahorse_valley_14);
+        int _lv_tag_121 = anf_113.tag;
+        switch (_lv_tag_121) {
             case 1: {
                 return vec3(0., 0., 0.);
                 break;
             }
             default: {
-                float n_15 = anf_114.Some_0;
-                vec3 anf_115 = vec3(10., 20., 30.);
-                vec3 anf_116 = (n_15 * anf_115);
-                vec3 anf_117 = (anf_116 + u_time);
-                vec3 anf_118 = sin(anf_117);
-                vec3 anf_119 = (anf_118 * 0.5);
-                return (anf_119 + 0.5);
+                float n_15 = anf_113.Some_0;
+                vec3 anf_114 = vec3(10., 20., 30.);
+                vec3 anf_115 = (n_15 * anf_114);
+                vec3 anf_116 = (anf_115 + u_time);
+                vec3 anf_117 = sin(anf_116);
+                vec3 anf_118 = (anf_117 * 0.5);
+                return (anf_118 + 0.5);
                 break;
             }
         }
