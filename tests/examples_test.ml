@@ -536,12 +536,11 @@ let%expect_test "compile examples" =
 
     === defunctionalize (2d_sdf_variants.glml) ===
     (Program
-     (((TypeDef shape
+     (((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+      ((Extern u_time) : float)
+      ((TypeDef shape
         (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
        : shape)
-      ((TypeDef DFn_129 (VariantDecl ((lctor_132 (shape)) (lctor_135 (shape)))))
-       : DFn_129)
-      ((TypeDef DFn_140 (VariantDecl ((lctor_141 (DFn_129 DFn_129))))) : DFn_140)
       ((Define Nonrec sdf_shape_0
         (lambda ((s_1 shape) (p_2 (vec 2)))
          (match s_1 ((Circle r_3) (- (length p_2) r_3))
@@ -551,6 +550,8 @@ let%expect_test "compile examples" =
              (min (max (index d_6 0) (index d_6 1)) 0))))
           ((Empty) 1.))))
        : (shape -> ((vec 2) -> float)))
+      ((TypeDef DFn_129 (VariantDecl ((lctor_132 (shape)) (lctor_135 (shape)))))
+       : DFn_129)
       ((Define Nonrec dapply_128
         (lambda ((dfn_142 DFn_129) (da_143 (vec 2)))
          (match dfn_142 ((lctor_132 ca_131) (app sdf_shape_0 ca_131 da_143))
@@ -560,13 +561,7 @@ let%expect_test "compile examples" =
         (lambda ((f_8 DFn_129) (f_prime_9 DFn_129) (p_10 (vec 2)))
          (min (app dapply_128 f_8 p_10) (app dapply_128 f_prime_9 p_10))))
        : (DFn_129 -> (DFn_129 -> ((vec 2) -> float))))
-      ((Define Nonrec dapply_139
-        (lambda ((dfn_144 DFn_140) (da_145 (vec 2)))
-         (match dfn_144
-          ((lctor_141 ca_137 ca_138) (app union_7 ca_137 ca_138 da_145)))))
-       : (DFn_140 -> ((vec 2) -> float)))
-      ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-      ((Extern u_time) : float)
+      ((TypeDef DFn_140 (VariantDecl ((lctor_141 (DFn_129 DFn_129))))) : DFn_140)
       ((Define Nonrec scene_11
         (let circle_12 (Variant DFn_129 lctor_132 (Variant shape Circle 0.3))
          (let rect_13 (Variant DFn_129 lctor_135 (Variant shape Rect 0.7 0.1))
@@ -580,6 +575,11 @@ let%expect_test "compile examples" =
           (let bot_17 (min (index u_resolution 0) (index u_resolution 1))
            (/ top_16 bot_17)))))
        : ((vec 2) -> (vec 2)))
+      ((Define Nonrec dapply_139
+        (lambda ((dfn_144 DFn_140) (da_145 (vec 2)))
+         (match dfn_144
+          ((lctor_141 ca_137 ca_138) (app union_7 ca_137 ca_138 da_145)))))
+       : (DFn_140 -> ((vec 2) -> float)))
       ((Define Nonrec main
         (lambda ((coord_20 (vec 2)))
          (let p_21 (app get_uv_14_vec2_to_vec2_127 coord_20)
@@ -601,13 +601,11 @@ let%expect_test "compile examples" =
        : ((vec 2) -> (vec 3)))))
 
     === lambda lift (2d_sdf_variants.glml) ===
-    (Program
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
      ((TypeDef shape
        (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
       : shape)
-     ((TypeDef DFn_129 (VariantDecl ((lctor_132 (shape)) (lctor_135 (shape))))) :
-      DFn_129)
-     ((TypeDef DFn_140 (VariantDecl ((lctor_141 (DFn_129 DFn_129))))) : DFn_140)
      ((Define Nonrec (name sdf_shape_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
         (match s_1 ((Circle r_3) (- (length p_2) r_3))
@@ -617,6 +615,8 @@ let%expect_test "compile examples" =
             (min (max (index d_6 0) (index d_6 1)) 0))))
          ((Empty) 1.))))
       : (shape -> ((vec 2) -> float)))
+     ((TypeDef DFn_129 (VariantDecl ((lctor_132 (shape)) (lctor_135 (shape))))) :
+      DFn_129)
      ((Define Nonrec (name dapply_128)
        (args ((dfn_142 DFn_129) (da_143 (vec 2))))
        (body
@@ -627,14 +627,7 @@ let%expect_test "compile examples" =
        (args ((f_8 DFn_129) (f_prime_9 DFn_129) (p_10 (vec 2))))
        (body (min (app dapply_128 f_8 p_10) (app dapply_128 f_prime_9 p_10))))
       : (DFn_129 -> (DFn_129 -> ((vec 2) -> float))))
-     ((Define Nonrec (name dapply_139)
-       (args ((dfn_144 DFn_140) (da_145 (vec 2))))
-       (body
-        (match dfn_144
-         ((lctor_141 ca_137 ca_138) (app union_7 ca_137 ca_138 da_145)))))
-      : (DFn_140 -> ((vec 2) -> float)))
-     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
+     ((TypeDef DFn_140 (VariantDecl ((lctor_141 (DFn_129 DFn_129))))) : DFn_140)
      ((Const scene_11
        (let circle_12 (Variant DFn_129 lctor_132 (Variant shape Circle 0.3))
         (let rect_13 (Variant DFn_129 lctor_135 (Variant shape Rect 0.7 0.1))
@@ -649,6 +642,12 @@ let%expect_test "compile examples" =
          (let bot_17 (min (index u_resolution 0) (index u_resolution 1))
           (/ top_16 bot_17)))))
       : ((vec 2) -> (vec 2)))
+     ((Define Nonrec (name dapply_139)
+       (args ((dfn_144 DFn_140) (da_145 (vec 2))))
+       (body
+        (match dfn_144
+         ((lctor_141 ca_137 ca_138) (app union_7 ca_137 ca_138 da_145)))))
+      : (DFn_140 -> ((vec 2) -> float)))
      ((Define Nonrec (name main) (args ((coord_20 (vec 2))))
        (body
         (let p_21 (app get_uv_14_vec2_to_vec2_127 coord_20)
@@ -670,13 +669,11 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === anf (2d_sdf_variants.glml) ===
-    (Program
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
      ((TypeDef shape
        (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
       : shape)
-     ((TypeDef DFn_129 (VariantDecl ((lctor_132 (shape)) (lctor_135 (shape))))) :
-      DFn_129)
-     ((TypeDef DFn_140 (VariantDecl ((lctor_141 (DFn_129 DFn_129))))) : DFn_140)
      ((Define Nonrec (name sdf_shape_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
         (return
@@ -695,6 +692,8 @@ let%expect_test "compile examples" =
                     (let anf_155 (min anf_154 0) (return (+ anf_151 anf_155)))))))))))))
           ((Empty) (return 1.))))))
       : (shape -> ((vec 2) -> float)))
+     ((TypeDef DFn_129 (VariantDecl ((lctor_132 (shape)) (lctor_135 (shape))))) :
+      DFn_129)
      ((Define Nonrec (name dapply_128)
        (args ((dfn_142 DFn_129) (da_143 (vec 2))))
        (body
@@ -708,15 +707,7 @@ let%expect_test "compile examples" =
         (let anf_156 (dapply_128 f_8 p_10)
          (let anf_157 (dapply_128 f_prime_9 p_10) (return (min anf_156 anf_157))))))
       : (DFn_129 -> (DFn_129 -> ((vec 2) -> float))))
-     ((Define Nonrec (name dapply_139)
-       (args ((dfn_144 DFn_140) (da_145 (vec 2))))
-       (body
-        (return
-         (match dfn_144
-          ((lctor_141 ca_137 ca_138) (return (union_7 ca_137 ca_138 da_145)))))))
-      : (DFn_140 -> ((vec 2) -> float)))
-     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
+     ((TypeDef DFn_140 (VariantDecl ((lctor_141 (DFn_129 DFn_129))))) : DFn_140)
      ((Const scene_11
        (let anf_158 (Variant shape Circle 0.3)
         (let circle_12 (Variant DFn_129 lctor_132 anf_158)
@@ -735,6 +726,13 @@ let%expect_test "compile examples" =
            (let anf_162 (index u_resolution 1)
             (let bot_17 (min anf_161 anf_162) (return (/ top_16 bot_17)))))))))
       : ((vec 2) -> (vec 2)))
+     ((Define Nonrec (name dapply_139)
+       (args ((dfn_144 DFn_140) (da_145 (vec 2))))
+       (body
+        (return
+         (match dfn_144
+          ((lctor_141 ca_137 ca_138) (return (union_7 ca_137 ca_138 da_145)))))))
+      : (DFn_140 -> ((vec 2) -> float)))
      ((Define Nonrec (name main) (args ((coord_20 (vec 2))))
        (body
         (let p_21 (get_uv_14_vec2_to_vec2_127 coord_20)
@@ -774,13 +772,11 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === tail call (2d_sdf_variants.glml) ===
-    (Program
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
      ((TypeDef shape
        (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
       : shape)
-     ((TypeDef DFn_129 (VariantDecl ((lctor_132 (shape)) (lctor_135 (shape))))) :
-      DFn_129)
-     ((TypeDef DFn_140 (VariantDecl ((lctor_141 (DFn_129 DFn_129))))) : DFn_140)
      ((Define (name sdf_shape_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
         (return
@@ -799,6 +795,8 @@ let%expect_test "compile examples" =
                     (let anf_155 (min anf_154 0) (return (+ anf_151 anf_155)))))))))))))
           ((Empty) (return 1.))))))
       : (shape -> ((vec 2) -> float)))
+     ((TypeDef DFn_129 (VariantDecl ((lctor_132 (shape)) (lctor_135 (shape))))) :
+      DFn_129)
      ((Define (name dapply_128) (args ((dfn_142 DFn_129) (da_143 (vec 2))))
        (body
         (return
@@ -811,14 +809,7 @@ let%expect_test "compile examples" =
         (let anf_156 (dapply_128 f_8 p_10)
          (let anf_157 (dapply_128 f_prime_9 p_10) (return (min anf_156 anf_157))))))
       : (DFn_129 -> (DFn_129 -> ((vec 2) -> float))))
-     ((Define (name dapply_139) (args ((dfn_144 DFn_140) (da_145 (vec 2))))
-       (body
-        (return
-         (match dfn_144
-          ((lctor_141 ca_137 ca_138) (return (union_7 ca_137 ca_138 da_145)))))))
-      : (DFn_140 -> ((vec 2) -> float)))
-     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
+     ((TypeDef DFn_140 (VariantDecl ((lctor_141 (DFn_129 DFn_129))))) : DFn_140)
      ((Const scene_11
        (let anf_158 (Variant shape Circle 0.3)
         (let circle_12 (Variant DFn_129 lctor_132 anf_158)
@@ -836,6 +827,12 @@ let%expect_test "compile examples" =
            (let anf_162 (index u_resolution 1)
             (let bot_17 (min anf_161 anf_162) (return (/ top_16 bot_17)))))))))
       : ((vec 2) -> (vec 2)))
+     ((Define (name dapply_139) (args ((dfn_144 DFn_140) (da_145 (vec 2))))
+       (body
+        (return
+         (match dfn_144
+          ((lctor_141 ca_137 ca_138) (return (union_7 ca_137 ca_138 da_145)))))))
+      : (DFn_140 -> ((vec 2) -> float)))
      ((Define (name main) (args ((coord_20 (vec 2))))
        (body
         (let p_21 (get_uv_14_vec2_to_vec2_127 coord_20)
@@ -875,16 +872,11 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === lower variants (2d_sdf_variants.glml) ===
-    (Program
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
      ((TypeDef shape
        (RecordDecl ((tag int) (Circle_0 float) (Rect_0 float) (Rect_1 float))))
       : shape)
-     ((TypeDef DFn_129
-       (RecordDecl ((tag int) (lctor_132_0 shape) (lctor_135_0 shape))))
-      : DFn_129)
-     ((TypeDef DFn_140
-       (RecordDecl ((tag int) (lctor_141_0 DFn_129) (lctor_141_1 DFn_129))))
-      : DFn_140)
      ((Define (name sdf_shape_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
         (let _lv_tag_184 (. s_1 tag)
@@ -908,6 +900,9 @@ let%expect_test "compile examples" =
                        (let anf_155 (min anf_154 0) (return (+ anf_151 anf_155)))))))))))))))
            (default (return 1.)))))))
       : (shape -> ((vec 2) -> float)))
+     ((TypeDef DFn_129
+       (RecordDecl ((tag int) (lctor_132_0 shape) (lctor_135_0 shape))))
+      : DFn_129)
      ((Define (name dapply_128) (args ((dfn_142 DFn_129) (da_143 (vec 2))))
        (body
         (let _lv_tag_185 (. dfn_142 tag)
@@ -926,14 +921,9 @@ let%expect_test "compile examples" =
         (let anf_156 (dapply_128 f_8 p_10)
          (let anf_157 (dapply_128 f_prime_9 p_10) (return (min anf_156 anf_157))))))
       : (DFn_129 -> (DFn_129 -> ((vec 2) -> float))))
-     ((Define (name dapply_139) (args ((dfn_144 DFn_140) (da_145 (vec 2))))
-       (body
-        (let ca_137 (. dfn_144 lctor_141_0)
-         (let ca_138 (. dfn_144 lctor_141_1)
-          (return (union_7 ca_137 ca_138 da_145))))))
-      : (DFn_140 -> ((vec 2) -> float)))
-     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
+     ((TypeDef DFn_140
+       (RecordDecl ((tag int) (lctor_141_0 DFn_129) (lctor_141_1 DFn_129))))
+      : DFn_140)
      ((Const scene_11
        (let anf_158 (shape 0 0.3 <temp> <temp>)
         (let circle_12 (DFn_129 0 anf_158 <temp>)
@@ -951,6 +941,12 @@ let%expect_test "compile examples" =
            (let anf_162 (index u_resolution 1)
             (let bot_17 (min anf_161 anf_162) (return (/ top_16 bot_17)))))))))
       : ((vec 2) -> (vec 2)))
+     ((Define (name dapply_139) (args ((dfn_144 DFn_140) (da_145 (vec 2))))
+       (body
+        (let ca_137 (. dfn_144 lctor_141_0)
+         (let ca_138 (. dfn_144 lctor_141_1)
+          (return (union_7 ca_137 ca_138 da_145))))))
+      : (DFn_140 -> ((vec 2) -> float)))
      ((Define (name main) (args ((coord_20 (vec 2))))
        (body
         (let p_21 (get_uv_14_vec2_to_vec2_127 coord_20)
@@ -990,16 +986,11 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === promote ints (2d_sdf_variants.glml) ===
-    (Program
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
      ((TypeDef shape
        (RecordDecl ((tag int) (Circle_0 float) (Rect_0 float) (Rect_1 float))))
       : shape)
-     ((TypeDef DFn_129
-       (RecordDecl ((tag int) (lctor_132_0 shape) (lctor_135_0 shape))))
-      : DFn_129)
-     ((TypeDef DFn_140
-       (RecordDecl ((tag int) (lctor_141_0 DFn_129) (lctor_141_1 DFn_129))))
-      : DFn_140)
      ((Define (name sdf_shape_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
         (let _lv_tag_184 (. s_1 tag)
@@ -1024,6 +1015,9 @@ let%expect_test "compile examples" =
                         (return (+ anf_151 anf_155)))))))))))))))
            (default (return 1.)))))))
       : (shape -> ((vec 2) -> float)))
+     ((TypeDef DFn_129
+       (RecordDecl ((tag int) (lctor_132_0 shape) (lctor_135_0 shape))))
+      : DFn_129)
      ((Define (name dapply_128) (args ((dfn_142 DFn_129) (da_143 (vec 2))))
        (body
         (let _lv_tag_185 (. dfn_142 tag)
@@ -1042,14 +1036,9 @@ let%expect_test "compile examples" =
         (let anf_156 (dapply_128 f_8 p_10)
          (let anf_157 (dapply_128 f_prime_9 p_10) (return (min anf_156 anf_157))))))
       : (DFn_129 -> (DFn_129 -> ((vec 2) -> float))))
-     ((Define (name dapply_139) (args ((dfn_144 DFn_140) (da_145 (vec 2))))
-       (body
-        (let ca_137 (. dfn_144 lctor_141_0)
-         (let ca_138 (. dfn_144 lctor_141_1)
-          (return (union_7 ca_137 ca_138 da_145))))))
-      : (DFn_140 -> ((vec 2) -> float)))
-     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
+     ((TypeDef DFn_140
+       (RecordDecl ((tag int) (lctor_141_0 DFn_129) (lctor_141_1 DFn_129))))
+      : DFn_140)
      ((Const scene_11
        (let anf_158 (shape 0 0.3 <temp> <temp>)
         (let circle_12 (DFn_129 0 anf_158 <temp>)
@@ -1067,6 +1056,12 @@ let%expect_test "compile examples" =
            (let anf_162 (index u_resolution 1)
             (let bot_17 (min anf_161 anf_162) (return (/ top_16 bot_17)))))))))
       : ((vec 2) -> (vec 2)))
+     ((Define (name dapply_139) (args ((dfn_144 DFn_140) (da_145 (vec 2))))
+       (body
+        (let ca_137 (. dfn_144 lctor_141_0)
+         (let ca_138 (. dfn_144 lctor_141_1)
+          (return (union_7 ca_137 ca_138 da_145))))))
+      : (DFn_140 -> ((vec 2) -> float)))
      ((Define (name main) (args ((coord_20 (vec 2))))
        (body
         (let p_21 (get_uv_14_vec2_to_vec2_127 coord_20)
@@ -1106,16 +1101,11 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === remove placeholder (2d_sdf_variants.glml) ===
-    (Program
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
      ((TypeDef shape
        (RecordDecl ((tag int) (Circle_0 float) (Rect_0 float) (Rect_1 float))))
       : shape)
-     ((TypeDef DFn_129
-       (RecordDecl ((tag int) (lctor_132_0 shape) (lctor_135_0 shape))))
-      : DFn_129)
-     ((TypeDef DFn_140
-       (RecordDecl ((tag int) (lctor_141_0 DFn_129) (lctor_141_1 DFn_129))))
-      : DFn_140)
      ((Define (name sdf_shape_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
         (let _lv_tag_184 (. s_1 tag)
@@ -1140,6 +1130,9 @@ let%expect_test "compile examples" =
                         (return (+ anf_151 anf_155)))))))))))))))
            (default (return 1.)))))))
       : (shape -> ((vec 2) -> float)))
+     ((TypeDef DFn_129
+       (RecordDecl ((tag int) (lctor_132_0 shape) (lctor_135_0 shape))))
+      : DFn_129)
      ((Define (name dapply_128) (args ((dfn_142 DFn_129) (da_143 (vec 2))))
        (body
         (let _lv_tag_185 (. dfn_142 tag)
@@ -1158,14 +1151,9 @@ let%expect_test "compile examples" =
         (let anf_156 (dapply_128 f_8 p_10)
          (let anf_157 (dapply_128 f_prime_9 p_10) (return (min anf_156 anf_157))))))
       : (DFn_129 -> (DFn_129 -> ((vec 2) -> float))))
-     ((Define (name dapply_139) (args ((dfn_144 DFn_140) (da_145 (vec 2))))
-       (body
-        (let ca_137 (. dfn_144 lctor_141_0)
-         (let ca_138 (. dfn_144 lctor_141_1)
-          (return (union_7 ca_137 ca_138 da_145))))))
-      : (DFn_140 -> ((vec 2) -> float)))
-     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
+     ((TypeDef DFn_140
+       (RecordDecl ((tag int) (lctor_141_0 DFn_129) (lctor_141_1 DFn_129))))
+      : DFn_140)
      ((Const scene_11
        (let anf_158 (shape 0 0.3 0. 0.)
         (placeholder _tmp_186
@@ -1185,6 +1173,12 @@ let%expect_test "compile examples" =
            (let anf_162 (index u_resolution 1)
             (let bot_17 (min anf_161 anf_162) (return (/ top_16 bot_17)))))))))
       : ((vec 2) -> (vec 2)))
+     ((Define (name dapply_139) (args ((dfn_144 DFn_140) (da_145 (vec 2))))
+       (body
+        (let ca_137 (. dfn_144 lctor_141_0)
+         (let ca_138 (. dfn_144 lctor_141_1)
+          (return (union_7 ca_137 ca_138 da_145))))))
+      : (DFn_140 -> ((vec 2) -> float)))
      ((Define (name main) (args ((coord_20 (vec 2))))
        (body
         (let p_21 (get_uv_14_vec2_to_vec2_127 coord_20)
@@ -1224,16 +1218,11 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === lift consts (2d_sdf_variants.glml) ===
-    (Program
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
      ((TypeDef shape
        (RecordDecl ((tag int) (Circle_0 float) (Rect_0 float) (Rect_1 float))))
       : shape)
-     ((TypeDef DFn_129
-       (RecordDecl ((tag int) (lctor_132_0 shape) (lctor_135_0 shape))))
-      : DFn_129)
-     ((TypeDef DFn_140
-       (RecordDecl ((tag int) (lctor_141_0 DFn_129) (lctor_141_1 DFn_129))))
-      : DFn_140)
      ((Define (name sdf_shape_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
         (let _lv_tag_184 (. s_1 tag)
@@ -1258,6 +1247,9 @@ let%expect_test "compile examples" =
                         (return (+ anf_151 anf_155)))))))))))))))
            (default (return 1.)))))))
       : (shape -> ((vec 2) -> float)))
+     ((TypeDef DFn_129
+       (RecordDecl ((tag int) (lctor_132_0 shape) (lctor_135_0 shape))))
+      : DFn_129)
      ((Define (name dapply_128) (args ((dfn_142 DFn_129) (da_143 (vec 2))))
        (body
         (let _lv_tag_185 (. dfn_142 tag)
@@ -1276,14 +1268,9 @@ let%expect_test "compile examples" =
         (let anf_156 (dapply_128 f_8 p_10)
          (let anf_157 (dapply_128 f_prime_9 p_10) (return (min anf_156 anf_157))))))
       : (DFn_129 -> (DFn_129 -> ((vec 2) -> float))))
-     ((Define (name dapply_139) (args ((dfn_144 DFn_140) (da_145 (vec 2))))
-       (body
-        (let ca_137 (. dfn_144 lctor_141_0)
-         (let ca_138 (. dfn_144 lctor_141_1)
-          (return (union_7 ca_137 ca_138 da_145))))))
-      : (DFn_140 -> ((vec 2) -> float)))
-     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
+     ((TypeDef DFn_140
+       (RecordDecl ((tag int) (lctor_141_0 DFn_129) (lctor_141_1 DFn_129))))
+      : DFn_140)
      ((Define (name scene_11) (args ())
        (body
         (let anf_158 (shape 0 0.3 0. 0.)
@@ -1304,6 +1291,12 @@ let%expect_test "compile examples" =
            (let anf_162 (index u_resolution 1)
             (let bot_17 (min anf_161 anf_162) (return (/ top_16 bot_17)))))))))
       : ((vec 2) -> (vec 2)))
+     ((Define (name dapply_139) (args ((dfn_144 DFn_140) (da_145 (vec 2))))
+       (body
+        (let ca_137 (. dfn_144 lctor_141_0)
+         (let ca_138 (. dfn_144 lctor_141_1)
+          (return (union_7 ca_137 ca_138 da_145))))))
+      : (DFn_140 -> ((vec 2) -> float)))
      ((Define (name main) (args ((coord_20 (vec 2))))
        (body
         (let p_21 (get_uv_14_vec2_to_vec2_127 coord_20)
@@ -1347,14 +1340,10 @@ let%expect_test "compile examples" =
 
     === translate (2d_sdf_variants.glml) ===
     (Program
-     ((Struct shape
+     ((Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform (TyVec 2) u_mouse ()) (Global Uniform TyFloat u_time ())
+      (Struct shape
        ((TyInt tag) (TyFloat Circle_0) (TyFloat Rect_0) (TyFloat Rect_1)))
-      (Struct DFn_129
-       ((TyInt tag) ((TyStruct shape) lctor_132_0)
-        ((TyStruct shape) lctor_135_0)))
-      (Struct DFn_140
-       ((TyInt tag) ((TyStruct DFn_129) lctor_141_0)
-        ((TyStruct DFn_129) lctor_141_1)))
       (Function (name sdf_shape_0) (desc ())
        (params (((TyStruct shape) s_1) ((TyVec 2) p_2))) (ret_type TyFloat)
        (body
@@ -1375,6 +1364,9 @@ let%expect_test "compile examples" =
            (set () float anf_155 ((min anf_154 0.))) (return (+ anf_151 anf_155))
            break)
           (default (return 1.) break)))))
+      (Struct DFn_129
+       ((TyInt tag) ((TyStruct shape) lctor_132_0)
+        ((TyStruct shape) lctor_135_0)))
       (Function (name dapply_128) (desc ())
        (params (((TyStruct DFn_129) dfn_142) ((TyVec 2) da_143)))
        (ret_type TyFloat)
@@ -1394,15 +1386,9 @@ let%expect_test "compile examples" =
         ((set () float anf_156 ((dapply_128 f_8 p_10)))
          (set () float anf_157 ((dapply_128 f_prime_9 p_10)))
          (return (min anf_156 anf_157)))))
-      (Function (name dapply_139) (desc ())
-       (params (((TyStruct DFn_140) dfn_144) ((TyVec 2) da_145)))
-       (ret_type TyFloat)
-       (body
-        ((set () DFn_129 ca_137 ((. dfn_144 lctor_141_0)))
-         (set () DFn_129 ca_138 ((. dfn_144 lctor_141_1)))
-         (return (union_7 ca_137 ca_138 da_145)))))
-      (Global Uniform (TyVec 2) u_resolution ())
-      (Global Uniform (TyVec 2) u_mouse ()) (Global Uniform TyFloat u_time ())
+      (Struct DFn_140
+       ((TyInt tag) ((TyStruct DFn_129) lctor_141_0)
+        ((TyStruct DFn_129) lctor_141_1)))
       (Function (name scene_11) (desc ()) (params ())
        (ret_type (TyStruct DFn_140))
        (body
@@ -1422,6 +1408,13 @@ let%expect_test "compile examples" =
          (set () float anf_162 ((index u_resolution 1)))
          (set () float bot_17 ((min anf_161 anf_162)))
          (return (/ top_16 bot_17)))))
+      (Function (name dapply_139) (desc ())
+       (params (((TyStruct DFn_140) dfn_144) ((TyVec 2) da_145)))
+       (ret_type TyFloat)
+       (body
+        ((set () DFn_129 ca_137 ((. dfn_144 lctor_141_0)))
+         (set () DFn_129 ca_138 ((. dfn_144 lctor_141_1)))
+         (return (union_7 ca_137 ca_138 da_145)))))
       (Function (name main) (desc ()) (params (((TyVec 2) coord_20)))
        (ret_type (TyVec 3))
        (body
@@ -1464,14 +1457,10 @@ let%expect_test "compile examples" =
     === patch main (2d_sdf_variants.glml) ===
     (Program
      ((Global Out (TyVec 4) fragColor ())
+      (Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform (TyVec 2) u_mouse ()) (Global Uniform TyFloat u_time ())
       (Struct shape
        ((TyInt tag) (TyFloat Circle_0) (TyFloat Rect_0) (TyFloat Rect_1)))
-      (Struct DFn_129
-       ((TyInt tag) ((TyStruct shape) lctor_132_0)
-        ((TyStruct shape) lctor_135_0)))
-      (Struct DFn_140
-       ((TyInt tag) ((TyStruct DFn_129) lctor_141_0)
-        ((TyStruct DFn_129) lctor_141_1)))
       (Function (name sdf_shape_0) (desc ())
        (params (((TyStruct shape) s_1) ((TyVec 2) p_2))) (ret_type TyFloat)
        (body
@@ -1492,6 +1481,9 @@ let%expect_test "compile examples" =
            (set () float anf_155 ((min anf_154 0.))) (return (+ anf_151 anf_155))
            break)
           (default (return 1.) break)))))
+      (Struct DFn_129
+       ((TyInt tag) ((TyStruct shape) lctor_132_0)
+        ((TyStruct shape) lctor_135_0)))
       (Function (name dapply_128) (desc ())
        (params (((TyStruct DFn_129) dfn_142) ((TyVec 2) da_143)))
        (ret_type TyFloat)
@@ -1511,15 +1503,9 @@ let%expect_test "compile examples" =
         ((set () float anf_156 ((dapply_128 f_8 p_10)))
          (set () float anf_157 ((dapply_128 f_prime_9 p_10)))
          (return (min anf_156 anf_157)))))
-      (Function (name dapply_139) (desc ())
-       (params (((TyStruct DFn_140) dfn_144) ((TyVec 2) da_145)))
-       (ret_type TyFloat)
-       (body
-        ((set () DFn_129 ca_137 ((. dfn_144 lctor_141_0)))
-         (set () DFn_129 ca_138 ((. dfn_144 lctor_141_1)))
-         (return (union_7 ca_137 ca_138 da_145)))))
-      (Global Uniform (TyVec 2) u_resolution ())
-      (Global Uniform (TyVec 2) u_mouse ()) (Global Uniform TyFloat u_time ())
+      (Struct DFn_140
+       ((TyInt tag) ((TyStruct DFn_129) lctor_141_0)
+        ((TyStruct DFn_129) lctor_141_1)))
       (Function (name scene_11) (desc ()) (params ())
        (ret_type (TyStruct DFn_140))
        (body
@@ -1539,6 +1525,13 @@ let%expect_test "compile examples" =
          (set () float anf_162 ((index u_resolution 1)))
          (set () float bot_17 ((min anf_161 anf_162)))
          (return (/ top_16 bot_17)))))
+      (Function (name dapply_139) (desc ())
+       (params (((TyStruct DFn_140) dfn_144) ((TyVec 2) da_145)))
+       (ret_type TyFloat)
+       (body
+        ((set () DFn_129 ca_137 ((. dfn_144 lctor_141_0)))
+         (set () DFn_129 ca_138 ((. dfn_144 lctor_141_1)))
+         (return (union_7 ca_137 ca_138 da_145)))))
       (Function (name main_pure) (desc ()) (params (((TyVec 2) coord_20)))
        (ret_type (TyVec 3))
        (body
@@ -1585,21 +1578,14 @@ let%expect_test "compile examples" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
+    uniform vec2 u_resolution;
+    uniform vec2 u_mouse;
+    uniform float u_time;
     struct shape {
         int tag;
         float Circle_0;
         float Rect_0;
         float Rect_1;
-    };
-    struct DFn_129 {
-        int tag;
-        shape lctor_132_0;
-        shape lctor_135_0;
-    };
-    struct DFn_140 {
-        int tag;
-        DFn_129 lctor_141_0;
-        DFn_129 lctor_141_1;
     };
     float sdf_shape_0(shape s_1, vec2 p_2) {
         int _lv_tag_184 = s_1.tag;
@@ -1632,6 +1618,11 @@ let%expect_test "compile examples" =
             }
         }
     }
+    struct DFn_129 {
+        int tag;
+        shape lctor_132_0;
+        shape lctor_135_0;
+    };
     float dapply_128(DFn_129 dfn_142, vec2 da_143) {
         int _lv_tag_185 = dfn_142.tag;
         switch (_lv_tag_185) {
@@ -1652,14 +1643,11 @@ let%expect_test "compile examples" =
         float anf_157 = dapply_128(f_prime_9, p_10);
         return min(anf_156, anf_157);
     }
-    float dapply_139(DFn_140 dfn_144, vec2 da_145) {
-        DFn_129 ca_137 = dfn_144.lctor_141_0;
-        DFn_129 ca_138 = dfn_144.lctor_141_1;
-        return union_7(ca_137, ca_138, da_145);
-    }
-    uniform vec2 u_resolution;
-    uniform vec2 u_mouse;
-    uniform float u_time;
+    struct DFn_140 {
+        int tag;
+        DFn_129 lctor_141_0;
+        DFn_129 lctor_141_1;
+    };
     DFn_140 scene_11() {
         shape anf_158 = shape(0, 0.3, 0., 0.);
         shape _tmp_186;
@@ -1678,6 +1666,11 @@ let%expect_test "compile examples" =
         float anf_162 = u_resolution[1];
         float bot_17 = min(anf_161, anf_162);
         return (top_16 / bot_17);
+    }
+    float dapply_139(DFn_140 dfn_144, vec2 da_145) {
+        DFn_129 ca_137 = dfn_144.lctor_141_0;
+        DFn_129 ca_138 = dfn_144.lctor_141_1;
+        return union_7(ca_137, ca_138, da_145);
     }
     vec3 main_pure(vec2 coord_20) {
         vec2 p_21 = get_uv_14_vec2_to_vec2_127(coord_20);

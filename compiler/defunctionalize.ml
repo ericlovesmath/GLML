@@ -230,14 +230,6 @@ let get_or_create_info (reg : registry) (ty : ty) : registry * fn_type_info =
     , info )
 ;;
 
-let dfn_level_of reg = function
-  | TyVariant vname ->
-    (match Map.find reg.by_variant vname with
-     | Some info -> Some info.level
-     | None -> None)
-  | _ -> None
-;;
-
 (** Retype function-typed params to their corresponding variant types. Returns updated
     registry, updated params, and an env mapping changed param names to their new types. *)
 let retype_params (reg : registry) params =
@@ -262,11 +254,16 @@ let add_lambda_entry (reg : registry) (ty : ty) params body captured loc
   : registry * fn_type_info * string
   =
   let reg, canonical_info = get_or_create_info reg ty in
+  let canonical_key = mangle_ty ty in
   let max_captured_level =
     List.fold captured ~init:(-1) ~f:(fun acc (_, cty) ->
-      match dfn_level_of reg cty with
-      | Some lvl -> max acc lvl
-      | None -> acc)
+      match cty with
+      | TyVariant vname ->
+        (match Map.find reg.by_variant vname with
+         | Some info when String.equal (mangle_ty info.arrow_ty) canonical_key ->
+           max acc info.level
+         | _ -> acc)
+      | _ -> acc)
   in
   let target_level = max_captured_level + 1 in
   let reg, info =
@@ -706,7 +703,7 @@ let rewrite_top
       (closure_global_types : ty String.Map.t)
       (reg : registry)
       (top : Uncurry.top)
-  : registry * Uncurry.top * bool
+  : registry * Uncurry.top
   =
   let ctx_base =
     { globals
@@ -721,16 +718,15 @@ let rewrite_top
   match top.desc with
   | Define (recur, name, ({ desc = Lam (params, body); _ } as lam)) ->
     let reg, params, env = retype_params reg params in
-    let is_hof_consumer = not (Map.is_empty env) in
     let ctx = { ctx_base with env } in
     let reg, body = rewrite_term ctx false reg body in
     let lam_ty = build_arrow_ty (List.map params ~f:snd) body.ty in
     let lam = { lam with desc = Lam (params, body); ty = lam_ty } in
     let top = { top with desc = Define (recur, name, lam); ty = lam_ty } in
-    reg, top, is_hof_consumer
+    reg, top
   | Define (recur, name, term) ->
     let reg, term = rewrite_term ctx_base false reg term in
-    reg, { top with desc = Define (recur, name, term); ty = term.ty }, false
+    reg, { top with desc = Define (recur, name, term); ty = term.ty }
   | TypeDef (name, RecordDecl fields) ->
     let reg, fields =
       List.fold_map fields ~init:reg ~f:(fun reg (field_name, ty) ->
@@ -740,7 +736,7 @@ let rewrite_top
           reg, (field_name, TyVariant info.variant_name))
         else reg, (field_name, ty))
     in
-    reg, { top with desc = TypeDef (name, RecordDecl fields) }, false
+    reg, { top with desc = TypeDef (name, RecordDecl fields) }
   | TypeDef (name, VariantDecl ctors) ->
     let reg, ctors =
       List.fold_map ctors ~init:reg ~f:(fun reg (ctor_name, arg_tys) ->
@@ -754,9 +750,13 @@ let rewrite_top
         in
         reg, (ctor_name, arg_tys))
     in
-    reg, { top with desc = TypeDef (name, VariantDecl ctors) }, false
-  | Extern _ -> reg, top, false
+    reg, { top with desc = TypeDef (name, VariantDecl ctors) }
+  | Extern _ -> reg, top
 ;;
+
+(******************************************************************************)
+(* Topological Sort Logic for Generated Types/Functions                       *)
+(******************************************************************************)
 
 let rec global_refs_of (globals : String.Set.t) (term : Uncurry.term) : String.Set.t =
   let go = global_refs_of globals in
@@ -775,17 +775,83 @@ let rec global_refs_of (globals : String.Set.t) (term : Uncurry.term) : String.S
     union_many (go scrut :: List.map cases ~f:(fun (_, body) -> go body))
 ;;
 
+let rec ty_struct_deps (ty : ty) : String.Set.t =
+  match ty with
+  | TyRecord s | TyVariant s -> String.Set.singleton s
+  | TyArrow (a, b) -> Set.union (ty_struct_deps a) (ty_struct_deps b)
+  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ -> String.Set.empty
+;;
+
+let rec term_ty_deps (t : term) : String.Set.t =
+  let self = ty_struct_deps t.ty in
+  let from_desc =
+    match t.desc with
+    | Lam (params, body) ->
+      List.fold params ~init:(term_ty_deps body) ~f:(fun acc (_, ty) ->
+        Set.union acc (ty_struct_deps ty))
+    | Var _ | Float _ | Int _ | Bool _ -> String.Set.empty
+    | App (f, args) -> String.Set.union_list (List.map ~f:term_ty_deps (f :: args))
+    | Let (_, _, b, e) -> Set.union (term_ty_deps b) (term_ty_deps e)
+    | If (c, t, e) ->
+      Set.union (Set.union (term_ty_deps c) (term_ty_deps t)) (term_ty_deps e)
+    | Bop (_, t, t') -> Set.union (term_ty_deps t) (term_ty_deps t')
+    | Vec (_, ts) | Mat (_, _, ts) | Builtin (_, ts) | Record (_, ts) | Variant (_, _, ts)
+      -> String.Set.union_list (List.map ~f:term_ty_deps ts)
+    | Index (t, _) | Field (t, _) -> term_ty_deps t
+    | Match (scrut, cases) ->
+      List.fold cases ~init:(term_ty_deps scrut) ~f:(fun acc (_, body) ->
+        Set.union acc (term_ty_deps body))
+  in
+  Set.union self from_desc
+;;
+
+let typedef_decl_deps = function
+  | RecordDecl fields ->
+    List.fold fields ~init:String.Set.empty ~f:(fun acc (_, ty) ->
+      Set.union acc (ty_struct_deps ty))
+  | VariantDecl ctors ->
+    List.fold ctors ~init:String.Set.empty ~f:(fun acc (_, tys) ->
+      List.fold tys ~init:acc ~f:(fun acc ty -> Set.union acc (ty_struct_deps ty)))
+;;
+
+(* TODO: Use the [topological_sort] library from Jane Street *)
+let topo_sort (all_tops : top list) : top list =
+  let all_globals =
+    List.filter_map all_tops ~f:(fun top ->
+      match top.desc with
+      | Define (_, name, _) | Extern name | TypeDef (name, _) -> Some name)
+    |> String.Set.of_list
+  in
+  let key_of (top : top) =
+    match top.desc with
+    | Define (_, name, _) | Extern name | TypeDef (name, _) -> name
+  in
+  let deps_of (top : top) =
+    match top.desc with
+    | Extern _ -> String.Set.empty
+    | TypeDef (_, decl) -> typedef_decl_deps decl
+    | Define (_, _, body) ->
+      Set.union (global_refs_of all_globals body) (term_ty_deps body)
+  in
+  let by_key = List.map all_tops ~f:(fun i -> key_of i, i) |> String.Map.of_alist_exn in
+  let visited = ref String.Set.empty in
+  let result = ref [] in
+  let rec visit k =
+    if not (Set.mem !visited k)
+    then (
+      visited := Set.add !visited k;
+      match Map.find by_key k with
+      | None -> ()
+      | Some item ->
+        Set.iter (deps_of item) ~f:visit;
+        result := item :: !result)
+  in
+  List.iter all_tops ~f:(fun i -> visit (key_of i));
+  List.rev !result
+;;
+
 let defunctionalize (Program tops : Uncurry.t) : Uncurry.t Compiler_error.t =
   let globals = collect_globals tops in
-  (* Snapshot the call graph before rewriting, [rewrite_top] transforms closures into
-     Variant constructors, which erases direct function references from bodies. *)
-  let orig_call_graph =
-    List.filter_map tops ~f:(fun (top : Uncurry.top) ->
-      match top.desc with
-      | Define (_, name, body) -> Some (name, global_refs_of globals body)
-      | _ -> None)
-    |> String.Map.of_alist_exn
-  in
   (* Arity of each global function at the GLSL level, needed to distinguish partial
      application from a full call to a function that returns a function value. *)
   let global_arities =
@@ -806,94 +872,24 @@ let defunctionalize (Program tops : Uncurry.t) : Uncurry.t Compiler_error.t =
       | _ -> None)
     |> String.Set.of_list
   in
-  let (reg, _), tagged_tops =
+  let (reg, _), rewritten_tops =
     List.fold_map tops ~init:(empty_registry, String.Map.empty) ~f:(fun (reg, cgt) top ->
-      let reg, top, is_hof =
-        rewrite_top globals global_arities closure_globals cgt reg top
-      in
+      let reg, top = rewrite_top globals global_arities closure_globals cgt reg top in
       let cgt =
         match top.desc with
         | Define (_, name, term) when Set.mem closure_globals name ->
           Map.set cgt ~key:name ~data:term.ty
         | _ -> cgt
       in
-      (reg, cgt), (top, is_hof))
+      (reg, cgt), top)
   in
-  (* Globals that dapply_ functions call directly *)
-  let direct_before_names =
-    Map.fold reg.by_variant ~init:String.Set.empty ~f:(fun ~key:_ ~data:info acc ->
-      List.fold info.entries ~init:acc ~f:(fun acc -> function
-        | GlobalEntry e -> Set.add acc e.fn_name
-        | LambdaEntry e -> Set.union acc (global_refs_of globals e.body)))
+  let all_tops =
+    let dfn_infos =
+      Map.data reg.by_variant |> List.filter ~f:(fun i -> not (List.is_empty i.entries))
+    in
+    rewritten_tops
+    @ List.map ~f:gen_typedef dfn_infos
+    @ List.map ~f:gen_apply_fn dfn_infos
   in
-  (* Every function [dapply_] depends on *)
-  let rec transitive_close visited worklist =
-    match Set.min_elt worklist with
-    | None -> visited
-    | Some name ->
-      let visited = Set.add visited name in
-      let deps =
-        Map.find orig_call_graph name |> Option.value ~default:String.Set.empty
-      in
-      let worklist = Set.remove worklist name |> Set.union (Set.diff deps visited) in
-      transitive_close visited worklist
-  in
-  let before_apply_names = transitive_close String.Set.empty direct_before_names in
-  let is_before_apply (top : Uncurry.top) =
-    match top.desc with
-    | Define (_, name, _) -> Set.mem before_apply_names name
-    | _ -> false
-  in
-  (* Sort all DFn infos by level so level-N types/apply-fns come after level-(N-1) ones.
-     Filter out canonical infos that had no direct entries (only served as a template for
-     higher-level DFns). *)
-  let sorted_infos =
-    Map.data reg.by_variant
-    |> List.filter ~f:(fun i -> not (List.is_empty i.entries))
-    |> List.sort ~compare:(fun a b -> Int.compare a.level b.level)
-  in
-  let typedef_tops = List.map sorted_infos ~f:gen_typedef in
-  let level0_apply_tops, higher_apply_tops =
-    sorted_infos
-    |> List.partition_map ~f:(fun i ->
-      let top = gen_apply_fn i in
-      if i.level = 0 then First top else Second top)
-  in
-  (* TODO: Mental hierarchy for sorting, although we should probably do a proper topo sort
-
-     1. Functions dapply_ calls must come before it
-     2. HOF consumers call dapply_ so must come after it
-     3. everything else (externs, main, unrelated functions) goes last
-     4. level-0 dapplys come first
-     5. HOF consumers that are needed by level-1+ dapplys (before_tops_hof) come after
-     6. level-1+ dapplys come last of the apply group
-     7. Non-HOF before_tops come before level-0 dapplys *)
-  let before_tops_non_hof, before_tops_hof, after_tops, rest_tops =
-    List.fold_right
-      tagged_tops
-      ~init:([], [], [], [])
-      ~f:(fun (top, is_hof) (bnh, bh, at, rt) ->
-        match is_before_apply top, is_hof with
-        | true, false -> top :: bnh, bh, at, rt
-        | true, true -> bnh, top :: bh, at, rt
-        | false, true -> bnh, bh, top :: at, rt
-        | false, false -> bnh, bh, at, top :: rt)
-  in
-  (* Original TypeDef tops must appear before any generated code that references them *)
-  let rest_typedef_tops, rest_non_typedef_tops =
-    List.partition_tf rest_tops ~f:(fun top ->
-      match top.desc with
-      | TypeDef _ -> true
-      | _ -> false)
-  in
-  Ok
-    (Program
-       (rest_typedef_tops
-        @ typedef_tops
-        @ before_tops_non_hof
-        @ level0_apply_tops
-        @ before_tops_hof
-        @ higher_apply_tops
-        @ after_tops
-        @ rest_non_typedef_tops))
+  Ok (Program (topo_sort all_tops))
 ;;
