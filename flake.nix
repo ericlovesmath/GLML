@@ -65,6 +65,7 @@
               devOpamPackages
               ++ (with pkgs; [
                 glsl_analyzer
+                glslang
                 nodejs
                 mdbook
               ]);

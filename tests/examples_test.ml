@@ -19,9 +19,13 @@ let%expect_test "compile examples" =
       |> Passes.Map.of_alist_exn
     in
     match compile ~dump source with
-    | Ok _ -> ()
-    | Error err -> print_endline (Compiler_error.to_string_hum ~source err));
-  [%expect {|
+    | Error err -> print_endline (Compiler_error.to_string_hum ~source err)
+    | Ok glsl ->
+      (match Glsl_validator.validate_glsl glsl with
+       | None -> ()
+       | Some err -> print_endline ("=== glslangValidator Error ===\n" ^ err)));
+  [%expect
+    {|
     ====== COMPILING EXAMPLE 2d_sdf_variants.glml ======
 
     === stlc (2d_sdf_variants.glml) ===

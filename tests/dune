@@ -1,5 +1,8 @@
 (library
  (name tests)
- (libraries core glml_compiler)
+ (libraries core glml_compiler
+   (select glsl_validator.ml from
+   (core_unix -> glsl_validator.unix.ml)
+   (-> glsl_validator.fallback.ml)))
  (preprocess (pps ppx_jane))
  (inline_tests (deps (glob_files ../examples/*.glml))))
