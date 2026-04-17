@@ -24,6 +24,7 @@
    js_of_ocaml
    js_of_ocaml-ppx
    core
+   topological_sort
    core_bench
    ppx_jane)
  (tags ("graphics" "shader" "DSL" "GLSL" "GLML" "compiler" "playground")))

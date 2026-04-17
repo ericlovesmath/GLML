@@ -25,6 +25,6 @@
    translate
    patch_main
    glsl)
- (libraries core)
+ (libraries core topological_sort)
  (preprocess (pps ppx_jane))
  (inline_tests))
