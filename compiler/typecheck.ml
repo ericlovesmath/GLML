@@ -509,7 +509,7 @@ let rec resolve_stlc_ty (env : env) (t : Stlc.ty) : ty Compiler_error.t =
     then Ok (TyVariant (name, args))
     else if Map.mem env.structs name
     then Ok (TyRecord (name, args))
-    else Err.fail "type not a variant or record"
+    else Err.fail "type not a variant or record" ~d:[%message (t : Stlc.ty)]
   in
   match t with
   | TyName name ->

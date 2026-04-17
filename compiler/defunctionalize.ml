@@ -71,6 +71,7 @@ type ctx =
   { globals : String.Set.t
   ; global_arities : int String.Map.t
   ; closure_globals : String.Set.t
+  ; closure_global_types : ty String.Map.t
   ; lift_only : String.Set.t
   ; lift_only_bodies : ((string * ty) list * Uncurry.term) String.Map.t
   ; env : ty String.Map.t
@@ -418,14 +419,23 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
        then (
          (* Evaluates to a closure value, so we route through [dapply] instead of calling by name *)
          let reg, info = get_or_create_info reg f.ty in
+         (* Use the actual post-defunctionalization DFn type if known *)
+         let actual_info =
+           match Map.find ctx.closure_global_types v with
+           | Some (TyVariant vname) ->
+             Map.find reg.by_variant vname |> Option.value ~default:info
+           | _ -> info
+         in
          let apply_ty =
-           build_arrow_ty (TyVariant info.variant_name :: info.arg_tys) info.ret_ty
+           build_arrow_ty
+             (TyVariant actual_info.variant_name :: actual_info.arg_tys)
+             actual_info.ret_ty
          in
          let apply_var : term =
-           { desc = Var info.apply_name; ty = apply_ty; loc = f.loc }
+           { desc = Var actual_info.apply_name; ty = apply_ty; loc = f.loc }
          in
-         let f = { f with ty = TyVariant info.variant_name } in
-         reg, { t with desc = App (apply_var, f :: args); ty = info.ret_ty })
+         let f = { f with ty = TyVariant actual_info.variant_name } in
+         reg, { t with desc = App (apply_var, f :: args); ty = actual_info.ret_ty })
        else if is_fn_ty t.ty
        then (
          let f_arity =
@@ -693,6 +703,7 @@ let rewrite_top
       (globals : String.Set.t)
       (global_arities : int String.Map.t)
       (closure_globals : String.Set.t)
+      (closure_global_types : ty String.Map.t)
       (reg : registry)
       (top : Uncurry.top)
   : registry * Uncurry.top * bool
@@ -701,6 +712,7 @@ let rewrite_top
     { globals
     ; global_arities
     ; closure_globals
+    ; closure_global_types
     ; lift_only = String.Set.empty
     ; lift_only_bodies = String.Map.empty
     ; env = String.Map.empty
@@ -794,10 +806,18 @@ let defunctionalize (Program tops : Uncurry.t) : Uncurry.t Compiler_error.t =
       | _ -> None)
     |> String.Set.of_list
   in
-  let reg, tagged_tops =
-    List.fold_map tops ~init:empty_registry ~f:(fun reg top ->
-      let reg, top, is_hof = rewrite_top globals global_arities closure_globals reg top in
-      reg, (top, is_hof))
+  let (reg, _), tagged_tops =
+    List.fold_map tops ~init:(empty_registry, String.Map.empty) ~f:(fun (reg, cgt) top ->
+      let reg, top, is_hof =
+        rewrite_top globals global_arities closure_globals cgt reg top
+      in
+      let cgt =
+        match top.desc with
+        | Define (_, name, term) when Set.mem closure_globals name ->
+          Map.set cgt ~key:name ~data:term.ty
+        | _ -> cgt
+      in
+      (reg, cgt), (top, is_hof))
   in
   (* Globals that dapply_ functions call directly *)
   let direct_before_names =

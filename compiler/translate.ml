@@ -8,7 +8,7 @@ module Err = Compiler_error.Pass (struct
 
 type record_env = (string * Monomorphize.ty) list String.Map.t
 
-let to_glsl_ty (ty : Monomorphize.ty) : ty Compiler_error.t =
+let to_glsl_ty (loc : Lexer.loc) (ty : Monomorphize.ty) : ty Compiler_error.t =
   match ty with
   | TyFloat -> Ok TyFloat
   | TyInt -> Ok TyInt
@@ -17,7 +17,7 @@ let to_glsl_ty (ty : Monomorphize.ty) : ty Compiler_error.t =
   | TyMat (x, y) -> Ok (TyMat (x, y))
   | TyRecord s | TyVariant s -> Ok (TyStruct s)
   | TyArrow _ ->
-    Err.fail "arrow types should not be translated" ~d:[%message (ty : Monomorphize.ty)]
+    Err.fail "unexpected arrow type" ~loc ~d:[%message (ty : Monomorphize.ty)]
 ;;
 
 let to_glsl_atom (a : Remove_placeholder.atom) : term =
@@ -113,11 +113,11 @@ and translate_set (env : record_env) (var : string) (anf : Remove_placeholder.an
   =
   match anf.desc with
   | Let (v, term, body) ->
-    let%bind ty = to_glsl_ty term.ty in
+    let%bind ty = to_glsl_ty term.loc term.ty in
     let%bind tail = translate_set env var body in
     translate_let env v term ty tail
   | Placeholder (v, body) ->
-    let%bind ty = to_glsl_ty anf.ty in
+    let%bind ty = to_glsl_ty anf.loc anf.ty in
     let placeholder = Decl (None, ty, v, None) in
     let%bind tail = translate_set env var body in
     Ok (placeholder :: tail)
@@ -137,11 +137,11 @@ and translate_block (env : record_env) (anf : Remove_placeholder.anf)
   =
   match anf.desc with
   | Let (v, bind, body) ->
-    let%bind ty = to_glsl_ty bind.ty in
+    let%bind ty = to_glsl_ty bind.loc bind.ty in
     let%bind tail = translate_block env body in
     translate_let env v bind ty tail
   | Placeholder (v, body) ->
-    let%bind ty = to_glsl_ty anf.ty in
+    let%bind ty = to_glsl_ty anf.loc anf.ty in
     let placeholder = Decl (None, ty, v, None) in
     let%bind tail = translate_block env body in
     Ok (placeholder :: tail)
@@ -219,11 +219,11 @@ let translate (Program tops : Remove_placeholder.t) : Glsl.t Compiler_error.t =
       let loc = top.loc in
       match top.desc with
       | Define { name; args; body; ret_ty } ->
-        let%bind ret_type = to_glsl_ty ret_ty in
+        let%bind ret_type = to_glsl_ty top.loc ret_ty in
         let%bind params =
           args
           |> List.map ~f:(fun (arg, arg_ty) ->
-            let%map arg_ty = to_glsl_ty arg_ty in
+            let%map arg_ty = to_glsl_ty top.loc arg_ty in
             arg_ty, arg)
           |> Compiler_error.all
         in
@@ -232,18 +232,18 @@ let translate (Program tops : Remove_placeholder.t) : Glsl.t Compiler_error.t =
       | Const (name, body) ->
         (match build_const_term body with
          | Some glsl_t ->
-           let%bind ty = to_glsl_ty top.ty in
+           let%bind ty = to_glsl_ty top.loc top.ty in
            Ok (Global (Const, ty, name, Some glsl_t))
          | None ->
            Err.fail "top-level constant must be atomic" ~loc ~d:[%message (name : string)])
       | Extern v ->
-        let%map ty = to_glsl_ty top.ty in
+        let%map ty = to_glsl_ty top.loc top.ty in
         Global (Uniform, ty, v, None)
       | TypeDef (s, RecordDecl fields) ->
         let%map fields =
           fields
           |> List.map ~f:(fun (arg, arg_ty) ->
-            let%map arg_ty = to_glsl_ty arg_ty in
+            let%map arg_ty = to_glsl_ty top.loc arg_ty in
             arg_ty, arg)
           |> Compiler_error.all
         in
