@@ -31,13 +31,13 @@ eval $(opam env)
 Compile a `.glml` file to GLSL and print to stdout:
 
 ```bash
-dune exec GLML -- compile examples/rainbow.glml
+dune exec GLML -- build examples/rainbow.glml
 ```
 
 Write the output to a file:
 
 ```bash
-dune exec GLML -- compile examples/rainbow.glml -o shader.glsl
+dune exec GLML -- build examples/rainbow.glml -o shader.glsl
 ```
 
 ## Inspecting Compiler Passes
@@ -46,13 +46,13 @@ GLML has a multi-pass pipeline. You can dump the AST at any pass for debugging:
 
 ```bash
 # Dump all passes to stdout
-dune exec GLML -- compile examples/rainbow.glml -p all
+dune exec GLML -- build examples/rainbow.glml -p all
 
 # Dump a specific pass
-dune exec GLML -- compile examples/rainbow.glml -p typecheck
+dune exec GLML -- build examples/rainbow.glml -p typecheck
 
 # Dump all passes to files in a directory
-dune exec GLML -- compile examples/rainbow.glml -p all -d /tmp/passes
+dune exec GLML -- build examples/rainbow.glml -p all -d /tmp/passes
 
 # List available pass names
 dune exec GLML -- list-passes
