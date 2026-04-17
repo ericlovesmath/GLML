@@ -814,40 +814,39 @@ let typedef_decl_deps = function
       List.fold tys ~init:acc ~f:(fun acc ty -> Set.union acc (ty_struct_deps ty)))
 ;;
 
-(* TODO: Use the [topological_sort] library from Jane Street *)
-let topo_sort (all_tops : top list) : top list =
-  let all_globals =
-    List.filter_map all_tops ~f:(fun top ->
-      match top.desc with
-      | Define (_, name, _) | Extern name | TypeDef (name, _) -> Some name)
-    |> String.Set.of_list
-  in
+let topo_sort (all_tops : top list) : t Compiler_error.t =
+  let open Compiler_error.Let_syntax in
   let key_of (top : top) =
     match top.desc with
     | Define (_, name, _) | Extern name | TypeDef (name, _) -> name
   in
+  let nodes = List.map all_tops ~f:key_of in
+  let globals = String.Set.of_list nodes in
   let deps_of (top : top) =
     match top.desc with
     | Extern _ -> String.Set.empty
     | TypeDef (_, decl) -> typedef_decl_deps decl
-    | Define (_, _, body) ->
-      Set.union (global_refs_of all_globals body) (term_ty_deps body)
+    | Define (_, _, body) -> Set.union (global_refs_of globals body) (term_ty_deps body)
   in
-  let by_key = List.map all_tops ~f:(fun i -> key_of i, i) |> String.Map.of_alist_exn in
-  let visited = ref String.Set.empty in
-  let result = ref [] in
-  let rec visit k =
-    if not (Set.mem !visited k)
-    then (
-      visited := Set.add !visited k;
-      match Map.find by_key k with
-      | None -> ()
-      | Some item ->
-        Set.iter (deps_of item) ~f:visit;
-        result := item :: !result)
+  let edges =
+    List.concat_map all_tops ~f:(fun top ->
+      let name = key_of top in
+      Set.to_list (deps_of top)
+      |> List.filter_map ~f:(fun dep ->
+        if String.equal dep name || not (Set.mem globals dep)
+        then None
+        else Some { Topological_sort.Edge.from = dep; to_ = name }))
   in
-  List.iter all_tops ~f:(fun i -> visit (key_of i));
-  List.rev !result
+  let%bind by_key =
+    List.map all_tops ~f:(fun top -> key_of top, top)
+    |> String.Map.of_alist_or_error
+    |> Err.of_or_error
+  in
+  let%bind labels =
+    Topological_sort.sort (module String) ~what:Nodes ~nodes ~edges |> Err.of_or_error
+  in
+  (* TODO: Make sure I'm not accidentally filtering something out *)
+  Ok (Program (List.filter_map ~f:(Map.find by_key) labels))
 ;;
 
 let defunctionalize (Program tops : Uncurry.t) : Uncurry.t Compiler_error.t =
@@ -891,5 +890,5 @@ let defunctionalize (Program tops : Uncurry.t) : Uncurry.t Compiler_error.t =
     @ List.map ~f:gen_typedef dfn_infos
     @ List.map ~f:gen_apply_fn dfn_infos
   in
-  Ok (Program (topo_sort all_tops))
+  topo_sort all_tops
 ;;

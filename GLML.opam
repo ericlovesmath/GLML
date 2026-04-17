@@ -15,6 +15,7 @@ depends: [
   "js_of_ocaml"
   "js_of_ocaml-ppx"
   "core"
+  "topological_sort"
   "core_bench"
   "ppx_jane"
   "odoc" {with-doc}
