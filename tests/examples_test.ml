@@ -3,11 +3,11 @@ open Glml_compiler
 
 let examples_dir = "../examples"
 
-let%expect_test "compile examples" =
+let test_examples () =
   let glml_files = Stdlib.Sys.readdir examples_dir in
   Array.iter glml_files ~f:(fun file ->
     let source = In_channel.read_all (Filename.concat examples_dir file) in
-    Printf.printf "====== COMPILING EXAMPLE %s ======\n\n" file;
+    Printf.printf "\n\n====== COMPILING EXAMPLE %s ======\n\n" file;
     let dump =
       let handler pass sexp =
         let pass = Passes.to_string pass in
@@ -18,12 +18,11 @@ let%expect_test "compile examples" =
       |> List.map ~f:(fun pass -> pass, handler pass)
       |> Passes.Map.of_alist_exn
     in
-    match compile ~dump source with
-    | Error err -> print_endline (Compiler_error.to_string_hum ~source err)
-    | Ok glsl ->
-      (match Glsl_validator.validate_glsl glsl with
-       | None -> ()
-       | Some err -> print_endline ("=== glslangValidator Error ===\n" ^ err)));
+    Runner.test ~dump source)
+;;
+
+let%expect_test "compile examples" =
+  test_examples ();
   [%expect
     {|
     ====== COMPILING EXAMPLE 2d_sdf_variants.glml ======
@@ -1583,6 +1582,152 @@ let%expect_test "compile examples" =
         ((set () vec3 color ((main_pure (. gl_FragCoord xy))))
          (set fragColor (clamp (vec4 (. color xyz) 1.) 0. 1.)))))))
 
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct shape {
+        int tag;
+        float Circle_0;
+        float Rect_0;
+        float Rect_1;
+    };
+    struct DFn_129 {
+        int tag;
+        shape lctor_132_0;
+        shape lctor_135_0;
+    };
+    struct DFn_140 {
+        int tag;
+        DFn_129 lctor_141_0;
+        DFn_129 lctor_141_1;
+    };
+    float sdf_shape_0(shape s_1, vec2 p_2) {
+        int _lv_tag_184 = s_1.tag;
+        switch (_lv_tag_184) {
+            case 0: {
+                float r_3 = s_1.Circle_0;
+                float anf_146 = length(p_2);
+                return (anf_146 - r_3);
+                break;
+            }
+            case 1: {
+                float w_4 = s_1.Rect_0;
+                float h_5 = s_1.Rect_1;
+                vec2 anf_147 = abs(p_2);
+                vec2 anf_148 = vec2(w_4, h_5);
+                vec2 d_6 = (anf_147 - anf_148);
+                vec2 anf_149 = vec2(0., 0.);
+                vec2 anf_150 = max(d_6, anf_149);
+                float anf_151 = length(anf_150);
+                float anf_152 = d_6[0];
+                float anf_153 = d_6[1];
+                float anf_154 = max(anf_152, anf_153);
+                float anf_155 = min(anf_154, 0.);
+                return (anf_151 + anf_155);
+                break;
+            }
+            default: {
+                return 1.;
+                break;
+            }
+        }
+    }
+    float dapply_128(DFn_129 dfn_142, vec2 da_143) {
+        int _lv_tag_185 = dfn_142.tag;
+        switch (_lv_tag_185) {
+            case 0: {
+                shape ca_131 = dfn_142.lctor_132_0;
+                return sdf_shape_0(ca_131, da_143);
+                break;
+            }
+            default: {
+                shape ca_134 = dfn_142.lctor_135_0;
+                return sdf_shape_0(ca_134, da_143);
+                break;
+            }
+        }
+    }
+    float union_7(DFn_129 f_8, DFn_129 f_prime_9, vec2 p_10) {
+        float anf_156 = dapply_128(f_8, p_10);
+        float anf_157 = dapply_128(f_prime_9, p_10);
+        return min(anf_156, anf_157);
+    }
+    float dapply_139(DFn_140 dfn_144, vec2 da_145) {
+        DFn_129 ca_137 = dfn_144.lctor_141_0;
+        DFn_129 ca_138 = dfn_144.lctor_141_1;
+        return union_7(ca_137, ca_138, da_145);
+    }
+    uniform vec2 u_resolution;
+    uniform vec2 u_mouse;
+    uniform float u_time;
+    DFn_140 scene_11() {
+        shape anf_158 = shape(0, 0.3, 0., 0.);
+        shape _tmp_186;
+        DFn_129 circle_12 = DFn_129(0, anf_158, _tmp_186);
+        shape anf_159 = shape(1, 0., 0.7, 0.1);
+        shape _tmp_187;
+        DFn_129 rect_13 = DFn_129(1, _tmp_187, anf_159);
+        return DFn_140(0, circle_12, rect_13);
+    }
+    const vec3 orange_18 = vec3(0.9, 0.6, 0.3);
+    const vec3 blue_19 = vec3(0.65, 0.85, 1.);
+    vec2 get_uv_14_vec2_to_vec2_127(vec2 coord_15) {
+        vec2 anf_160 = (2. * coord_15);
+        vec2 top_16 = (anf_160 - u_resolution);
+        float anf_161 = u_resolution[0];
+        float anf_162 = u_resolution[1];
+        float bot_17 = min(anf_161, anf_162);
+        return (top_16 / bot_17);
+    }
+    vec3 main_pure(vec2 coord_20) {
+        vec2 p_21 = get_uv_14_vec2_to_vec2_127(coord_20);
+        vec2 m_22 = get_uv_14_vec2_to_vec2_127(u_mouse);
+        DFn_140 _lc_188 = scene_11();
+        float d_23 = dapply_139(_lc_188, p_21);
+        bool anf_163 = (d_23 > 0.);
+        vec3 col_24;
+        if (anf_163) {
+            col_24 = orange_18;
+        } else {
+            col_24 = blue_19;
+        }
+        float anf_164 = abs(d_23);
+        float anf_165 = (-6. * anf_164);
+        float anf_166 = exp(anf_165);
+        float darken_26 = (1. - anf_166);
+        float anf_167 = (150. * d_23);
+        float anf_168 = cos(anf_167);
+        float anf_169 = (0.2 * anf_168);
+        float rings_27 = (0.8 + anf_169);
+        vec3 anf_170 = (col_24 * darken_26);
+        vec3 col_25 = (anf_170 * rings_27);
+        vec3 anf_171 = vec3(1., 1., 1.);
+        float anf_172 = abs(d_23);
+        float anf_173 = smoothstep(0., 0.01, anf_172);
+        float anf_174 = (1. - anf_173);
+        vec3 col_28 = mix(col_25, anf_171, anf_174);
+        DFn_140 _lc_189 = scene_11();
+        float anf_175 = dapply_139(_lc_189, m_22);
+        float d_30 = abs(anf_175);
+        vec2 anf_176 = (p_21 - m_22);
+        float dm_31 = length(anf_176);
+        float anf_177 = (dm_31 - d_30);
+        float anf_178 = abs(anf_177);
+        float anf_179 = (anf_178 - 0.0025);
+        float anf_180 = (dm_31 - 0.015);
+        float d_32 = min(anf_179, anf_180);
+        vec3 anf_181 = vec3(1., 1., 0.);
+        float anf_182 = smoothstep(0., 0.005, d_32);
+        float anf_183 = (1. - anf_182);
+        vec3 col_29 = mix(col_28, anf_181, anf_183);
+        return col_29;
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+
+
     ====== COMPILING EXAMPLE checkerboard.glml ======
 
     === stlc (checkerboard.glml) ===
@@ -2050,6 +2195,48 @@ let%expect_test "compile examples" =
        (body
         ((set () vec3 color ((main_pure (. gl_FragCoord xy))))
          (set fragColor (clamp (vec4 (. color xyz) 1.) 0. 1.)))))))
+
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform vec2 u_resolution;
+    uniform float u_time;
+    const int size_0 = 5;
+    vec2 get_uv_1_vec2_to_vec2_38(vec2 coord_2) {
+        vec2 anf_39 = (2. * coord_2);
+        vec2 top_3 = (anf_39 - u_resolution);
+        float anf_40 = u_resolution[0];
+        float anf_41 = u_resolution[1];
+        float bot_4 = min(anf_40, anf_41);
+        return (top_3 / bot_4);
+    }
+    vec3 main_pure(vec2 coord_5) {
+        vec2 uv_6 = get_uv_1_vec2_to_vec2_38(coord_5);
+        float pf_52 = float(size_0);
+        vec2 anf_42 = (uv_6 * pf_52);
+        float anf_43 = (2. * u_time);
+        vec2 anf_44 = vec2(anf_43, 0.);
+        vec2 anf_45 = (anf_42 + anf_44);
+        vec2 c_7 = floor(anf_45);
+        float anf_46 = c_7[0];
+        float anf_47 = c_7[1];
+        float checker_sum_8 = (anf_46 + anf_47);
+        float anf_48 = (checker_sum_8 / 2.);
+        float anf_49 = floor(anf_48);
+        float anf_50 = (anf_49 * 2.);
+        float is_even_9 = (checker_sum_8 - anf_50);
+        bool anf_51 = (is_even_9 < 0.5);
+        if (anf_51) {
+            return vec3(0.2, 0.2, 0.2);
+        } else {
+            return vec3(0.8, 0.8, 0.8);
+        }
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+
 
     ====== COMPILING EXAMPLE mandelbrot.glml ======
 
@@ -3105,6 +3292,103 @@ let%expect_test "compile examples" =
         ((set () vec3 color ((main_pure (. gl_FragCoord xy))))
          (set fragColor (clamp (vec4 (. color xyz) 1.) 0. 1.)))))))
 
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct v_option_float {
+        int tag;
+        float Some_0;
+    };
+    uniform vec2 u_resolution;
+    uniform float u_time;
+    v_option_float mandel_2_vec2_to_int_to_v_option_float_84_85(vec2 c_1, vec2 z_3, int i_4) {
+        int _iter_120 = 0;
+        while ((_iter_120 < 1000)) {
+            bool anf_86 = (i_4 > 150);
+            if (anf_86) {
+                return v_option_float(1, 0.);
+            } else {
+                float anf_87 = length(z_3);
+                bool anf_88 = (anf_87 > 4.);
+                if (anf_88) {
+                    float anf_89 = length(z_3);
+                    float anf_90 = log2(anf_89);
+                    float nu_5 = log2(anf_90);
+                    float pf_123 = float(i_4);
+                    float anf_91 = (pf_123 - nu_5);
+                    float anf_92 = (anf_91 / 150.);
+                    return v_option_float(0, anf_92);
+                } else {
+                    float anf_93 = z_3[0];
+                    float anf_94 = z_3[0];
+                    float anf_95 = (anf_93 * anf_94);
+                    float anf_96 = z_3[1];
+                    float anf_97 = z_3[1];
+                    float anf_98 = (anf_96 * anf_97);
+                    float zx_6 = (anf_95 - anf_98);
+                    float anf_99 = z_3[0];
+                    float anf_100 = (2. * anf_99);
+                    float anf_101 = z_3[1];
+                    float zy_7 = (anf_100 * anf_101);
+                    vec2 anf_102 = vec2(zx_6, zy_7);
+                    vec2 z_prime_8 = (anf_102 + c_1);
+                    int anf_103 = (i_4 + 1);
+                    c_1 = c_1;
+                    z_3 = z_prime_8;
+                    i_4 = anf_103;
+                    int _iter_inc_121 = (_iter_120 + 1);
+                    _iter_120 = _iter_inc_121;
+                    continue;
+                }
+            }
+        }
+        v_option_float _tmp_124;
+        return _tmp_124;
+    }
+    v_option_float mandelbrot_0_vec2_to_v_option_float_83(vec2 c_1) {
+        vec2 anf_104 = vec2(0., 0.);
+        return mandel_2_vec2_to_int_to_v_option_float_84_85(c_1, anf_104, 0);
+    }
+    vec3 main_pure(vec2 coord_9) {
+        vec2 anf_105 = (2. * coord_9);
+        vec2 top_11 = (anf_105 - u_resolution);
+        float anf_106 = u_resolution[0];
+        float anf_107 = u_resolution[1];
+        float bot_12 = min(anf_106, anf_107);
+        vec2 uv_10 = (top_11 / bot_12);
+        float anf_108 = (u_time * 0.4);
+        float anf_109 = sin(anf_108);
+        float anf_110 = (anf_109 * 4.5);
+        float anf_111 = (anf_110 + 3.5);
+        float zoom_13 = exp(anf_111);
+        vec2 anf_112 = vec2(-0.7453, 0.1127);
+        vec2 anf_113 = (uv_10 / zoom_13);
+        vec2 seahorse_valley_14 = (anf_112 + anf_113);
+        v_option_float anf_114 = mandelbrot_0_vec2_to_v_option_float_83(seahorse_valley_14);
+        int _lv_tag_122 = anf_114.tag;
+        switch (_lv_tag_122) {
+            case 1: {
+                return vec3(0., 0., 0.);
+                break;
+            }
+            default: {
+                float n_15 = anf_114.Some_0;
+                vec3 anf_115 = vec3(10., 20., 30.);
+                vec3 anf_116 = (n_15 * anf_115);
+                vec3 anf_117 = (anf_116 + u_time);
+                vec3 anf_118 = sin(anf_117);
+                vec3 anf_119 = (anf_118 * 0.5);
+                return (anf_119 + 0.5);
+                break;
+            }
+        }
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+
+
     ====== COMPILING EXAMPLE mouse_circle.glml ======
 
     === stlc (mouse_circle.glml) ===
@@ -3541,6 +3825,44 @@ let%expect_test "compile examples" =
        (body
         ((set () vec3 color ((main_pure (. gl_FragCoord xy))))
          (set fragColor (clamp (vec4 (. color xyz) 1.) 0. 1.)))))))
+
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform vec2 u_resolution;
+    uniform vec2 u_mouse;
+    uniform float u_time;
+    vec2 get_uv_0_vec2_to_vec2_33(vec2 coord_1) {
+        vec2 anf_34 = (2. * coord_1);
+        vec2 top_2 = (anf_34 - u_resolution);
+        float anf_35 = u_resolution[0];
+        float anf_36 = u_resolution[1];
+        float bot_3 = min(anf_35, anf_36);
+        return (top_2 / bot_3);
+    }
+    vec3 main_pure(vec2 coord_4) {
+        vec2 uv_5 = get_uv_0_vec2_to_vec2_33(coord_4);
+        vec2 anf_37 = (2. * u_mouse);
+        vec2 anf_38 = (anf_37 - u_resolution);
+        float anf_39 = u_resolution[1];
+        vec2 mouseUV_6 = (anf_38 / anf_39);
+        float anf_40 = (u_time * 2.);
+        float anf_41 = sin(anf_40);
+        float anf_42 = (anf_41 * 0.1);
+        float radius_7 = (anf_42 + 0.15);
+        float anf_43 = distance(uv_5, mouseUV_6);
+        bool anf_44 = (anf_43 < radius_7);
+        if (anf_44) {
+            return vec3(0., 0., 0.5);
+        } else {
+            return vec3(0.5, 0.5, 1.);
+        }
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+
 
     ====== COMPILING EXAMPLE planet.glml ======
 
@@ -7546,6 +7868,283 @@ let%expect_test "compile examples" =
         ((set () vec3 color ((main_pure (. gl_FragCoord xy))))
          (set fragColor (clamp (vec4 (. color xyz) 1.) 0. 1.)))))))
 
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct v_option_float {
+        int tag;
+        float Some_0;
+    };
+    uniform vec2 u_resolution;
+    uniform float u_time;
+    uniform vec2 u_mouse;
+    vec2 rotate_0(vec2 p_1, float angle_2) {
+        float s_3 = sin(angle_2);
+        float c_4 = cos(angle_2);
+        float anf_321 = p_1[0];
+        float anf_322 = (anf_321 * c_4);
+        float anf_323 = p_1[1];
+        float anf_324 = (anf_323 * s_3);
+        float anf_325 = (anf_322 - anf_324);
+        float anf_326 = p_1[0];
+        float anf_327 = (anf_326 * s_3);
+        float anf_328 = p_1[1];
+        float anf_329 = (anf_328 * c_4);
+        float anf_330 = (anf_327 + anf_329);
+        return vec2(anf_325, anf_330);
+    }
+    float hash_10_318(vec3 p_11) {
+        vec3 anf_331 = vec3(127.1, 311.7, 74.7);
+        float d_12 = dot(p_11, anf_331);
+        float anf_332 = sin(d_12);
+        float anf_333 = (anf_332 * 43758.5453);
+        return fract(anf_333);
+    }
+    float noise3d_5(vec3 p_6) {
+        vec3 i_7 = floor(p_6);
+        vec3 f_8 = fract(p_6);
+        vec3 anf_334 = (f_8 * f_8);
+        vec3 anf_335 = (2. * f_8);
+        vec3 anf_336 = (3. - anf_335);
+        vec3 u_9 = (anf_334 * anf_336);
+        float a_13 = hash_10_318(i_7);
+        vec3 anf_337 = vec3(1., 0., 0.);
+        vec3 anf_338 = (i_7 + anf_337);
+        float b_14 = hash_10_318(anf_338);
+        vec3 anf_339 = vec3(0., 1., 0.);
+        vec3 anf_340 = (i_7 + anf_339);
+        float c_15 = hash_10_318(anf_340);
+        vec3 anf_341 = vec3(1., 1., 0.);
+        vec3 anf_342 = (i_7 + anf_341);
+        float d_16 = hash_10_318(anf_342);
+        vec3 anf_343 = vec3(0., 0., 1.);
+        vec3 anf_344 = (i_7 + anf_343);
+        float e_17 = hash_10_318(anf_344);
+        vec3 anf_345 = vec3(1., 0., 1.);
+        vec3 anf_346 = (i_7 + anf_345);
+        float f_18 = hash_10_318(anf_346);
+        vec3 anf_347 = vec3(0., 1., 1.);
+        vec3 anf_348 = (i_7 + anf_347);
+        float g_19 = hash_10_318(anf_348);
+        vec3 anf_349 = vec3(1., 1., 1.);
+        vec3 anf_350 = (i_7 + anf_349);
+        float h_20 = hash_10_318(anf_350);
+        float anf_351 = u_9[0];
+        float ab_21 = mix(a_13, b_14, anf_351);
+        float anf_352 = u_9[0];
+        float cd_22 = mix(c_15, d_16, anf_352);
+        float anf_353 = u_9[0];
+        float ef_23 = mix(e_17, f_18, anf_353);
+        float anf_354 = u_9[0];
+        float gh_24 = mix(g_19, h_20, anf_354);
+        float anf_355 = u_9[1];
+        float abcd_25 = mix(ab_21, cd_22, anf_355);
+        float anf_356 = u_9[1];
+        float efgh_26 = mix(ef_23, gh_24, anf_356);
+        float anf_357 = u_9[2];
+        return mix(abcd_25, efgh_26, anf_357);
+    }
+    float fbm_27(vec3 p_28) {
+        vec3 anf_358 = (p_28 * 1.);
+        float anf_359 = noise3d_5(anf_358);
+        float anf_360 = (anf_359 * 0.5);
+        vec3 anf_361 = (p_28 * 2.);
+        float anf_362 = noise3d_5(anf_361);
+        float anf_363 = (anf_362 * 0.25);
+        float anf_364 = (anf_360 + anf_363);
+        vec3 anf_365 = (p_28 * 4.);
+        float anf_366 = noise3d_5(anf_365);
+        float anf_367 = (anf_366 * 0.125);
+        float anf_368 = (anf_364 + anf_367);
+        vec3 anf_369 = (p_28 * 8.);
+        float anf_370 = noise3d_5(anf_369);
+        float anf_371 = (anf_370 * 0.0625);
+        float anf_372 = (anf_368 + anf_371);
+        vec3 anf_373 = (p_28 * 16.);
+        float anf_374 = noise3d_5(anf_373);
+        float anf_375 = (anf_374 * 0.03125);
+        return (anf_372 + anf_375);
+    }
+    float sdPlanet_29(vec3 p_30, float radius_31) {
+        float len_32 = length(p_30);
+        vec3 dir_33 = (p_30 / len_32);
+        vec3 anf_376 = (dir_33 * 3.);
+        float anf_377 = fbm_27(anf_376);
+        float terrain_34 = (anf_377 * 0.4);
+        float anf_378 = (len_32 - radius_31);
+        return (anf_378 - terrain_34);
+    }
+    float map_35(vec3 p_36) {
+        return sdPlanet_29(p_36, 1.5);
+    }
+    vec3 getNormal_37(vec3 p_38) {
+        float e_39 = 0.002;
+        vec3 e_x_40 = vec3(e_39, 0., 0.);
+        vec3 e_y_41 = vec3(0., e_39, 0.);
+        vec3 e_z_42 = vec3(0., 0., e_39);
+        vec3 anf_379 = (p_38 + e_x_40);
+        float anf_380 = map_35(anf_379);
+        vec3 anf_381 = (p_38 - e_x_40);
+        float anf_382 = map_35(anf_381);
+        float dx_43 = (anf_380 - anf_382);
+        vec3 anf_383 = (p_38 + e_y_41);
+        float anf_384 = map_35(anf_383);
+        vec3 anf_385 = (p_38 - e_y_41);
+        float anf_386 = map_35(anf_385);
+        float dy_44 = (anf_384 - anf_386);
+        vec3 anf_387 = (p_38 + e_z_42);
+        float anf_388 = map_35(anf_387);
+        vec3 anf_389 = (p_38 - e_z_42);
+        float anf_390 = map_35(anf_389);
+        float dz_45 = (anf_388 - anf_390);
+        vec3 anf_391 = vec3(dx_43, dy_44, dz_45);
+        return normalize(anf_391);
+    }
+    v_option_float march_49_319(vec3 rd_48, vec3 ro_47, float t_50, int steps_51) {
+        int _iter_448 = 0;
+        while ((_iter_448 < 1000)) {
+            bool anf_392 = (steps_51 > 120);
+            if (anf_392) {
+                return v_option_float(1, 0.);
+            } else {
+                vec3 anf_393 = (rd_48 * t_50);
+                vec3 anf_394 = (ro_47 + anf_393);
+                float d_52 = map_35(anf_394);
+                bool anf_395 = (d_52 < 0.0005);
+                if (anf_395) {
+                    return v_option_float(0, t_50);
+                } else {
+                    bool anf_396 = (t_50 > 50.);
+                    if (anf_396) {
+                        return v_option_float(1, 0.);
+                    } else {
+                        float anf_397 = (d_52 * 0.8);
+                        float anf_398 = (t_50 + anf_397);
+                        int anf_399 = (steps_51 + 1);
+                        rd_48 = rd_48;
+                        ro_47 = ro_47;
+                        t_50 = anf_398;
+                        steps_51 = anf_399;
+                        int _iter_inc_449 = (_iter_448 + 1);
+                        _iter_448 = _iter_inc_449;
+                        continue;
+                    }
+                }
+            }
+        }
+        v_option_float _tmp_451;
+        return _tmp_451;
+    }
+    v_option_float march_46(vec3 ro_47, vec3 rd_48) {
+        return march_49_319(rd_48, ro_47, 0., 0);
+    }
+    const vec3 deepColor_53 = vec3(0.02, 0.05, 0.2);
+    const vec3 landColor_54 = vec3(0.15, 0.35, 0.1);
+    const vec3 mountColor_55 = vec3(0.4, 0.3, 0.2);
+    const vec3 snowColor_56 = vec3(0.85, 0.85, 0.9);
+    vec3 rotate_by_mouse_61_vec3_to_vec3_317_320(vec2 mouseUV_60, vec3 ray_62) {
+        float anf_400 = mouseUV_60[1];
+        float anf_401 = (-1. * anf_400);
+        float rotX_63 = (anf_401 * 1.5);
+        float anf_402 = ray_62[1];
+        float anf_403 = ray_62[2];
+        vec2 anf_404 = vec2(anf_402, anf_403);
+        vec2 ro_yz_64 = rotate_0(anf_404, rotX_63);
+        float anf_405 = mouseUV_60[0];
+        float anf_406 = (-1. * anf_405);
+        float rotY_65 = (anf_406 * 1.5);
+        float anf_407 = ray_62[0];
+        float anf_408 = ro_yz_64[1];
+        vec2 anf_409 = vec2(anf_407, anf_408);
+        vec2 ro_xz_66 = rotate_0(anf_409, rotY_65);
+        float anf_410 = ro_xz_66[0];
+        float anf_411 = ro_yz_64[0];
+        float anf_412 = ro_xz_66[1];
+        return vec3(anf_410, anf_411, anf_412);
+    }
+    vec3 main_pure(vec2 coord_57) {
+        float anf_413 = u_resolution[0];
+        float anf_414 = u_resolution[1];
+        float res_min_58 = min(anf_413, anf_414);
+        vec2 anf_415 = (coord_57 * 2.);
+        vec2 anf_416 = (anf_415 - u_resolution);
+        vec2 uv_59 = (anf_416 / res_min_58);
+        vec2 anf_417 = (u_mouse * 2.);
+        vec2 anf_418 = (anf_417 - u_resolution);
+        vec2 mouseUV_60 = (anf_418 / res_min_58);
+        vec3 anf_419 = vec3(0., 0., -4.);
+        vec3 ro_67 = rotate_by_mouse_61_vec3_to_vec3_317_320(mouseUV_60, anf_419);
+        float anf_420 = uv_59[0];
+        float anf_421 = uv_59[1];
+        vec3 anf_422 = vec3(anf_420, anf_421, 1.5);
+        vec3 anf_423 = normalize(anf_422);
+        vec3 rd_68 = rotate_by_mouse_61_vec3_to_vec3_317_320(mouseUV_60, anf_423);
+        v_option_float t_69 = march_46(ro_67, rd_68);
+        int _lv_tag_450 = t_69.tag;
+        switch (_lv_tag_450) {
+            case 1: {
+                return vec3(0., 0., 0.);
+                break;
+            }
+            default: {
+                float t_70 = t_69.Some_0;
+                vec3 anf_424 = (rd_68 * t_70);
+                vec3 hitPos_71 = (ro_67 + anf_424);
+                vec3 n_72 = getNormal_37(hitPos_71);
+                vec3 anf_425 = vec3(1., 0.8, -0.5);
+                vec3 lightDir_73 = normalize(anf_425);
+                float anf_426 = dot(n_72, lightDir_73);
+                float diff_74 = max(anf_426, 0.);
+                float ambient_75 = 0.08;
+                float anf_427 = length(hitPos_71);
+                vec3 dir_76 = (hitPos_71 / anf_427);
+                vec3 anf_428 = (dir_76 * 3.);
+                float rawHeight_77 = fbm_27(anf_428);
+                float seaLevel_78 = 0.35;
+                float anf_429 = (rawHeight_77 - seaLevel_78);
+                float anf_430 = (1. - seaLevel_78);
+                float anf_431 = (anf_429 / anf_430);
+                float h_norm_79 = clamp(anf_431, 0., 1.);
+                bool anf_432 = (h_norm_79 < 0.3);
+                vec3 baseColor_80;
+                if (anf_432) {
+                    float anf_433 = (h_norm_79 / 0.3);
+                    baseColor_80 = mix(deepColor_53, landColor_54, anf_433);
+                } else {
+                    bool anf_434 = (h_norm_79 < 0.6);
+                    if (anf_434) {
+                        float anf_435 = (h_norm_79 - 0.3);
+                        float anf_436 = (anf_435 / 0.3);
+                        baseColor_80 = mix(landColor_54, mountColor_55, anf_436);
+                    } else {
+                        float anf_437 = (h_norm_79 - 0.6);
+                        float anf_438 = (anf_437 / 0.4);
+                        baseColor_80 = mix(mountColor_55, snowColor_56, anf_438);
+                    }
+                }
+                vec3 anf_439 = (rd_68 * -1.);
+                float anf_440 = dot(n_72, anf_439);
+                float anf_441 = max(anf_440, 0.);
+                float fresnel_81 = (1. - anf_441);
+                float anf_442 = (fresnel_81 * fresnel_81);
+                float anf_443 = (anf_442 * fresnel_81);
+                float rim_82 = (anf_443 * 0.4);
+                vec3 atmoColor_83 = vec3(0.3, 0.5, 1.);
+                float anf_444 = (diff_74 * 0.9);
+                float anf_445 = (anf_444 + ambient_75);
+                vec3 anf_446 = (baseColor_80 * anf_445);
+                vec3 anf_447 = (atmoColor_83 * rim_82);
+                return (anf_446 + anf_447);
+                break;
+            }
+        }
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+
+
     ====== COMPILING EXAMPLE rainbow.glml ======
 
     === stlc (rainbow.glml) ===
@@ -7923,6 +8522,38 @@ let%expect_test "compile examples" =
        (body
         ((set () vec3 color ((main_pure (. gl_FragCoord xy))))
          (set fragColor (clamp (vec4 (. color xyz) 1.) 0. 1.)))))))
+
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform vec2 u_resolution;
+    uniform float u_time;
+    vec2 get_uv_0_vec2_to_vec2_30(vec2 coord_1) {
+        vec2 anf_31 = (2. * coord_1);
+        vec2 top_2 = (anf_31 - u_resolution);
+        float anf_32 = u_resolution[0];
+        float anf_33 = u_resolution[1];
+        float bot_3 = min(anf_32, anf_33);
+        return (top_2 / bot_3);
+    }
+    vec3 main_pure(vec2 coord_4) {
+        vec2 uv_5 = get_uv_0_vec2_to_vec2_30(coord_4);
+        float anf_34 = uv_5[0];
+        float anf_35 = uv_5[1];
+        float anf_36 = (anf_34 + anf_35);
+        float anf_37 = (5. * anf_36);
+        float wave_6 = (anf_37 + u_time);
+        vec3 anf_38 = vec3(0., 2., 4.);
+        vec3 anf_39 = (wave_6 + anf_38);
+        vec3 anf_40 = sin(anf_39);
+        vec3 anf_41 = (anf_40 * 0.3);
+        return (anf_41 + 0.7);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+
 
     ====== COMPILING EXAMPLE raymarch.glml ======
 
@@ -10638,6 +11269,203 @@ let%expect_test "compile examples" =
         ((set () vec3 color ((main_pure (. gl_FragCoord xy))))
          (set fragColor (clamp (vec4 (. color xyz) 1.) 0. 1.)))))))
 
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct v_option_float {
+        int tag;
+        float Some_0;
+    };
+    uniform vec2 u_resolution;
+    uniform float u_time;
+    uniform vec2 u_mouse;
+    vec2 rotate_0(vec2 p_1, float angle_2) {
+        float s_3 = sin(angle_2);
+        float c_4 = cos(angle_2);
+        float anf_193 = p_1[0];
+        float anf_194 = (anf_193 * c_4);
+        float anf_195 = p_1[1];
+        float anf_196 = (anf_195 * s_3);
+        float anf_197 = (anf_194 - anf_196);
+        float anf_198 = p_1[0];
+        float anf_199 = (anf_198 * s_3);
+        float anf_200 = p_1[1];
+        float anf_201 = (anf_200 * c_4);
+        float anf_202 = (anf_199 + anf_201);
+        return vec2(anf_197, anf_202);
+    }
+    float sMin_5(float a_6, float b_7) {
+        float k_8 = 0.1;
+        float anf_203 = (b_7 - a_6);
+        float anf_204 = (0.5 * anf_203);
+        float anf_205 = (anf_204 / k_8);
+        float anf_206 = (0.5 + anf_205);
+        float h_9 = clamp(anf_206, 0., 1.);
+        float anf_207 = mix(b_7, a_6, h_9);
+        float anf_208 = (k_8 * h_9);
+        float anf_209 = (1. - h_9);
+        float anf_210 = (anf_208 * anf_209);
+        return (anf_207 - anf_210);
+    }
+    vec3 palette_10(float t_11) {
+        vec3 cfg_12 = vec3(0.3, 0.416, 0.557);
+        vec3 anf_211 = (cfg_12 + t_11);
+        vec3 anf_212 = (anf_211 * 6.28318);
+        vec3 anf_213 = cos(anf_212);
+        vec3 anf_214 = (anf_213 * 0.5);
+        return (anf_214 + 0.5);
+    }
+    float sdTorus_13(vec3 p_14, vec2 t_15) {
+        float anf_215 = p_14[0];
+        float anf_216 = p_14[2];
+        vec2 anf_217 = vec2(anf_215, anf_216);
+        float anf_218 = length(anf_217);
+        float anf_219 = t_15[0];
+        float anf_220 = (anf_218 - anf_219);
+        float anf_221 = p_14[1];
+        vec2 q_16 = vec2(anf_220, anf_221);
+        float anf_222 = length(q_16);
+        float anf_223 = t_15[1];
+        return (anf_222 - anf_223);
+    }
+    float map_17(vec3 p_18) {
+        float angle_19 = (u_time * 2.);
+        float anf_224 = p_18[0];
+        float anf_225 = p_18[1];
+        vec2 anf_226 = vec2(anf_224, anf_225);
+        vec2 p_xy_20 = rotate_0(anf_226, angle_19);
+        float anf_227 = p_xy_20[0];
+        float anf_228 = p_xy_20[1];
+        float anf_229 = p_18[2];
+        vec3 p_prime_21 = vec3(anf_227, anf_228, anf_229);
+        float anf_230 = p_prime_21[1];
+        float anf_231 = p_prime_21[2];
+        vec2 anf_232 = vec2(anf_230, anf_231);
+        vec2 p_yz_22 = rotate_0(anf_232, angle_19);
+        float anf_233 = p_prime_21[0];
+        float anf_234 = p_yz_22[0];
+        float anf_235 = p_yz_22[1];
+        vec3 p_prime_23 = vec3(anf_233, anf_234, anf_235);
+        vec2 anf_236 = vec2(1., 0.3);
+        float anf_237 = sdTorus_13(p_prime_23, anf_236);
+        vec2 anf_238 = vec2(2., 0.5);
+        float anf_239 = sdTorus_13(p_18, anf_238);
+        return sMin_5(anf_237, anf_239);
+    }
+    v_option_float march_27_192(vec3 rd_26, vec3 ro_25, float t_28, int steps_29) {
+        int _iter_286 = 0;
+        while ((_iter_286 < 1000)) {
+            bool anf_240 = (steps_29 > 80);
+            if (anf_240) {
+                return v_option_float(1, 0.);
+            } else {
+                vec3 anf_241 = (rd_26 * t_28);
+                vec3 anf_242 = (ro_25 + anf_241);
+                float d_30 = map_17(anf_242);
+                bool anf_243 = (d_30 < 0.001);
+                if (anf_243) {
+                    return v_option_float(0, t_28);
+                } else {
+                    bool anf_244 = (t_28 > 100.);
+                    if (anf_244) {
+                        return v_option_float(1, 0.);
+                    } else {
+                        float anf_245 = (t_28 + d_30);
+                        int anf_246 = (steps_29 + 1);
+                        rd_26 = rd_26;
+                        ro_25 = ro_25;
+                        t_28 = anf_245;
+                        steps_29 = anf_246;
+                        int _iter_inc_287 = (_iter_286 + 1);
+                        _iter_286 = _iter_inc_287;
+                        continue;
+                    }
+                }
+            }
+        }
+        v_option_float _tmp_289;
+        return _tmp_289;
+    }
+    v_option_float march_24(vec3 ro_25, vec3 rd_26) {
+        return march_27_192(rd_26, ro_25, 0., 0);
+    }
+    vec3 main_pure(vec2 coord_31) {
+        float anf_247 = u_resolution[0];
+        float anf_248 = u_resolution[1];
+        float res_min_32 = min(anf_247, anf_248);
+        vec2 anf_249 = (coord_31 * 2.);
+        vec2 anf_250 = (anf_249 - u_resolution);
+        vec2 uv_33 = (anf_250 / res_min_32);
+        vec2 anf_251 = (u_mouse * 2.);
+        vec2 anf_252 = (anf_251 - u_resolution);
+        vec2 mouseUV_34 = (anf_252 / res_min_32);
+        vec3 ro_init_35 = vec3(0., 0., -6.);
+        float anf_253 = uv_33[0];
+        float anf_254 = uv_33[1];
+        vec3 anf_255 = vec3(anf_253, anf_254, 1.);
+        vec3 rd_init_36 = normalize(anf_255);
+        float anf_256 = mouseUV_34[1];
+        float rotX_37 = (-1. * anf_256);
+        float anf_257 = mouseUV_34[0];
+        float rotY_38 = (-1. * anf_257);
+        float anf_258 = ro_init_35[1];
+        float anf_259 = ro_init_35[2];
+        vec2 anf_260 = vec2(anf_258, anf_259);
+        vec2 ro_yz_39 = rotate_0(anf_260, rotX_37);
+        float anf_261 = rd_init_36[1];
+        float anf_262 = rd_init_36[2];
+        vec2 anf_263 = vec2(anf_261, anf_262);
+        vec2 rd_yz_40 = rotate_0(anf_263, rotX_37);
+        float anf_264 = ro_init_35[0];
+        float anf_265 = ro_yz_39[0];
+        float anf_266 = ro_yz_39[1];
+        vec3 ro_41 = vec3(anf_264, anf_265, anf_266);
+        float anf_267 = rd_init_36[0];
+        float anf_268 = rd_yz_40[0];
+        float anf_269 = rd_yz_40[1];
+        vec3 rd_42 = vec3(anf_267, anf_268, anf_269);
+        float anf_270 = ro_41[0];
+        float anf_271 = ro_41[2];
+        vec2 anf_272 = vec2(anf_270, anf_271);
+        vec2 ro_xz_43 = rotate_0(anf_272, rotY_38);
+        float anf_273 = rd_42[0];
+        float anf_274 = rd_42[2];
+        vec2 anf_275 = vec2(anf_273, anf_274);
+        vec2 rd_xz_44 = rotate_0(anf_275, rotY_38);
+        float anf_276 = ro_xz_43[0];
+        float anf_277 = ro_41[1];
+        float anf_278 = ro_xz_43[1];
+        vec3 ro_45 = vec3(anf_276, anf_277, anf_278);
+        float anf_279 = rd_xz_44[0];
+        float anf_280 = rd_42[1];
+        float anf_281 = rd_xz_44[1];
+        vec3 rd_46 = vec3(anf_279, anf_280, anf_281);
+        v_option_float anf_282 = march_24(ro_45, rd_46);
+        int _lv_tag_288 = anf_282.tag;
+        vec3 col_47;
+        switch (_lv_tag_288) {
+            case 1: {
+                col_47 = vec3(0.2, 0.2, 0.2);
+                break;
+            }
+            default: {
+                float t_48 = anf_282.Some_0;
+                float anf_283 = (t_48 * 0.3);
+                col_47 = palette_10(anf_283);
+                break;
+            }
+        }
+        vec2 anf_284 = (uv_33 - mouseUV_34);
+        float anf_285 = length(anf_284);
+        float glow_49 = (0.02 / anf_285);
+        return (col_47 + glow_49);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+
+
     ====== COMPILING EXAMPLE recursion.glml ======
 
     === stlc (recursion.glml) ===
@@ -11498,6 +12326,84 @@ let%expect_test "compile examples" =
        (body
         ((set () vec3 color ((main_pure (. gl_FragCoord xy))))
          (set fragColor (clamp (vec4 (. color xyz) 1.) 0. 1.)))))))
+
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform vec2 u_resolution;
+    uniform float u_time;
+    vec2 get_uv_0(vec2 coord_1) {
+        vec2 anf_71 = (2. * coord_1);
+        vec2 top_2 = (anf_71 - u_resolution);
+        float anf_72 = u_resolution[0];
+        float anf_73 = u_resolution[1];
+        float bot_3 = min(anf_72, anf_73);
+        return (top_2 / bot_3);
+    }
+    mat2 rotate_4(float angle_5) {
+        float s_6 = sin(angle_5);
+        float c_7 = cos(angle_5);
+        float anf_74 = (-1. * s_6);
+        return mat2(c_7, anf_74, s_6, c_7);
+    }
+    float gcd_8_float_to_float_to_float_70(float a_9, float b_10) {
+        int _iter_93 = 0;
+        while ((_iter_93 < 1000)) {
+            bool anf_75 = (a_9 < 0.05);
+            if (anf_75) {
+                return b_10;
+            } else {
+                bool anf_76 = (b_10 < 0.05);
+                if (anf_76) {
+                    return a_9;
+                } else {
+                    bool anf_77 = (a_9 > b_10);
+                    if (anf_77) {
+                        float anf_78 = (a_9 - b_10);
+                        a_9 = anf_78;
+                        b_10 = b_10;
+                        int _iter_inc_94 = (_iter_93 + 1);
+                        _iter_93 = _iter_inc_94;
+                        continue;
+                    } else {
+                        float anf_79 = (b_10 - a_9);
+                        a_9 = a_9;
+                        b_10 = anf_79;
+                        int _iter_inc_95 = (_iter_93 + 1);
+                        _iter_93 = _iter_inc_95;
+                        continue;
+                    }
+                }
+            }
+        }
+        return 0.;
+    }
+    vec3 main_pure(vec2 coord_11) {
+        vec2 uv_12 = get_uv_0(coord_11);
+        mat2 anf_80 = rotate_4(u_time);
+        vec2 uv_13 = (anf_80 * uv_12);
+        float anf_81 = uv_13[0];
+        float anf_82 = (u_time * 2.);
+        float anf_83 = sin(anf_82);
+        float anf_84 = (anf_81 * anf_83);
+        float anf_85 = (anf_84 * 2.);
+        float x_14 = abs(anf_85);
+        float anf_86 = uv_13[1];
+        float anf_87 = (u_time * 2.);
+        float anf_88 = sin(anf_87);
+        float anf_89 = (anf_86 * anf_88);
+        float anf_90 = (anf_89 * 2.);
+        float y_15 = abs(anf_90);
+        float res_16 = gcd_8_float_to_float_to_float_70(x_14, y_15);
+        float anf_91 = (res_16 * 0.5);
+        float anf_92 = (1. - res_16);
+        return vec3(res_16, anf_91, anf_92);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+
 
     ====== COMPILING EXAMPLE warped_noise.glml ======
 
@@ -13655,5 +14561,150 @@ let%expect_test "compile examples" =
        (body
         ((set () vec3 color ((main_pure (. gl_FragCoord xy))))
          (set fragColor (clamp (vec4 (. color xyz) 1.) 0. 1.)))))))
+
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform vec2 u_resolution;
+    uniform float u_time;
+    float smoothNoise_0(vec2 p_1) {
+        vec2 i_2 = floor(p_1);
+        vec2 pf_3 = (p_1 - i_2);
+        vec2 anf_165 = (pf_3 * pf_3);
+        vec2 anf_166 = (2. * pf_3);
+        vec2 anf_167 = (3. - anf_166);
+        vec2 inter_4 = (anf_165 * anf_167);
+        vec4 v4_5 = vec4(0., 1., 27., 28.);
+        float anf_168 = i_2[0];
+        vec4 anf_169 = (v4_5 + anf_168);
+        float anf_170 = i_2[1];
+        float anf_171 = (anf_170 * 27.);
+        vec4 seed_6 = (anf_169 + anf_171);
+        vec4 anf_172 = mod(seed_6, 6.2831853);
+        vec4 anf_173 = sin(anf_172);
+        vec4 anf_174 = (anf_173 * 200000.);
+        vec4 hash_7 = fract(anf_174);
+        float anf_175 = hash_7[0];
+        float anf_176 = hash_7[1];
+        vec2 col0_8 = vec2(anf_175, anf_176);
+        float anf_177 = hash_7[2];
+        float anf_178 = hash_7[3];
+        vec2 col1_9 = vec2(anf_177, anf_178);
+        float anf_179 = inter_4[1];
+        float anf_180 = (1. - anf_179);
+        vec2 anf_181 = (col0_8 * anf_180);
+        float anf_182 = inter_4[1];
+        vec2 anf_183 = (col1_9 * anf_182);
+        vec2 res_v_10 = (anf_181 + anf_183);
+        float anf_184 = inter_4[0];
+        float anf_185 = (1. - anf_184);
+        float anf_186 = inter_4[0];
+        vec2 anf_187 = vec2(anf_185, anf_186);
+        return dot(res_v_10, anf_187);
+    }
+    float fractalNoise_11(vec2 p_12) {
+        float anf_188 = smoothNoise_0(p_12);
+        float anf_189 = (anf_188 * 0.5333);
+        vec2 anf_190 = (p_12 * 2.);
+        float anf_191 = smoothNoise_0(anf_190);
+        float anf_192 = (anf_191 * 0.2667);
+        float anf_193 = (anf_189 + anf_192);
+        vec2 anf_194 = (p_12 * 4.);
+        float anf_195 = smoothNoise_0(anf_194);
+        float anf_196 = (anf_195 * 0.1333);
+        float anf_197 = (anf_193 + anf_196);
+        vec2 anf_198 = (p_12 * 8.);
+        float anf_199 = smoothNoise_0(anf_198);
+        float anf_200 = (anf_199 * 0.0667);
+        return (anf_197 + anf_200);
+    }
+    float warpedNoise_13(vec2 p_14) {
+        float anf_201 = (-1. * u_time);
+        vec2 anf_202 = vec2(u_time, anf_201);
+        vec2 m_15 = (anf_202 * 0.5);
+        vec2 anf_203 = (p_14 + m_15);
+        float x_16 = fractalNoise_11(anf_203);
+        float anf_204 = m_15[1];
+        float anf_205 = m_15[0];
+        vec2 anf_206 = vec2(anf_204, anf_205);
+        vec2 anf_207 = (p_14 + anf_206);
+        vec2 anf_208 = (anf_207 + x_16);
+        float y_17 = fractalNoise_11(anf_208);
+        vec2 anf_209 = (p_14 - m_15);
+        vec2 anf_210 = (anf_209 - x_16);
+        vec2 anf_211 = (anf_210 + y_17);
+        float z_18 = fractalNoise_11(anf_211);
+        vec2 anf_212 = vec2(x_16, y_17);
+        vec2 anf_213 = vec2(y_17, z_18);
+        vec2 anf_214 = (anf_212 + anf_213);
+        vec2 anf_215 = vec2(z_18, x_16);
+        vec2 warp_19 = (anf_214 + anf_215);
+        vec3 anf_216 = vec3(x_16, y_17, z_18);
+        float anf_217 = length(anf_216);
+        float mag_20 = (anf_217 * 0.25);
+        vec2 anf_218 = (p_14 + warp_19);
+        vec2 anf_219 = (anf_218 + mag_20);
+        return fractalNoise_11(anf_219);
+    }
+    vec3 main_pure(vec2 coord_21) {
+        vec2 anf_220 = (u_resolution * 0.5);
+        vec2 anf_221 = (coord_21 - anf_220);
+        float anf_222 = u_resolution[1];
+        vec2 uv_22 = (anf_221 / anf_222);
+        vec2 anf_223 = (uv_22 * 6.);
+        float n_23 = warpedNoise_13(anf_223);
+        vec2 anf_224 = (uv_22 * 6.);
+        vec2 anf_225 = (anf_224 - 0.02);
+        float n2_24 = warpedNoise_13(anf_225);
+        float anf_226 = (n2_24 - n_23);
+        float anf_227 = max(anf_226, 0.);
+        float anf_228 = (anf_227 / 0.02);
+        float bump_25 = (anf_228 * 0.7071);
+        float anf_229 = (n_23 - n2_24);
+        float anf_230 = max(anf_229, 0.);
+        float anf_231 = (anf_230 / 0.02);
+        float bump2_26 = (anf_231 * 0.7071);
+        float anf_232 = (bump_25 * bump_25);
+        float anf_233 = pow(bump_25, 4.);
+        float anf_234 = (anf_233 * 0.5);
+        float b1_27 = (anf_232 + anf_234);
+        float anf_235 = (bump2_26 * bump2_26);
+        float anf_236 = pow(bump2_26, 4.);
+        float anf_237 = (anf_236 * 0.5);
+        float b2_28 = (anf_235 + anf_237);
+        vec3 anf_238 = vec3(1., 0.7, 0.6);
+        float anf_239 = (b1_27 + b2_28);
+        float anf_240 = (anf_239 * 0.4);
+        vec3 anf_241 = vec3(b1_27, anf_240, b2_28);
+        vec3 anf_242 = (anf_238 * anf_241);
+        vec3 anf_243 = (anf_242 * 0.3);
+        vec3 base_col_29 = (anf_243 + 0.5);
+        float anf_244 = (n_23 * n_23);
+        vec3 col_30 = (anf_244 * base_col_29);
+        vec2 anf_245 = (uv_22 - 0.65);
+        float spot1_dist_31 = length(anf_245);
+        vec2 anf_246 = (uv_22 + 0.5);
+        float spot2_dist_32 = length(anf_246);
+        vec3 anf_247 = vec3(0.8, 0.4, 1.);
+        vec3 anf_248 = (anf_247 * 0.35);
+        vec3 anf_249 = vec3(1., 0.5, 0.2);
+        float anf_250 = (1. - spot1_dist_31);
+        float anf_251 = smoothstep(0., 1., anf_250);
+        vec3 anf_252 = (anf_249 * anf_251);
+        vec3 anf_253 = vec3(0.2, 0.4, 1.);
+        float anf_254 = (1. - spot2_dist_32);
+        float anf_255 = smoothstep(0., 1., anf_254);
+        vec3 anf_256 = (anf_253 * anf_255);
+        vec3 anf_257 = (anf_252 + anf_256);
+        vec3 anf_258 = (anf_257 * 5.);
+        vec3 spot_logic_33 = (anf_248 + anf_258);
+        vec3 final_col_34 = (col_30 * spot_logic_33);
+        vec3 anf_259 = max(final_col_34, 0.);
+        return sqrt(anf_259);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
     |}]
 ;;
