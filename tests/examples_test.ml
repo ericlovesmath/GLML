@@ -27,33 +27,37 @@ let%expect_test "compile examples" =
     === stlc (2d_sdf_variants.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern (vec 2) u_mouse)
-      (Extern float u_time)
+      (Extern float u_time) (TypeDef sdf (AliasDecl ((vec 2) -> float)))
       (TypeDef shape
        (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
-      (Define Nonrec sdf
+      (Define Nonrec sdf_shape (: (shape -> sdf))
        (lambda (s (shape))
-        (lambda (p ((vec 2)))
+        (lambda (p ())
          (match s ((Circle r) (- (length p) r))
           ((Rect w h)
            (let d (- (abs p) (vec2 w h))
-            (+ (length (max d (vec2 0 0)))
-             (min (max (index d 0) (index d 1)) 0.))))
+            (+ (length (max d (vec2 0 0))) (min (max (index d 0) (index d 1)) 0))))
           ((Empty) 1.)))))
-      (Define Nonrec scene
-       (lambda (p ((vec 2)))
-        (let circle (app (app sdf (Variant Circle 0.3)) p)
-         (let rect (app (app sdf (Variant Rect 0.7 0.1)) p) (min circle rect)))))
+      (Define Nonrec union (: (sdf -> (sdf -> sdf)))
+       (lambda (f (sdf))
+        (lambda (f' (sdf)) (lambda (p ()) (min (app f p) (app f' p))))))
+      (Define Nonrec scene (: sdf)
+       (let circle (app sdf_shape (Variant Circle 0.3))
+        (let rect (app sdf_shape (Variant Rect 0.7 0.1))
+         (app (app union circle) rect))))
       (Define Nonrec get_uv
        (lambda (coord ())
         (let top (- (* 2 coord) u_resolution)
          (let bot (min (index u_resolution 0) (index u_resolution 1))
           (/ top bot)))))
+      (Define Nonrec orange (vec3 0.9 0.6 0.3))
+      (Define Nonrec blue (vec3 0.65 0.85 1.))
       (Define Nonrec main
        (lambda (coord ((vec 2)))
         (let p (app get_uv coord)
          (let m (app get_uv u_mouse)
           (let d (app scene p)
-           (let col (if (> d 0) (vec3 0.9 0.6 0.3) (vec3 0.65 0.85 1.))
+           (let col (if (> d 0) orange blue)
             (let col
              (let darken (- 1 (exp (* -6 (abs d))))
               (let rings (+ 0.8 (* 0.2 (cos (* 150 d))))
@@ -69,46 +73,51 @@ let%expect_test "compile examples" =
     === uniquify (2d_sdf_variants.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern (vec 2) u_mouse)
-      (Extern float u_time)
+      (Extern float u_time) (TypeDef sdf (AliasDecl ((vec 2) -> float)))
       (TypeDef shape
        (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
-      (Define Nonrec sdf_0
+      (Define Nonrec sdf_shape_0 (: (shape -> sdf))
        (lambda (s_1 (shape))
-        (lambda (p_2 ((vec 2)))
+        (lambda (p_2 ())
          (match s_1 ((Circle r_3) (- (length p_2) r_3))
           ((Rect w_4 h_5)
            (let d_6 (- (abs p_2) (vec2 w_4 h_5))
             (+ (length (max d_6 (vec2 0 0)))
-             (min (max (index d_6 0) (index d_6 1)) 0.))))
+             (min (max (index d_6 0) (index d_6 1)) 0))))
           ((Empty) 1.)))))
-      (Define Nonrec scene_7
-       (lambda (p_8 ((vec 2)))
-        (let circle_9 (app (app sdf_0 (Variant Circle 0.3)) p_8)
-         (let rect_10 (app (app sdf_0 (Variant Rect 0.7 0.1)) p_8)
-          (min circle_9 rect_10)))))
-      (Define Nonrec get_uv_11
-       (lambda (coord_12 ())
-        (let top_13 (- (* 2 coord_12) u_resolution)
-         (let bot_14 (min (index u_resolution 0) (index u_resolution 1))
-          (/ top_13 bot_14)))))
+      (Define Nonrec union_7 (: (sdf -> (sdf -> sdf)))
+       (lambda (f_8 (sdf))
+        (lambda (f_prime_9 (sdf))
+         (lambda (p_10 ()) (min (app f_8 p_10) (app f_prime_9 p_10))))))
+      (Define Nonrec scene_11 (: sdf)
+       (let circle_12 (app sdf_shape_0 (Variant Circle 0.3))
+        (let rect_13 (app sdf_shape_0 (Variant Rect 0.7 0.1))
+         (app (app union_7 circle_12) rect_13))))
+      (Define Nonrec get_uv_14
+       (lambda (coord_15 ())
+        (let top_16 (- (* 2 coord_15) u_resolution)
+         (let bot_17 (min (index u_resolution 0) (index u_resolution 1))
+          (/ top_16 bot_17)))))
+      (Define Nonrec orange_18 (vec3 0.9 0.6 0.3))
+      (Define Nonrec blue_19 (vec3 0.65 0.85 1.))
       (Define Nonrec main
-       (lambda (coord_15 ((vec 2)))
-        (let p_16 (app get_uv_11 coord_15)
-         (let m_17 (app get_uv_11 u_mouse)
-          (let d_18 (app scene_7 p_16)
-           (let col_19 (if (> d_18 0) (vec3 0.9 0.6 0.3) (vec3 0.65 0.85 1.))
-            (let col_20
-             (let darken_21 (- 1 (exp (* -6 (abs d_18))))
-              (let rings_22 (+ 0.8 (* 0.2 (cos (* 150 d_18))))
-               (* (* col_19 darken_21) rings_22)))
-             (let col_23
-              (mix col_20 (vec3 1 1 1) (- 1 (smoothstep 0 0.01 (abs d_18))))
-              (let col_24
-               (let d_25 (abs (app scene_7 m_17))
-                (let dm_26 (length (- p_16 m_17))
-                 (let d_27 (min (- (abs (- dm_26 d_25)) 0.0025) (- dm_26 0.015))
-                  (mix col_23 (vec3 1 1 0) (- 1 (smoothstep 0 0.005 d_27))))))
-               col_24)))))))))))
+       (lambda (coord_20 ((vec 2)))
+        (let p_21 (app get_uv_14 coord_20)
+         (let m_22 (app get_uv_14 u_mouse)
+          (let d_23 (app scene_11 p_21)
+           (let col_24 (if (> d_23 0) orange_18 blue_19)
+            (let col_25
+             (let darken_26 (- 1 (exp (* -6 (abs d_23))))
+              (let rings_27 (+ 0.8 (* 0.2 (cos (* 150 d_23))))
+               (* (* col_24 darken_26) rings_27)))
+             (let col_28
+              (mix col_25 (vec3 1 1 1) (- 1 (smoothstep 0 0.01 (abs d_23))))
+              (let col_29
+               (let d_30 (abs (app scene_11 m_22))
+                (let dm_31 (length (- p_21 m_22))
+                 (let d_32 (min (- (abs (- dm_31 d_30)) 0.0025) (- dm_31 0.015))
+                  (mix col_28 (vec3 1 1 0) (- 1 (smoothstep 0 0.005 d_32))))))
+               col_29)))))))))))
 
     === typecheck (2d_sdf_variants.glml) ===
     (Program
@@ -117,7 +126,7 @@ let%expect_test "compile examples" =
       ((TypeDef shape
         (VariantDecl () ((Circle (float)) (Rect (float float)) (Empty ()))))
        : shape)
-      ((Define Nonrec sdf_0
+      ((Define Nonrec sdf_shape_0
         ((lambda s_1
           ((lambda p_2
             ((match (s_1 : shape)
@@ -138,7 +147,7 @@ let%expect_test "compile examples" =
                      ((max ((index (d_6 : (vec 2)) 0) : float)
                        ((index (d_6 : (vec 2)) 1) : float))
                       : float)
-                     (0. : float))
+                     (0 : int))
                     : float))
                   : float))
                 : float))
@@ -147,123 +156,139 @@ let%expect_test "compile examples" =
            : ((vec 2) -> float)))
          : (shape -> ((vec 2) -> float))))
        : (shape -> ((vec 2) -> float)))
-      ((Define Nonrec scene_7
-        ((lambda p_8
-          ((let circle_9
+      ((Define Nonrec union_7
+        ((lambda f_8
+          ((lambda f_prime_9
+            ((lambda p_10
+              ((min ((app (f_8 : ((vec 2) -> float)) (p_10 : (vec 2))) : float)
+                ((app (f_prime_9 : ((vec 2) -> float)) (p_10 : (vec 2))) : float))
+               : float))
+             : ((vec 2) -> float)))
+           : (((vec 2) -> float) -> ((vec 2) -> float))))
+         : (((vec 2) -> float) -> (((vec 2) -> float) -> ((vec 2) -> float)))))
+       : (((vec 2) -> float) -> (((vec 2) -> float) -> ((vec 2) -> float))))
+      ((Define Nonrec scene_11
+        ((let circle_12
+          ((app (sdf_shape_0 : (shape -> ((vec 2) -> float)))
+            ((Variant shape Circle (0.3 : float)) : shape))
+           : ((vec 2) -> float))
+          ((let rect_13
+            ((app (sdf_shape_0 : (shape -> ((vec 2) -> float)))
+              ((Variant shape Rect (0.7 : float) (0.1 : float)) : shape))
+             : ((vec 2) -> float))
             ((app
-              ((app (sdf_0 : (shape -> ((vec 2) -> float)))
-                ((Variant shape Circle (0.3 : float)) : shape))
-               : ((vec 2) -> float))
-              (p_8 : (vec 2)))
-             : float)
-            ((let rect_10
               ((app
-                ((app (sdf_0 : (shape -> ((vec 2) -> float)))
-                  ((Variant shape Rect (0.7 : float) (0.1 : float)) : shape))
-                 : ((vec 2) -> float))
-                (p_8 : (vec 2)))
-               : float)
-              ((min (circle_9 : float) (rect_10 : float)) : float))
-             : float))
-           : float))
+                (union_7 :
+                 (((vec 2) -> float) ->
+                  (((vec 2) -> float) -> ((vec 2) -> float))))
+                (circle_12 : ((vec 2) -> float)))
+               : (((vec 2) -> float) -> ((vec 2) -> float)))
+              (rect_13 : ((vec 2) -> float)))
+             : ((vec 2) -> float)))
+           : ((vec 2) -> float)))
          : ((vec 2) -> float)))
        : ((vec 2) -> float))
-      ((Define Nonrec get_uv_11
-        ((lambda coord_12
-          ((let top_13
-            ((- ((* (2 : int) (coord_12 : 'v_55)) : 'v_56)
+      ((Define Nonrec get_uv_14
+        ((lambda coord_15
+          ((let top_16
+            ((- ((* (2 : int) (coord_15 : 'v_64)) : 'v_65)
               (u_resolution : (vec 2)))
-             : 'v_57)
-            ((let bot_14
+             : 'v_66)
+            ((let bot_17
               ((min ((index (u_resolution : (vec 2)) 0) : float)
                 ((index (u_resolution : (vec 2)) 1) : float))
                : float)
-              ((/ (top_13 : 'v_57) (bot_14 : float)) : 'v_62))
-             : 'v_62))
-           : 'v_62))
-         : ('v_55 -> 'v_62)))
+              ((/ (top_16 : 'v_66) (bot_17 : float)) : 'v_71))
+             : 'v_71))
+           : 'v_71))
+         : ('v_64 -> 'v_71)))
        :
        (forall
-        ((Broadcast 'v_56 (vec 2) 'v_57) (MulBroadcast int 'v_55 'v_56)
-         (MulBroadcast 'v_57 float 'v_62))
-        ('v_55 -> 'v_62)))
+        ((Broadcast 'v_65 (vec 2) 'v_66) (MulBroadcast int 'v_64 'v_65)
+         (MulBroadcast 'v_66 float 'v_71))
+        ('v_64 -> 'v_71)))
+      ((Define Nonrec orange_18
+        ((vec3 (0.9 : float) (0.6 : float) (0.3 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec blue_19
+        ((vec3 (0.65 : float) (0.85 : float) (1. : float)) : (vec 3)))
+       : (vec 3))
       ((Define Nonrec main
-        ((lambda coord_15
-          ((let p_16
-            ((app (get_uv_11 : ((vec 2) -> (vec 2))) (coord_15 : (vec 2))) :
+        ((lambda coord_20
+          ((let p_21
+            ((app (get_uv_14 : ((vec 2) -> (vec 2))) (coord_20 : (vec 2))) :
              (vec 2))
-            ((let m_17
-              ((app (get_uv_11 : ((vec 2) -> (vec 2))) (u_mouse : (vec 2))) :
+            ((let m_22
+              ((app (get_uv_14 : ((vec 2) -> (vec 2))) (u_mouse : (vec 2))) :
                (vec 2))
-              ((let d_18
-                ((app (scene_7 : ((vec 2) -> float)) (p_16 : (vec 2))) : float)
-                ((let col_19
-                  ((if ((> (d_18 : float) (0 : int)) : bool)
-                    ((vec3 (0.9 : float) (0.6 : float) (0.3 : float)) : (vec 3))
-                    ((vec3 (0.65 : float) (0.85 : float) (1. : float)) : (vec 3)))
+              ((let d_23
+                ((app (scene_11 : ((vec 2) -> float)) (p_21 : (vec 2))) : float)
+                ((let col_24
+                  ((if ((> (d_23 : float) (0 : int)) : bool)
+                    (orange_18 : (vec 3)) (blue_19 : (vec 3)))
                    : (vec 3))
-                  ((let col_20
-                    ((let darken_21
+                  ((let col_25
+                    ((let darken_26
                       ((- (1 : int)
                         ((exp
-                          ((* (-6 : int) ((abs (d_18 : float)) : float)) : float))
+                          ((* (-6 : int) ((abs (d_23 : float)) : float)) : float))
                          : float))
                        : float)
-                      ((let rings_22
+                      ((let rings_27
                         ((+ (0.8 : float)
                           ((* (0.2 : float)
-                            ((cos ((* (150 : int) (d_18 : float)) : float)) :
+                            ((cos ((* (150 : int) (d_23 : float)) : float)) :
                              float))
                            : float))
                          : float)
                         ((*
-                          ((* (col_19 : (vec 3)) (darken_21 : float)) : (vec 3))
-                          (rings_22 : float))
+                          ((* (col_24 : (vec 3)) (darken_26 : float)) : (vec 3))
+                          (rings_27 : float))
                          : (vec 3)))
                        : (vec 3)))
                      : (vec 3))
-                    ((let col_23
-                      ((mix (col_20 : (vec 3))
+                    ((let col_28
+                      ((mix (col_25 : (vec 3))
                         ((vec3 (1 : int) (1 : int) (1 : int)) : (vec 3))
                         ((- (1 : int)
                           ((smoothstep (0 : int) (0.01 : float)
-                            ((abs (d_18 : float)) : float))
+                            ((abs (d_23 : float)) : float))
                            : float))
                          : float))
                        : (vec 3))
-                      ((let col_24
-                        ((let d_25
+                      ((let col_29
+                        ((let d_30
                           ((abs
-                            ((app (scene_7 : ((vec 2) -> float))
-                              (m_17 : (vec 2)))
+                            ((app (scene_11 : ((vec 2) -> float))
+                              (m_22 : (vec 2)))
                              : float))
                            : float)
-                          ((let dm_26
+                          ((let dm_31
                             ((length
-                              ((- (p_16 : (vec 2)) (m_17 : (vec 2))) : (vec 2)))
+                              ((- (p_21 : (vec 2)) (m_22 : (vec 2))) : (vec 2)))
                              : float)
-                            ((let d_27
+                            ((let d_32
                               ((min
                                 ((-
                                   ((abs
-                                    ((- (dm_26 : float) (d_25 : float)) : float))
+                                    ((- (dm_31 : float) (d_30 : float)) : float))
                                    : float)
                                   (0.0025 : float))
                                  : float)
-                                ((- (dm_26 : float) (0.015 : float)) : float))
+                                ((- (dm_31 : float) (0.015 : float)) : float))
                                : float)
-                              ((mix (col_23 : (vec 3))
+                              ((mix (col_28 : (vec 3))
                                 ((vec3 (1 : int) (1 : int) (0 : int)) : (vec 3))
                                 ((- (1 : int)
                                   ((smoothstep (0 : int) (0.005 : float)
-                                    (d_27 : float))
+                                    (d_32 : float))
                                    : float))
                                  : float))
                                : (vec 3)))
                              : (vec 3)))
                            : (vec 3)))
                          : (vec 3))
-                        (col_24 : (vec 3)))
+                        (col_29 : (vec 3)))
                        : (vec 3)))
                      : (vec 3)))
                    : (vec 3)))
@@ -281,7 +306,7 @@ let%expect_test "compile examples" =
       ((TypeDef shape
         (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
        : shape)
-      ((Define Nonrec sdf_0
+      ((Define Nonrec sdf_shape_0
         ((lambda s_1
           ((lambda p_2
             ((match (s_1 : shape)
@@ -302,7 +327,7 @@ let%expect_test "compile examples" =
                      ((max ((index (d_6 : (vec 2)) 0) : float)
                        ((index (d_6 : (vec 2)) 1) : float))
                       : float)
-                     (0. : float))
+                     (0 : int))
                     : float))
                   : float))
                 : float))
@@ -311,121 +336,137 @@ let%expect_test "compile examples" =
            : ((vec 2) -> float)))
          : (shape -> ((vec 2) -> float))))
        : (shape -> ((vec 2) -> float)))
-      ((Define Nonrec scene_7
-        ((lambda p_8
-          ((let circle_9
+      ((Define Nonrec union_7
+        ((lambda f_8
+          ((lambda f_prime_9
+            ((lambda p_10
+              ((min ((app (f_8 : ((vec 2) -> float)) (p_10 : (vec 2))) : float)
+                ((app (f_prime_9 : ((vec 2) -> float)) (p_10 : (vec 2))) : float))
+               : float))
+             : ((vec 2) -> float)))
+           : (((vec 2) -> float) -> ((vec 2) -> float))))
+         : (((vec 2) -> float) -> (((vec 2) -> float) -> ((vec 2) -> float)))))
+       : (((vec 2) -> float) -> (((vec 2) -> float) -> ((vec 2) -> float))))
+      ((Define Nonrec scene_11
+        ((let circle_12
+          ((app (sdf_shape_0 : (shape -> ((vec 2) -> float)))
+            ((Variant shape Circle (0.3 : float)) : shape))
+           : ((vec 2) -> float))
+          ((let rect_13
+            ((app (sdf_shape_0 : (shape -> ((vec 2) -> float)))
+              ((Variant shape Rect (0.7 : float) (0.1 : float)) : shape))
+             : ((vec 2) -> float))
             ((app
-              ((app (sdf_0 : (shape -> ((vec 2) -> float)))
-                ((Variant shape Circle (0.3 : float)) : shape))
-               : ((vec 2) -> float))
-              (p_8 : (vec 2)))
-             : float)
-            ((let rect_10
               ((app
-                ((app (sdf_0 : (shape -> ((vec 2) -> float)))
-                  ((Variant shape Rect (0.7 : float) (0.1 : float)) : shape))
-                 : ((vec 2) -> float))
-                (p_8 : (vec 2)))
-               : float)
-              ((min (circle_9 : float) (rect_10 : float)) : float))
-             : float))
-           : float))
+                (union_7 :
+                 (((vec 2) -> float) ->
+                  (((vec 2) -> float) -> ((vec 2) -> float))))
+                (circle_12 : ((vec 2) -> float)))
+               : (((vec 2) -> float) -> ((vec 2) -> float)))
+              (rect_13 : ((vec 2) -> float)))
+             : ((vec 2) -> float)))
+           : ((vec 2) -> float)))
          : ((vec 2) -> float)))
        : ((vec 2) -> float))
-      ((Define Nonrec get_uv_11_vec2_to_vec2_118
-        ((lambda coord_12
-          ((let top_13
-            ((- ((* (2 : int) (coord_12 : (vec 2))) : (vec 2))
+      ((Define Nonrec orange_18
+        ((vec3 (0.9 : float) (0.6 : float) (0.3 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec blue_19
+        ((vec3 (0.65 : float) (0.85 : float) (1. : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec get_uv_14_vec2_to_vec2_127
+        ((lambda coord_15
+          ((let top_16
+            ((- ((* (2 : int) (coord_15 : (vec 2))) : (vec 2))
               (u_resolution : (vec 2)))
              : (vec 2))
-            ((let bot_14
+            ((let bot_17
               ((min ((index (u_resolution : (vec 2)) 0) : float)
                 ((index (u_resolution : (vec 2)) 1) : float))
                : float)
-              ((/ (top_13 : (vec 2)) (bot_14 : float)) : (vec 2)))
+              ((/ (top_16 : (vec 2)) (bot_17 : float)) : (vec 2)))
              : (vec 2)))
            : (vec 2)))
          : ((vec 2) -> (vec 2))))
        : ((vec 2) -> (vec 2)))
       ((Define Nonrec main
-        ((lambda coord_15
-          ((let p_16
-            ((app (get_uv_11_vec2_to_vec2_118 : ((vec 2) -> (vec 2)))
-              (coord_15 : (vec 2)))
+        ((lambda coord_20
+          ((let p_21
+            ((app (get_uv_14_vec2_to_vec2_127 : ((vec 2) -> (vec 2)))
+              (coord_20 : (vec 2)))
              : (vec 2))
-            ((let m_17
-              ((app (get_uv_11_vec2_to_vec2_118 : ((vec 2) -> (vec 2)))
+            ((let m_22
+              ((app (get_uv_14_vec2_to_vec2_127 : ((vec 2) -> (vec 2)))
                 (u_mouse : (vec 2)))
                : (vec 2))
-              ((let d_18
-                ((app (scene_7 : ((vec 2) -> float)) (p_16 : (vec 2))) : float)
-                ((let col_19
-                  ((if ((> (d_18 : float) (0 : int)) : bool)
-                    ((vec3 (0.9 : float) (0.6 : float) (0.3 : float)) : (vec 3))
-                    ((vec3 (0.65 : float) (0.85 : float) (1. : float)) : (vec 3)))
+              ((let d_23
+                ((app (scene_11 : ((vec 2) -> float)) (p_21 : (vec 2))) : float)
+                ((let col_24
+                  ((if ((> (d_23 : float) (0 : int)) : bool)
+                    (orange_18 : (vec 3)) (blue_19 : (vec 3)))
                    : (vec 3))
-                  ((let col_20
-                    ((let darken_21
+                  ((let col_25
+                    ((let darken_26
                       ((- (1 : int)
                         ((exp
-                          ((* (-6 : int) ((abs (d_18 : float)) : float)) : float))
+                          ((* (-6 : int) ((abs (d_23 : float)) : float)) : float))
                          : float))
                        : float)
-                      ((let rings_22
+                      ((let rings_27
                         ((+ (0.8 : float)
                           ((* (0.2 : float)
-                            ((cos ((* (150 : int) (d_18 : float)) : float)) :
+                            ((cos ((* (150 : int) (d_23 : float)) : float)) :
                              float))
                            : float))
                          : float)
                         ((*
-                          ((* (col_19 : (vec 3)) (darken_21 : float)) : (vec 3))
-                          (rings_22 : float))
+                          ((* (col_24 : (vec 3)) (darken_26 : float)) : (vec 3))
+                          (rings_27 : float))
                          : (vec 3)))
                        : (vec 3)))
                      : (vec 3))
-                    ((let col_23
-                      ((mix (col_20 : (vec 3))
+                    ((let col_28
+                      ((mix (col_25 : (vec 3))
                         ((vec3 (1 : int) (1 : int) (1 : int)) : (vec 3))
                         ((- (1 : int)
                           ((smoothstep (0 : int) (0.01 : float)
-                            ((abs (d_18 : float)) : float))
+                            ((abs (d_23 : float)) : float))
                            : float))
                          : float))
                        : (vec 3))
-                      ((let col_24
-                        ((let d_25
+                      ((let col_29
+                        ((let d_30
                           ((abs
-                            ((app (scene_7 : ((vec 2) -> float))
-                              (m_17 : (vec 2)))
+                            ((app (scene_11 : ((vec 2) -> float))
+                              (m_22 : (vec 2)))
                              : float))
                            : float)
-                          ((let dm_26
+                          ((let dm_31
                             ((length
-                              ((- (p_16 : (vec 2)) (m_17 : (vec 2))) : (vec 2)))
+                              ((- (p_21 : (vec 2)) (m_22 : (vec 2))) : (vec 2)))
                              : float)
-                            ((let d_27
+                            ((let d_32
                               ((min
                                 ((-
                                   ((abs
-                                    ((- (dm_26 : float) (d_25 : float)) : float))
+                                    ((- (dm_31 : float) (d_30 : float)) : float))
                                    : float)
                                   (0.0025 : float))
                                  : float)
-                                ((- (dm_26 : float) (0.015 : float)) : float))
+                                ((- (dm_31 : float) (0.015 : float)) : float))
                                : float)
-                              ((mix (col_23 : (vec 3))
+                              ((mix (col_28 : (vec 3))
                                 ((vec3 (1 : int) (1 : int) (0 : int)) : (vec 3))
                                 ((- (1 : int)
                                   ((smoothstep (0 : int) (0.005 : float)
-                                    (d_27 : float))
+                                    (d_32 : float))
                                    : float))
                                  : float))
                                : (vec 3)))
                              : (vec 3)))
                            : (vec 3)))
                          : (vec 3))
-                        (col_24 : (vec 3)))
+                        (col_29 : (vec 3)))
                        : (vec 3)))
                      : (vec 3)))
                    : (vec 3)))
@@ -443,45 +484,51 @@ let%expect_test "compile examples" =
       ((TypeDef shape
         (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
        : shape)
-      ((Define Nonrec sdf_0
+      ((Define Nonrec sdf_shape_0
         (lambda ((s_1 shape) (p_2 (vec 2)))
          (match s_1 ((Circle r_3) (- (length p_2) r_3))
           ((Rect w_4 h_5)
            (let d_6 (- (abs p_2) (vec2 w_4 h_5))
             (+ (length (max d_6 (vec2 0 0)))
-             (min (max (index d_6 0) (index d_6 1)) 0.))))
+             (min (max (index d_6 0) (index d_6 1)) 0))))
           ((Empty) 1.))))
        : (shape -> ((vec 2) -> float)))
-      ((Define Nonrec scene_7
-        (lambda ((p_8 (vec 2)))
-         (let circle_9 (app sdf_0 (Variant shape Circle 0.3) p_8)
-          (let rect_10 (app sdf_0 (Variant shape Rect 0.7 0.1) p_8)
-           (min circle_9 rect_10)))))
+      ((Define Nonrec union_7
+        (lambda
+         ((f_8 ((vec 2) -> float)) (f_prime_9 ((vec 2) -> float)) (p_10 (vec 2)))
+         (min (app f_8 p_10) (app f_prime_9 p_10))))
+       : (((vec 2) -> float) -> (((vec 2) -> float) -> ((vec 2) -> float))))
+      ((Define Nonrec scene_11
+        (let circle_12 (app sdf_shape_0 (Variant shape Circle 0.3))
+         (let rect_13 (app sdf_shape_0 (Variant shape Rect 0.7 0.1))
+          (app union_7 circle_12 rect_13))))
        : ((vec 2) -> float))
-      ((Define Nonrec get_uv_11_vec2_to_vec2_118
-        (lambda ((coord_12 (vec 2)))
-         (let top_13 (- (* 2 coord_12) u_resolution)
-          (let bot_14 (min (index u_resolution 0) (index u_resolution 1))
-           (/ top_13 bot_14)))))
+      ((Define Nonrec orange_18 (vec3 0.9 0.6 0.3)) : (vec 3))
+      ((Define Nonrec blue_19 (vec3 0.65 0.85 1.)) : (vec 3))
+      ((Define Nonrec get_uv_14_vec2_to_vec2_127
+        (lambda ((coord_15 (vec 2)))
+         (let top_16 (- (* 2 coord_15) u_resolution)
+          (let bot_17 (min (index u_resolution 0) (index u_resolution 1))
+           (/ top_16 bot_17)))))
        : ((vec 2) -> (vec 2)))
       ((Define Nonrec main
-        (lambda ((coord_15 (vec 2)))
-         (let p_16 (app get_uv_11_vec2_to_vec2_118 coord_15)
-          (let m_17 (app get_uv_11_vec2_to_vec2_118 u_mouse)
-           (let d_18 (app scene_7 p_16)
-            (let col_19 (if (> d_18 0) (vec3 0.9 0.6 0.3) (vec3 0.65 0.85 1.))
-             (let col_20
-              (let darken_21 (- 1 (exp (* -6 (abs d_18))))
-               (let rings_22 (+ 0.8 (* 0.2 (cos (* 150 d_18))))
-                (* (* col_19 darken_21) rings_22)))
-              (let col_23
-               (mix col_20 (vec3 1 1 1) (- 1 (smoothstep 0 0.01 (abs d_18))))
-               (let col_24
-                (let d_25 (abs (app scene_7 m_17))
-                 (let dm_26 (length (- p_16 m_17))
-                  (let d_27 (min (- (abs (- dm_26 d_25)) 0.0025) (- dm_26 0.015))
-                   (mix col_23 (vec3 1 1 0) (- 1 (smoothstep 0 0.005 d_27))))))
-                col_24)))))))))
+        (lambda ((coord_20 (vec 2)))
+         (let p_21 (app get_uv_14_vec2_to_vec2_127 coord_20)
+          (let m_22 (app get_uv_14_vec2_to_vec2_127 u_mouse)
+           (let d_23 (app scene_11 p_21)
+            (let col_24 (if (> d_23 0) orange_18 blue_19)
+             (let col_25
+              (let darken_26 (- 1 (exp (* -6 (abs d_23))))
+               (let rings_27 (+ 0.8 (* 0.2 (cos (* 150 d_23))))
+                (* (* col_24 darken_26) rings_27)))
+              (let col_28
+               (mix col_25 (vec3 1 1 1) (- 1 (smoothstep 0 0.01 (abs d_23))))
+               (let col_29
+                (let d_30 (abs (app scene_11 m_22))
+                 (let dm_31 (length (- p_21 m_22))
+                  (let d_32 (min (- (abs (- dm_31 d_30)) 0.0025) (- dm_31 0.015))
+                   (mix col_28 (vec3 1 1 0) (- 1 (smoothstep 0 0.005 d_32))))))
+                col_29)))))))))
        : ((vec 2) -> (vec 3)))))
 
     === defunctionalize (2d_sdf_variants.glml) ===
@@ -489,47 +536,65 @@ let%expect_test "compile examples" =
      (((TypeDef shape
         (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
        : shape)
-      ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-      ((Extern u_time) : float)
-      ((Define Nonrec sdf_0
+      ((TypeDef DFn_129 (VariantDecl ((lctor_132 (shape)) (lctor_135 (shape)))))
+       : DFn_129)
+      ((TypeDef DFn_140 (VariantDecl ((lctor_141 (DFn_129 DFn_129))))) : DFn_140)
+      ((Define Nonrec sdf_shape_0
         (lambda ((s_1 shape) (p_2 (vec 2)))
          (match s_1 ((Circle r_3) (- (length p_2) r_3))
           ((Rect w_4 h_5)
            (let d_6 (- (abs p_2) (vec2 w_4 h_5))
             (+ (length (max d_6 (vec2 0 0)))
-             (min (max (index d_6 0) (index d_6 1)) 0.))))
+             (min (max (index d_6 0) (index d_6 1)) 0))))
           ((Empty) 1.))))
        : (shape -> ((vec 2) -> float)))
-      ((Define Nonrec scene_7
-        (lambda ((p_8 (vec 2)))
-         (let circle_9 (app sdf_0 (Variant shape Circle 0.3) p_8)
-          (let rect_10 (app sdf_0 (Variant shape Rect 0.7 0.1) p_8)
-           (min circle_9 rect_10)))))
-       : ((vec 2) -> float))
-      ((Define Nonrec get_uv_11_vec2_to_vec2_118
-        (lambda ((coord_12 (vec 2)))
-         (let top_13 (- (* 2 coord_12) u_resolution)
-          (let bot_14 (min (index u_resolution 0) (index u_resolution 1))
-           (/ top_13 bot_14)))))
+      ((Define Nonrec dapply_128
+        (lambda ((dfn_142 DFn_129) (da_143 (vec 2)))
+         (match dfn_142 ((lctor_132 ca_131) (app sdf_shape_0 ca_131 da_143))
+          ((lctor_135 ca_134) (app sdf_shape_0 ca_134 da_143)))))
+       : (DFn_129 -> ((vec 2) -> float)))
+      ((Define Nonrec union_7
+        (lambda ((f_8 DFn_129) (f_prime_9 DFn_129) (p_10 (vec 2)))
+         (min (app dapply_128 f_8 p_10) (app dapply_128 f_prime_9 p_10))))
+       : (DFn_129 -> (DFn_129 -> ((vec 2) -> float))))
+      ((Define Nonrec dapply_139
+        (lambda ((dfn_144 DFn_140) (da_145 (vec 2)))
+         (match dfn_144
+          ((lctor_141 ca_137 ca_138) (app union_7 ca_137 ca_138 da_145)))))
+       : (DFn_140 -> ((vec 2) -> float)))
+      ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+      ((Extern u_time) : float)
+      ((Define Nonrec scene_11
+        (let circle_12 (Variant DFn_129 lctor_132 (Variant shape Circle 0.3))
+         (let rect_13 (Variant DFn_129 lctor_135 (Variant shape Rect 0.7 0.1))
+          (Variant DFn_140 lctor_141 circle_12 rect_13))))
+       : DFn_140)
+      ((Define Nonrec orange_18 (vec3 0.9 0.6 0.3)) : (vec 3))
+      ((Define Nonrec blue_19 (vec3 0.65 0.85 1.)) : (vec 3))
+      ((Define Nonrec get_uv_14_vec2_to_vec2_127
+        (lambda ((coord_15 (vec 2)))
+         (let top_16 (- (* 2 coord_15) u_resolution)
+          (let bot_17 (min (index u_resolution 0) (index u_resolution 1))
+           (/ top_16 bot_17)))))
        : ((vec 2) -> (vec 2)))
       ((Define Nonrec main
-        (lambda ((coord_15 (vec 2)))
-         (let p_16 (app get_uv_11_vec2_to_vec2_118 coord_15)
-          (let m_17 (app get_uv_11_vec2_to_vec2_118 u_mouse)
-           (let d_18 (app scene_7 p_16)
-            (let col_19 (if (> d_18 0) (vec3 0.9 0.6 0.3) (vec3 0.65 0.85 1.))
-             (let col_20
-              (let darken_21 (- 1 (exp (* -6 (abs d_18))))
-               (let rings_22 (+ 0.8 (* 0.2 (cos (* 150 d_18))))
-                (* (* col_19 darken_21) rings_22)))
-              (let col_23
-               (mix col_20 (vec3 1 1 1) (- 1 (smoothstep 0 0.01 (abs d_18))))
-               (let col_24
-                (let d_25 (abs (app scene_7 m_17))
-                 (let dm_26 (length (- p_16 m_17))
-                  (let d_27 (min (- (abs (- dm_26 d_25)) 0.0025) (- dm_26 0.015))
-                   (mix col_23 (vec3 1 1 0) (- 1 (smoothstep 0 0.005 d_27))))))
-                col_24)))))))))
+        (lambda ((coord_20 (vec 2)))
+         (let p_21 (app get_uv_14_vec2_to_vec2_127 coord_20)
+          (let m_22 (app get_uv_14_vec2_to_vec2_127 u_mouse)
+           (let d_23 (app dapply_139 scene_11 p_21)
+            (let col_24 (if (> d_23 0) orange_18 blue_19)
+             (let col_25
+              (let darken_26 (- 1 (exp (* -6 (abs d_23))))
+               (let rings_27 (+ 0.8 (* 0.2 (cos (* 150 d_23))))
+                (* (* col_24 darken_26) rings_27)))
+              (let col_28
+               (mix col_25 (vec3 1 1 1) (- 1 (smoothstep 0 0.01 (abs d_23))))
+               (let col_29
+                (let d_30 (abs (app dapply_139 scene_11 m_22))
+                 (let dm_31 (length (- p_21 m_22))
+                  (let d_32 (min (- (abs (- dm_31 d_30)) 0.0025) (- dm_31 0.015))
+                   (mix col_28 (vec3 1 1 0) (- 1 (smoothstep 0 0.005 d_32))))))
+                col_29)))))))))
        : ((vec 2) -> (vec 3)))))
 
     === lambda lift (2d_sdf_variants.glml) ===
@@ -537,48 +602,68 @@ let%expect_test "compile examples" =
      ((TypeDef shape
        (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
       : shape)
-     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
-     ((Define Nonrec (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
+     ((TypeDef DFn_129 (VariantDecl ((lctor_132 (shape)) (lctor_135 (shape))))) :
+      DFn_129)
+     ((TypeDef DFn_140 (VariantDecl ((lctor_141 (DFn_129 DFn_129))))) : DFn_140)
+     ((Define Nonrec (name sdf_shape_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
         (match s_1 ((Circle r_3) (- (length p_2) r_3))
          ((Rect w_4 h_5)
           (let d_6 (- (abs p_2) (vec2 w_4 h_5))
            (+ (length (max d_6 (vec2 0 0)))
-            (min (max (index d_6 0) (index d_6 1)) 0.))))
+            (min (max (index d_6 0) (index d_6 1)) 0))))
          ((Empty) 1.))))
       : (shape -> ((vec 2) -> float)))
-     ((Define Nonrec (name scene_7) (args ((p_8 (vec 2))))
+     ((Define Nonrec (name dapply_128)
+       (args ((dfn_142 DFn_129) (da_143 (vec 2))))
        (body
-        (let circle_9 (app sdf_0 (Variant shape Circle 0.3) p_8)
-         (let rect_10 (app sdf_0 (Variant shape Rect 0.7 0.1) p_8)
-          (min circle_9 rect_10)))))
-      : ((vec 2) -> float))
-     ((Define Nonrec (name get_uv_11_vec2_to_vec2_118)
-       (args ((coord_12 (vec 2))))
+        (match dfn_142 ((lctor_132 ca_131) (app sdf_shape_0 ca_131 da_143))
+         ((lctor_135 ca_134) (app sdf_shape_0 ca_134 da_143)))))
+      : (DFn_129 -> ((vec 2) -> float)))
+     ((Define Nonrec (name union_7)
+       (args ((f_8 DFn_129) (f_prime_9 DFn_129) (p_10 (vec 2))))
+       (body (min (app dapply_128 f_8 p_10) (app dapply_128 f_prime_9 p_10))))
+      : (DFn_129 -> (DFn_129 -> ((vec 2) -> float))))
+     ((Define Nonrec (name dapply_139)
+       (args ((dfn_144 DFn_140) (da_145 (vec 2))))
        (body
-        (let top_13 (- (* 2 coord_12) u_resolution)
-         (let bot_14 (min (index u_resolution 0) (index u_resolution 1))
-          (/ top_13 bot_14)))))
+        (match dfn_144
+         ((lctor_141 ca_137 ca_138) (app union_7 ca_137 ca_138 da_145)))))
+      : (DFn_140 -> ((vec 2) -> float)))
+     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
+     ((Const scene_11
+       (let circle_12 (Variant DFn_129 lctor_132 (Variant shape Circle 0.3))
+        (let rect_13 (Variant DFn_129 lctor_135 (Variant shape Rect 0.7 0.1))
+         (Variant DFn_140 lctor_141 circle_12 rect_13))))
+      : DFn_140)
+     ((Const orange_18 (vec3 0.9 0.6 0.3)) : (vec 3))
+     ((Const blue_19 (vec3 0.65 0.85 1.)) : (vec 3))
+     ((Define Nonrec (name get_uv_14_vec2_to_vec2_127)
+       (args ((coord_15 (vec 2))))
+       (body
+        (let top_16 (- (* 2 coord_15) u_resolution)
+         (let bot_17 (min (index u_resolution 0) (index u_resolution 1))
+          (/ top_16 bot_17)))))
       : ((vec 2) -> (vec 2)))
-     ((Define Nonrec (name main) (args ((coord_15 (vec 2))))
+     ((Define Nonrec (name main) (args ((coord_20 (vec 2))))
        (body
-        (let p_16 (app get_uv_11_vec2_to_vec2_118 coord_15)
-         (let m_17 (app get_uv_11_vec2_to_vec2_118 u_mouse)
-          (let d_18 (app scene_7 p_16)
-           (let col_19 (if (> d_18 0) (vec3 0.9 0.6 0.3) (vec3 0.65 0.85 1.))
-            (let col_20
-             (let darken_21 (- 1 (exp (* -6 (abs d_18))))
-              (let rings_22 (+ 0.8 (* 0.2 (cos (* 150 d_18))))
-               (* (* col_19 darken_21) rings_22)))
-             (let col_23
-              (mix col_20 (vec3 1 1 1) (- 1 (smoothstep 0 0.01 (abs d_18))))
-              (let col_24
-               (let d_25 (abs (app scene_7 m_17))
-                (let dm_26 (length (- p_16 m_17))
-                 (let d_27 (min (- (abs (- dm_26 d_25)) 0.0025) (- dm_26 0.015))
-                  (mix col_23 (vec3 1 1 0) (- 1 (smoothstep 0 0.005 d_27))))))
-               col_24)))))))))
+        (let p_21 (app get_uv_14_vec2_to_vec2_127 coord_20)
+         (let m_22 (app get_uv_14_vec2_to_vec2_127 u_mouse)
+          (let d_23 (app dapply_139 scene_11 p_21)
+           (let col_24 (if (> d_23 0) orange_18 blue_19)
+            (let col_25
+             (let darken_26 (- 1 (exp (* -6 (abs d_23))))
+              (let rings_27 (+ 0.8 (* 0.2 (cos (* 150 d_23))))
+               (* (* col_24 darken_26) rings_27)))
+             (let col_28
+              (mix col_25 (vec3 1 1 1) (- 1 (smoothstep 0 0.01 (abs d_23))))
+              (let col_29
+               (let d_30 (abs (app dapply_139 scene_11 m_22))
+                (let dm_31 (length (- p_21 m_22))
+                 (let d_32 (min (- (abs (- dm_31 d_30)) 0.0025) (- dm_31 0.015))
+                  (mix col_28 (vec3 1 1 0) (- 1 (smoothstep 0 0.005 d_32))))))
+               col_29)))))))))
       : ((vec 2) -> (vec 3))))
 
     === anf (2d_sdf_variants.glml) ===
@@ -586,80 +671,103 @@ let%expect_test "compile examples" =
      ((TypeDef shape
        (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
       : shape)
-     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
-     ((Define Nonrec (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
+     ((TypeDef DFn_129 (VariantDecl ((lctor_132 (shape)) (lctor_135 (shape))))) :
+      DFn_129)
+     ((TypeDef DFn_140 (VariantDecl ((lctor_141 (DFn_129 DFn_129))))) : DFn_140)
+     ((Define Nonrec (name sdf_shape_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
         (return
          (match s_1
-          ((Circle r_3) (let anf_119 (length p_2) (return (- anf_119 r_3))))
+          ((Circle r_3) (let anf_146 (length p_2) (return (- anf_146 r_3))))
           ((Rect w_4 h_5)
-           (let anf_120 (abs p_2)
-            (let anf_121 (vec2 w_4 h_5)
-             (let d_6 (- anf_120 anf_121)
-              (let anf_122 (vec2 0 0)
-               (let anf_123 (max d_6 anf_122)
-                (let anf_124 (length anf_123)
-                 (let anf_125 (index d_6 0)
-                  (let anf_126 (index d_6 1)
-                   (let anf_127 (max anf_125 anf_126)
-                    (let anf_128 (min anf_127 0.) (return (+ anf_124 anf_128)))))))))))))
+           (let anf_147 (abs p_2)
+            (let anf_148 (vec2 w_4 h_5)
+             (let d_6 (- anf_147 anf_148)
+              (let anf_149 (vec2 0 0)
+               (let anf_150 (max d_6 anf_149)
+                (let anf_151 (length anf_150)
+                 (let anf_152 (index d_6 0)
+                  (let anf_153 (index d_6 1)
+                   (let anf_154 (max anf_152 anf_153)
+                    (let anf_155 (min anf_154 0) (return (+ anf_151 anf_155)))))))))))))
           ((Empty) (return 1.))))))
       : (shape -> ((vec 2) -> float)))
-     ((Define Nonrec (name scene_7) (args ((p_8 (vec 2))))
+     ((Define Nonrec (name dapply_128)
+       (args ((dfn_142 DFn_129) (da_143 (vec 2))))
        (body
-        (let anf_129 (Variant shape Circle 0.3)
-         (let circle_9 (sdf_0 anf_129 p_8)
-          (let anf_130 (Variant shape Rect 0.7 0.1)
-           (let rect_10 (sdf_0 anf_130 p_8) (return (min circle_9 rect_10))))))))
-      : ((vec 2) -> float))
-     ((Define Nonrec (name get_uv_11_vec2_to_vec2_118)
-       (args ((coord_12 (vec 2))))
+        (return
+         (match dfn_142 ((lctor_132 ca_131) (return (sdf_shape_0 ca_131 da_143)))
+          ((lctor_135 ca_134) (return (sdf_shape_0 ca_134 da_143)))))))
+      : (DFn_129 -> ((vec 2) -> float)))
+     ((Define Nonrec (name union_7)
+       (args ((f_8 DFn_129) (f_prime_9 DFn_129) (p_10 (vec 2))))
        (body
-        (let anf_131 (* 2 coord_12)
-         (let top_13 (- anf_131 u_resolution)
-          (let anf_132 (index u_resolution 0)
-           (let anf_133 (index u_resolution 1)
-            (let bot_14 (min anf_132 anf_133) (return (/ top_13 bot_14)))))))))
+        (let anf_156 (dapply_128 f_8 p_10)
+         (let anf_157 (dapply_128 f_prime_9 p_10) (return (min anf_156 anf_157))))))
+      : (DFn_129 -> (DFn_129 -> ((vec 2) -> float))))
+     ((Define Nonrec (name dapply_139)
+       (args ((dfn_144 DFn_140) (da_145 (vec 2))))
+       (body
+        (return
+         (match dfn_144
+          ((lctor_141 ca_137 ca_138) (return (union_7 ca_137 ca_138 da_145)))))))
+      : (DFn_140 -> ((vec 2) -> float)))
+     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
+     ((Const scene_11
+       (let anf_158 (Variant shape Circle 0.3)
+        (let circle_12 (Variant DFn_129 lctor_132 anf_158)
+         (let anf_159 (Variant shape Rect 0.7 0.1)
+          (let rect_13 (Variant DFn_129 lctor_135 anf_159)
+           (return (Variant DFn_140 lctor_141 circle_12 rect_13)))))))
+      : DFn_140)
+     ((Const orange_18 (return (vec3 0.9 0.6 0.3))) : (vec 3))
+     ((Const blue_19 (return (vec3 0.65 0.85 1.))) : (vec 3))
+     ((Define Nonrec (name get_uv_14_vec2_to_vec2_127)
+       (args ((coord_15 (vec 2))))
+       (body
+        (let anf_160 (* 2 coord_15)
+         (let top_16 (- anf_160 u_resolution)
+          (let anf_161 (index u_resolution 0)
+           (let anf_162 (index u_resolution 1)
+            (let bot_17 (min anf_161 anf_162) (return (/ top_16 bot_17)))))))))
       : ((vec 2) -> (vec 2)))
-     ((Define Nonrec (name main) (args ((coord_15 (vec 2))))
+     ((Define Nonrec (name main) (args ((coord_20 (vec 2))))
        (body
-        (let p_16 (get_uv_11_vec2_to_vec2_118 coord_15)
-         (let m_17 (get_uv_11_vec2_to_vec2_118 u_mouse)
-          (let d_18 (scene_7 p_16)
-           (let anf_134 (> d_18 0)
-            (let col_19
-             (if anf_134 (return (vec3 0.9 0.6 0.3))
-              (return (vec3 0.65 0.85 1.)))
-             (let anf_135 (abs d_18)
-              (let anf_136 (* -6 anf_135)
-               (let anf_137 (exp anf_136)
-                (let darken_21 (- 1 anf_137)
-                 (let anf_138 (* 150 d_18)
-                  (let anf_139 (cos anf_138)
-                   (let anf_140 (* 0.2 anf_139)
-                    (let rings_22 (+ 0.8 anf_140)
-                     (let anf_141 (* col_19 darken_21)
-                      (let col_20 (* anf_141 rings_22)
-                       (let anf_142 (vec3 1 1 1)
-                        (let anf_143 (abs d_18)
-                         (let anf_144 (smoothstep 0 0.01 anf_143)
-                          (let anf_145 (- 1 anf_144)
-                           (let col_23 (mix col_20 anf_142 anf_145)
-                            (let anf_146 (scene_7 m_17)
-                             (let d_25 (abs anf_146)
-                              (let anf_147 (- p_16 m_17)
-                               (let dm_26 (length anf_147)
-                                (let anf_148 (- dm_26 d_25)
-                                 (let anf_149 (abs anf_148)
-                                  (let anf_150 (- anf_149 0.0025)
-                                   (let anf_151 (- dm_26 0.015)
-                                    (let d_27 (min anf_150 anf_151)
-                                     (let anf_152 (vec3 1 1 0)
-                                      (let anf_153 (smoothstep 0 0.005 d_27)
-                                       (let anf_154 (- 1 anf_153)
-                                        (let col_24 (mix col_23 anf_152 anf_154)
-                                         (return col_24))))))))))))))))))))))))))))))))))))
+        (let p_21 (get_uv_14_vec2_to_vec2_127 coord_20)
+         (let m_22 (get_uv_14_vec2_to_vec2_127 u_mouse)
+          (let d_23 (dapply_139 scene_11 p_21)
+           (let anf_163 (> d_23 0)
+            (let col_24 (if anf_163 (return orange_18) (return blue_19))
+             (let anf_164 (abs d_23)
+              (let anf_165 (* -6 anf_164)
+               (let anf_166 (exp anf_165)
+                (let darken_26 (- 1 anf_166)
+                 (let anf_167 (* 150 d_23)
+                  (let anf_168 (cos anf_167)
+                   (let anf_169 (* 0.2 anf_168)
+                    (let rings_27 (+ 0.8 anf_169)
+                     (let anf_170 (* col_24 darken_26)
+                      (let col_25 (* anf_170 rings_27)
+                       (let anf_171 (vec3 1 1 1)
+                        (let anf_172 (abs d_23)
+                         (let anf_173 (smoothstep 0 0.01 anf_172)
+                          (let anf_174 (- 1 anf_173)
+                           (let col_28 (mix col_25 anf_171 anf_174)
+                            (let anf_175 (dapply_139 scene_11 m_22)
+                             (let d_30 (abs anf_175)
+                              (let anf_176 (- p_21 m_22)
+                               (let dm_31 (length anf_176)
+                                (let anf_177 (- dm_31 d_30)
+                                 (let anf_178 (abs anf_177)
+                                  (let anf_179 (- anf_178 0.0025)
+                                   (let anf_180 (- dm_31 0.015)
+                                    (let d_32 (min anf_179 anf_180)
+                                     (let anf_181 (vec3 1 1 0)
+                                      (let anf_182 (smoothstep 0 0.005 d_32)
+                                       (let anf_183 (- 1 anf_182)
+                                        (let col_29 (mix col_28 anf_181 anf_183)
+                                         (return col_29))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === tail call (2d_sdf_variants.glml) ===
@@ -667,79 +775,100 @@ let%expect_test "compile examples" =
      ((TypeDef shape
        (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
       : shape)
-     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
-     ((Define (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
+     ((TypeDef DFn_129 (VariantDecl ((lctor_132 (shape)) (lctor_135 (shape))))) :
+      DFn_129)
+     ((TypeDef DFn_140 (VariantDecl ((lctor_141 (DFn_129 DFn_129))))) : DFn_140)
+     ((Define (name sdf_shape_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
         (return
          (match s_1
-          ((Circle r_3) (let anf_119 (length p_2) (return (- anf_119 r_3))))
+          ((Circle r_3) (let anf_146 (length p_2) (return (- anf_146 r_3))))
           ((Rect w_4 h_5)
-           (let anf_120 (abs p_2)
-            (let anf_121 (vec2 w_4 h_5)
-             (let d_6 (- anf_120 anf_121)
-              (let anf_122 (vec2 0 0)
-               (let anf_123 (max d_6 anf_122)
-                (let anf_124 (length anf_123)
-                 (let anf_125 (index d_6 0)
-                  (let anf_126 (index d_6 1)
-                   (let anf_127 (max anf_125 anf_126)
-                    (let anf_128 (min anf_127 0.) (return (+ anf_124 anf_128)))))))))))))
+           (let anf_147 (abs p_2)
+            (let anf_148 (vec2 w_4 h_5)
+             (let d_6 (- anf_147 anf_148)
+              (let anf_149 (vec2 0 0)
+               (let anf_150 (max d_6 anf_149)
+                (let anf_151 (length anf_150)
+                 (let anf_152 (index d_6 0)
+                  (let anf_153 (index d_6 1)
+                   (let anf_154 (max anf_152 anf_153)
+                    (let anf_155 (min anf_154 0) (return (+ anf_151 anf_155)))))))))))))
           ((Empty) (return 1.))))))
       : (shape -> ((vec 2) -> float)))
-     ((Define (name scene_7) (args ((p_8 (vec 2))))
+     ((Define (name dapply_128) (args ((dfn_142 DFn_129) (da_143 (vec 2))))
        (body
-        (let anf_129 (Variant shape Circle 0.3)
-         (let circle_9 (sdf_0 anf_129 p_8)
-          (let anf_130 (Variant shape Rect 0.7 0.1)
-           (let rect_10 (sdf_0 anf_130 p_8) (return (min circle_9 rect_10))))))))
-      : ((vec 2) -> float))
-     ((Define (name get_uv_11_vec2_to_vec2_118) (args ((coord_12 (vec 2))))
+        (return
+         (match dfn_142 ((lctor_132 ca_131) (return (sdf_shape_0 ca_131 da_143)))
+          ((lctor_135 ca_134) (return (sdf_shape_0 ca_134 da_143)))))))
+      : (DFn_129 -> ((vec 2) -> float)))
+     ((Define (name union_7)
+       (args ((f_8 DFn_129) (f_prime_9 DFn_129) (p_10 (vec 2))))
        (body
-        (let anf_131 (* 2 coord_12)
-         (let top_13 (- anf_131 u_resolution)
-          (let anf_132 (index u_resolution 0)
-           (let anf_133 (index u_resolution 1)
-            (let bot_14 (min anf_132 anf_133) (return (/ top_13 bot_14)))))))))
+        (let anf_156 (dapply_128 f_8 p_10)
+         (let anf_157 (dapply_128 f_prime_9 p_10) (return (min anf_156 anf_157))))))
+      : (DFn_129 -> (DFn_129 -> ((vec 2) -> float))))
+     ((Define (name dapply_139) (args ((dfn_144 DFn_140) (da_145 (vec 2))))
+       (body
+        (return
+         (match dfn_144
+          ((lctor_141 ca_137 ca_138) (return (union_7 ca_137 ca_138 da_145)))))))
+      : (DFn_140 -> ((vec 2) -> float)))
+     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
+     ((Const scene_11
+       (let anf_158 (Variant shape Circle 0.3)
+        (let circle_12 (Variant DFn_129 lctor_132 anf_158)
+         (let anf_159 (Variant shape Rect 0.7 0.1)
+          (let rect_13 (Variant DFn_129 lctor_135 anf_159)
+           (return (Variant DFn_140 lctor_141 circle_12 rect_13)))))))
+      : DFn_140)
+     ((Const orange_18 (return (vec3 0.9 0.6 0.3))) : (vec 3))
+     ((Const blue_19 (return (vec3 0.65 0.85 1.))) : (vec 3))
+     ((Define (name get_uv_14_vec2_to_vec2_127) (args ((coord_15 (vec 2))))
+       (body
+        (let anf_160 (* 2 coord_15)
+         (let top_16 (- anf_160 u_resolution)
+          (let anf_161 (index u_resolution 0)
+           (let anf_162 (index u_resolution 1)
+            (let bot_17 (min anf_161 anf_162) (return (/ top_16 bot_17)))))))))
       : ((vec 2) -> (vec 2)))
-     ((Define (name main) (args ((coord_15 (vec 2))))
+     ((Define (name main) (args ((coord_20 (vec 2))))
        (body
-        (let p_16 (get_uv_11_vec2_to_vec2_118 coord_15)
-         (let m_17 (get_uv_11_vec2_to_vec2_118 u_mouse)
-          (let d_18 (scene_7 p_16)
-           (let anf_134 (> d_18 0)
-            (let col_19
-             (if anf_134 (return (vec3 0.9 0.6 0.3))
-              (return (vec3 0.65 0.85 1.)))
-             (let anf_135 (abs d_18)
-              (let anf_136 (* -6 anf_135)
-               (let anf_137 (exp anf_136)
-                (let darken_21 (- 1 anf_137)
-                 (let anf_138 (* 150 d_18)
-                  (let anf_139 (cos anf_138)
-                   (let anf_140 (* 0.2 anf_139)
-                    (let rings_22 (+ 0.8 anf_140)
-                     (let anf_141 (* col_19 darken_21)
-                      (let col_20 (* anf_141 rings_22)
-                       (let anf_142 (vec3 1 1 1)
-                        (let anf_143 (abs d_18)
-                         (let anf_144 (smoothstep 0 0.01 anf_143)
-                          (let anf_145 (- 1 anf_144)
-                           (let col_23 (mix col_20 anf_142 anf_145)
-                            (let anf_146 (scene_7 m_17)
-                             (let d_25 (abs anf_146)
-                              (let anf_147 (- p_16 m_17)
-                               (let dm_26 (length anf_147)
-                                (let anf_148 (- dm_26 d_25)
-                                 (let anf_149 (abs anf_148)
-                                  (let anf_150 (- anf_149 0.0025)
-                                   (let anf_151 (- dm_26 0.015)
-                                    (let d_27 (min anf_150 anf_151)
-                                     (let anf_152 (vec3 1 1 0)
-                                      (let anf_153 (smoothstep 0 0.005 d_27)
-                                       (let anf_154 (- 1 anf_153)
-                                        (let col_24 (mix col_23 anf_152 anf_154)
-                                         (return col_24))))))))))))))))))))))))))))))))))))
+        (let p_21 (get_uv_14_vec2_to_vec2_127 coord_20)
+         (let m_22 (get_uv_14_vec2_to_vec2_127 u_mouse)
+          (let d_23 (dapply_139 scene_11 p_21)
+           (let anf_163 (> d_23 0)
+            (let col_24 (if anf_163 (return orange_18) (return blue_19))
+             (let anf_164 (abs d_23)
+              (let anf_165 (* -6 anf_164)
+               (let anf_166 (exp anf_165)
+                (let darken_26 (- 1 anf_166)
+                 (let anf_167 (* 150 d_23)
+                  (let anf_168 (cos anf_167)
+                   (let anf_169 (* 0.2 anf_168)
+                    (let rings_27 (+ 0.8 anf_169)
+                     (let anf_170 (* col_24 darken_26)
+                      (let col_25 (* anf_170 rings_27)
+                       (let anf_171 (vec3 1 1 1)
+                        (let anf_172 (abs d_23)
+                         (let anf_173 (smoothstep 0 0.01 anf_172)
+                          (let anf_174 (- 1 anf_173)
+                           (let col_28 (mix col_25 anf_171 anf_174)
+                            (let anf_175 (dapply_139 scene_11 m_22)
+                             (let d_30 (abs anf_175)
+                              (let anf_176 (- p_21 m_22)
+                               (let dm_31 (length anf_176)
+                                (let anf_177 (- dm_31 d_30)
+                                 (let anf_178 (abs anf_177)
+                                  (let anf_179 (- anf_178 0.0025)
+                                   (let anf_180 (- dm_31 0.015)
+                                    (let d_32 (min anf_179 anf_180)
+                                     (let anf_181 (vec3 1 1 0)
+                                      (let anf_182 (smoothstep 0 0.005 d_32)
+                                       (let anf_183 (- 1 anf_182)
+                                        (let col_29 (mix col_28 anf_181 anf_183)
+                                         (return col_29))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === lower variants (2d_sdf_variants.glml) ===
@@ -747,85 +876,114 @@ let%expect_test "compile examples" =
      ((TypeDef shape
        (RecordDecl ((tag int) (Circle_0 float) (Rect_0 float) (Rect_1 float))))
       : shape)
-     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
-     ((Define (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
+     ((TypeDef DFn_129
+       (RecordDecl ((tag int) (lctor_132_0 shape) (lctor_135_0 shape))))
+      : DFn_129)
+     ((TypeDef DFn_140
+       (RecordDecl ((tag int) (lctor_141_0 DFn_129) (lctor_141_1 DFn_129))))
+      : DFn_140)
+     ((Define (name sdf_shape_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
-        (let _lv_tag_155 (. s_1 tag)
+        (let _lv_tag_184 (. s_1 tag)
          (return
-          (switch _lv_tag_155
+          (switch _lv_tag_184
            (0
             (let r_3 (. s_1 Circle_0)
-             (let anf_119 (length p_2) (return (- anf_119 r_3)))))
+             (let anf_146 (length p_2) (return (- anf_146 r_3)))))
            (1
             (let w_4 (. s_1 Rect_0)
              (let h_5 (. s_1 Rect_1)
-              (let anf_120 (abs p_2)
-               (let anf_121 (vec2 w_4 h_5)
-                (let d_6 (- anf_120 anf_121)
-                 (let anf_122 (vec2 0 0)
-                  (let anf_123 (max d_6 anf_122)
-                   (let anf_124 (length anf_123)
-                    (let anf_125 (index d_6 0)
-                     (let anf_126 (index d_6 1)
-                      (let anf_127 (max anf_125 anf_126)
-                       (let anf_128 (min anf_127 0.)
-                        (return (+ anf_124 anf_128)))))))))))))))
+              (let anf_147 (abs p_2)
+               (let anf_148 (vec2 w_4 h_5)
+                (let d_6 (- anf_147 anf_148)
+                 (let anf_149 (vec2 0 0)
+                  (let anf_150 (max d_6 anf_149)
+                   (let anf_151 (length anf_150)
+                    (let anf_152 (index d_6 0)
+                     (let anf_153 (index d_6 1)
+                      (let anf_154 (max anf_152 anf_153)
+                       (let anf_155 (min anf_154 0) (return (+ anf_151 anf_155)))))))))))))))
            (default (return 1.)))))))
       : (shape -> ((vec 2) -> float)))
-     ((Define (name scene_7) (args ((p_8 (vec 2))))
+     ((Define (name dapply_128) (args ((dfn_142 DFn_129) (da_143 (vec 2))))
        (body
-        (let anf_129 (shape 0 0.3 <temp> <temp>)
-         (let circle_9 (sdf_0 anf_129 p_8)
-          (let anf_130 (shape 1 <temp> 0.7 0.1)
-           (let rect_10 (sdf_0 anf_130 p_8) (return (min circle_9 rect_10))))))))
-      : ((vec 2) -> float))
-     ((Define (name get_uv_11_vec2_to_vec2_118) (args ((coord_12 (vec 2))))
+        (let _lv_tag_185 (. dfn_142 tag)
+         (return
+          (switch _lv_tag_185
+           (0
+            (let ca_131 (. dfn_142 lctor_132_0)
+             (return (sdf_shape_0 ca_131 da_143))))
+           (default
+            (let ca_134 (. dfn_142 lctor_135_0)
+             (return (sdf_shape_0 ca_134 da_143)))))))))
+      : (DFn_129 -> ((vec 2) -> float)))
+     ((Define (name union_7)
+       (args ((f_8 DFn_129) (f_prime_9 DFn_129) (p_10 (vec 2))))
        (body
-        (let anf_131 (* 2 coord_12)
-         (let top_13 (- anf_131 u_resolution)
-          (let anf_132 (index u_resolution 0)
-           (let anf_133 (index u_resolution 1)
-            (let bot_14 (min anf_132 anf_133) (return (/ top_13 bot_14)))))))))
+        (let anf_156 (dapply_128 f_8 p_10)
+         (let anf_157 (dapply_128 f_prime_9 p_10) (return (min anf_156 anf_157))))))
+      : (DFn_129 -> (DFn_129 -> ((vec 2) -> float))))
+     ((Define (name dapply_139) (args ((dfn_144 DFn_140) (da_145 (vec 2))))
+       (body
+        (let ca_137 (. dfn_144 lctor_141_0)
+         (let ca_138 (. dfn_144 lctor_141_1)
+          (return (union_7 ca_137 ca_138 da_145))))))
+      : (DFn_140 -> ((vec 2) -> float)))
+     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
+     ((Const scene_11
+       (let anf_158 (shape 0 0.3 <temp> <temp>)
+        (let circle_12 (DFn_129 0 anf_158 <temp>)
+         (let anf_159 (shape 1 <temp> 0.7 0.1)
+          (let rect_13 (DFn_129 1 <temp> anf_159)
+           (return (DFn_140 0 circle_12 rect_13)))))))
+      : DFn_140)
+     ((Const orange_18 (return (vec3 0.9 0.6 0.3))) : (vec 3))
+     ((Const blue_19 (return (vec3 0.65 0.85 1.))) : (vec 3))
+     ((Define (name get_uv_14_vec2_to_vec2_127) (args ((coord_15 (vec 2))))
+       (body
+        (let anf_160 (* 2 coord_15)
+         (let top_16 (- anf_160 u_resolution)
+          (let anf_161 (index u_resolution 0)
+           (let anf_162 (index u_resolution 1)
+            (let bot_17 (min anf_161 anf_162) (return (/ top_16 bot_17)))))))))
       : ((vec 2) -> (vec 2)))
-     ((Define (name main) (args ((coord_15 (vec 2))))
+     ((Define (name main) (args ((coord_20 (vec 2))))
        (body
-        (let p_16 (get_uv_11_vec2_to_vec2_118 coord_15)
-         (let m_17 (get_uv_11_vec2_to_vec2_118 u_mouse)
-          (let d_18 (scene_7 p_16)
-           (let anf_134 (> d_18 0)
-            (let col_19
-             (if anf_134 (return (vec3 0.9 0.6 0.3))
-              (return (vec3 0.65 0.85 1.)))
-             (let anf_135 (abs d_18)
-              (let anf_136 (* -6 anf_135)
-               (let anf_137 (exp anf_136)
-                (let darken_21 (- 1 anf_137)
-                 (let anf_138 (* 150 d_18)
-                  (let anf_139 (cos anf_138)
-                   (let anf_140 (* 0.2 anf_139)
-                    (let rings_22 (+ 0.8 anf_140)
-                     (let anf_141 (* col_19 darken_21)
-                      (let col_20 (* anf_141 rings_22)
-                       (let anf_142 (vec3 1 1 1)
-                        (let anf_143 (abs d_18)
-                         (let anf_144 (smoothstep 0 0.01 anf_143)
-                          (let anf_145 (- 1 anf_144)
-                           (let col_23 (mix col_20 anf_142 anf_145)
-                            (let anf_146 (scene_7 m_17)
-                             (let d_25 (abs anf_146)
-                              (let anf_147 (- p_16 m_17)
-                               (let dm_26 (length anf_147)
-                                (let anf_148 (- dm_26 d_25)
-                                 (let anf_149 (abs anf_148)
-                                  (let anf_150 (- anf_149 0.0025)
-                                   (let anf_151 (- dm_26 0.015)
-                                    (let d_27 (min anf_150 anf_151)
-                                     (let anf_152 (vec3 1 1 0)
-                                      (let anf_153 (smoothstep 0 0.005 d_27)
-                                       (let anf_154 (- 1 anf_153)
-                                        (let col_24 (mix col_23 anf_152 anf_154)
-                                         (return col_24))))))))))))))))))))))))))))))))))))
+        (let p_21 (get_uv_14_vec2_to_vec2_127 coord_20)
+         (let m_22 (get_uv_14_vec2_to_vec2_127 u_mouse)
+          (let d_23 (dapply_139 scene_11 p_21)
+           (let anf_163 (> d_23 0)
+            (let col_24 (if anf_163 (return orange_18) (return blue_19))
+             (let anf_164 (abs d_23)
+              (let anf_165 (* -6 anf_164)
+               (let anf_166 (exp anf_165)
+                (let darken_26 (- 1 anf_166)
+                 (let anf_167 (* 150 d_23)
+                  (let anf_168 (cos anf_167)
+                   (let anf_169 (* 0.2 anf_168)
+                    (let rings_27 (+ 0.8 anf_169)
+                     (let anf_170 (* col_24 darken_26)
+                      (let col_25 (* anf_170 rings_27)
+                       (let anf_171 (vec3 1 1 1)
+                        (let anf_172 (abs d_23)
+                         (let anf_173 (smoothstep 0 0.01 anf_172)
+                          (let anf_174 (- 1 anf_173)
+                           (let col_28 (mix col_25 anf_171 anf_174)
+                            (let anf_175 (dapply_139 scene_11 m_22)
+                             (let d_30 (abs anf_175)
+                              (let anf_176 (- p_21 m_22)
+                               (let dm_31 (length anf_176)
+                                (let anf_177 (- dm_31 d_30)
+                                 (let anf_178 (abs anf_177)
+                                  (let anf_179 (- anf_178 0.0025)
+                                   (let anf_180 (- dm_31 0.015)
+                                    (let d_32 (min anf_179 anf_180)
+                                     (let anf_181 (vec3 1 1 0)
+                                      (let anf_182 (smoothstep 0 0.005 d_32)
+                                       (let anf_183 (- 1 anf_182)
+                                        (let col_29 (mix col_28 anf_181 anf_183)
+                                         (return col_29))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === promote ints (2d_sdf_variants.glml) ===
@@ -833,85 +991,115 @@ let%expect_test "compile examples" =
      ((TypeDef shape
        (RecordDecl ((tag int) (Circle_0 float) (Rect_0 float) (Rect_1 float))))
       : shape)
-     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
-     ((Define (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
+     ((TypeDef DFn_129
+       (RecordDecl ((tag int) (lctor_132_0 shape) (lctor_135_0 shape))))
+      : DFn_129)
+     ((TypeDef DFn_140
+       (RecordDecl ((tag int) (lctor_141_0 DFn_129) (lctor_141_1 DFn_129))))
+      : DFn_140)
+     ((Define (name sdf_shape_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
-        (let _lv_tag_155 (. s_1 tag)
+        (let _lv_tag_184 (. s_1 tag)
          (return
-          (switch _lv_tag_155
+          (switch _lv_tag_184
            (0
             (let r_3 (. s_1 Circle_0)
-             (let anf_119 (length p_2) (return (- anf_119 r_3)))))
+             (let anf_146 (length p_2) (return (- anf_146 r_3)))))
            (1
             (let w_4 (. s_1 Rect_0)
              (let h_5 (. s_1 Rect_1)
-              (let anf_120 (abs p_2)
-               (let anf_121 (vec2 w_4 h_5)
-                (let d_6 (- anf_120 anf_121)
-                 (let anf_122 (vec2 0. 0.)
-                  (let anf_123 (max d_6 anf_122)
-                   (let anf_124 (length anf_123)
-                    (let anf_125 (index d_6 0)
-                     (let anf_126 (index d_6 1)
-                      (let anf_127 (max anf_125 anf_126)
-                       (let anf_128 (min anf_127 0.)
-                        (return (+ anf_124 anf_128)))))))))))))))
+              (let anf_147 (abs p_2)
+               (let anf_148 (vec2 w_4 h_5)
+                (let d_6 (- anf_147 anf_148)
+                 (let anf_149 (vec2 0. 0.)
+                  (let anf_150 (max d_6 anf_149)
+                   (let anf_151 (length anf_150)
+                    (let anf_152 (index d_6 0)
+                     (let anf_153 (index d_6 1)
+                      (let anf_154 (max anf_152 anf_153)
+                       (let anf_155 (min anf_154 0.)
+                        (return (+ anf_151 anf_155)))))))))))))))
            (default (return 1.)))))))
       : (shape -> ((vec 2) -> float)))
-     ((Define (name scene_7) (args ((p_8 (vec 2))))
+     ((Define (name dapply_128) (args ((dfn_142 DFn_129) (da_143 (vec 2))))
        (body
-        (let anf_129 (shape 0 0.3 <temp> <temp>)
-         (let circle_9 (sdf_0 anf_129 p_8)
-          (let anf_130 (shape 1 <temp> 0.7 0.1)
-           (let rect_10 (sdf_0 anf_130 p_8) (return (min circle_9 rect_10))))))))
-      : ((vec 2) -> float))
-     ((Define (name get_uv_11_vec2_to_vec2_118) (args ((coord_12 (vec 2))))
+        (let _lv_tag_185 (. dfn_142 tag)
+         (return
+          (switch _lv_tag_185
+           (0
+            (let ca_131 (. dfn_142 lctor_132_0)
+             (return (sdf_shape_0 ca_131 da_143))))
+           (default
+            (let ca_134 (. dfn_142 lctor_135_0)
+             (return (sdf_shape_0 ca_134 da_143)))))))))
+      : (DFn_129 -> ((vec 2) -> float)))
+     ((Define (name union_7)
+       (args ((f_8 DFn_129) (f_prime_9 DFn_129) (p_10 (vec 2))))
        (body
-        (let anf_131 (* 2. coord_12)
-         (let top_13 (- anf_131 u_resolution)
-          (let anf_132 (index u_resolution 0)
-           (let anf_133 (index u_resolution 1)
-            (let bot_14 (min anf_132 anf_133) (return (/ top_13 bot_14)))))))))
+        (let anf_156 (dapply_128 f_8 p_10)
+         (let anf_157 (dapply_128 f_prime_9 p_10) (return (min anf_156 anf_157))))))
+      : (DFn_129 -> (DFn_129 -> ((vec 2) -> float))))
+     ((Define (name dapply_139) (args ((dfn_144 DFn_140) (da_145 (vec 2))))
+       (body
+        (let ca_137 (. dfn_144 lctor_141_0)
+         (let ca_138 (. dfn_144 lctor_141_1)
+          (return (union_7 ca_137 ca_138 da_145))))))
+      : (DFn_140 -> ((vec 2) -> float)))
+     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
+     ((Const scene_11
+       (let anf_158 (shape 0 0.3 <temp> <temp>)
+        (let circle_12 (DFn_129 0 anf_158 <temp>)
+         (let anf_159 (shape 1 <temp> 0.7 0.1)
+          (let rect_13 (DFn_129 1 <temp> anf_159)
+           (return (DFn_140 0 circle_12 rect_13)))))))
+      : DFn_140)
+     ((Const orange_18 (return (vec3 0.9 0.6 0.3))) : (vec 3))
+     ((Const blue_19 (return (vec3 0.65 0.85 1.))) : (vec 3))
+     ((Define (name get_uv_14_vec2_to_vec2_127) (args ((coord_15 (vec 2))))
+       (body
+        (let anf_160 (* 2. coord_15)
+         (let top_16 (- anf_160 u_resolution)
+          (let anf_161 (index u_resolution 0)
+           (let anf_162 (index u_resolution 1)
+            (let bot_17 (min anf_161 anf_162) (return (/ top_16 bot_17)))))))))
       : ((vec 2) -> (vec 2)))
-     ((Define (name main) (args ((coord_15 (vec 2))))
+     ((Define (name main) (args ((coord_20 (vec 2))))
        (body
-        (let p_16 (get_uv_11_vec2_to_vec2_118 coord_15)
-         (let m_17 (get_uv_11_vec2_to_vec2_118 u_mouse)
-          (let d_18 (scene_7 p_16)
-           (let anf_134 (> d_18 0.)
-            (let col_19
-             (if anf_134 (return (vec3 0.9 0.6 0.3))
-              (return (vec3 0.65 0.85 1.)))
-             (let anf_135 (abs d_18)
-              (let anf_136 (* -6. anf_135)
-               (let anf_137 (exp anf_136)
-                (let darken_21 (- 1. anf_137)
-                 (let anf_138 (* 150. d_18)
-                  (let anf_139 (cos anf_138)
-                   (let anf_140 (* 0.2 anf_139)
-                    (let rings_22 (+ 0.8 anf_140)
-                     (let anf_141 (* col_19 darken_21)
-                      (let col_20 (* anf_141 rings_22)
-                       (let anf_142 (vec3 1. 1. 1.)
-                        (let anf_143 (abs d_18)
-                         (let anf_144 (smoothstep 0. 0.01 anf_143)
-                          (let anf_145 (- 1. anf_144)
-                           (let col_23 (mix col_20 anf_142 anf_145)
-                            (let anf_146 (scene_7 m_17)
-                             (let d_25 (abs anf_146)
-                              (let anf_147 (- p_16 m_17)
-                               (let dm_26 (length anf_147)
-                                (let anf_148 (- dm_26 d_25)
-                                 (let anf_149 (abs anf_148)
-                                  (let anf_150 (- anf_149 0.0025)
-                                   (let anf_151 (- dm_26 0.015)
-                                    (let d_27 (min anf_150 anf_151)
-                                     (let anf_152 (vec3 1. 1. 0.)
-                                      (let anf_153 (smoothstep 0. 0.005 d_27)
-                                       (let anf_154 (- 1. anf_153)
-                                        (let col_24 (mix col_23 anf_152 anf_154)
-                                         (return col_24))))))))))))))))))))))))))))))))))))
+        (let p_21 (get_uv_14_vec2_to_vec2_127 coord_20)
+         (let m_22 (get_uv_14_vec2_to_vec2_127 u_mouse)
+          (let d_23 (dapply_139 scene_11 p_21)
+           (let anf_163 (> d_23 0.)
+            (let col_24 (if anf_163 (return orange_18) (return blue_19))
+             (let anf_164 (abs d_23)
+              (let anf_165 (* -6. anf_164)
+               (let anf_166 (exp anf_165)
+                (let darken_26 (- 1. anf_166)
+                 (let anf_167 (* 150. d_23)
+                  (let anf_168 (cos anf_167)
+                   (let anf_169 (* 0.2 anf_168)
+                    (let rings_27 (+ 0.8 anf_169)
+                     (let anf_170 (* col_24 darken_26)
+                      (let col_25 (* anf_170 rings_27)
+                       (let anf_171 (vec3 1. 1. 1.)
+                        (let anf_172 (abs d_23)
+                         (let anf_173 (smoothstep 0. 0.01 anf_172)
+                          (let anf_174 (- 1. anf_173)
+                           (let col_28 (mix col_25 anf_171 anf_174)
+                            (let anf_175 (dapply_139 scene_11 m_22)
+                             (let d_30 (abs anf_175)
+                              (let anf_176 (- p_21 m_22)
+                               (let dm_31 (length anf_176)
+                                (let anf_177 (- dm_31 d_30)
+                                 (let anf_178 (abs anf_177)
+                                  (let anf_179 (- anf_178 0.0025)
+                                   (let anf_180 (- dm_31 0.015)
+                                    (let d_32 (min anf_179 anf_180)
+                                     (let anf_181 (vec3 1. 1. 0.)
+                                      (let anf_182 (smoothstep 0. 0.005 d_32)
+                                       (let anf_183 (- 1. anf_182)
+                                        (let col_29 (mix col_28 anf_181 anf_183)
+                                         (return col_29))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === remove placeholder (2d_sdf_variants.glml) ===
@@ -919,85 +1107,117 @@ let%expect_test "compile examples" =
      ((TypeDef shape
        (RecordDecl ((tag int) (Circle_0 float) (Rect_0 float) (Rect_1 float))))
       : shape)
-     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
-     ((Define (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
+     ((TypeDef DFn_129
+       (RecordDecl ((tag int) (lctor_132_0 shape) (lctor_135_0 shape))))
+      : DFn_129)
+     ((TypeDef DFn_140
+       (RecordDecl ((tag int) (lctor_141_0 DFn_129) (lctor_141_1 DFn_129))))
+      : DFn_140)
+     ((Define (name sdf_shape_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
-        (let _lv_tag_155 (. s_1 tag)
+        (let _lv_tag_184 (. s_1 tag)
          (return
-          (switch _lv_tag_155
+          (switch _lv_tag_184
            (0
             (let r_3 (. s_1 Circle_0)
-             (let anf_119 (length p_2) (return (- anf_119 r_3)))))
+             (let anf_146 (length p_2) (return (- anf_146 r_3)))))
            (1
             (let w_4 (. s_1 Rect_0)
              (let h_5 (. s_1 Rect_1)
-              (let anf_120 (abs p_2)
-               (let anf_121 (vec2 w_4 h_5)
-                (let d_6 (- anf_120 anf_121)
-                 (let anf_122 (vec2 0. 0.)
-                  (let anf_123 (max d_6 anf_122)
-                   (let anf_124 (length anf_123)
-                    (let anf_125 (index d_6 0)
-                     (let anf_126 (index d_6 1)
-                      (let anf_127 (max anf_125 anf_126)
-                       (let anf_128 (min anf_127 0.)
-                        (return (+ anf_124 anf_128)))))))))))))))
+              (let anf_147 (abs p_2)
+               (let anf_148 (vec2 w_4 h_5)
+                (let d_6 (- anf_147 anf_148)
+                 (let anf_149 (vec2 0. 0.)
+                  (let anf_150 (max d_6 anf_149)
+                   (let anf_151 (length anf_150)
+                    (let anf_152 (index d_6 0)
+                     (let anf_153 (index d_6 1)
+                      (let anf_154 (max anf_152 anf_153)
+                       (let anf_155 (min anf_154 0.)
+                        (return (+ anf_151 anf_155)))))))))))))))
            (default (return 1.)))))))
       : (shape -> ((vec 2) -> float)))
-     ((Define (name scene_7) (args ((p_8 (vec 2))))
+     ((Define (name dapply_128) (args ((dfn_142 DFn_129) (da_143 (vec 2))))
        (body
-        (let anf_129 (shape 0 0.3 0. 0.)
-         (let circle_9 (sdf_0 anf_129 p_8)
-          (let anf_130 (shape 1 0. 0.7 0.1)
-           (let rect_10 (sdf_0 anf_130 p_8) (return (min circle_9 rect_10))))))))
-      : ((vec 2) -> float))
-     ((Define (name get_uv_11_vec2_to_vec2_118) (args ((coord_12 (vec 2))))
+        (let _lv_tag_185 (. dfn_142 tag)
+         (return
+          (switch _lv_tag_185
+           (0
+            (let ca_131 (. dfn_142 lctor_132_0)
+             (return (sdf_shape_0 ca_131 da_143))))
+           (default
+            (let ca_134 (. dfn_142 lctor_135_0)
+             (return (sdf_shape_0 ca_134 da_143)))))))))
+      : (DFn_129 -> ((vec 2) -> float)))
+     ((Define (name union_7)
+       (args ((f_8 DFn_129) (f_prime_9 DFn_129) (p_10 (vec 2))))
        (body
-        (let anf_131 (* 2. coord_12)
-         (let top_13 (- anf_131 u_resolution)
-          (let anf_132 (index u_resolution 0)
-           (let anf_133 (index u_resolution 1)
-            (let bot_14 (min anf_132 anf_133) (return (/ top_13 bot_14)))))))))
+        (let anf_156 (dapply_128 f_8 p_10)
+         (let anf_157 (dapply_128 f_prime_9 p_10) (return (min anf_156 anf_157))))))
+      : (DFn_129 -> (DFn_129 -> ((vec 2) -> float))))
+     ((Define (name dapply_139) (args ((dfn_144 DFn_140) (da_145 (vec 2))))
+       (body
+        (let ca_137 (. dfn_144 lctor_141_0)
+         (let ca_138 (. dfn_144 lctor_141_1)
+          (return (union_7 ca_137 ca_138 da_145))))))
+      : (DFn_140 -> ((vec 2) -> float)))
+     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
+     ((Const scene_11
+       (let anf_158 (shape 0 0.3 0. 0.)
+        (placeholder _tmp_186
+         (let circle_12 (DFn_129 0 anf_158 _tmp_186)
+          (let anf_159 (shape 1 0. 0.7 0.1)
+           (placeholder _tmp_187
+            (let rect_13 (DFn_129 1 _tmp_187 anf_159)
+             (return (DFn_140 0 circle_12 rect_13)))))))))
+      : DFn_140)
+     ((Const orange_18 (return (vec3 0.9 0.6 0.3))) : (vec 3))
+     ((Const blue_19 (return (vec3 0.65 0.85 1.))) : (vec 3))
+     ((Define (name get_uv_14_vec2_to_vec2_127) (args ((coord_15 (vec 2))))
+       (body
+        (let anf_160 (* 2. coord_15)
+         (let top_16 (- anf_160 u_resolution)
+          (let anf_161 (index u_resolution 0)
+           (let anf_162 (index u_resolution 1)
+            (let bot_17 (min anf_161 anf_162) (return (/ top_16 bot_17)))))))))
       : ((vec 2) -> (vec 2)))
-     ((Define (name main) (args ((coord_15 (vec 2))))
+     ((Define (name main) (args ((coord_20 (vec 2))))
        (body
-        (let p_16 (get_uv_11_vec2_to_vec2_118 coord_15)
-         (let m_17 (get_uv_11_vec2_to_vec2_118 u_mouse)
-          (let d_18 (scene_7 p_16)
-           (let anf_134 (> d_18 0.)
-            (let col_19
-             (if anf_134 (return (vec3 0.9 0.6 0.3))
-              (return (vec3 0.65 0.85 1.)))
-             (let anf_135 (abs d_18)
-              (let anf_136 (* -6. anf_135)
-               (let anf_137 (exp anf_136)
-                (let darken_21 (- 1. anf_137)
-                 (let anf_138 (* 150. d_18)
-                  (let anf_139 (cos anf_138)
-                   (let anf_140 (* 0.2 anf_139)
-                    (let rings_22 (+ 0.8 anf_140)
-                     (let anf_141 (* col_19 darken_21)
-                      (let col_20 (* anf_141 rings_22)
-                       (let anf_142 (vec3 1. 1. 1.)
-                        (let anf_143 (abs d_18)
-                         (let anf_144 (smoothstep 0. 0.01 anf_143)
-                          (let anf_145 (- 1. anf_144)
-                           (let col_23 (mix col_20 anf_142 anf_145)
-                            (let anf_146 (scene_7 m_17)
-                             (let d_25 (abs anf_146)
-                              (let anf_147 (- p_16 m_17)
-                               (let dm_26 (length anf_147)
-                                (let anf_148 (- dm_26 d_25)
-                                 (let anf_149 (abs anf_148)
-                                  (let anf_150 (- anf_149 0.0025)
-                                   (let anf_151 (- dm_26 0.015)
-                                    (let d_27 (min anf_150 anf_151)
-                                     (let anf_152 (vec3 1. 1. 0.)
-                                      (let anf_153 (smoothstep 0. 0.005 d_27)
-                                       (let anf_154 (- 1. anf_153)
-                                        (let col_24 (mix col_23 anf_152 anf_154)
-                                         (return col_24))))))))))))))))))))))))))))))))))))
+        (let p_21 (get_uv_14_vec2_to_vec2_127 coord_20)
+         (let m_22 (get_uv_14_vec2_to_vec2_127 u_mouse)
+          (let d_23 (dapply_139 scene_11 p_21)
+           (let anf_163 (> d_23 0.)
+            (let col_24 (if anf_163 (return orange_18) (return blue_19))
+             (let anf_164 (abs d_23)
+              (let anf_165 (* -6. anf_164)
+               (let anf_166 (exp anf_165)
+                (let darken_26 (- 1. anf_166)
+                 (let anf_167 (* 150. d_23)
+                  (let anf_168 (cos anf_167)
+                   (let anf_169 (* 0.2 anf_168)
+                    (let rings_27 (+ 0.8 anf_169)
+                     (let anf_170 (* col_24 darken_26)
+                      (let col_25 (* anf_170 rings_27)
+                       (let anf_171 (vec3 1. 1. 1.)
+                        (let anf_172 (abs d_23)
+                         (let anf_173 (smoothstep 0. 0.01 anf_172)
+                          (let anf_174 (- 1. anf_173)
+                           (let col_28 (mix col_25 anf_171 anf_174)
+                            (let anf_175 (dapply_139 scene_11 m_22)
+                             (let d_30 (abs anf_175)
+                              (let anf_176 (- p_21 m_22)
+                               (let dm_31 (length anf_176)
+                                (let anf_177 (- dm_31 d_30)
+                                 (let anf_178 (abs anf_177)
+                                  (let anf_179 (- anf_178 0.0025)
+                                   (let anf_180 (- dm_31 0.015)
+                                    (let d_32 (min anf_179 anf_180)
+                                     (let anf_181 (vec3 1. 1. 0.)
+                                      (let anf_182 (smoothstep 0. 0.005 d_32)
+                                       (let anf_183 (- 1. anf_182)
+                                        (let col_29 (mix col_28 anf_181 anf_183)
+                                         (return col_29))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === lift consts (2d_sdf_variants.glml) ===
@@ -1005,249 +1225,355 @@ let%expect_test "compile examples" =
      ((TypeDef shape
        (RecordDecl ((tag int) (Circle_0 float) (Rect_0 float) (Rect_1 float))))
       : shape)
-     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
-     ((Extern u_time) : float)
-     ((Define (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
+     ((TypeDef DFn_129
+       (RecordDecl ((tag int) (lctor_132_0 shape) (lctor_135_0 shape))))
+      : DFn_129)
+     ((TypeDef DFn_140
+       (RecordDecl ((tag int) (lctor_141_0 DFn_129) (lctor_141_1 DFn_129))))
+      : DFn_140)
+     ((Define (name sdf_shape_0) (args ((s_1 shape) (p_2 (vec 2))))
        (body
-        (let _lv_tag_155 (. s_1 tag)
+        (let _lv_tag_184 (. s_1 tag)
          (return
-          (switch _lv_tag_155
+          (switch _lv_tag_184
            (0
             (let r_3 (. s_1 Circle_0)
-             (let anf_119 (length p_2) (return (- anf_119 r_3)))))
+             (let anf_146 (length p_2) (return (- anf_146 r_3)))))
            (1
             (let w_4 (. s_1 Rect_0)
              (let h_5 (. s_1 Rect_1)
-              (let anf_120 (abs p_2)
-               (let anf_121 (vec2 w_4 h_5)
-                (let d_6 (- anf_120 anf_121)
-                 (let anf_122 (vec2 0. 0.)
-                  (let anf_123 (max d_6 anf_122)
-                   (let anf_124 (length anf_123)
-                    (let anf_125 (index d_6 0)
-                     (let anf_126 (index d_6 1)
-                      (let anf_127 (max anf_125 anf_126)
-                       (let anf_128 (min anf_127 0.)
-                        (return (+ anf_124 anf_128)))))))))))))))
+              (let anf_147 (abs p_2)
+               (let anf_148 (vec2 w_4 h_5)
+                (let d_6 (- anf_147 anf_148)
+                 (let anf_149 (vec2 0. 0.)
+                  (let anf_150 (max d_6 anf_149)
+                   (let anf_151 (length anf_150)
+                    (let anf_152 (index d_6 0)
+                     (let anf_153 (index d_6 1)
+                      (let anf_154 (max anf_152 anf_153)
+                       (let anf_155 (min anf_154 0.)
+                        (return (+ anf_151 anf_155)))))))))))))))
            (default (return 1.)))))))
       : (shape -> ((vec 2) -> float)))
-     ((Define (name scene_7) (args ((p_8 (vec 2))))
+     ((Define (name dapply_128) (args ((dfn_142 DFn_129) (da_143 (vec 2))))
        (body
-        (let anf_129 (shape 0 0.3 0. 0.)
-         (let circle_9 (sdf_0 anf_129 p_8)
-          (let anf_130 (shape 1 0. 0.7 0.1)
-           (let rect_10 (sdf_0 anf_130 p_8) (return (min circle_9 rect_10))))))))
-      : ((vec 2) -> float))
-     ((Define (name get_uv_11_vec2_to_vec2_118) (args ((coord_12 (vec 2))))
+        (let _lv_tag_185 (. dfn_142 tag)
+         (return
+          (switch _lv_tag_185
+           (0
+            (let ca_131 (. dfn_142 lctor_132_0)
+             (return (sdf_shape_0 ca_131 da_143))))
+           (default
+            (let ca_134 (. dfn_142 lctor_135_0)
+             (return (sdf_shape_0 ca_134 da_143)))))))))
+      : (DFn_129 -> ((vec 2) -> float)))
+     ((Define (name union_7)
+       (args ((f_8 DFn_129) (f_prime_9 DFn_129) (p_10 (vec 2))))
        (body
-        (let anf_131 (* 2. coord_12)
-         (let top_13 (- anf_131 u_resolution)
-          (let anf_132 (index u_resolution 0)
-           (let anf_133 (index u_resolution 1)
-            (let bot_14 (min anf_132 anf_133) (return (/ top_13 bot_14)))))))))
+        (let anf_156 (dapply_128 f_8 p_10)
+         (let anf_157 (dapply_128 f_prime_9 p_10) (return (min anf_156 anf_157))))))
+      : (DFn_129 -> (DFn_129 -> ((vec 2) -> float))))
+     ((Define (name dapply_139) (args ((dfn_144 DFn_140) (da_145 (vec 2))))
+       (body
+        (let ca_137 (. dfn_144 lctor_141_0)
+         (let ca_138 (. dfn_144 lctor_141_1)
+          (return (union_7 ca_137 ca_138 da_145))))))
+      : (DFn_140 -> ((vec 2) -> float)))
+     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
+     ((Define (name scene_11) (args ())
+       (body
+        (let anf_158 (shape 0 0.3 0. 0.)
+         (placeholder _tmp_186
+          (let circle_12 (DFn_129 0 anf_158 _tmp_186)
+           (let anf_159 (shape 1 0. 0.7 0.1)
+            (placeholder _tmp_187
+             (let rect_13 (DFn_129 1 _tmp_187 anf_159)
+              (return (DFn_140 0 circle_12 rect_13))))))))))
+      : DFn_140)
+     ((Const orange_18 (return (vec3 0.9 0.6 0.3))) : (vec 3))
+     ((Const blue_19 (return (vec3 0.65 0.85 1.))) : (vec 3))
+     ((Define (name get_uv_14_vec2_to_vec2_127) (args ((coord_15 (vec 2))))
+       (body
+        (let anf_160 (* 2. coord_15)
+         (let top_16 (- anf_160 u_resolution)
+          (let anf_161 (index u_resolution 0)
+           (let anf_162 (index u_resolution 1)
+            (let bot_17 (min anf_161 anf_162) (return (/ top_16 bot_17)))))))))
       : ((vec 2) -> (vec 2)))
-     ((Define (name main) (args ((coord_15 (vec 2))))
+     ((Define (name main) (args ((coord_20 (vec 2))))
        (body
-        (let p_16 (get_uv_11_vec2_to_vec2_118 coord_15)
-         (let m_17 (get_uv_11_vec2_to_vec2_118 u_mouse)
-          (let d_18 (scene_7 p_16)
-           (let anf_134 (> d_18 0.)
-            (let col_19
-             (if anf_134 (return (vec3 0.9 0.6 0.3))
-              (return (vec3 0.65 0.85 1.)))
-             (let anf_135 (abs d_18)
-              (let anf_136 (* -6. anf_135)
-               (let anf_137 (exp anf_136)
-                (let darken_21 (- 1. anf_137)
-                 (let anf_138 (* 150. d_18)
-                  (let anf_139 (cos anf_138)
-                   (let anf_140 (* 0.2 anf_139)
-                    (let rings_22 (+ 0.8 anf_140)
-                     (let anf_141 (* col_19 darken_21)
-                      (let col_20 (* anf_141 rings_22)
-                       (let anf_142 (vec3 1. 1. 1.)
-                        (let anf_143 (abs d_18)
-                         (let anf_144 (smoothstep 0. 0.01 anf_143)
-                          (let anf_145 (- 1. anf_144)
-                           (let col_23 (mix col_20 anf_142 anf_145)
-                            (let anf_146 (scene_7 m_17)
-                             (let d_25 (abs anf_146)
-                              (let anf_147 (- p_16 m_17)
-                               (let dm_26 (length anf_147)
-                                (let anf_148 (- dm_26 d_25)
-                                 (let anf_149 (abs anf_148)
-                                  (let anf_150 (- anf_149 0.0025)
-                                   (let anf_151 (- dm_26 0.015)
-                                    (let d_27 (min anf_150 anf_151)
-                                     (let anf_152 (vec3 1. 1. 0.)
-                                      (let anf_153 (smoothstep 0. 0.005 d_27)
-                                       (let anf_154 (- 1. anf_153)
-                                        (let col_24 (mix col_23 anf_152 anf_154)
-                                         (return col_24))))))))))))))))))))))))))))))))))))
+        (let p_21 (get_uv_14_vec2_to_vec2_127 coord_20)
+         (let m_22 (get_uv_14_vec2_to_vec2_127 u_mouse)
+          (let _lc_188 (scene_11)
+           (let d_23 (dapply_139 _lc_188 p_21)
+            (let anf_163 (> d_23 0.)
+             (let col_24 (if anf_163 (return orange_18) (return blue_19))
+              (let anf_164 (abs d_23)
+               (let anf_165 (* -6. anf_164)
+                (let anf_166 (exp anf_165)
+                 (let darken_26 (- 1. anf_166)
+                  (let anf_167 (* 150. d_23)
+                   (let anf_168 (cos anf_167)
+                    (let anf_169 (* 0.2 anf_168)
+                     (let rings_27 (+ 0.8 anf_169)
+                      (let anf_170 (* col_24 darken_26)
+                       (let col_25 (* anf_170 rings_27)
+                        (let anf_171 (vec3 1. 1. 1.)
+                         (let anf_172 (abs d_23)
+                          (let anf_173 (smoothstep 0. 0.01 anf_172)
+                           (let anf_174 (- 1. anf_173)
+                            (let col_28 (mix col_25 anf_171 anf_174)
+                             (let _lc_189 (scene_11)
+                              (let anf_175 (dapply_139 _lc_189 m_22)
+                               (let d_30 (abs anf_175)
+                                (let anf_176 (- p_21 m_22)
+                                 (let dm_31 (length anf_176)
+                                  (let anf_177 (- dm_31 d_30)
+                                   (let anf_178 (abs anf_177)
+                                    (let anf_179 (- anf_178 0.0025)
+                                     (let anf_180 (- dm_31 0.015)
+                                      (let d_32 (min anf_179 anf_180)
+                                       (let anf_181 (vec3 1. 1. 0.)
+                                        (let anf_182 (smoothstep 0. 0.005 d_32)
+                                         (let anf_183 (- 1. anf_182)
+                                          (let col_29
+                                           (mix col_28 anf_181 anf_183)
+                                           (return col_29))))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === translate (2d_sdf_variants.glml) ===
     (Program
      ((Struct shape
        ((TyInt tag) (TyFloat Circle_0) (TyFloat Rect_0) (TyFloat Rect_1)))
-      (Global Uniform (TyVec 2) u_resolution ())
-      (Global Uniform (TyVec 2) u_mouse ()) (Global Uniform TyFloat u_time ())
-      (Function (name sdf_0) (desc ())
+      (Struct DFn_129
+       ((TyInt tag) ((TyStruct shape) lctor_132_0)
+        ((TyStruct shape) lctor_135_0)))
+      (Struct DFn_140
+       ((TyInt tag) ((TyStruct DFn_129) lctor_141_0)
+        ((TyStruct DFn_129) lctor_141_1)))
+      (Function (name sdf_shape_0) (desc ())
        (params (((TyStruct shape) s_1) ((TyVec 2) p_2))) (ret_type TyFloat)
        (body
-        ((set () int _lv_tag_155 ((. s_1 tag)))
-         (switch _lv_tag_155
+        ((set () int _lv_tag_184 ((. s_1 tag)))
+         (switch _lv_tag_184
           (0 (set () float r_3 ((. s_1 Circle_0)))
-           (set () float anf_119 ((length p_2))) (return (- anf_119 r_3)) break)
+           (set () float anf_146 ((length p_2))) (return (- anf_146 r_3)) break)
           (1 (set () float w_4 ((. s_1 Rect_0)))
-           (set () float h_5 ((. s_1 Rect_1))) (set () vec2 anf_120 ((abs p_2)))
-           (set () vec2 anf_121 ((vec2 w_4 h_5)))
-           (set () vec2 d_6 ((- anf_120 anf_121)))
-           (set () vec2 anf_122 ((vec2 0. 0.)))
-           (set () vec2 anf_123 ((max d_6 anf_122)))
-           (set () float anf_124 ((length anf_123)))
-           (set () float anf_125 ((index d_6 0)))
-           (set () float anf_126 ((index d_6 1)))
-           (set () float anf_127 ((max anf_125 anf_126)))
-           (set () float anf_128 ((min anf_127 0.))) (return (+ anf_124 anf_128))
+           (set () float h_5 ((. s_1 Rect_1))) (set () vec2 anf_147 ((abs p_2)))
+           (set () vec2 anf_148 ((vec2 w_4 h_5)))
+           (set () vec2 d_6 ((- anf_147 anf_148)))
+           (set () vec2 anf_149 ((vec2 0. 0.)))
+           (set () vec2 anf_150 ((max d_6 anf_149)))
+           (set () float anf_151 ((length anf_150)))
+           (set () float anf_152 ((index d_6 0)))
+           (set () float anf_153 ((index d_6 1)))
+           (set () float anf_154 ((max anf_152 anf_153)))
+           (set () float anf_155 ((min anf_154 0.))) (return (+ anf_151 anf_155))
            break)
           (default (return 1.) break)))))
-      (Function (name scene_7) (desc ()) (params (((TyVec 2) p_8)))
+      (Function (name dapply_128) (desc ())
+       (params (((TyStruct DFn_129) dfn_142) ((TyVec 2) da_143)))
        (ret_type TyFloat)
        (body
-        ((set () shape anf_129 ((shape 0 0.3 0. 0.)))
-         (set () float circle_9 ((sdf_0 anf_129 p_8)))
-         (set () shape anf_130 ((shape 1 0. 0.7 0.1)))
-         (set () float rect_10 ((sdf_0 anf_130 p_8)))
-         (return (min circle_9 rect_10)))))
-      (Function (name get_uv_11_vec2_to_vec2_118) (desc ())
-       (params (((TyVec 2) coord_12))) (ret_type (TyVec 2))
+        ((set () int _lv_tag_185 ((. dfn_142 tag)))
+         (switch _lv_tag_185
+          (0 (set () shape ca_131 ((. dfn_142 lctor_132_0)))
+           (return (sdf_shape_0 ca_131 da_143)) break)
+          (default (set () shape ca_134 ((. dfn_142 lctor_135_0)))
+           (return (sdf_shape_0 ca_134 da_143)) break)))))
+      (Function (name union_7) (desc ())
+       (params
+        (((TyStruct DFn_129) f_8) ((TyStruct DFn_129) f_prime_9)
+         ((TyVec 2) p_10)))
+       (ret_type TyFloat)
        (body
-        ((set () vec2 anf_131 ((* 2. coord_12)))
-         (set () vec2 top_13 ((- anf_131 u_resolution)))
-         (set () float anf_132 ((index u_resolution 0)))
-         (set () float anf_133 ((index u_resolution 1)))
-         (set () float bot_14 ((min anf_132 anf_133)))
-         (return (/ top_13 bot_14)))))
-      (Function (name main) (desc ()) (params (((TyVec 2) coord_15)))
+        ((set () float anf_156 ((dapply_128 f_8 p_10)))
+         (set () float anf_157 ((dapply_128 f_prime_9 p_10)))
+         (return (min anf_156 anf_157)))))
+      (Function (name dapply_139) (desc ())
+       (params (((TyStruct DFn_140) dfn_144) ((TyVec 2) da_145)))
+       (ret_type TyFloat)
+       (body
+        ((set () DFn_129 ca_137 ((. dfn_144 lctor_141_0)))
+         (set () DFn_129 ca_138 ((. dfn_144 lctor_141_1)))
+         (return (union_7 ca_137 ca_138 da_145)))))
+      (Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform (TyVec 2) u_mouse ()) (Global Uniform TyFloat u_time ())
+      (Function (name scene_11) (desc ()) (params ())
+       (ret_type (TyStruct DFn_140))
+       (body
+        ((set () shape anf_158 ((shape 0 0.3 0. 0.))) (set () shape _tmp_186 ())
+         (set () DFn_129 circle_12 ((DFn_129 0 anf_158 _tmp_186)))
+         (set () shape anf_159 ((shape 1 0. 0.7 0.1))) (set () shape _tmp_187 ())
+         (set () DFn_129 rect_13 ((DFn_129 1 _tmp_187 anf_159)))
+         (return (DFn_140 0 circle_12 rect_13)))))
+      (Global Const (TyVec 3) orange_18 ((vec3 0.9 0.6 0.3)))
+      (Global Const (TyVec 3) blue_19 ((vec3 0.65 0.85 1.)))
+      (Function (name get_uv_14_vec2_to_vec2_127) (desc ())
+       (params (((TyVec 2) coord_15))) (ret_type (TyVec 2))
+       (body
+        ((set () vec2 anf_160 ((* 2. coord_15)))
+         (set () vec2 top_16 ((- anf_160 u_resolution)))
+         (set () float anf_161 ((index u_resolution 0)))
+         (set () float anf_162 ((index u_resolution 1)))
+         (set () float bot_17 ((min anf_161 anf_162)))
+         (return (/ top_16 bot_17)))))
+      (Function (name main) (desc ()) (params (((TyVec 2) coord_20)))
        (ret_type (TyVec 3))
        (body
-        ((set () vec2 p_16 ((get_uv_11_vec2_to_vec2_118 coord_15)))
-         (set () vec2 m_17 ((get_uv_11_vec2_to_vec2_118 u_mouse)))
-         (set () float d_18 ((scene_7 p_16))) (set () bool anf_134 ((> d_18 0.)))
-         (set () vec3 col_19 ())
-         (if anf_134 (Block (set col_19 (vec3 0.9 0.6 0.3)))
-          (Block (set col_19 (vec3 0.65 0.85 1.))))
-         (set () float anf_135 ((abs d_18)))
-         (set () float anf_136 ((* -6. anf_135)))
-         (set () float anf_137 ((exp anf_136)))
-         (set () float darken_21 ((- 1. anf_137)))
-         (set () float anf_138 ((* 150. d_18)))
-         (set () float anf_139 ((cos anf_138)))
-         (set () float anf_140 ((* 0.2 anf_139)))
-         (set () float rings_22 ((+ 0.8 anf_140)))
-         (set () vec3 anf_141 ((* col_19 darken_21)))
-         (set () vec3 col_20 ((* anf_141 rings_22)))
-         (set () vec3 anf_142 ((vec3 1. 1. 1.)))
-         (set () float anf_143 ((abs d_18)))
-         (set () float anf_144 ((smoothstep 0. 0.01 anf_143)))
-         (set () float anf_145 ((- 1. anf_144)))
-         (set () vec3 col_23 ((mix col_20 anf_142 anf_145)))
-         (set () float anf_146 ((scene_7 m_17)))
-         (set () float d_25 ((abs anf_146)))
-         (set () vec2 anf_147 ((- p_16 m_17)))
-         (set () float dm_26 ((length anf_147)))
-         (set () float anf_148 ((- dm_26 d_25)))
-         (set () float anf_149 ((abs anf_148)))
-         (set () float anf_150 ((- anf_149 0.0025)))
-         (set () float anf_151 ((- dm_26 0.015)))
-         (set () float d_27 ((min anf_150 anf_151)))
-         (set () vec3 anf_152 ((vec3 1. 1. 0.)))
-         (set () float anf_153 ((smoothstep 0. 0.005 d_27)))
-         (set () float anf_154 ((- 1. anf_153)))
-         (set () vec3 col_24 ((mix col_23 anf_152 anf_154))) (return col_24))))))
+        ((set () vec2 p_21 ((get_uv_14_vec2_to_vec2_127 coord_20)))
+         (set () vec2 m_22 ((get_uv_14_vec2_to_vec2_127 u_mouse)))
+         (set () DFn_140 _lc_188 ((scene_11)))
+         (set () float d_23 ((dapply_139 _lc_188 p_21)))
+         (set () bool anf_163 ((> d_23 0.))) (set () vec3 col_24 ())
+         (if anf_163 (Block (set col_24 orange_18)) (Block (set col_24 blue_19)))
+         (set () float anf_164 ((abs d_23)))
+         (set () float anf_165 ((* -6. anf_164)))
+         (set () float anf_166 ((exp anf_165)))
+         (set () float darken_26 ((- 1. anf_166)))
+         (set () float anf_167 ((* 150. d_23)))
+         (set () float anf_168 ((cos anf_167)))
+         (set () float anf_169 ((* 0.2 anf_168)))
+         (set () float rings_27 ((+ 0.8 anf_169)))
+         (set () vec3 anf_170 ((* col_24 darken_26)))
+         (set () vec3 col_25 ((* anf_170 rings_27)))
+         (set () vec3 anf_171 ((vec3 1. 1. 1.)))
+         (set () float anf_172 ((abs d_23)))
+         (set () float anf_173 ((smoothstep 0. 0.01 anf_172)))
+         (set () float anf_174 ((- 1. anf_173)))
+         (set () vec3 col_28 ((mix col_25 anf_171 anf_174)))
+         (set () DFn_140 _lc_189 ((scene_11)))
+         (set () float anf_175 ((dapply_139 _lc_189 m_22)))
+         (set () float d_30 ((abs anf_175)))
+         (set () vec2 anf_176 ((- p_21 m_22)))
+         (set () float dm_31 ((length anf_176)))
+         (set () float anf_177 ((- dm_31 d_30)))
+         (set () float anf_178 ((abs anf_177)))
+         (set () float anf_179 ((- anf_178 0.0025)))
+         (set () float anf_180 ((- dm_31 0.015)))
+         (set () float d_32 ((min anf_179 anf_180)))
+         (set () vec3 anf_181 ((vec3 1. 1. 0.)))
+         (set () float anf_182 ((smoothstep 0. 0.005 d_32)))
+         (set () float anf_183 ((- 1. anf_182)))
+         (set () vec3 col_29 ((mix col_28 anf_181 anf_183))) (return col_29))))))
 
     === patch main (2d_sdf_variants.glml) ===
     (Program
      ((Global Out (TyVec 4) fragColor ())
       (Struct shape
        ((TyInt tag) (TyFloat Circle_0) (TyFloat Rect_0) (TyFloat Rect_1)))
-      (Global Uniform (TyVec 2) u_resolution ())
-      (Global Uniform (TyVec 2) u_mouse ()) (Global Uniform TyFloat u_time ())
-      (Function (name sdf_0) (desc ())
+      (Struct DFn_129
+       ((TyInt tag) ((TyStruct shape) lctor_132_0)
+        ((TyStruct shape) lctor_135_0)))
+      (Struct DFn_140
+       ((TyInt tag) ((TyStruct DFn_129) lctor_141_0)
+        ((TyStruct DFn_129) lctor_141_1)))
+      (Function (name sdf_shape_0) (desc ())
        (params (((TyStruct shape) s_1) ((TyVec 2) p_2))) (ret_type TyFloat)
        (body
-        ((set () int _lv_tag_155 ((. s_1 tag)))
-         (switch _lv_tag_155
+        ((set () int _lv_tag_184 ((. s_1 tag)))
+         (switch _lv_tag_184
           (0 (set () float r_3 ((. s_1 Circle_0)))
-           (set () float anf_119 ((length p_2))) (return (- anf_119 r_3)) break)
+           (set () float anf_146 ((length p_2))) (return (- anf_146 r_3)) break)
           (1 (set () float w_4 ((. s_1 Rect_0)))
-           (set () float h_5 ((. s_1 Rect_1))) (set () vec2 anf_120 ((abs p_2)))
-           (set () vec2 anf_121 ((vec2 w_4 h_5)))
-           (set () vec2 d_6 ((- anf_120 anf_121)))
-           (set () vec2 anf_122 ((vec2 0. 0.)))
-           (set () vec2 anf_123 ((max d_6 anf_122)))
-           (set () float anf_124 ((length anf_123)))
-           (set () float anf_125 ((index d_6 0)))
-           (set () float anf_126 ((index d_6 1)))
-           (set () float anf_127 ((max anf_125 anf_126)))
-           (set () float anf_128 ((min anf_127 0.))) (return (+ anf_124 anf_128))
+           (set () float h_5 ((. s_1 Rect_1))) (set () vec2 anf_147 ((abs p_2)))
+           (set () vec2 anf_148 ((vec2 w_4 h_5)))
+           (set () vec2 d_6 ((- anf_147 anf_148)))
+           (set () vec2 anf_149 ((vec2 0. 0.)))
+           (set () vec2 anf_150 ((max d_6 anf_149)))
+           (set () float anf_151 ((length anf_150)))
+           (set () float anf_152 ((index d_6 0)))
+           (set () float anf_153 ((index d_6 1)))
+           (set () float anf_154 ((max anf_152 anf_153)))
+           (set () float anf_155 ((min anf_154 0.))) (return (+ anf_151 anf_155))
            break)
           (default (return 1.) break)))))
-      (Function (name scene_7) (desc ()) (params (((TyVec 2) p_8)))
+      (Function (name dapply_128) (desc ())
+       (params (((TyStruct DFn_129) dfn_142) ((TyVec 2) da_143)))
        (ret_type TyFloat)
        (body
-        ((set () shape anf_129 ((shape 0 0.3 0. 0.)))
-         (set () float circle_9 ((sdf_0 anf_129 p_8)))
-         (set () shape anf_130 ((shape 1 0. 0.7 0.1)))
-         (set () float rect_10 ((sdf_0 anf_130 p_8)))
-         (return (min circle_9 rect_10)))))
-      (Function (name get_uv_11_vec2_to_vec2_118) (desc ())
-       (params (((TyVec 2) coord_12))) (ret_type (TyVec 2))
+        ((set () int _lv_tag_185 ((. dfn_142 tag)))
+         (switch _lv_tag_185
+          (0 (set () shape ca_131 ((. dfn_142 lctor_132_0)))
+           (return (sdf_shape_0 ca_131 da_143)) break)
+          (default (set () shape ca_134 ((. dfn_142 lctor_135_0)))
+           (return (sdf_shape_0 ca_134 da_143)) break)))))
+      (Function (name union_7) (desc ())
+       (params
+        (((TyStruct DFn_129) f_8) ((TyStruct DFn_129) f_prime_9)
+         ((TyVec 2) p_10)))
+       (ret_type TyFloat)
        (body
-        ((set () vec2 anf_131 ((* 2. coord_12)))
-         (set () vec2 top_13 ((- anf_131 u_resolution)))
-         (set () float anf_132 ((index u_resolution 0)))
-         (set () float anf_133 ((index u_resolution 1)))
-         (set () float bot_14 ((min anf_132 anf_133)))
-         (return (/ top_13 bot_14)))))
-      (Function (name main_pure) (desc ()) (params (((TyVec 2) coord_15)))
+        ((set () float anf_156 ((dapply_128 f_8 p_10)))
+         (set () float anf_157 ((dapply_128 f_prime_9 p_10)))
+         (return (min anf_156 anf_157)))))
+      (Function (name dapply_139) (desc ())
+       (params (((TyStruct DFn_140) dfn_144) ((TyVec 2) da_145)))
+       (ret_type TyFloat)
+       (body
+        ((set () DFn_129 ca_137 ((. dfn_144 lctor_141_0)))
+         (set () DFn_129 ca_138 ((. dfn_144 lctor_141_1)))
+         (return (union_7 ca_137 ca_138 da_145)))))
+      (Global Uniform (TyVec 2) u_resolution ())
+      (Global Uniform (TyVec 2) u_mouse ()) (Global Uniform TyFloat u_time ())
+      (Function (name scene_11) (desc ()) (params ())
+       (ret_type (TyStruct DFn_140))
+       (body
+        ((set () shape anf_158 ((shape 0 0.3 0. 0.))) (set () shape _tmp_186 ())
+         (set () DFn_129 circle_12 ((DFn_129 0 anf_158 _tmp_186)))
+         (set () shape anf_159 ((shape 1 0. 0.7 0.1))) (set () shape _tmp_187 ())
+         (set () DFn_129 rect_13 ((DFn_129 1 _tmp_187 anf_159)))
+         (return (DFn_140 0 circle_12 rect_13)))))
+      (Global Const (TyVec 3) orange_18 ((vec3 0.9 0.6 0.3)))
+      (Global Const (TyVec 3) blue_19 ((vec3 0.65 0.85 1.)))
+      (Function (name get_uv_14_vec2_to_vec2_127) (desc ())
+       (params (((TyVec 2) coord_15))) (ret_type (TyVec 2))
+       (body
+        ((set () vec2 anf_160 ((* 2. coord_15)))
+         (set () vec2 top_16 ((- anf_160 u_resolution)))
+         (set () float anf_161 ((index u_resolution 0)))
+         (set () float anf_162 ((index u_resolution 1)))
+         (set () float bot_17 ((min anf_161 anf_162)))
+         (return (/ top_16 bot_17)))))
+      (Function (name main_pure) (desc ()) (params (((TyVec 2) coord_20)))
        (ret_type (TyVec 3))
        (body
-        ((set () vec2 p_16 ((get_uv_11_vec2_to_vec2_118 coord_15)))
-         (set () vec2 m_17 ((get_uv_11_vec2_to_vec2_118 u_mouse)))
-         (set () float d_18 ((scene_7 p_16))) (set () bool anf_134 ((> d_18 0.)))
-         (set () vec3 col_19 ())
-         (if anf_134 (Block (set col_19 (vec3 0.9 0.6 0.3)))
-          (Block (set col_19 (vec3 0.65 0.85 1.))))
-         (set () float anf_135 ((abs d_18)))
-         (set () float anf_136 ((* -6. anf_135)))
-         (set () float anf_137 ((exp anf_136)))
-         (set () float darken_21 ((- 1. anf_137)))
-         (set () float anf_138 ((* 150. d_18)))
-         (set () float anf_139 ((cos anf_138)))
-         (set () float anf_140 ((* 0.2 anf_139)))
-         (set () float rings_22 ((+ 0.8 anf_140)))
-         (set () vec3 anf_141 ((* col_19 darken_21)))
-         (set () vec3 col_20 ((* anf_141 rings_22)))
-         (set () vec3 anf_142 ((vec3 1. 1. 1.)))
-         (set () float anf_143 ((abs d_18)))
-         (set () float anf_144 ((smoothstep 0. 0.01 anf_143)))
-         (set () float anf_145 ((- 1. anf_144)))
-         (set () vec3 col_23 ((mix col_20 anf_142 anf_145)))
-         (set () float anf_146 ((scene_7 m_17)))
-         (set () float d_25 ((abs anf_146)))
-         (set () vec2 anf_147 ((- p_16 m_17)))
-         (set () float dm_26 ((length anf_147)))
-         (set () float anf_148 ((- dm_26 d_25)))
-         (set () float anf_149 ((abs anf_148)))
-         (set () float anf_150 ((- anf_149 0.0025)))
-         (set () float anf_151 ((- dm_26 0.015)))
-         (set () float d_27 ((min anf_150 anf_151)))
-         (set () vec3 anf_152 ((vec3 1. 1. 0.)))
-         (set () float anf_153 ((smoothstep 0. 0.005 d_27)))
-         (set () float anf_154 ((- 1. anf_153)))
-         (set () vec3 col_24 ((mix col_23 anf_152 anf_154))) (return col_24))))
+        ((set () vec2 p_21 ((get_uv_14_vec2_to_vec2_127 coord_20)))
+         (set () vec2 m_22 ((get_uv_14_vec2_to_vec2_127 u_mouse)))
+         (set () DFn_140 _lc_188 ((scene_11)))
+         (set () float d_23 ((dapply_139 _lc_188 p_21)))
+         (set () bool anf_163 ((> d_23 0.))) (set () vec3 col_24 ())
+         (if anf_163 (Block (set col_24 orange_18)) (Block (set col_24 blue_19)))
+         (set () float anf_164 ((abs d_23)))
+         (set () float anf_165 ((* -6. anf_164)))
+         (set () float anf_166 ((exp anf_165)))
+         (set () float darken_26 ((- 1. anf_166)))
+         (set () float anf_167 ((* 150. d_23)))
+         (set () float anf_168 ((cos anf_167)))
+         (set () float anf_169 ((* 0.2 anf_168)))
+         (set () float rings_27 ((+ 0.8 anf_169)))
+         (set () vec3 anf_170 ((* col_24 darken_26)))
+         (set () vec3 col_25 ((* anf_170 rings_27)))
+         (set () vec3 anf_171 ((vec3 1. 1. 1.)))
+         (set () float anf_172 ((abs d_23)))
+         (set () float anf_173 ((smoothstep 0. 0.01 anf_172)))
+         (set () float anf_174 ((- 1. anf_173)))
+         (set () vec3 col_28 ((mix col_25 anf_171 anf_174)))
+         (set () DFn_140 _lc_189 ((scene_11)))
+         (set () float anf_175 ((dapply_139 _lc_189 m_22)))
+         (set () float d_30 ((abs anf_175)))
+         (set () vec2 anf_176 ((- p_21 m_22)))
+         (set () float dm_31 ((length anf_176)))
+         (set () float anf_177 ((- dm_31 d_30)))
+         (set () float anf_178 ((abs anf_177)))
+         (set () float anf_179 ((- anf_178 0.0025)))
+         (set () float anf_180 ((- dm_31 0.015)))
+         (set () float d_32 ((min anf_179 anf_180)))
+         (set () vec3 anf_181 ((vec3 1. 1. 0.)))
+         (set () float anf_182 ((smoothstep 0. 0.005 d_32)))
+         (set () float anf_183 ((- 1. anf_182)))
+         (set () vec3 col_29 ((mix col_28 anf_181 anf_183))) (return col_29))))
       (Function (name main) (desc ()) (params ()) (ret_type TyVoid)
        (body
         ((set () vec3 color ((main_pure (. gl_FragCoord xy))))
@@ -3287,6 +3613,10 @@ let%expect_test "compile examples" =
                (if (> t 50.) (Variant None)
                 (app (app march (+ t (* d 0.8))) (+ steps 1))))))))
           (app (app march 0.) 0)))))
+      (Define Nonrec deepColor (vec3 0.02 0.05 0.2))
+      (Define Nonrec landColor (vec3 0.15 0.35 0.1))
+      (Define Nonrec mountColor (vec3 0.4 0.3 0.2))
+      (Define Nonrec snowColor (vec3 0.85 0.85 0.9))
       (Define Nonrec main
        (lambda (coord ((vec 2)))
         (let res_min (min (index u_resolution 0) (index u_resolution 1))
@@ -3318,23 +3648,17 @@ let%expect_test "compile examples" =
                         (let seaLevel 0.35
                          (let h_norm
                           (clamp (/ (- rawHeight seaLevel) (- 1 seaLevel)) 0 1)
-                          (let deepColor (vec3 0.02 0.05 0.2)
-                           (let landColor (vec3 0.15 0.35 0.1)
-                            (let mountColor (vec3 0.4 0.3 0.2)
-                             (let snowColor (vec3 0.85 0.85 0.9)
-                              (let baseColor
-                               (if (< h_norm 0.3)
-                                (mix deepColor landColor (/ h_norm 0.3))
-                                (if (< h_norm 0.6)
-                                 (mix landColor mountColor
-                                  (/ (- h_norm 0.3) 0.3))
-                                 (mix mountColor snowColor
-                                  (/ (- h_norm 0.6) 0.4))))
-                               (let fresnel (- 1. (max (dot n (* rd -1.)) 0))
-                                (let rim (* (* (* fresnel fresnel) fresnel) 0.4)
-                                 (let atmoColor (vec3 0.3 0.5 1.)
-                                  (+ (* baseColor (+ (* diff 0.9) ambient))
-                                   (* atmoColor rim))))))))))))))))))))))))))))))))
+                          (let baseColor
+                           (if (< h_norm 0.3)
+                            (mix deepColor landColor (/ h_norm 0.3))
+                            (if (< h_norm 0.6)
+                             (mix landColor mountColor (/ (- h_norm 0.3) 0.3))
+                             (mix mountColor snowColor (/ (- h_norm 0.6) 0.4))))
+                           (let fresnel (- 1 (max (dot n (* rd -1)) 0))
+                            (let rim (* (* (* fresnel fresnel) fresnel) 0.4)
+                             (let atmoColor (vec3 0.3 0.5 1.)
+                              (+ (* baseColor (+ (* diff 0.9) ambient))
+                               (* atmoColor rim))))))))))))))))))))))))))))
 
     === uniquify (planet.glml) ===
     (Program
@@ -3416,62 +3740,59 @@ let%expect_test "compile examples" =
                (if (> t_50 50.) (Variant None)
                 (app (app march_49 (+ t_50 (* d_52 0.8))) (+ steps_51 1))))))))
           (app (app march_49 0.) 0)))))
+      (Define Nonrec deepColor_53 (vec3 0.02 0.05 0.2))
+      (Define Nonrec landColor_54 (vec3 0.15 0.35 0.1))
+      (Define Nonrec mountColor_55 (vec3 0.4 0.3 0.2))
+      (Define Nonrec snowColor_56 (vec3 0.85 0.85 0.9))
       (Define Nonrec main
-       (lambda (coord_53 ((vec 2)))
-        (let res_min_54 (min (index u_resolution 0) (index u_resolution 1))
-         (let uv_55 (/ (- (* coord_53 2) u_resolution) res_min_54)
-          (let mouseUV_56 (/ (- (* u_mouse 2) u_resolution) res_min_54)
-           (let rotate_by_mouse_57
-            (lambda (ray_58 ())
-             (let rotX_59 (* (* -1 (index mouseUV_56 1)) 1.5)
-              (let ro_yz_60
-               (app (app rotate_0 (vec2 (index ray_58 1) (index ray_58 2)))
-                rotX_59)
-               (let rotY_61 (* (* -1 (index mouseUV_56 0)) 1.5)
-                (let ro_xz_62
-                 (app (app rotate_0 (vec2 (index ray_58 0) (index ro_yz_60 1)))
-                  rotY_61)
-                 (vec3 (index ro_xz_62 0) (index ro_yz_60 0) (index ro_xz_62 1)))))))
-            (let ro_63 (app rotate_by_mouse_57 (vec3 0 0 -4))
-             (let rd_64
-              (app rotate_by_mouse_57
-               (normalize (vec3 (index uv_55 0) (index uv_55 1) 1.5)))
-              (let t_65 (app (app march_46 ro_63) rd_64)
-               (match t_65 ((None) (vec3 0 0 0))
-                ((Some t_66)
-                 (let hitPos_67 (+ ro_63 (* rd_64 t_66))
-                  (let n_68 (app getNormal_37 hitPos_67)
-                   (let lightDir_69 (normalize (vec3 1. 0.8 -0.5))
-                    (let diff_70 (max (dot n_68 lightDir_69) 0)
-                     (let ambient_71 0.08
-                      (let dir_72 (/ hitPos_67 (length hitPos_67))
-                       (let rawHeight_73 (app fbm_27 (* dir_72 3.))
-                        (let seaLevel_74 0.35
-                         (let h_norm_75
+       (lambda (coord_57 ((vec 2)))
+        (let res_min_58 (min (index u_resolution 0) (index u_resolution 1))
+         (let uv_59 (/ (- (* coord_57 2) u_resolution) res_min_58)
+          (let mouseUV_60 (/ (- (* u_mouse 2) u_resolution) res_min_58)
+           (let rotate_by_mouse_61
+            (lambda (ray_62 ())
+             (let rotX_63 (* (* -1 (index mouseUV_60 1)) 1.5)
+              (let ro_yz_64
+               (app (app rotate_0 (vec2 (index ray_62 1) (index ray_62 2)))
+                rotX_63)
+               (let rotY_65 (* (* -1 (index mouseUV_60 0)) 1.5)
+                (let ro_xz_66
+                 (app (app rotate_0 (vec2 (index ray_62 0) (index ro_yz_64 1)))
+                  rotY_65)
+                 (vec3 (index ro_xz_66 0) (index ro_yz_64 0) (index ro_xz_66 1)))))))
+            (let ro_67 (app rotate_by_mouse_61 (vec3 0 0 -4))
+             (let rd_68
+              (app rotate_by_mouse_61
+               (normalize (vec3 (index uv_59 0) (index uv_59 1) 1.5)))
+              (let t_69 (app (app march_46 ro_67) rd_68)
+               (match t_69 ((None) (vec3 0 0 0))
+                ((Some t_70)
+                 (let hitPos_71 (+ ro_67 (* rd_68 t_70))
+                  (let n_72 (app getNormal_37 hitPos_71)
+                   (let lightDir_73 (normalize (vec3 1. 0.8 -0.5))
+                    (let diff_74 (max (dot n_72 lightDir_73) 0)
+                     (let ambient_75 0.08
+                      (let dir_76 (/ hitPos_71 (length hitPos_71))
+                       (let rawHeight_77 (app fbm_27 (* dir_76 3.))
+                        (let seaLevel_78 0.35
+                         (let h_norm_79
                           (clamp
-                           (/ (- rawHeight_73 seaLevel_74) (- 1 seaLevel_74)) 0
+                           (/ (- rawHeight_77 seaLevel_78) (- 1 seaLevel_78)) 0
                            1)
-                          (let deepColor_76 (vec3 0.02 0.05 0.2)
-                           (let landColor_77 (vec3 0.15 0.35 0.1)
-                            (let mountColor_78 (vec3 0.4 0.3 0.2)
-                             (let snowColor_79 (vec3 0.85 0.85 0.9)
-                              (let baseColor_80
-                               (if (< h_norm_75 0.3)
-                                (mix deepColor_76 landColor_77 (/ h_norm_75 0.3))
-                                (if (< h_norm_75 0.6)
-                                 (mix landColor_77 mountColor_78
-                                  (/ (- h_norm_75 0.3) 0.3))
-                                 (mix mountColor_78 snowColor_79
-                                  (/ (- h_norm_75 0.6) 0.4))))
-                               (let fresnel_81
-                                (- 1. (max (dot n_68 (* rd_64 -1.)) 0))
-                                (let rim_82
-                                 (* (* (* fresnel_81 fresnel_81) fresnel_81) 0.4)
-                                 (let atmoColor_83 (vec3 0.3 0.5 1.)
-                                  (+
-                                   (* baseColor_80
-                                    (+ (* diff_70 0.9) ambient_71))
-                                   (* atmoColor_83 rim_82))))))))))))))))))))))))))))))))
+                          (let baseColor_80
+                           (if (< h_norm_79 0.3)
+                            (mix deepColor_53 landColor_54 (/ h_norm_79 0.3))
+                            (if (< h_norm_79 0.6)
+                             (mix landColor_54 mountColor_55
+                              (/ (- h_norm_79 0.3) 0.3))
+                             (mix mountColor_55 snowColor_56
+                              (/ (- h_norm_79 0.6) 0.4))))
+                           (let fresnel_81 (- 1 (max (dot n_72 (* rd_68 -1)) 0))
+                            (let rim_82
+                             (* (* (* fresnel_81 fresnel_81) fresnel_81) 0.4)
+                             (let atmoColor_83 (vec3 0.3 0.5 1.)
+                              (+ (* baseColor_80 (+ (* diff_74 0.9) ambient_75))
+                               (* atmoColor_83 rim_82))))))))))))))))))))))))))))
 
     === typecheck (planet.glml) ===
     (Program
@@ -3784,63 +4105,75 @@ let%expect_test "compile examples" =
            : ((vec 3) -> (option float))))
          : ((vec 3) -> ((vec 3) -> (option float)))))
        : ((vec 3) -> ((vec 3) -> (option float))))
+      ((Define Nonrec deepColor_53
+        ((vec3 (0.02 : float) (0.05 : float) (0.2 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec landColor_54
+        ((vec3 (0.15 : float) (0.35 : float) (0.1 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec mountColor_55
+        ((vec3 (0.4 : float) (0.3 : float) (0.2 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec snowColor_56
+        ((vec3 (0.85 : float) (0.85 : float) (0.9 : float)) : (vec 3)))
+       : (vec 3))
       ((Define Nonrec main
-        ((lambda coord_53
-          ((let res_min_54
+        ((lambda coord_57
+          ((let res_min_58
             ((min ((index (u_resolution : (vec 2)) 0) : float)
               ((index (u_resolution : (vec 2)) 1) : float))
              : float)
-            ((let uv_55
+            ((let uv_59
               ((/
-                ((- ((* (coord_53 : (vec 2)) (2 : int)) : (vec 2))
+                ((- ((* (coord_57 : (vec 2)) (2 : int)) : (vec 2))
                   (u_resolution : (vec 2)))
                  : (vec 2))
-                (res_min_54 : float))
+                (res_min_58 : float))
                : (vec 2))
-              ((let mouseUV_56
+              ((let mouseUV_60
                 ((/
                   ((- ((* (u_mouse : (vec 2)) (2 : int)) : (vec 2))
                     (u_resolution : (vec 2)))
                    : (vec 2))
-                  (res_min_54 : float))
+                  (res_min_58 : float))
                  : (vec 2))
-                ((let rotate_by_mouse_57
-                  ((lambda ray_58
-                    ((let rotX_59
+                ((let rotate_by_mouse_61
+                  ((lambda ray_62
+                    ((let rotX_63
                       ((*
                         ((* (-1 : int)
-                          ((index (mouseUV_56 : (vec 2)) 1) : float))
+                          ((index (mouseUV_60 : (vec 2)) 1) : float))
                          : float)
                         (1.5 : float))
                        : float)
-                      ((let ro_yz_60
+                      ((let ro_yz_64
                         ((app
                           ((app (rotate_0 : ((vec 2) -> (float -> (vec 2))))
-                            ((vec2 ((index (ray_58 : 'v_231) 1) : 'v_235)
-                              ((index (ray_58 : 'v_231) 2) : 'v_236))
+                            ((vec2 ((index (ray_62 : 'v_231) 1) : 'v_235)
+                              ((index (ray_62 : 'v_231) 2) : 'v_236))
                              : (vec 2)))
                            : (float -> (vec 2)))
-                          (rotX_59 : float))
+                          (rotX_63 : float))
                          : (vec 2))
-                        ((let rotY_61
+                        ((let rotY_65
                           ((*
                             ((* (-1 : int)
-                              ((index (mouseUV_56 : (vec 2)) 0) : float))
+                              ((index (mouseUV_60 : (vec 2)) 0) : float))
                              : float)
                             (1.5 : float))
                            : float)
-                          ((let ro_xz_62
+                          ((let ro_xz_66
                             ((app
                               ((app (rotate_0 : ((vec 2) -> (float -> (vec 2))))
-                                ((vec2 ((index (ray_58 : 'v_231) 0) : 'v_242)
-                                  ((index (ro_yz_60 : (vec 2)) 1) : float))
+                                ((vec2 ((index (ray_62 : 'v_231) 0) : 'v_242)
+                                  ((index (ro_yz_64 : (vec 2)) 1) : float))
                                  : (vec 2)))
                                : (float -> (vec 2)))
-                              (rotY_61 : float))
+                              (rotY_65 : float))
                              : (vec 2))
-                            ((vec3 ((index (ro_xz_62 : (vec 2)) 0) : float)
-                              ((index (ro_yz_60 : (vec 2)) 0) : float)
-                              ((index (ro_xz_62 : (vec 2)) 1) : float))
+                            ((vec3 ((index (ro_xz_66 : (vec 2)) 0) : float)
+                              ((index (ro_yz_64 : (vec 2)) 0) : float)
+                              ((index (ro_xz_66 : (vec 2)) 1) : float))
                              : (vec 3)))
                            : (vec 3)))
                          : (vec 3)))
@@ -3852,197 +4185,149 @@ let%expect_test "compile examples" =
                      (Comparable 'v_235) (IndexAccess 'v_231 1 'v_235)
                      (Comparable 'v_242) (IndexAccess 'v_231 0 'v_242))
                     ('v_231 -> (vec 3))))
-                  ((let ro_63
-                    ((app (rotate_by_mouse_57 : ((vec 3) -> (vec 3)))
+                  ((let ro_67
+                    ((app (rotate_by_mouse_61 : ((vec 3) -> (vec 3)))
                       ((vec3 (0 : int) (0 : int) (-4 : int)) : (vec 3)))
                      : (vec 3))
-                    ((let rd_64
-                      ((app (rotate_by_mouse_57 : ((vec 3) -> (vec 3)))
+                    ((let rd_68
+                      ((app (rotate_by_mouse_61 : ((vec 3) -> (vec 3)))
                         ((normalize
-                          ((vec3 ((index (uv_55 : (vec 2)) 0) : float)
-                            ((index (uv_55 : (vec 2)) 1) : float) (1.5 : float))
+                          ((vec3 ((index (uv_59 : (vec 2)) 0) : float)
+                            ((index (uv_59 : (vec 2)) 1) : float) (1.5 : float))
                            : (vec 3)))
                          : (vec 3)))
                        : (vec 3))
-                      ((let t_65
+                      ((let t_69
                         ((app
                           ((app
                             (march_46 : ((vec 3) -> ((vec 3) -> (option float))))
-                            (ro_63 : (vec 3)))
+                            (ro_67 : (vec 3)))
                            : ((vec 3) -> (option float)))
-                          (rd_64 : (vec 3)))
+                          (rd_68 : (vec 3)))
                          : (option float))
-                        ((match (t_65 : (option float))
+                        ((match (t_69 : (option float))
                           ((None)
                            ((vec3 (0 : int) (0 : int) (0 : int)) : (vec 3)))
-                          ((Some t_66)
-                           ((let hitPos_67
-                             ((+ (ro_63 : (vec 3))
-                               ((* (rd_64 : (vec 3)) (t_66 : float)) : (vec 3)))
+                          ((Some t_70)
+                           ((let hitPos_71
+                             ((+ (ro_67 : (vec 3))
+                               ((* (rd_68 : (vec 3)) (t_70 : float)) : (vec 3)))
                               : (vec 3))
-                             ((let n_68
+                             ((let n_72
                                ((app (getNormal_37 : ((vec 3) -> (vec 3)))
-                                 (hitPos_67 : (vec 3)))
+                                 (hitPos_71 : (vec 3)))
                                 : (vec 3))
-                               ((let lightDir_69
+                               ((let lightDir_73
                                  ((normalize
                                    ((vec3 (1. : float) (0.8 : float)
                                      (-0.5 : float))
                                     : (vec 3)))
                                   : (vec 3))
-                                 ((let diff_70
+                                 ((let diff_74
                                    ((max
-                                     ((dot (n_68 : (vec 3))
-                                       (lightDir_69 : (vec 3)))
+                                     ((dot (n_72 : (vec 3))
+                                       (lightDir_73 : (vec 3)))
                                       : float)
                                      (0 : int))
                                     : float)
-                                   ((let ambient_71 (0.08 : float)
-                                     ((let dir_72
-                                       ((/ (hitPos_67 : (vec 3))
-                                         ((length (hitPos_67 : (vec 3))) : float))
+                                   ((let ambient_75 (0.08 : float)
+                                     ((let dir_76
+                                       ((/ (hitPos_71 : (vec 3))
+                                         ((length (hitPos_71 : (vec 3))) : float))
                                         : (vec 3))
-                                       ((let rawHeight_73
+                                       ((let rawHeight_77
                                          ((app (fbm_27 : ((vec 3) -> float))
-                                           ((* (dir_72 : (vec 3)) (3. : float)) :
+                                           ((* (dir_76 : (vec 3)) (3. : float)) :
                                             (vec 3)))
                                           : float)
-                                         ((let seaLevel_74 (0.35 : float)
-                                           ((let h_norm_75
+                                         ((let seaLevel_78 (0.35 : float)
+                                           ((let h_norm_79
                                              ((clamp
                                                ((/
-                                                 ((- (rawHeight_73 : float)
-                                                   (seaLevel_74 : float))
+                                                 ((- (rawHeight_77 : float)
+                                                   (seaLevel_78 : float))
                                                   : float)
                                                  ((- (1 : int)
-                                                   (seaLevel_74 : float))
+                                                   (seaLevel_78 : float))
                                                   : float))
                                                 : float)
                                                (0 : int) (1 : int))
                                               : float)
-                                             ((let deepColor_76
-                                               ((vec3 (0.02 : float)
-                                                 (0.05 : float) (0.2 : float))
-                                                : (vec 3))
-                                               ((let landColor_77
-                                                 ((vec3 (0.15 : float)
-                                                   (0.35 : float) (0.1 : float))
+                                             ((let baseColor_80
+                                               ((if
+                                                 ((< (h_norm_79 : float)
+                                                   (0.3 : float))
+                                                  : bool)
+                                                 ((mix (deepColor_53 : (vec 3))
+                                                   (landColor_54 : (vec 3))
+                                                   ((/ (h_norm_79 : float)
+                                                     (0.3 : float))
+                                                    : float))
                                                   : (vec 3))
-                                                 ((let mountColor_78
-                                                   ((vec3 (0.4 : float)
-                                                     (0.3 : float) (0.2 : float))
+                                                 ((if
+                                                   ((< (h_norm_79 : float)
+                                                     (0.6 : float))
+                                                    : bool)
+                                                   ((mix (landColor_54 : (vec 3))
+                                                     (mountColor_55 : (vec 3))
+                                                     ((/
+                                                       ((- (h_norm_79 : float)
+                                                         (0.3 : float))
+                                                        : float)
+                                                       (0.3 : float))
+                                                      : float))
                                                     : (vec 3))
-                                                   ((let snowColor_79
-                                                     ((vec3 (0.85 : float)
-                                                       (0.85 : float)
-                                                       (0.9 : float))
+                                                   ((mix
+                                                     (mountColor_55 : (vec 3))
+                                                     (snowColor_56 : (vec 3))
+                                                     ((/
+                                                       ((- (h_norm_79 : float)
+                                                         (0.6 : float))
+                                                        : float)
+                                                       (0.4 : float))
+                                                      : float))
+                                                    : (vec 3)))
+                                                  : (vec 3)))
+                                                : (vec 3))
+                                               ((let fresnel_81
+                                                 ((- (1 : int)
+                                                   ((max
+                                                     ((dot (n_72 : (vec 3))
+                                                       ((* (rd_68 : (vec 3))
+                                                         (-1 : int))
+                                                        : (vec 3)))
+                                                      : float)
+                                                     (0 : int))
+                                                    : float))
+                                                  : float)
+                                                 ((let rim_82
+                                                   ((*
+                                                     ((*
+                                                       ((* (fresnel_81 : float)
+                                                         (fresnel_81 : float))
+                                                        : float)
+                                                       (fresnel_81 : float))
+                                                      : float)
+                                                     (0.4 : float))
+                                                    : float)
+                                                   ((let atmoColor_83
+                                                     ((vec3 (0.3 : float)
+                                                       (0.5 : float)
+                                                       (1. : float))
                                                       : (vec 3))
-                                                     ((let baseColor_80
-                                                       ((if
-                                                         ((< (h_norm_75 : float)
-                                                           (0.3 : float))
-                                                          : bool)
-                                                         ((mix
-                                                           (deepColor_76 :
-                                                            (vec 3))
-                                                           (landColor_77 :
-                                                            (vec 3))
-                                                           ((/
-                                                             (h_norm_75 : float)
-                                                             (0.3 : float))
-                                                            : float))
-                                                          : (vec 3))
-                                                         ((if
-                                                           ((<
-                                                             (h_norm_75 : float)
-                                                             (0.6 : float))
-                                                            : bool)
-                                                           ((mix
-                                                             (landColor_77 :
-                                                              (vec 3))
-                                                             (mountColor_78 :
-                                                              (vec 3))
-                                                             ((/
-                                                               ((-
-                                                                 (h_norm_75 :
-                                                                  float)
-                                                                 (0.3 : float))
-                                                                : float)
-                                                               (0.3 : float))
-                                                              : float))
-                                                            : (vec 3))
-                                                           ((mix
-                                                             (mountColor_78 :
-                                                              (vec 3))
-                                                             (snowColor_79 :
-                                                              (vec 3))
-                                                             ((/
-                                                               ((-
-                                                                 (h_norm_75 :
-                                                                  float)
-                                                                 (0.6 : float))
-                                                                : float)
-                                                               (0.4 : float))
-                                                              : float))
-                                                            : (vec 3)))
-                                                          : (vec 3)))
-                                                        : (vec 3))
-                                                       ((let fresnel_81
-                                                         ((- (1. : float)
-                                                           ((max
-                                                             ((dot
-                                                               (n_68 : (vec 3))
-                                                               ((*
-                                                                 (rd_64 :
-                                                                  (vec 3))
-                                                                 (-1. : float))
-                                                                : (vec 3)))
-                                                              : float)
-                                                             (0 : int))
-                                                            : float))
-                                                          : float)
-                                                         ((let rim_82
-                                                           ((*
-                                                             ((*
-                                                               ((*
-                                                                 (fresnel_81 :
-                                                                  float)
-                                                                 (fresnel_81 :
-                                                                  float))
-                                                                : float)
-                                                               (fresnel_81 :
-                                                                float))
-                                                              : float)
-                                                             (0.4 : float))
+                                                     ((+
+                                                       ((*
+                                                         (baseColor_80 : (vec 3))
+                                                         ((+
+                                                           ((* (diff_74 : float)
+                                                             (0.9 : float))
                                                             : float)
-                                                           ((let atmoColor_83
-                                                             ((vec3 (0.3 : float)
-                                                               (0.5 : float)
-                                                               (1. : float))
-                                                              : (vec 3))
-                                                             ((+
-                                                               ((*
-                                                                 (baseColor_80 :
-                                                                  (vec 3))
-                                                                 ((+
-                                                                   ((*
-                                                                     (diff_70 :
-                                                                      float)
-                                                                     (0.9 :
-                                                                      float))
-                                                                    : float)
-                                                                   (ambient_71 :
-                                                                    float))
-                                                                  : float))
-                                                                : (vec 3))
-                                                               ((*
-                                                                 (atmoColor_83 :
-                                                                  (vec 3))
-                                                                 (rim_82 : float))
-                                                                : (vec 3)))
-                                                              : (vec 3)))
-                                                            : (vec 3)))
-                                                          : (vec 3)))
+                                                           (ambient_75 : float))
+                                                          : float))
+                                                        : (vec 3))
+                                                       ((*
+                                                         (atmoColor_83 : (vec 3))
+                                                         (rim_82 : float))
                                                         : (vec 3)))
                                                       : (vec 3)))
                                                     : (vec 3)))
@@ -4382,264 +4667,228 @@ let%expect_test "compile examples" =
            : ((vec 3) -> v_option_float)))
          : ((vec 3) -> ((vec 3) -> v_option_float))))
        : ((vec 3) -> ((vec 3) -> v_option_float)))
+      ((Define Nonrec deepColor_53
+        ((vec3 (0.02 : float) (0.05 : float) (0.2 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec landColor_54
+        ((vec3 (0.15 : float) (0.35 : float) (0.1 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec mountColor_55
+        ((vec3 (0.4 : float) (0.3 : float) (0.2 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec snowColor_56
+        ((vec3 (0.85 : float) (0.85 : float) (0.9 : float)) : (vec 3)))
+       : (vec 3))
       ((Define Nonrec main
-        ((lambda coord_53
-          ((let res_min_54
+        ((lambda coord_57
+          ((let res_min_58
             ((min ((index (u_resolution : (vec 2)) 0) : float)
               ((index (u_resolution : (vec 2)) 1) : float))
              : float)
-            ((let uv_55
+            ((let uv_59
               ((/
-                ((- ((* (coord_53 : (vec 2)) (2 : int)) : (vec 2))
+                ((- ((* (coord_57 : (vec 2)) (2 : int)) : (vec 2))
                   (u_resolution : (vec 2)))
                  : (vec 2))
-                (res_min_54 : float))
+                (res_min_58 : float))
                : (vec 2))
-              ((let mouseUV_56
+              ((let mouseUV_60
                 ((/
                   ((- ((* (u_mouse : (vec 2)) (2 : int)) : (vec 2))
                     (u_resolution : (vec 2)))
                    : (vec 2))
-                  (res_min_54 : float))
+                  (res_min_58 : float))
                  : (vec 2))
-                ((let rotate_by_mouse_57_vec3_to_vec3_317
-                  ((lambda ray_58
-                    ((let rotX_59
+                ((let rotate_by_mouse_61_vec3_to_vec3_317
+                  ((lambda ray_62
+                    ((let rotX_63
                       ((*
                         ((* (-1 : int)
-                          ((index (mouseUV_56 : (vec 2)) 1) : float))
+                          ((index (mouseUV_60 : (vec 2)) 1) : float))
                          : float)
                         (1.5 : float))
                        : float)
-                      ((let ro_yz_60
+                      ((let ro_yz_64
                         ((app
                           ((app (rotate_0 : ((vec 2) -> (float -> (vec 2))))
-                            ((vec2 ((index (ray_58 : (vec 3)) 1) : float)
-                              ((index (ray_58 : (vec 3)) 2) : float))
+                            ((vec2 ((index (ray_62 : (vec 3)) 1) : float)
+                              ((index (ray_62 : (vec 3)) 2) : float))
                              : (vec 2)))
                            : (float -> (vec 2)))
-                          (rotX_59 : float))
+                          (rotX_63 : float))
                          : (vec 2))
-                        ((let rotY_61
+                        ((let rotY_65
                           ((*
                             ((* (-1 : int)
-                              ((index (mouseUV_56 : (vec 2)) 0) : float))
+                              ((index (mouseUV_60 : (vec 2)) 0) : float))
                              : float)
                             (1.5 : float))
                            : float)
-                          ((let ro_xz_62
+                          ((let ro_xz_66
                             ((app
                               ((app (rotate_0 : ((vec 2) -> (float -> (vec 2))))
-                                ((vec2 ((index (ray_58 : (vec 3)) 0) : float)
-                                  ((index (ro_yz_60 : (vec 2)) 1) : float))
+                                ((vec2 ((index (ray_62 : (vec 3)) 0) : float)
+                                  ((index (ro_yz_64 : (vec 2)) 1) : float))
                                  : (vec 2)))
                                : (float -> (vec 2)))
-                              (rotY_61 : float))
+                              (rotY_65 : float))
                              : (vec 2))
-                            ((vec3 ((index (ro_xz_62 : (vec 2)) 0) : float)
-                              ((index (ro_yz_60 : (vec 2)) 0) : float)
-                              ((index (ro_xz_62 : (vec 2)) 1) : float))
+                            ((vec3 ((index (ro_xz_66 : (vec 2)) 0) : float)
+                              ((index (ro_yz_64 : (vec 2)) 0) : float)
+                              ((index (ro_xz_66 : (vec 2)) 1) : float))
                              : (vec 3)))
                            : (vec 3)))
                          : (vec 3)))
                        : (vec 3)))
                      : (vec 3)))
                    : ((vec 3) -> (vec 3)))
-                  ((let ro_63
+                  ((let ro_67
                     ((app
-                      (rotate_by_mouse_57_vec3_to_vec3_317 :
+                      (rotate_by_mouse_61_vec3_to_vec3_317 :
                        ((vec 3) -> (vec 3)))
                       ((vec3 (0 : int) (0 : int) (-4 : int)) : (vec 3)))
                      : (vec 3))
-                    ((let rd_64
+                    ((let rd_68
                       ((app
-                        (rotate_by_mouse_57_vec3_to_vec3_317 :
+                        (rotate_by_mouse_61_vec3_to_vec3_317 :
                          ((vec 3) -> (vec 3)))
                         ((normalize
-                          ((vec3 ((index (uv_55 : (vec 2)) 0) : float)
-                            ((index (uv_55 : (vec 2)) 1) : float) (1.5 : float))
+                          ((vec3 ((index (uv_59 : (vec 2)) 0) : float)
+                            ((index (uv_59 : (vec 2)) 1) : float) (1.5 : float))
                            : (vec 3)))
                          : (vec 3)))
                        : (vec 3))
-                      ((let t_65
+                      ((let t_69
                         ((app
                           ((app
                             (march_46 : ((vec 3) -> ((vec 3) -> v_option_float)))
-                            (ro_63 : (vec 3)))
+                            (ro_67 : (vec 3)))
                            : ((vec 3) -> v_option_float))
-                          (rd_64 : (vec 3)))
+                          (rd_68 : (vec 3)))
                          : v_option_float)
-                        ((match (t_65 : v_option_float)
+                        ((match (t_69 : v_option_float)
                           ((None)
                            ((vec3 (0 : int) (0 : int) (0 : int)) : (vec 3)))
-                          ((Some t_66)
-                           ((let hitPos_67
-                             ((+ (ro_63 : (vec 3))
-                               ((* (rd_64 : (vec 3)) (t_66 : float)) : (vec 3)))
+                          ((Some t_70)
+                           ((let hitPos_71
+                             ((+ (ro_67 : (vec 3))
+                               ((* (rd_68 : (vec 3)) (t_70 : float)) : (vec 3)))
                               : (vec 3))
-                             ((let n_68
+                             ((let n_72
                                ((app (getNormal_37 : ((vec 3) -> (vec 3)))
-                                 (hitPos_67 : (vec 3)))
+                                 (hitPos_71 : (vec 3)))
                                 : (vec 3))
-                               ((let lightDir_69
+                               ((let lightDir_73
                                  ((normalize
                                    ((vec3 (1. : float) (0.8 : float)
                                      (-0.5 : float))
                                     : (vec 3)))
                                   : (vec 3))
-                                 ((let diff_70
+                                 ((let diff_74
                                    ((max
-                                     ((dot (n_68 : (vec 3))
-                                       (lightDir_69 : (vec 3)))
+                                     ((dot (n_72 : (vec 3))
+                                       (lightDir_73 : (vec 3)))
                                       : float)
                                      (0 : int))
                                     : float)
-                                   ((let ambient_71 (0.08 : float)
-                                     ((let dir_72
-                                       ((/ (hitPos_67 : (vec 3))
-                                         ((length (hitPos_67 : (vec 3))) : float))
+                                   ((let ambient_75 (0.08 : float)
+                                     ((let dir_76
+                                       ((/ (hitPos_71 : (vec 3))
+                                         ((length (hitPos_71 : (vec 3))) : float))
                                         : (vec 3))
-                                       ((let rawHeight_73
+                                       ((let rawHeight_77
                                          ((app (fbm_27 : ((vec 3) -> float))
-                                           ((* (dir_72 : (vec 3)) (3. : float)) :
+                                           ((* (dir_76 : (vec 3)) (3. : float)) :
                                             (vec 3)))
                                           : float)
-                                         ((let seaLevel_74 (0.35 : float)
-                                           ((let h_norm_75
+                                         ((let seaLevel_78 (0.35 : float)
+                                           ((let h_norm_79
                                              ((clamp
                                                ((/
-                                                 ((- (rawHeight_73 : float)
-                                                   (seaLevel_74 : float))
+                                                 ((- (rawHeight_77 : float)
+                                                   (seaLevel_78 : float))
                                                   : float)
                                                  ((- (1 : int)
-                                                   (seaLevel_74 : float))
+                                                   (seaLevel_78 : float))
                                                   : float))
                                                 : float)
                                                (0 : int) (1 : int))
                                               : float)
-                                             ((let deepColor_76
-                                               ((vec3 (0.02 : float)
-                                                 (0.05 : float) (0.2 : float))
-                                                : (vec 3))
-                                               ((let landColor_77
-                                                 ((vec3 (0.15 : float)
-                                                   (0.35 : float) (0.1 : float))
+                                             ((let baseColor_80
+                                               ((if
+                                                 ((< (h_norm_79 : float)
+                                                   (0.3 : float))
+                                                  : bool)
+                                                 ((mix (deepColor_53 : (vec 3))
+                                                   (landColor_54 : (vec 3))
+                                                   ((/ (h_norm_79 : float)
+                                                     (0.3 : float))
+                                                    : float))
                                                   : (vec 3))
-                                                 ((let mountColor_78
-                                                   ((vec3 (0.4 : float)
-                                                     (0.3 : float) (0.2 : float))
+                                                 ((if
+                                                   ((< (h_norm_79 : float)
+                                                     (0.6 : float))
+                                                    : bool)
+                                                   ((mix (landColor_54 : (vec 3))
+                                                     (mountColor_55 : (vec 3))
+                                                     ((/
+                                                       ((- (h_norm_79 : float)
+                                                         (0.3 : float))
+                                                        : float)
+                                                       (0.3 : float))
+                                                      : float))
                                                     : (vec 3))
-                                                   ((let snowColor_79
-                                                     ((vec3 (0.85 : float)
-                                                       (0.85 : float)
-                                                       (0.9 : float))
+                                                   ((mix
+                                                     (mountColor_55 : (vec 3))
+                                                     (snowColor_56 : (vec 3))
+                                                     ((/
+                                                       ((- (h_norm_79 : float)
+                                                         (0.6 : float))
+                                                        : float)
+                                                       (0.4 : float))
+                                                      : float))
+                                                    : (vec 3)))
+                                                  : (vec 3)))
+                                                : (vec 3))
+                                               ((let fresnel_81
+                                                 ((- (1 : int)
+                                                   ((max
+                                                     ((dot (n_72 : (vec 3))
+                                                       ((* (rd_68 : (vec 3))
+                                                         (-1 : int))
+                                                        : (vec 3)))
+                                                      : float)
+                                                     (0 : int))
+                                                    : float))
+                                                  : float)
+                                                 ((let rim_82
+                                                   ((*
+                                                     ((*
+                                                       ((* (fresnel_81 : float)
+                                                         (fresnel_81 : float))
+                                                        : float)
+                                                       (fresnel_81 : float))
+                                                      : float)
+                                                     (0.4 : float))
+                                                    : float)
+                                                   ((let atmoColor_83
+                                                     ((vec3 (0.3 : float)
+                                                       (0.5 : float)
+                                                       (1. : float))
                                                       : (vec 3))
-                                                     ((let baseColor_80
-                                                       ((if
-                                                         ((< (h_norm_75 : float)
-                                                           (0.3 : float))
-                                                          : bool)
-                                                         ((mix
-                                                           (deepColor_76 :
-                                                            (vec 3))
-                                                           (landColor_77 :
-                                                            (vec 3))
-                                                           ((/
-                                                             (h_norm_75 : float)
-                                                             (0.3 : float))
-                                                            : float))
-                                                          : (vec 3))
-                                                         ((if
-                                                           ((<
-                                                             (h_norm_75 : float)
-                                                             (0.6 : float))
-                                                            : bool)
-                                                           ((mix
-                                                             (landColor_77 :
-                                                              (vec 3))
-                                                             (mountColor_78 :
-                                                              (vec 3))
-                                                             ((/
-                                                               ((-
-                                                                 (h_norm_75 :
-                                                                  float)
-                                                                 (0.3 : float))
-                                                                : float)
-                                                               (0.3 : float))
-                                                              : float))
-                                                            : (vec 3))
-                                                           ((mix
-                                                             (mountColor_78 :
-                                                              (vec 3))
-                                                             (snowColor_79 :
-                                                              (vec 3))
-                                                             ((/
-                                                               ((-
-                                                                 (h_norm_75 :
-                                                                  float)
-                                                                 (0.6 : float))
-                                                                : float)
-                                                               (0.4 : float))
-                                                              : float))
-                                                            : (vec 3)))
-                                                          : (vec 3)))
-                                                        : (vec 3))
-                                                       ((let fresnel_81
-                                                         ((- (1. : float)
-                                                           ((max
-                                                             ((dot
-                                                               (n_68 : (vec 3))
-                                                               ((*
-                                                                 (rd_64 :
-                                                                  (vec 3))
-                                                                 (-1. : float))
-                                                                : (vec 3)))
-                                                              : float)
-                                                             (0 : int))
-                                                            : float))
-                                                          : float)
-                                                         ((let rim_82
-                                                           ((*
-                                                             ((*
-                                                               ((*
-                                                                 (fresnel_81 :
-                                                                  float)
-                                                                 (fresnel_81 :
-                                                                  float))
-                                                                : float)
-                                                               (fresnel_81 :
-                                                                float))
-                                                              : float)
-                                                             (0.4 : float))
+                                                     ((+
+                                                       ((*
+                                                         (baseColor_80 : (vec 3))
+                                                         ((+
+                                                           ((* (diff_74 : float)
+                                                             (0.9 : float))
                                                             : float)
-                                                           ((let atmoColor_83
-                                                             ((vec3 (0.3 : float)
-                                                               (0.5 : float)
-                                                               (1. : float))
-                                                              : (vec 3))
-                                                             ((+
-                                                               ((*
-                                                                 (baseColor_80 :
-                                                                  (vec 3))
-                                                                 ((+
-                                                                   ((*
-                                                                     (diff_70 :
-                                                                      float)
-                                                                     (0.9 :
-                                                                      float))
-                                                                    : float)
-                                                                   (ambient_71 :
-                                                                    float))
-                                                                  : float))
-                                                                : (vec 3))
-                                                               ((*
-                                                                 (atmoColor_83 :
-                                                                  (vec 3))
-                                                                 (rim_82 : float))
-                                                                : (vec 3)))
-                                                              : (vec 3)))
-                                                            : (vec 3)))
-                                                          : (vec 3)))
+                                                           (ambient_75 : float))
+                                                          : float))
+                                                        : (vec 3))
+                                                       ((*
+                                                         (atmoColor_83 : (vec 3))
+                                                         (rim_82 : float))
                                                         : (vec 3)))
                                                       : (vec 3)))
                                                     : (vec 3)))
@@ -4750,63 +4999,58 @@ let%expect_test "compile examples" =
                (app march_49 (+ t_50 (* d_52 0.8)) (+ steps_51 1)))))))
           (app march_49 0. 0))))
        : ((vec 3) -> ((vec 3) -> v_option_float)))
+      ((Define Nonrec deepColor_53 (vec3 0.02 0.05 0.2)) : (vec 3))
+      ((Define Nonrec landColor_54 (vec3 0.15 0.35 0.1)) : (vec 3))
+      ((Define Nonrec mountColor_55 (vec3 0.4 0.3 0.2)) : (vec 3))
+      ((Define Nonrec snowColor_56 (vec3 0.85 0.85 0.9)) : (vec 3))
       ((Define Nonrec main
-        (lambda ((coord_53 (vec 2)))
-         (let res_min_54 (min (index u_resolution 0) (index u_resolution 1))
-          (let uv_55 (/ (- (* coord_53 2) u_resolution) res_min_54)
-           (let mouseUV_56 (/ (- (* u_mouse 2) u_resolution) res_min_54)
-            (let rotate_by_mouse_57_vec3_to_vec3_317
-             (lambda ((ray_58 (vec 3)))
-              (let rotX_59 (* (* -1 (index mouseUV_56 1)) 1.5)
-               (let ro_yz_60
-                (app rotate_0 (vec2 (index ray_58 1) (index ray_58 2)) rotX_59)
-                (let rotY_61 (* (* -1 (index mouseUV_56 0)) 1.5)
-                 (let ro_xz_62
-                  (app rotate_0 (vec2 (index ray_58 0) (index ro_yz_60 1))
-                   rotY_61)
-                  (vec3 (index ro_xz_62 0) (index ro_yz_60 0) (index ro_xz_62 1)))))))
-             (let ro_63 (app rotate_by_mouse_57_vec3_to_vec3_317 (vec3 0 0 -4))
-              (let rd_64
-               (app rotate_by_mouse_57_vec3_to_vec3_317
-                (normalize (vec3 (index uv_55 0) (index uv_55 1) 1.5)))
-               (let t_65 (app march_46 ro_63 rd_64)
-                (match t_65 ((None) (vec3 0 0 0))
-                 ((Some t_66)
-                  (let hitPos_67 (+ ro_63 (* rd_64 t_66))
-                   (let n_68 (app getNormal_37 hitPos_67)
-                    (let lightDir_69 (normalize (vec3 1. 0.8 -0.5))
-                     (let diff_70 (max (dot n_68 lightDir_69) 0)
-                      (let ambient_71 0.08
-                       (let dir_72 (/ hitPos_67 (length hitPos_67))
-                        (let rawHeight_73 (app fbm_27 (* dir_72 3.))
-                         (let seaLevel_74 0.35
-                          (let h_norm_75
+        (lambda ((coord_57 (vec 2)))
+         (let res_min_58 (min (index u_resolution 0) (index u_resolution 1))
+          (let uv_59 (/ (- (* coord_57 2) u_resolution) res_min_58)
+           (let mouseUV_60 (/ (- (* u_mouse 2) u_resolution) res_min_58)
+            (let rotate_by_mouse_61_vec3_to_vec3_317
+             (lambda ((ray_62 (vec 3)))
+              (let rotX_63 (* (* -1 (index mouseUV_60 1)) 1.5)
+               (let ro_yz_64
+                (app rotate_0 (vec2 (index ray_62 1) (index ray_62 2)) rotX_63)
+                (let rotY_65 (* (* -1 (index mouseUV_60 0)) 1.5)
+                 (let ro_xz_66
+                  (app rotate_0 (vec2 (index ray_62 0) (index ro_yz_64 1))
+                   rotY_65)
+                  (vec3 (index ro_xz_66 0) (index ro_yz_64 0) (index ro_xz_66 1)))))))
+             (let ro_67 (app rotate_by_mouse_61_vec3_to_vec3_317 (vec3 0 0 -4))
+              (let rd_68
+               (app rotate_by_mouse_61_vec3_to_vec3_317
+                (normalize (vec3 (index uv_59 0) (index uv_59 1) 1.5)))
+               (let t_69 (app march_46 ro_67 rd_68)
+                (match t_69 ((None) (vec3 0 0 0))
+                 ((Some t_70)
+                  (let hitPos_71 (+ ro_67 (* rd_68 t_70))
+                   (let n_72 (app getNormal_37 hitPos_71)
+                    (let lightDir_73 (normalize (vec3 1. 0.8 -0.5))
+                     (let diff_74 (max (dot n_72 lightDir_73) 0)
+                      (let ambient_75 0.08
+                       (let dir_76 (/ hitPos_71 (length hitPos_71))
+                        (let rawHeight_77 (app fbm_27 (* dir_76 3.))
+                         (let seaLevel_78 0.35
+                          (let h_norm_79
                            (clamp
-                            (/ (- rawHeight_73 seaLevel_74) (- 1 seaLevel_74)) 0
+                            (/ (- rawHeight_77 seaLevel_78) (- 1 seaLevel_78)) 0
                             1)
-                           (let deepColor_76 (vec3 0.02 0.05 0.2)
-                            (let landColor_77 (vec3 0.15 0.35 0.1)
-                             (let mountColor_78 (vec3 0.4 0.3 0.2)
-                              (let snowColor_79 (vec3 0.85 0.85 0.9)
-                               (let baseColor_80
-                                (if (< h_norm_75 0.3)
-                                 (mix deepColor_76 landColor_77
-                                  (/ h_norm_75 0.3))
-                                 (if (< h_norm_75 0.6)
-                                  (mix landColor_77 mountColor_78
-                                   (/ (- h_norm_75 0.3) 0.3))
-                                  (mix mountColor_78 snowColor_79
-                                   (/ (- h_norm_75 0.6) 0.4))))
-                                (let fresnel_81
-                                 (- 1. (max (dot n_68 (* rd_64 -1.)) 0))
-                                 (let rim_82
-                                  (* (* (* fresnel_81 fresnel_81) fresnel_81)
-                                   0.4)
-                                  (let atmoColor_83 (vec3 0.3 0.5 1.)
-                                   (+
-                                    (* baseColor_80
-                                     (+ (* diff_70 0.9) ambient_71))
-                                    (* atmoColor_83 rim_82))))))))))))))))))))))))))))))
+                           (let baseColor_80
+                            (if (< h_norm_79 0.3)
+                             (mix deepColor_53 landColor_54 (/ h_norm_79 0.3))
+                             (if (< h_norm_79 0.6)
+                              (mix landColor_54 mountColor_55
+                               (/ (- h_norm_79 0.3) 0.3))
+                              (mix mountColor_55 snowColor_56
+                               (/ (- h_norm_79 0.6) 0.4))))
+                            (let fresnel_81 (- 1 (max (dot n_72 (* rd_68 -1)) 0))
+                             (let rim_82
+                              (* (* (* fresnel_81 fresnel_81) fresnel_81) 0.4)
+                              (let atmoColor_83 (vec3 0.3 0.5 1.)
+                               (+ (* baseColor_80 (+ (* diff_74 0.9) ambient_75))
+                                (* atmoColor_83 rim_82))))))))))))))))))))))))))
        : ((vec 2) -> (vec 3)))))
 
     === defunctionalize (planet.glml) ===
@@ -4893,63 +5137,58 @@ let%expect_test "compile examples" =
                (app march_49 (+ t_50 (* d_52 0.8)) (+ steps_51 1)))))))
           (app march_49 0. 0))))
        : ((vec 3) -> ((vec 3) -> v_option_float)))
+      ((Define Nonrec deepColor_53 (vec3 0.02 0.05 0.2)) : (vec 3))
+      ((Define Nonrec landColor_54 (vec3 0.15 0.35 0.1)) : (vec 3))
+      ((Define Nonrec mountColor_55 (vec3 0.4 0.3 0.2)) : (vec 3))
+      ((Define Nonrec snowColor_56 (vec3 0.85 0.85 0.9)) : (vec 3))
       ((Define Nonrec main
-        (lambda ((coord_53 (vec 2)))
-         (let res_min_54 (min (index u_resolution 0) (index u_resolution 1))
-          (let uv_55 (/ (- (* coord_53 2) u_resolution) res_min_54)
-           (let mouseUV_56 (/ (- (* u_mouse 2) u_resolution) res_min_54)
-            (let rotate_by_mouse_57_vec3_to_vec3_317
-             (lambda ((ray_58 (vec 3)))
-              (let rotX_59 (* (* -1 (index mouseUV_56 1)) 1.5)
-               (let ro_yz_60
-                (app rotate_0 (vec2 (index ray_58 1) (index ray_58 2)) rotX_59)
-                (let rotY_61 (* (* -1 (index mouseUV_56 0)) 1.5)
-                 (let ro_xz_62
-                  (app rotate_0 (vec2 (index ray_58 0) (index ro_yz_60 1))
-                   rotY_61)
-                  (vec3 (index ro_xz_62 0) (index ro_yz_60 0) (index ro_xz_62 1)))))))
-             (let ro_63 (app rotate_by_mouse_57_vec3_to_vec3_317 (vec3 0 0 -4))
-              (let rd_64
-               (app rotate_by_mouse_57_vec3_to_vec3_317
-                (normalize (vec3 (index uv_55 0) (index uv_55 1) 1.5)))
-               (let t_65 (app march_46 ro_63 rd_64)
-                (match t_65 ((None) (vec3 0 0 0))
-                 ((Some t_66)
-                  (let hitPos_67 (+ ro_63 (* rd_64 t_66))
-                   (let n_68 (app getNormal_37 hitPos_67)
-                    (let lightDir_69 (normalize (vec3 1. 0.8 -0.5))
-                     (let diff_70 (max (dot n_68 lightDir_69) 0)
-                      (let ambient_71 0.08
-                       (let dir_72 (/ hitPos_67 (length hitPos_67))
-                        (let rawHeight_73 (app fbm_27 (* dir_72 3.))
-                         (let seaLevel_74 0.35
-                          (let h_norm_75
+        (lambda ((coord_57 (vec 2)))
+         (let res_min_58 (min (index u_resolution 0) (index u_resolution 1))
+          (let uv_59 (/ (- (* coord_57 2) u_resolution) res_min_58)
+           (let mouseUV_60 (/ (- (* u_mouse 2) u_resolution) res_min_58)
+            (let rotate_by_mouse_61_vec3_to_vec3_317
+             (lambda ((ray_62 (vec 3)))
+              (let rotX_63 (* (* -1 (index mouseUV_60 1)) 1.5)
+               (let ro_yz_64
+                (app rotate_0 (vec2 (index ray_62 1) (index ray_62 2)) rotX_63)
+                (let rotY_65 (* (* -1 (index mouseUV_60 0)) 1.5)
+                 (let ro_xz_66
+                  (app rotate_0 (vec2 (index ray_62 0) (index ro_yz_64 1))
+                   rotY_65)
+                  (vec3 (index ro_xz_66 0) (index ro_yz_64 0) (index ro_xz_66 1)))))))
+             (let ro_67 (app rotate_by_mouse_61_vec3_to_vec3_317 (vec3 0 0 -4))
+              (let rd_68
+               (app rotate_by_mouse_61_vec3_to_vec3_317
+                (normalize (vec3 (index uv_59 0) (index uv_59 1) 1.5)))
+               (let t_69 (app march_46 ro_67 rd_68)
+                (match t_69 ((None) (vec3 0 0 0))
+                 ((Some t_70)
+                  (let hitPos_71 (+ ro_67 (* rd_68 t_70))
+                   (let n_72 (app getNormal_37 hitPos_71)
+                    (let lightDir_73 (normalize (vec3 1. 0.8 -0.5))
+                     (let diff_74 (max (dot n_72 lightDir_73) 0)
+                      (let ambient_75 0.08
+                       (let dir_76 (/ hitPos_71 (length hitPos_71))
+                        (let rawHeight_77 (app fbm_27 (* dir_76 3.))
+                         (let seaLevel_78 0.35
+                          (let h_norm_79
                            (clamp
-                            (/ (- rawHeight_73 seaLevel_74) (- 1 seaLevel_74)) 0
+                            (/ (- rawHeight_77 seaLevel_78) (- 1 seaLevel_78)) 0
                             1)
-                           (let deepColor_76 (vec3 0.02 0.05 0.2)
-                            (let landColor_77 (vec3 0.15 0.35 0.1)
-                             (let mountColor_78 (vec3 0.4 0.3 0.2)
-                              (let snowColor_79 (vec3 0.85 0.85 0.9)
-                               (let baseColor_80
-                                (if (< h_norm_75 0.3)
-                                 (mix deepColor_76 landColor_77
-                                  (/ h_norm_75 0.3))
-                                 (if (< h_norm_75 0.6)
-                                  (mix landColor_77 mountColor_78
-                                   (/ (- h_norm_75 0.3) 0.3))
-                                  (mix mountColor_78 snowColor_79
-                                   (/ (- h_norm_75 0.6) 0.4))))
-                                (let fresnel_81
-                                 (- 1. (max (dot n_68 (* rd_64 -1.)) 0))
-                                 (let rim_82
-                                  (* (* (* fresnel_81 fresnel_81) fresnel_81)
-                                   0.4)
-                                  (let atmoColor_83 (vec3 0.3 0.5 1.)
-                                   (+
-                                    (* baseColor_80
-                                     (+ (* diff_70 0.9) ambient_71))
-                                    (* atmoColor_83 rim_82))))))))))))))))))))))))))))))
+                           (let baseColor_80
+                            (if (< h_norm_79 0.3)
+                             (mix deepColor_53 landColor_54 (/ h_norm_79 0.3))
+                             (if (< h_norm_79 0.6)
+                              (mix landColor_54 mountColor_55
+                               (/ (- h_norm_79 0.3) 0.3))
+                              (mix mountColor_55 snowColor_56
+                               (/ (- h_norm_79 0.6) 0.4))))
+                            (let fresnel_81 (- 1 (max (dot n_72 (* rd_68 -1)) 0))
+                             (let rim_82
+                              (* (* (* fresnel_81 fresnel_81) fresnel_81) 0.4)
+                              (let atmoColor_83 (vec3 0.3 0.5 1.)
+                               (+ (* baseColor_80 (+ (* diff_74 0.9) ambient_75))
+                                (* atmoColor_83 rim_82))))))))))))))))))))))))))
        : ((vec 2) -> (vec 3)))))
 
     === lambda lift (planet.glml) ===
@@ -5038,62 +5277,60 @@ let%expect_test "compile examples" =
      ((Define Nonrec (name march_46) (args ((ro_47 (vec 3)) (rd_48 (vec 3))))
        (body (app march_49_319 rd_48 ro_47 0. 0)))
       : ((vec 3) -> ((vec 3) -> v_option_float)))
-     ((Define Nonrec (name rotate_by_mouse_57_vec3_to_vec3_317_320)
-       (args ((mouseUV_56 (vec 2)) (ray_58 (vec 3))))
+     ((Const deepColor_53 (vec3 0.02 0.05 0.2)) : (vec 3))
+     ((Const landColor_54 (vec3 0.15 0.35 0.1)) : (vec 3))
+     ((Const mountColor_55 (vec3 0.4 0.3 0.2)) : (vec 3))
+     ((Const snowColor_56 (vec3 0.85 0.85 0.9)) : (vec 3))
+     ((Define Nonrec (name rotate_by_mouse_61_vec3_to_vec3_317_320)
+       (args ((mouseUV_60 (vec 2)) (ray_62 (vec 3))))
        (body
-        (let rotX_59 (* (* -1 (index mouseUV_56 1)) 1.5)
-         (let ro_yz_60
-          (app rotate_0 (vec2 (index ray_58 1) (index ray_58 2)) rotX_59)
-          (let rotY_61 (* (* -1 (index mouseUV_56 0)) 1.5)
-           (let ro_xz_62
-            (app rotate_0 (vec2 (index ray_58 0) (index ro_yz_60 1)) rotY_61)
-            (vec3 (index ro_xz_62 0) (index ro_yz_60 0) (index ro_xz_62 1))))))))
+        (let rotX_63 (* (* -1 (index mouseUV_60 1)) 1.5)
+         (let ro_yz_64
+          (app rotate_0 (vec2 (index ray_62 1) (index ray_62 2)) rotX_63)
+          (let rotY_65 (* (* -1 (index mouseUV_60 0)) 1.5)
+           (let ro_xz_66
+            (app rotate_0 (vec2 (index ray_62 0) (index ro_yz_64 1)) rotY_65)
+            (vec3 (index ro_xz_66 0) (index ro_yz_64 0) (index ro_xz_66 1))))))))
       : ((vec 3) -> (vec 3)))
-     ((Define Nonrec (name main) (args ((coord_53 (vec 2))))
+     ((Define Nonrec (name main) (args ((coord_57 (vec 2))))
        (body
-        (let res_min_54 (min (index u_resolution 0) (index u_resolution 1))
-         (let uv_55 (/ (- (* coord_53 2) u_resolution) res_min_54)
-          (let mouseUV_56 (/ (- (* u_mouse 2) u_resolution) res_min_54)
-           (let ro_63
-            (app rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56
+        (let res_min_58 (min (index u_resolution 0) (index u_resolution 1))
+         (let uv_59 (/ (- (* coord_57 2) u_resolution) res_min_58)
+          (let mouseUV_60 (/ (- (* u_mouse 2) u_resolution) res_min_58)
+           (let ro_67
+            (app rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60
              (vec3 0 0 -4))
-            (let rd_64
-             (app rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56
-              (normalize (vec3 (index uv_55 0) (index uv_55 1) 1.5)))
-             (let t_65 (app march_46 ro_63 rd_64)
-              (match t_65 ((None) (vec3 0 0 0))
-               ((Some t_66)
-                (let hitPos_67 (+ ro_63 (* rd_64 t_66))
-                 (let n_68 (app getNormal_37 hitPos_67)
-                  (let lightDir_69 (normalize (vec3 1. 0.8 -0.5))
-                   (let diff_70 (max (dot n_68 lightDir_69) 0)
-                    (let ambient_71 0.08
-                     (let dir_72 (/ hitPos_67 (length hitPos_67))
-                      (let rawHeight_73 (app fbm_27 (* dir_72 3.))
-                       (let seaLevel_74 0.35
-                        (let h_norm_75
+            (let rd_68
+             (app rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60
+              (normalize (vec3 (index uv_59 0) (index uv_59 1) 1.5)))
+             (let t_69 (app march_46 ro_67 rd_68)
+              (match t_69 ((None) (vec3 0 0 0))
+               ((Some t_70)
+                (let hitPos_71 (+ ro_67 (* rd_68 t_70))
+                 (let n_72 (app getNormal_37 hitPos_71)
+                  (let lightDir_73 (normalize (vec3 1. 0.8 -0.5))
+                   (let diff_74 (max (dot n_72 lightDir_73) 0)
+                    (let ambient_75 0.08
+                     (let dir_76 (/ hitPos_71 (length hitPos_71))
+                      (let rawHeight_77 (app fbm_27 (* dir_76 3.))
+                       (let seaLevel_78 0.35
+                        (let h_norm_79
                          (clamp
-                          (/ (- rawHeight_73 seaLevel_74) (- 1 seaLevel_74)) 0 1)
-                         (let deepColor_76 (vec3 0.02 0.05 0.2)
-                          (let landColor_77 (vec3 0.15 0.35 0.1)
-                           (let mountColor_78 (vec3 0.4 0.3 0.2)
-                            (let snowColor_79 (vec3 0.85 0.85 0.9)
-                             (let baseColor_80
-                              (if (< h_norm_75 0.3)
-                               (mix deepColor_76 landColor_77 (/ h_norm_75 0.3))
-                               (if (< h_norm_75 0.6)
-                                (mix landColor_77 mountColor_78
-                                 (/ (- h_norm_75 0.3) 0.3))
-                                (mix mountColor_78 snowColor_79
-                                 (/ (- h_norm_75 0.6) 0.4))))
-                              (let fresnel_81
-                               (- 1. (max (dot n_68 (* rd_64 -1.)) 0))
-                               (let rim_82
-                                (* (* (* fresnel_81 fresnel_81) fresnel_81) 0.4)
-                                (let atmoColor_83 (vec3 0.3 0.5 1.)
-                                 (+
-                                  (* baseColor_80 (+ (* diff_70 0.9) ambient_71))
-                                  (* atmoColor_83 rim_82)))))))))))))))))))))))))))))
+                          (/ (- rawHeight_77 seaLevel_78) (- 1 seaLevel_78)) 0 1)
+                         (let baseColor_80
+                          (if (< h_norm_79 0.3)
+                           (mix deepColor_53 landColor_54 (/ h_norm_79 0.3))
+                           (if (< h_norm_79 0.6)
+                            (mix landColor_54 mountColor_55
+                             (/ (- h_norm_79 0.3) 0.3))
+                            (mix mountColor_55 snowColor_56
+                             (/ (- h_norm_79 0.6) 0.4))))
+                          (let fresnel_81 (- 1 (max (dot n_72 (* rd_68 -1)) 0))
+                           (let rim_82
+                            (* (* (* fresnel_81 fresnel_81) fresnel_81) 0.4)
+                            (let atmoColor_83 (vec3 0.3 0.5 1.)
+                             (+ (* baseColor_80 (+ (* diff_74 0.9) ambient_75))
+                              (* atmoColor_83 rim_82)))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === anf (planet.glml) ===
@@ -5254,133 +5491,118 @@ let%expect_test "compile examples" =
      ((Define Nonrec (name march_46) (args ((ro_47 (vec 3)) (rd_48 (vec 3))))
        (body (return (march_49_319 rd_48 ro_47 0. 0))))
       : ((vec 3) -> ((vec 3) -> v_option_float)))
-     ((Define Nonrec (name rotate_by_mouse_57_vec3_to_vec3_317_320)
-       (args ((mouseUV_56 (vec 2)) (ray_58 (vec 3))))
+     ((Const deepColor_53 (return (vec3 0.02 0.05 0.2))) : (vec 3))
+     ((Const landColor_54 (return (vec3 0.15 0.35 0.1))) : (vec 3))
+     ((Const mountColor_55 (return (vec3 0.4 0.3 0.2))) : (vec 3))
+     ((Const snowColor_56 (return (vec3 0.85 0.85 0.9))) : (vec 3))
+     ((Define Nonrec (name rotate_by_mouse_61_vec3_to_vec3_317_320)
+       (args ((mouseUV_60 (vec 2)) (ray_62 (vec 3))))
        (body
-        (let anf_400 (index mouseUV_56 1)
+        (let anf_400 (index mouseUV_60 1)
          (let anf_401 (* -1 anf_400)
-          (let rotX_59 (* anf_401 1.5)
-           (let anf_402 (index ray_58 1)
-            (let anf_403 (index ray_58 2)
+          (let rotX_63 (* anf_401 1.5)
+           (let anf_402 (index ray_62 1)
+            (let anf_403 (index ray_62 2)
              (let anf_404 (vec2 anf_402 anf_403)
-              (let ro_yz_60 (rotate_0 anf_404 rotX_59)
-               (let anf_405 (index mouseUV_56 0)
+              (let ro_yz_64 (rotate_0 anf_404 rotX_63)
+               (let anf_405 (index mouseUV_60 0)
                 (let anf_406 (* -1 anf_405)
-                 (let rotY_61 (* anf_406 1.5)
-                  (let anf_407 (index ray_58 0)
-                   (let anf_408 (index ro_yz_60 1)
+                 (let rotY_65 (* anf_406 1.5)
+                  (let anf_407 (index ray_62 0)
+                   (let anf_408 (index ro_yz_64 1)
                     (let anf_409 (vec2 anf_407 anf_408)
-                     (let ro_xz_62 (rotate_0 anf_409 rotY_61)
-                      (let anf_410 (index ro_xz_62 0)
-                       (let anf_411 (index ro_yz_60 0)
-                        (let anf_412 (index ro_xz_62 1)
+                     (let ro_xz_66 (rotate_0 anf_409 rotY_65)
+                      (let anf_410 (index ro_xz_66 0)
+                       (let anf_411 (index ro_yz_64 0)
+                        (let anf_412 (index ro_xz_66 1)
                          (return (vec3 anf_410 anf_411 anf_412)))))))))))))))))))))
       : ((vec 3) -> (vec 3)))
-     ((Define Nonrec (name main) (args ((coord_53 (vec 2))))
+     ((Define Nonrec (name main) (args ((coord_57 (vec 2))))
        (body
         (let anf_413 (index u_resolution 0)
          (let anf_414 (index u_resolution 1)
-          (let res_min_54 (min anf_413 anf_414)
-           (let anf_415 (* coord_53 2)
+          (let res_min_58 (min anf_413 anf_414)
+           (let anf_415 (* coord_57 2)
             (let anf_416 (- anf_415 u_resolution)
-             (let uv_55 (/ anf_416 res_min_54)
+             (let uv_59 (/ anf_416 res_min_58)
               (let anf_417 (* u_mouse 2)
                (let anf_418 (- anf_417 u_resolution)
-                (let mouseUV_56 (/ anf_418 res_min_54)
+                (let mouseUV_60 (/ anf_418 res_min_58)
                  (let anf_419 (vec3 0 0 -4)
-                  (let ro_63
-                   (rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56 anf_419)
-                   (let anf_420 (index uv_55 0)
-                    (let anf_421 (index uv_55 1)
+                  (let ro_67
+                   (rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60 anf_419)
+                   (let anf_420 (index uv_59 0)
+                    (let anf_421 (index uv_59 1)
                      (let anf_422 (vec3 anf_420 anf_421 1.5)
                       (let anf_423 (normalize anf_422)
-                       (let rd_64
-                        (rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56
+                       (let rd_68
+                        (rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60
                          anf_423)
-                        (let t_65 (march_46 ro_63 rd_64)
+                        (let t_69 (march_46 ro_67 rd_68)
                          (return
-                          (match t_65 ((None) (return (vec3 0 0 0)))
-                           ((Some t_66)
-                            (let anf_424 (* rd_64 t_66)
-                             (let hitPos_67 (+ ro_63 anf_424)
-                              (let n_68 (getNormal_37 hitPos_67)
+                          (match t_69 ((None) (return (vec3 0 0 0)))
+                           ((Some t_70)
+                            (let anf_424 (* rd_68 t_70)
+                             (let hitPos_71 (+ ro_67 anf_424)
+                              (let n_72 (getNormal_37 hitPos_71)
                                (let anf_425 (vec3 1. 0.8 -0.5)
-                                (let lightDir_69 (normalize anf_425)
-                                 (let anf_426 (dot n_68 lightDir_69)
-                                  (let diff_70 (max anf_426 0)
-                                   (let ambient_71 0.08
-                                    (let anf_427 (length hitPos_67)
-                                     (let dir_72 (/ hitPos_67 anf_427)
-                                      (let anf_428 (* dir_72 3.)
-                                       (let rawHeight_73 (fbm_27 anf_428)
-                                        (let seaLevel_74 0.35
+                                (let lightDir_73 (normalize anf_425)
+                                 (let anf_426 (dot n_72 lightDir_73)
+                                  (let diff_74 (max anf_426 0)
+                                   (let ambient_75 0.08
+                                    (let anf_427 (length hitPos_71)
+                                     (let dir_76 (/ hitPos_71 anf_427)
+                                      (let anf_428 (* dir_76 3.)
+                                       (let rawHeight_77 (fbm_27 anf_428)
+                                        (let seaLevel_78 0.35
                                          (let anf_429
-                                          (- rawHeight_73 seaLevel_74)
-                                          (let anf_430 (- 1 seaLevel_74)
+                                          (- rawHeight_77 seaLevel_78)
+                                          (let anf_430 (- 1 seaLevel_78)
                                            (let anf_431 (/ anf_429 anf_430)
-                                            (let h_norm_75 (clamp anf_431 0 1)
-                                             (let deepColor_76
-                                              (vec3 0.02 0.05 0.2)
-                                              (let landColor_77
-                                               (vec3 0.15 0.35 0.1)
-                                               (let mountColor_78
-                                                (vec3 0.4 0.3 0.2)
-                                                (let snowColor_79
-                                                 (vec3 0.85 0.85 0.9)
-                                                 (let anf_432 (< h_norm_75 0.3)
-                                                  (let baseColor_80
-                                                   (if anf_432
-                                                    (let anf_433
-                                                     (/ h_norm_75 0.3)
+                                            (let h_norm_79 (clamp anf_431 0 1)
+                                             (let anf_432 (< h_norm_79 0.3)
+                                              (let baseColor_80
+                                               (if anf_432
+                                                (let anf_433 (/ h_norm_79 0.3)
+                                                 (return
+                                                  (mix deepColor_53 landColor_54
+                                                   anf_433)))
+                                                (let anf_434 (< h_norm_79 0.6)
+                                                 (return
+                                                  (if anf_434
+                                                   (let anf_435 (- h_norm_79 0.3)
+                                                    (let anf_436 (/ anf_435 0.3)
                                                      (return
-                                                      (mix deepColor_76
-                                                       landColor_77 anf_433)))
-                                                    (let anf_434
-                                                     (< h_norm_75 0.6)
+                                                      (mix landColor_54
+                                                       mountColor_55 anf_436))))
+                                                   (let anf_437 (- h_norm_79 0.6)
+                                                    (let anf_438 (/ anf_437 0.4)
                                                      (return
-                                                      (if anf_434
-                                                       (let anf_435
-                                                        (- h_norm_75 0.3)
-                                                        (let anf_436
-                                                         (/ anf_435 0.3)
-                                                         (return
-                                                          (mix landColor_77
-                                                           mountColor_78 anf_436))))
-                                                       (let anf_437
-                                                        (- h_norm_75 0.6)
-                                                        (let anf_438
-                                                         (/ anf_437 0.4)
-                                                         (return
-                                                          (mix mountColor_78
-                                                           snowColor_79 anf_438))))))))
-                                                   (let anf_439 (* rd_64 -1.)
-                                                    (let anf_440
-                                                     (dot n_68 anf_439)
-                                                     (let anf_441 (max anf_440 0)
-                                                      (let fresnel_81
-                                                       (- 1. anf_441)
-                                                       (let anf_442
-                                                        (* fresnel_81 fresnel_81)
-                                                        (let anf_443
-                                                         (* anf_442 fresnel_81)
-                                                         (let rim_82
-                                                          (* anf_443 0.4)
-                                                          (let atmoColor_83
-                                                           (vec3 0.3 0.5 1.)
-                                                           (let anf_444
-                                                            (* diff_70 0.9)
-                                                            (let anf_445
-                                                             (+ anf_444
-                                                              ambient_71)
-                                                             (let anf_446
-                                                              (* baseColor_80
-                                                               anf_445)
-                                                              (let anf_447
-                                                               (* atmoColor_83
-                                                                rim_82)
-                                                               (return
-                                                                (+ anf_446
-                                                                 anf_447)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+                                                      (mix mountColor_55
+                                                       snowColor_56 anf_438))))))))
+                                               (let anf_439 (* rd_68 -1)
+                                                (let anf_440 (dot n_72 anf_439)
+                                                 (let anf_441 (max anf_440 0)
+                                                  (let fresnel_81 (- 1 anf_441)
+                                                   (let anf_442
+                                                    (* fresnel_81 fresnel_81)
+                                                    (let anf_443
+                                                     (* anf_442 fresnel_81)
+                                                     (let rim_82 (* anf_443 0.4)
+                                                      (let atmoColor_83
+                                                       (vec3 0.3 0.5 1.)
+                                                       (let anf_444
+                                                        (* diff_74 0.9)
+                                                        (let anf_445
+                                                         (+ anf_444 ambient_75)
+                                                         (let anf_446
+                                                          (* baseColor_80
+                                                           anf_445)
+                                                          (let anf_447
+                                                           (* atmoColor_83
+                                                            rim_82)
+                                                           (return
+                                                            (+ anf_446 anf_447)))))))))))))))))))))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === tail call (planet.glml) ===
@@ -5549,133 +5771,118 @@ let%expect_test "compile examples" =
      ((Define (name march_46) (args ((ro_47 (vec 3)) (rd_48 (vec 3))))
        (body (return (march_49_319 rd_48 ro_47 0. 0))))
       : ((vec 3) -> ((vec 3) -> v_option_float)))
-     ((Define (name rotate_by_mouse_57_vec3_to_vec3_317_320)
-       (args ((mouseUV_56 (vec 2)) (ray_58 (vec 3))))
+     ((Const deepColor_53 (return (vec3 0.02 0.05 0.2))) : (vec 3))
+     ((Const landColor_54 (return (vec3 0.15 0.35 0.1))) : (vec 3))
+     ((Const mountColor_55 (return (vec3 0.4 0.3 0.2))) : (vec 3))
+     ((Const snowColor_56 (return (vec3 0.85 0.85 0.9))) : (vec 3))
+     ((Define (name rotate_by_mouse_61_vec3_to_vec3_317_320)
+       (args ((mouseUV_60 (vec 2)) (ray_62 (vec 3))))
        (body
-        (let anf_400 (index mouseUV_56 1)
+        (let anf_400 (index mouseUV_60 1)
          (let anf_401 (* -1 anf_400)
-          (let rotX_59 (* anf_401 1.5)
-           (let anf_402 (index ray_58 1)
-            (let anf_403 (index ray_58 2)
+          (let rotX_63 (* anf_401 1.5)
+           (let anf_402 (index ray_62 1)
+            (let anf_403 (index ray_62 2)
              (let anf_404 (vec2 anf_402 anf_403)
-              (let ro_yz_60 (rotate_0 anf_404 rotX_59)
-               (let anf_405 (index mouseUV_56 0)
+              (let ro_yz_64 (rotate_0 anf_404 rotX_63)
+               (let anf_405 (index mouseUV_60 0)
                 (let anf_406 (* -1 anf_405)
-                 (let rotY_61 (* anf_406 1.5)
-                  (let anf_407 (index ray_58 0)
-                   (let anf_408 (index ro_yz_60 1)
+                 (let rotY_65 (* anf_406 1.5)
+                  (let anf_407 (index ray_62 0)
+                   (let anf_408 (index ro_yz_64 1)
                     (let anf_409 (vec2 anf_407 anf_408)
-                     (let ro_xz_62 (rotate_0 anf_409 rotY_61)
-                      (let anf_410 (index ro_xz_62 0)
-                       (let anf_411 (index ro_yz_60 0)
-                        (let anf_412 (index ro_xz_62 1)
+                     (let ro_xz_66 (rotate_0 anf_409 rotY_65)
+                      (let anf_410 (index ro_xz_66 0)
+                       (let anf_411 (index ro_yz_64 0)
+                        (let anf_412 (index ro_xz_66 1)
                          (return (vec3 anf_410 anf_411 anf_412)))))))))))))))))))))
       : ((vec 3) -> (vec 3)))
-     ((Define (name main) (args ((coord_53 (vec 2))))
+     ((Define (name main) (args ((coord_57 (vec 2))))
        (body
         (let anf_413 (index u_resolution 0)
          (let anf_414 (index u_resolution 1)
-          (let res_min_54 (min anf_413 anf_414)
-           (let anf_415 (* coord_53 2)
+          (let res_min_58 (min anf_413 anf_414)
+           (let anf_415 (* coord_57 2)
             (let anf_416 (- anf_415 u_resolution)
-             (let uv_55 (/ anf_416 res_min_54)
+             (let uv_59 (/ anf_416 res_min_58)
               (let anf_417 (* u_mouse 2)
                (let anf_418 (- anf_417 u_resolution)
-                (let mouseUV_56 (/ anf_418 res_min_54)
+                (let mouseUV_60 (/ anf_418 res_min_58)
                  (let anf_419 (vec3 0 0 -4)
-                  (let ro_63
-                   (rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56 anf_419)
-                   (let anf_420 (index uv_55 0)
-                    (let anf_421 (index uv_55 1)
+                  (let ro_67
+                   (rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60 anf_419)
+                   (let anf_420 (index uv_59 0)
+                    (let anf_421 (index uv_59 1)
                      (let anf_422 (vec3 anf_420 anf_421 1.5)
                       (let anf_423 (normalize anf_422)
-                       (let rd_64
-                        (rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56
+                       (let rd_68
+                        (rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60
                          anf_423)
-                        (let t_65 (march_46 ro_63 rd_64)
+                        (let t_69 (march_46 ro_67 rd_68)
                          (return
-                          (match t_65 ((None) (return (vec3 0 0 0)))
-                           ((Some t_66)
-                            (let anf_424 (* rd_64 t_66)
-                             (let hitPos_67 (+ ro_63 anf_424)
-                              (let n_68 (getNormal_37 hitPos_67)
+                          (match t_69 ((None) (return (vec3 0 0 0)))
+                           ((Some t_70)
+                            (let anf_424 (* rd_68 t_70)
+                             (let hitPos_71 (+ ro_67 anf_424)
+                              (let n_72 (getNormal_37 hitPos_71)
                                (let anf_425 (vec3 1. 0.8 -0.5)
-                                (let lightDir_69 (normalize anf_425)
-                                 (let anf_426 (dot n_68 lightDir_69)
-                                  (let diff_70 (max anf_426 0)
-                                   (let ambient_71 0.08
-                                    (let anf_427 (length hitPos_67)
-                                     (let dir_72 (/ hitPos_67 anf_427)
-                                      (let anf_428 (* dir_72 3.)
-                                       (let rawHeight_73 (fbm_27 anf_428)
-                                        (let seaLevel_74 0.35
+                                (let lightDir_73 (normalize anf_425)
+                                 (let anf_426 (dot n_72 lightDir_73)
+                                  (let diff_74 (max anf_426 0)
+                                   (let ambient_75 0.08
+                                    (let anf_427 (length hitPos_71)
+                                     (let dir_76 (/ hitPos_71 anf_427)
+                                      (let anf_428 (* dir_76 3.)
+                                       (let rawHeight_77 (fbm_27 anf_428)
+                                        (let seaLevel_78 0.35
                                          (let anf_429
-                                          (- rawHeight_73 seaLevel_74)
-                                          (let anf_430 (- 1 seaLevel_74)
+                                          (- rawHeight_77 seaLevel_78)
+                                          (let anf_430 (- 1 seaLevel_78)
                                            (let anf_431 (/ anf_429 anf_430)
-                                            (let h_norm_75 (clamp anf_431 0 1)
-                                             (let deepColor_76
-                                              (vec3 0.02 0.05 0.2)
-                                              (let landColor_77
-                                               (vec3 0.15 0.35 0.1)
-                                               (let mountColor_78
-                                                (vec3 0.4 0.3 0.2)
-                                                (let snowColor_79
-                                                 (vec3 0.85 0.85 0.9)
-                                                 (let anf_432 (< h_norm_75 0.3)
-                                                  (let baseColor_80
-                                                   (if anf_432
-                                                    (let anf_433
-                                                     (/ h_norm_75 0.3)
+                                            (let h_norm_79 (clamp anf_431 0 1)
+                                             (let anf_432 (< h_norm_79 0.3)
+                                              (let baseColor_80
+                                               (if anf_432
+                                                (let anf_433 (/ h_norm_79 0.3)
+                                                 (return
+                                                  (mix deepColor_53 landColor_54
+                                                   anf_433)))
+                                                (let anf_434 (< h_norm_79 0.6)
+                                                 (return
+                                                  (if anf_434
+                                                   (let anf_435 (- h_norm_79 0.3)
+                                                    (let anf_436 (/ anf_435 0.3)
                                                      (return
-                                                      (mix deepColor_76
-                                                       landColor_77 anf_433)))
-                                                    (let anf_434
-                                                     (< h_norm_75 0.6)
+                                                      (mix landColor_54
+                                                       mountColor_55 anf_436))))
+                                                   (let anf_437 (- h_norm_79 0.6)
+                                                    (let anf_438 (/ anf_437 0.4)
                                                      (return
-                                                      (if anf_434
-                                                       (let anf_435
-                                                        (- h_norm_75 0.3)
-                                                        (let anf_436
-                                                         (/ anf_435 0.3)
-                                                         (return
-                                                          (mix landColor_77
-                                                           mountColor_78 anf_436))))
-                                                       (let anf_437
-                                                        (- h_norm_75 0.6)
-                                                        (let anf_438
-                                                         (/ anf_437 0.4)
-                                                         (return
-                                                          (mix mountColor_78
-                                                           snowColor_79 anf_438))))))))
-                                                   (let anf_439 (* rd_64 -1.)
-                                                    (let anf_440
-                                                     (dot n_68 anf_439)
-                                                     (let anf_441 (max anf_440 0)
-                                                      (let fresnel_81
-                                                       (- 1. anf_441)
-                                                       (let anf_442
-                                                        (* fresnel_81 fresnel_81)
-                                                        (let anf_443
-                                                         (* anf_442 fresnel_81)
-                                                         (let rim_82
-                                                          (* anf_443 0.4)
-                                                          (let atmoColor_83
-                                                           (vec3 0.3 0.5 1.)
-                                                           (let anf_444
-                                                            (* diff_70 0.9)
-                                                            (let anf_445
-                                                             (+ anf_444
-                                                              ambient_71)
-                                                             (let anf_446
-                                                              (* baseColor_80
-                                                               anf_445)
-                                                              (let anf_447
-                                                               (* atmoColor_83
-                                                                rim_82)
-                                                               (return
-                                                                (+ anf_446
-                                                                 anf_447)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+                                                      (mix mountColor_55
+                                                       snowColor_56 anf_438))))))))
+                                               (let anf_439 (* rd_68 -1)
+                                                (let anf_440 (dot n_72 anf_439)
+                                                 (let anf_441 (max anf_440 0)
+                                                  (let fresnel_81 (- 1 anf_441)
+                                                   (let anf_442
+                                                    (* fresnel_81 fresnel_81)
+                                                    (let anf_443
+                                                     (* anf_442 fresnel_81)
+                                                     (let rim_82 (* anf_443 0.4)
+                                                      (let atmoColor_83
+                                                       (vec3 0.3 0.5 1.)
+                                                       (let anf_444
+                                                        (* diff_74 0.9)
+                                                        (let anf_445
+                                                         (+ anf_444 ambient_75)
+                                                         (let anf_446
+                                                          (* baseColor_80
+                                                           anf_445)
+                                                          (let anf_447
+                                                           (* atmoColor_83
+                                                            rim_82)
+                                                           (return
+                                                            (+ anf_446 anf_447)))))))))))))))))))))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === lower variants (planet.glml) ===
@@ -5844,139 +6051,125 @@ let%expect_test "compile examples" =
      ((Define (name march_46) (args ((ro_47 (vec 3)) (rd_48 (vec 3))))
        (body (return (march_49_319 rd_48 ro_47 0. 0))))
       : ((vec 3) -> ((vec 3) -> v_option_float)))
-     ((Define (name rotate_by_mouse_57_vec3_to_vec3_317_320)
-       (args ((mouseUV_56 (vec 2)) (ray_58 (vec 3))))
+     ((Const deepColor_53 (return (vec3 0.02 0.05 0.2))) : (vec 3))
+     ((Const landColor_54 (return (vec3 0.15 0.35 0.1))) : (vec 3))
+     ((Const mountColor_55 (return (vec3 0.4 0.3 0.2))) : (vec 3))
+     ((Const snowColor_56 (return (vec3 0.85 0.85 0.9))) : (vec 3))
+     ((Define (name rotate_by_mouse_61_vec3_to_vec3_317_320)
+       (args ((mouseUV_60 (vec 2)) (ray_62 (vec 3))))
        (body
-        (let anf_400 (index mouseUV_56 1)
+        (let anf_400 (index mouseUV_60 1)
          (let anf_401 (* -1 anf_400)
-          (let rotX_59 (* anf_401 1.5)
-           (let anf_402 (index ray_58 1)
-            (let anf_403 (index ray_58 2)
+          (let rotX_63 (* anf_401 1.5)
+           (let anf_402 (index ray_62 1)
+            (let anf_403 (index ray_62 2)
              (let anf_404 (vec2 anf_402 anf_403)
-              (let ro_yz_60 (rotate_0 anf_404 rotX_59)
-               (let anf_405 (index mouseUV_56 0)
+              (let ro_yz_64 (rotate_0 anf_404 rotX_63)
+               (let anf_405 (index mouseUV_60 0)
                 (let anf_406 (* -1 anf_405)
-                 (let rotY_61 (* anf_406 1.5)
-                  (let anf_407 (index ray_58 0)
-                   (let anf_408 (index ro_yz_60 1)
+                 (let rotY_65 (* anf_406 1.5)
+                  (let anf_407 (index ray_62 0)
+                   (let anf_408 (index ro_yz_64 1)
                     (let anf_409 (vec2 anf_407 anf_408)
-                     (let ro_xz_62 (rotate_0 anf_409 rotY_61)
-                      (let anf_410 (index ro_xz_62 0)
-                       (let anf_411 (index ro_yz_60 0)
-                        (let anf_412 (index ro_xz_62 1)
+                     (let ro_xz_66 (rotate_0 anf_409 rotY_65)
+                      (let anf_410 (index ro_xz_66 0)
+                       (let anf_411 (index ro_yz_64 0)
+                        (let anf_412 (index ro_xz_66 1)
                          (return (vec3 anf_410 anf_411 anf_412)))))))))))))))))))))
       : ((vec 3) -> (vec 3)))
-     ((Define (name main) (args ((coord_53 (vec 2))))
+     ((Define (name main) (args ((coord_57 (vec 2))))
        (body
         (let anf_413 (index u_resolution 0)
          (let anf_414 (index u_resolution 1)
-          (let res_min_54 (min anf_413 anf_414)
-           (let anf_415 (* coord_53 2)
+          (let res_min_58 (min anf_413 anf_414)
+           (let anf_415 (* coord_57 2)
             (let anf_416 (- anf_415 u_resolution)
-             (let uv_55 (/ anf_416 res_min_54)
+             (let uv_59 (/ anf_416 res_min_58)
               (let anf_417 (* u_mouse 2)
                (let anf_418 (- anf_417 u_resolution)
-                (let mouseUV_56 (/ anf_418 res_min_54)
+                (let mouseUV_60 (/ anf_418 res_min_58)
                  (let anf_419 (vec3 0 0 -4)
-                  (let ro_63
-                   (rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56 anf_419)
-                   (let anf_420 (index uv_55 0)
-                    (let anf_421 (index uv_55 1)
+                  (let ro_67
+                   (rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60 anf_419)
+                   (let anf_420 (index uv_59 0)
+                    (let anf_421 (index uv_59 1)
                      (let anf_422 (vec3 anf_420 anf_421 1.5)
                       (let anf_423 (normalize anf_422)
-                       (let rd_64
-                        (rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56
+                       (let rd_68
+                        (rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60
                          anf_423)
-                        (let t_65 (march_46 ro_63 rd_64)
-                         (let _lv_tag_450 (. t_65 tag)
+                        (let t_69 (march_46 ro_67 rd_68)
+                         (let _lv_tag_450 (. t_69 tag)
                           (return
                            (switch _lv_tag_450 (1 (return (vec3 0 0 0)))
                             (default
-                             (let t_66 (. t_65 Some_0)
-                              (let anf_424 (* rd_64 t_66)
-                               (let hitPos_67 (+ ro_63 anf_424)
-                                (let n_68 (getNormal_37 hitPos_67)
+                             (let t_70 (. t_69 Some_0)
+                              (let anf_424 (* rd_68 t_70)
+                               (let hitPos_71 (+ ro_67 anf_424)
+                                (let n_72 (getNormal_37 hitPos_71)
                                  (let anf_425 (vec3 1. 0.8 -0.5)
-                                  (let lightDir_69 (normalize anf_425)
-                                   (let anf_426 (dot n_68 lightDir_69)
-                                    (let diff_70 (max anf_426 0)
-                                     (let ambient_71 0.08
-                                      (let anf_427 (length hitPos_67)
-                                       (let dir_72 (/ hitPos_67 anf_427)
-                                        (let anf_428 (* dir_72 3.)
-                                         (let rawHeight_73 (fbm_27 anf_428)
-                                          (let seaLevel_74 0.35
+                                  (let lightDir_73 (normalize anf_425)
+                                   (let anf_426 (dot n_72 lightDir_73)
+                                    (let diff_74 (max anf_426 0)
+                                     (let ambient_75 0.08
+                                      (let anf_427 (length hitPos_71)
+                                       (let dir_76 (/ hitPos_71 anf_427)
+                                        (let anf_428 (* dir_76 3.)
+                                         (let rawHeight_77 (fbm_27 anf_428)
+                                          (let seaLevel_78 0.35
                                            (let anf_429
-                                            (- rawHeight_73 seaLevel_74)
-                                            (let anf_430 (- 1 seaLevel_74)
+                                            (- rawHeight_77 seaLevel_78)
+                                            (let anf_430 (- 1 seaLevel_78)
                                              (let anf_431 (/ anf_429 anf_430)
-                                              (let h_norm_75 (clamp anf_431 0 1)
-                                               (let deepColor_76
-                                                (vec3 0.02 0.05 0.2)
-                                                (let landColor_77
-                                                 (vec3 0.15 0.35 0.1)
-                                                 (let mountColor_78
-                                                  (vec3 0.4 0.3 0.2)
-                                                  (let snowColor_79
-                                                   (vec3 0.85 0.85 0.9)
-                                                   (let anf_432 (< h_norm_75 0.3)
-                                                    (let baseColor_80
-                                                     (if anf_432
-                                                      (let anf_433
-                                                       (/ h_norm_75 0.3)
+                                              (let h_norm_79 (clamp anf_431 0 1)
+                                               (let anf_432 (< h_norm_79 0.3)
+                                                (let baseColor_80
+                                                 (if anf_432
+                                                  (let anf_433 (/ h_norm_79 0.3)
+                                                   (return
+                                                    (mix deepColor_53
+                                                     landColor_54 anf_433)))
+                                                  (let anf_434 (< h_norm_79 0.6)
+                                                   (return
+                                                    (if anf_434
+                                                     (let anf_435
+                                                      (- h_norm_79 0.3)
+                                                      (let anf_436
+                                                       (/ anf_435 0.3)
                                                        (return
-                                                        (mix deepColor_76
-                                                         landColor_77 anf_433)))
-                                                      (let anf_434
-                                                       (< h_norm_75 0.6)
+                                                        (mix landColor_54
+                                                         mountColor_55 anf_436))))
+                                                     (let anf_437
+                                                      (- h_norm_79 0.6)
+                                                      (let anf_438
+                                                       (/ anf_437 0.4)
                                                        (return
-                                                        (if anf_434
-                                                         (let anf_435
-                                                          (- h_norm_75 0.3)
-                                                          (let anf_436
-                                                           (/ anf_435 0.3)
-                                                           (return
-                                                            (mix landColor_77
-                                                             mountColor_78
-                                                             anf_436))))
-                                                         (let anf_437
-                                                          (- h_norm_75 0.6)
-                                                          (let anf_438
-                                                           (/ anf_437 0.4)
-                                                           (return
-                                                            (mix mountColor_78
-                                                             snowColor_79
-                                                             anf_438))))))))
-                                                     (let anf_439 (* rd_64 -1.)
-                                                      (let anf_440
-                                                       (dot n_68 anf_439)
-                                                       (let anf_441
-                                                        (max anf_440 0)
-                                                        (let fresnel_81
-                                                         (- 1. anf_441)
-                                                         (let anf_442
-                                                          (* fresnel_81
-                                                           fresnel_81)
-                                                          (let anf_443
-                                                           (* anf_442 fresnel_81)
-                                                           (let rim_82
-                                                            (* anf_443 0.4)
-                                                            (let atmoColor_83
-                                                             (vec3 0.3 0.5 1.)
-                                                             (let anf_444
-                                                              (* diff_70 0.9)
-                                                              (let anf_445
-                                                               (+ anf_444
-                                                                ambient_71)
-                                                               (let anf_446
-                                                                (* baseColor_80
-                                                                 anf_445)
-                                                                (let anf_447
-                                                                 (* atmoColor_83
-                                                                  rim_82)
-                                                                 (return
-                                                                  (+ anf_446
-                                                                   anf_447)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+                                                        (mix mountColor_55
+                                                         snowColor_56 anf_438))))))))
+                                                 (let anf_439 (* rd_68 -1)
+                                                  (let anf_440 (dot n_72 anf_439)
+                                                   (let anf_441 (max anf_440 0)
+                                                    (let fresnel_81 (- 1 anf_441)
+                                                     (let anf_442
+                                                      (* fresnel_81 fresnel_81)
+                                                      (let anf_443
+                                                       (* anf_442 fresnel_81)
+                                                       (let rim_82
+                                                        (* anf_443 0.4)
+                                                        (let atmoColor_83
+                                                         (vec3 0.3 0.5 1.)
+                                                         (let anf_444
+                                                          (* diff_74 0.9)
+                                                          (let anf_445
+                                                           (+ anf_444 ambient_75)
+                                                           (let anf_446
+                                                            (* baseColor_80
+                                                             anf_445)
+                                                            (let anf_447
+                                                             (* atmoColor_83
+                                                              rim_82)
+                                                             (return
+                                                              (+ anf_446 anf_447)))))))))))))))))))))))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === promote ints (planet.glml) ===
@@ -6145,140 +6338,127 @@ let%expect_test "compile examples" =
      ((Define (name march_46) (args ((ro_47 (vec 3)) (rd_48 (vec 3))))
        (body (return (march_49_319 rd_48 ro_47 0. 0))))
       : ((vec 3) -> ((vec 3) -> v_option_float)))
-     ((Define (name rotate_by_mouse_57_vec3_to_vec3_317_320)
-       (args ((mouseUV_56 (vec 2)) (ray_58 (vec 3))))
+     ((Const deepColor_53 (return (vec3 0.02 0.05 0.2))) : (vec 3))
+     ((Const landColor_54 (return (vec3 0.15 0.35 0.1))) : (vec 3))
+     ((Const mountColor_55 (return (vec3 0.4 0.3 0.2))) : (vec 3))
+     ((Const snowColor_56 (return (vec3 0.85 0.85 0.9))) : (vec 3))
+     ((Define (name rotate_by_mouse_61_vec3_to_vec3_317_320)
+       (args ((mouseUV_60 (vec 2)) (ray_62 (vec 3))))
        (body
-        (let anf_400 (index mouseUV_56 1)
+        (let anf_400 (index mouseUV_60 1)
          (let anf_401 (* -1. anf_400)
-          (let rotX_59 (* anf_401 1.5)
-           (let anf_402 (index ray_58 1)
-            (let anf_403 (index ray_58 2)
+          (let rotX_63 (* anf_401 1.5)
+           (let anf_402 (index ray_62 1)
+            (let anf_403 (index ray_62 2)
              (let anf_404 (vec2 anf_402 anf_403)
-              (let ro_yz_60 (rotate_0 anf_404 rotX_59)
-               (let anf_405 (index mouseUV_56 0)
+              (let ro_yz_64 (rotate_0 anf_404 rotX_63)
+               (let anf_405 (index mouseUV_60 0)
                 (let anf_406 (* -1. anf_405)
-                 (let rotY_61 (* anf_406 1.5)
-                  (let anf_407 (index ray_58 0)
-                   (let anf_408 (index ro_yz_60 1)
+                 (let rotY_65 (* anf_406 1.5)
+                  (let anf_407 (index ray_62 0)
+                   (let anf_408 (index ro_yz_64 1)
                     (let anf_409 (vec2 anf_407 anf_408)
-                     (let ro_xz_62 (rotate_0 anf_409 rotY_61)
-                      (let anf_410 (index ro_xz_62 0)
-                       (let anf_411 (index ro_yz_60 0)
-                        (let anf_412 (index ro_xz_62 1)
+                     (let ro_xz_66 (rotate_0 anf_409 rotY_65)
+                      (let anf_410 (index ro_xz_66 0)
+                       (let anf_411 (index ro_yz_64 0)
+                        (let anf_412 (index ro_xz_66 1)
                          (return (vec3 anf_410 anf_411 anf_412)))))))))))))))))))))
       : ((vec 3) -> (vec 3)))
-     ((Define (name main) (args ((coord_53 (vec 2))))
+     ((Define (name main) (args ((coord_57 (vec 2))))
        (body
         (let anf_413 (index u_resolution 0)
          (let anf_414 (index u_resolution 1)
-          (let res_min_54 (min anf_413 anf_414)
-           (let anf_415 (* coord_53 2.)
+          (let res_min_58 (min anf_413 anf_414)
+           (let anf_415 (* coord_57 2.)
             (let anf_416 (- anf_415 u_resolution)
-             (let uv_55 (/ anf_416 res_min_54)
+             (let uv_59 (/ anf_416 res_min_58)
               (let anf_417 (* u_mouse 2.)
                (let anf_418 (- anf_417 u_resolution)
-                (let mouseUV_56 (/ anf_418 res_min_54)
+                (let mouseUV_60 (/ anf_418 res_min_58)
                  (let anf_419 (vec3 0. 0. -4.)
-                  (let ro_63
-                   (rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56 anf_419)
-                   (let anf_420 (index uv_55 0)
-                    (let anf_421 (index uv_55 1)
+                  (let ro_67
+                   (rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60 anf_419)
+                   (let anf_420 (index uv_59 0)
+                    (let anf_421 (index uv_59 1)
                      (let anf_422 (vec3 anf_420 anf_421 1.5)
                       (let anf_423 (normalize anf_422)
-                       (let rd_64
-                        (rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56
+                       (let rd_68
+                        (rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60
                          anf_423)
-                        (let t_65 (march_46 ro_63 rd_64)
-                         (let _lv_tag_450 (. t_65 tag)
+                        (let t_69 (march_46 ro_67 rd_68)
+                         (let _lv_tag_450 (. t_69 tag)
                           (return
                            (switch _lv_tag_450 (1 (return (vec3 0. 0. 0.)))
                             (default
-                             (let t_66 (. t_65 Some_0)
-                              (let anf_424 (* rd_64 t_66)
-                               (let hitPos_67 (+ ro_63 anf_424)
-                                (let n_68 (getNormal_37 hitPos_67)
+                             (let t_70 (. t_69 Some_0)
+                              (let anf_424 (* rd_68 t_70)
+                               (let hitPos_71 (+ ro_67 anf_424)
+                                (let n_72 (getNormal_37 hitPos_71)
                                  (let anf_425 (vec3 1. 0.8 -0.5)
-                                  (let lightDir_69 (normalize anf_425)
-                                   (let anf_426 (dot n_68 lightDir_69)
-                                    (let diff_70 (max anf_426 0.)
-                                     (let ambient_71 0.08
-                                      (let anf_427 (length hitPos_67)
-                                       (let dir_72 (/ hitPos_67 anf_427)
-                                        (let anf_428 (* dir_72 3.)
-                                         (let rawHeight_73 (fbm_27 anf_428)
-                                          (let seaLevel_74 0.35
+                                  (let lightDir_73 (normalize anf_425)
+                                   (let anf_426 (dot n_72 lightDir_73)
+                                    (let diff_74 (max anf_426 0.)
+                                     (let ambient_75 0.08
+                                      (let anf_427 (length hitPos_71)
+                                       (let dir_76 (/ hitPos_71 anf_427)
+                                        (let anf_428 (* dir_76 3.)
+                                         (let rawHeight_77 (fbm_27 anf_428)
+                                          (let seaLevel_78 0.35
                                            (let anf_429
-                                            (- rawHeight_73 seaLevel_74)
-                                            (let anf_430 (- 1. seaLevel_74)
+                                            (- rawHeight_77 seaLevel_78)
+                                            (let anf_430 (- 1. seaLevel_78)
                                              (let anf_431 (/ anf_429 anf_430)
-                                              (let h_norm_75
+                                              (let h_norm_79
                                                (clamp anf_431 0. 1.)
-                                               (let deepColor_76
-                                                (vec3 0.02 0.05 0.2)
-                                                (let landColor_77
-                                                 (vec3 0.15 0.35 0.1)
-                                                 (let mountColor_78
-                                                  (vec3 0.4 0.3 0.2)
-                                                  (let snowColor_79
-                                                   (vec3 0.85 0.85 0.9)
-                                                   (let anf_432 (< h_norm_75 0.3)
-                                                    (let baseColor_80
-                                                     (if anf_432
-                                                      (let anf_433
-                                                       (/ h_norm_75 0.3)
+                                               (let anf_432 (< h_norm_79 0.3)
+                                                (let baseColor_80
+                                                 (if anf_432
+                                                  (let anf_433 (/ h_norm_79 0.3)
+                                                   (return
+                                                    (mix deepColor_53
+                                                     landColor_54 anf_433)))
+                                                  (let anf_434 (< h_norm_79 0.6)
+                                                   (return
+                                                    (if anf_434
+                                                     (let anf_435
+                                                      (- h_norm_79 0.3)
+                                                      (let anf_436
+                                                       (/ anf_435 0.3)
                                                        (return
-                                                        (mix deepColor_76
-                                                         landColor_77 anf_433)))
-                                                      (let anf_434
-                                                       (< h_norm_75 0.6)
+                                                        (mix landColor_54
+                                                         mountColor_55 anf_436))))
+                                                     (let anf_437
+                                                      (- h_norm_79 0.6)
+                                                      (let anf_438
+                                                       (/ anf_437 0.4)
                                                        (return
-                                                        (if anf_434
-                                                         (let anf_435
-                                                          (- h_norm_75 0.3)
-                                                          (let anf_436
-                                                           (/ anf_435 0.3)
-                                                           (return
-                                                            (mix landColor_77
-                                                             mountColor_78
-                                                             anf_436))))
-                                                         (let anf_437
-                                                          (- h_norm_75 0.6)
-                                                          (let anf_438
-                                                           (/ anf_437 0.4)
-                                                           (return
-                                                            (mix mountColor_78
-                                                             snowColor_79
-                                                             anf_438))))))))
-                                                     (let anf_439 (* rd_64 -1.)
-                                                      (let anf_440
-                                                       (dot n_68 anf_439)
-                                                       (let anf_441
-                                                        (max anf_440 0.)
-                                                        (let fresnel_81
-                                                         (- 1. anf_441)
-                                                         (let anf_442
-                                                          (* fresnel_81
-                                                           fresnel_81)
-                                                          (let anf_443
-                                                           (* anf_442 fresnel_81)
-                                                           (let rim_82
-                                                            (* anf_443 0.4)
-                                                            (let atmoColor_83
-                                                             (vec3 0.3 0.5 1.)
-                                                             (let anf_444
-                                                              (* diff_70 0.9)
-                                                              (let anf_445
-                                                               (+ anf_444
-                                                                ambient_71)
-                                                               (let anf_446
-                                                                (* baseColor_80
-                                                                 anf_445)
-                                                                (let anf_447
-                                                                 (* atmoColor_83
-                                                                  rim_82)
-                                                                 (return
-                                                                  (+ anf_446
-                                                                   anf_447)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+                                                        (mix mountColor_55
+                                                         snowColor_56 anf_438))))))))
+                                                 (let anf_439 (* rd_68 -1.)
+                                                  (let anf_440 (dot n_72 anf_439)
+                                                   (let anf_441 (max anf_440 0.)
+                                                    (let fresnel_81
+                                                     (- 1. anf_441)
+                                                     (let anf_442
+                                                      (* fresnel_81 fresnel_81)
+                                                      (let anf_443
+                                                       (* anf_442 fresnel_81)
+                                                       (let rim_82
+                                                        (* anf_443 0.4)
+                                                        (let atmoColor_83
+                                                         (vec3 0.3 0.5 1.)
+                                                         (let anf_444
+                                                          (* diff_74 0.9)
+                                                          (let anf_445
+                                                           (+ anf_444 ambient_75)
+                                                           (let anf_446
+                                                            (* baseColor_80
+                                                             anf_445)
+                                                            (let anf_447
+                                                             (* atmoColor_83
+                                                              rim_82)
+                                                             (return
+                                                              (+ anf_446 anf_447)))))))))))))))))))))))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === remove placeholder (planet.glml) ===
@@ -6447,140 +6627,127 @@ let%expect_test "compile examples" =
      ((Define (name march_46) (args ((ro_47 (vec 3)) (rd_48 (vec 3))))
        (body (return (march_49_319 rd_48 ro_47 0. 0))))
       : ((vec 3) -> ((vec 3) -> v_option_float)))
-     ((Define (name rotate_by_mouse_57_vec3_to_vec3_317_320)
-       (args ((mouseUV_56 (vec 2)) (ray_58 (vec 3))))
+     ((Const deepColor_53 (return (vec3 0.02 0.05 0.2))) : (vec 3))
+     ((Const landColor_54 (return (vec3 0.15 0.35 0.1))) : (vec 3))
+     ((Const mountColor_55 (return (vec3 0.4 0.3 0.2))) : (vec 3))
+     ((Const snowColor_56 (return (vec3 0.85 0.85 0.9))) : (vec 3))
+     ((Define (name rotate_by_mouse_61_vec3_to_vec3_317_320)
+       (args ((mouseUV_60 (vec 2)) (ray_62 (vec 3))))
        (body
-        (let anf_400 (index mouseUV_56 1)
+        (let anf_400 (index mouseUV_60 1)
          (let anf_401 (* -1. anf_400)
-          (let rotX_59 (* anf_401 1.5)
-           (let anf_402 (index ray_58 1)
-            (let anf_403 (index ray_58 2)
+          (let rotX_63 (* anf_401 1.5)
+           (let anf_402 (index ray_62 1)
+            (let anf_403 (index ray_62 2)
              (let anf_404 (vec2 anf_402 anf_403)
-              (let ro_yz_60 (rotate_0 anf_404 rotX_59)
-               (let anf_405 (index mouseUV_56 0)
+              (let ro_yz_64 (rotate_0 anf_404 rotX_63)
+               (let anf_405 (index mouseUV_60 0)
                 (let anf_406 (* -1. anf_405)
-                 (let rotY_61 (* anf_406 1.5)
-                  (let anf_407 (index ray_58 0)
-                   (let anf_408 (index ro_yz_60 1)
+                 (let rotY_65 (* anf_406 1.5)
+                  (let anf_407 (index ray_62 0)
+                   (let anf_408 (index ro_yz_64 1)
                     (let anf_409 (vec2 anf_407 anf_408)
-                     (let ro_xz_62 (rotate_0 anf_409 rotY_61)
-                      (let anf_410 (index ro_xz_62 0)
-                       (let anf_411 (index ro_yz_60 0)
-                        (let anf_412 (index ro_xz_62 1)
+                     (let ro_xz_66 (rotate_0 anf_409 rotY_65)
+                      (let anf_410 (index ro_xz_66 0)
+                       (let anf_411 (index ro_yz_64 0)
+                        (let anf_412 (index ro_xz_66 1)
                          (return (vec3 anf_410 anf_411 anf_412)))))))))))))))))))))
       : ((vec 3) -> (vec 3)))
-     ((Define (name main) (args ((coord_53 (vec 2))))
+     ((Define (name main) (args ((coord_57 (vec 2))))
        (body
         (let anf_413 (index u_resolution 0)
          (let anf_414 (index u_resolution 1)
-          (let res_min_54 (min anf_413 anf_414)
-           (let anf_415 (* coord_53 2.)
+          (let res_min_58 (min anf_413 anf_414)
+           (let anf_415 (* coord_57 2.)
             (let anf_416 (- anf_415 u_resolution)
-             (let uv_55 (/ anf_416 res_min_54)
+             (let uv_59 (/ anf_416 res_min_58)
               (let anf_417 (* u_mouse 2.)
                (let anf_418 (- anf_417 u_resolution)
-                (let mouseUV_56 (/ anf_418 res_min_54)
+                (let mouseUV_60 (/ anf_418 res_min_58)
                  (let anf_419 (vec3 0. 0. -4.)
-                  (let ro_63
-                   (rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56 anf_419)
-                   (let anf_420 (index uv_55 0)
-                    (let anf_421 (index uv_55 1)
+                  (let ro_67
+                   (rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60 anf_419)
+                   (let anf_420 (index uv_59 0)
+                    (let anf_421 (index uv_59 1)
                      (let anf_422 (vec3 anf_420 anf_421 1.5)
                       (let anf_423 (normalize anf_422)
-                       (let rd_64
-                        (rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56
+                       (let rd_68
+                        (rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60
                          anf_423)
-                        (let t_65 (march_46 ro_63 rd_64)
-                         (let _lv_tag_450 (. t_65 tag)
+                        (let t_69 (march_46 ro_67 rd_68)
+                         (let _lv_tag_450 (. t_69 tag)
                           (return
                            (switch _lv_tag_450 (1 (return (vec3 0. 0. 0.)))
                             (default
-                             (let t_66 (. t_65 Some_0)
-                              (let anf_424 (* rd_64 t_66)
-                               (let hitPos_67 (+ ro_63 anf_424)
-                                (let n_68 (getNormal_37 hitPos_67)
+                             (let t_70 (. t_69 Some_0)
+                              (let anf_424 (* rd_68 t_70)
+                               (let hitPos_71 (+ ro_67 anf_424)
+                                (let n_72 (getNormal_37 hitPos_71)
                                  (let anf_425 (vec3 1. 0.8 -0.5)
-                                  (let lightDir_69 (normalize anf_425)
-                                   (let anf_426 (dot n_68 lightDir_69)
-                                    (let diff_70 (max anf_426 0.)
-                                     (let ambient_71 0.08
-                                      (let anf_427 (length hitPos_67)
-                                       (let dir_72 (/ hitPos_67 anf_427)
-                                        (let anf_428 (* dir_72 3.)
-                                         (let rawHeight_73 (fbm_27 anf_428)
-                                          (let seaLevel_74 0.35
+                                  (let lightDir_73 (normalize anf_425)
+                                   (let anf_426 (dot n_72 lightDir_73)
+                                    (let diff_74 (max anf_426 0.)
+                                     (let ambient_75 0.08
+                                      (let anf_427 (length hitPos_71)
+                                       (let dir_76 (/ hitPos_71 anf_427)
+                                        (let anf_428 (* dir_76 3.)
+                                         (let rawHeight_77 (fbm_27 anf_428)
+                                          (let seaLevel_78 0.35
                                            (let anf_429
-                                            (- rawHeight_73 seaLevel_74)
-                                            (let anf_430 (- 1. seaLevel_74)
+                                            (- rawHeight_77 seaLevel_78)
+                                            (let anf_430 (- 1. seaLevel_78)
                                              (let anf_431 (/ anf_429 anf_430)
-                                              (let h_norm_75
+                                              (let h_norm_79
                                                (clamp anf_431 0. 1.)
-                                               (let deepColor_76
-                                                (vec3 0.02 0.05 0.2)
-                                                (let landColor_77
-                                                 (vec3 0.15 0.35 0.1)
-                                                 (let mountColor_78
-                                                  (vec3 0.4 0.3 0.2)
-                                                  (let snowColor_79
-                                                   (vec3 0.85 0.85 0.9)
-                                                   (let anf_432 (< h_norm_75 0.3)
-                                                    (let baseColor_80
-                                                     (if anf_432
-                                                      (let anf_433
-                                                       (/ h_norm_75 0.3)
+                                               (let anf_432 (< h_norm_79 0.3)
+                                                (let baseColor_80
+                                                 (if anf_432
+                                                  (let anf_433 (/ h_norm_79 0.3)
+                                                   (return
+                                                    (mix deepColor_53
+                                                     landColor_54 anf_433)))
+                                                  (let anf_434 (< h_norm_79 0.6)
+                                                   (return
+                                                    (if anf_434
+                                                     (let anf_435
+                                                      (- h_norm_79 0.3)
+                                                      (let anf_436
+                                                       (/ anf_435 0.3)
                                                        (return
-                                                        (mix deepColor_76
-                                                         landColor_77 anf_433)))
-                                                      (let anf_434
-                                                       (< h_norm_75 0.6)
+                                                        (mix landColor_54
+                                                         mountColor_55 anf_436))))
+                                                     (let anf_437
+                                                      (- h_norm_79 0.6)
+                                                      (let anf_438
+                                                       (/ anf_437 0.4)
                                                        (return
-                                                        (if anf_434
-                                                         (let anf_435
-                                                          (- h_norm_75 0.3)
-                                                          (let anf_436
-                                                           (/ anf_435 0.3)
-                                                           (return
-                                                            (mix landColor_77
-                                                             mountColor_78
-                                                             anf_436))))
-                                                         (let anf_437
-                                                          (- h_norm_75 0.6)
-                                                          (let anf_438
-                                                           (/ anf_437 0.4)
-                                                           (return
-                                                            (mix mountColor_78
-                                                             snowColor_79
-                                                             anf_438))))))))
-                                                     (let anf_439 (* rd_64 -1.)
-                                                      (let anf_440
-                                                       (dot n_68 anf_439)
-                                                       (let anf_441
-                                                        (max anf_440 0.)
-                                                        (let fresnel_81
-                                                         (- 1. anf_441)
-                                                         (let anf_442
-                                                          (* fresnel_81
-                                                           fresnel_81)
-                                                          (let anf_443
-                                                           (* anf_442 fresnel_81)
-                                                           (let rim_82
-                                                            (* anf_443 0.4)
-                                                            (let atmoColor_83
-                                                             (vec3 0.3 0.5 1.)
-                                                             (let anf_444
-                                                              (* diff_70 0.9)
-                                                              (let anf_445
-                                                               (+ anf_444
-                                                                ambient_71)
-                                                               (let anf_446
-                                                                (* baseColor_80
-                                                                 anf_445)
-                                                                (let anf_447
-                                                                 (* atmoColor_83
-                                                                  rim_82)
-                                                                 (return
-                                                                  (+ anf_446
-                                                                   anf_447)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+                                                        (mix mountColor_55
+                                                         snowColor_56 anf_438))))))))
+                                                 (let anf_439 (* rd_68 -1.)
+                                                  (let anf_440 (dot n_72 anf_439)
+                                                   (let anf_441 (max anf_440 0.)
+                                                    (let fresnel_81
+                                                     (- 1. anf_441)
+                                                     (let anf_442
+                                                      (* fresnel_81 fresnel_81)
+                                                      (let anf_443
+                                                       (* anf_442 fresnel_81)
+                                                       (let rim_82
+                                                        (* anf_443 0.4)
+                                                        (let atmoColor_83
+                                                         (vec3 0.3 0.5 1.)
+                                                         (let anf_444
+                                                          (* diff_74 0.9)
+                                                          (let anf_445
+                                                           (+ anf_444 ambient_75)
+                                                           (let anf_446
+                                                            (* baseColor_80
+                                                             anf_445)
+                                                            (let anf_447
+                                                             (* atmoColor_83
+                                                              rim_82)
+                                                             (return
+                                                              (+ anf_446 anf_447)))))))))))))))))))))))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === lift consts (planet.glml) ===
@@ -6749,140 +6916,127 @@ let%expect_test "compile examples" =
      ((Define (name march_46) (args ((ro_47 (vec 3)) (rd_48 (vec 3))))
        (body (return (march_49_319 rd_48 ro_47 0. 0))))
       : ((vec 3) -> ((vec 3) -> v_option_float)))
-     ((Define (name rotate_by_mouse_57_vec3_to_vec3_317_320)
-       (args ((mouseUV_56 (vec 2)) (ray_58 (vec 3))))
+     ((Const deepColor_53 (return (vec3 0.02 0.05 0.2))) : (vec 3))
+     ((Const landColor_54 (return (vec3 0.15 0.35 0.1))) : (vec 3))
+     ((Const mountColor_55 (return (vec3 0.4 0.3 0.2))) : (vec 3))
+     ((Const snowColor_56 (return (vec3 0.85 0.85 0.9))) : (vec 3))
+     ((Define (name rotate_by_mouse_61_vec3_to_vec3_317_320)
+       (args ((mouseUV_60 (vec 2)) (ray_62 (vec 3))))
        (body
-        (let anf_400 (index mouseUV_56 1)
+        (let anf_400 (index mouseUV_60 1)
          (let anf_401 (* -1. anf_400)
-          (let rotX_59 (* anf_401 1.5)
-           (let anf_402 (index ray_58 1)
-            (let anf_403 (index ray_58 2)
+          (let rotX_63 (* anf_401 1.5)
+           (let anf_402 (index ray_62 1)
+            (let anf_403 (index ray_62 2)
              (let anf_404 (vec2 anf_402 anf_403)
-              (let ro_yz_60 (rotate_0 anf_404 rotX_59)
-               (let anf_405 (index mouseUV_56 0)
+              (let ro_yz_64 (rotate_0 anf_404 rotX_63)
+               (let anf_405 (index mouseUV_60 0)
                 (let anf_406 (* -1. anf_405)
-                 (let rotY_61 (* anf_406 1.5)
-                  (let anf_407 (index ray_58 0)
-                   (let anf_408 (index ro_yz_60 1)
+                 (let rotY_65 (* anf_406 1.5)
+                  (let anf_407 (index ray_62 0)
+                   (let anf_408 (index ro_yz_64 1)
                     (let anf_409 (vec2 anf_407 anf_408)
-                     (let ro_xz_62 (rotate_0 anf_409 rotY_61)
-                      (let anf_410 (index ro_xz_62 0)
-                       (let anf_411 (index ro_yz_60 0)
-                        (let anf_412 (index ro_xz_62 1)
+                     (let ro_xz_66 (rotate_0 anf_409 rotY_65)
+                      (let anf_410 (index ro_xz_66 0)
+                       (let anf_411 (index ro_yz_64 0)
+                        (let anf_412 (index ro_xz_66 1)
                          (return (vec3 anf_410 anf_411 anf_412)))))))))))))))))))))
       : ((vec 3) -> (vec 3)))
-     ((Define (name main) (args ((coord_53 (vec 2))))
+     ((Define (name main) (args ((coord_57 (vec 2))))
        (body
         (let anf_413 (index u_resolution 0)
          (let anf_414 (index u_resolution 1)
-          (let res_min_54 (min anf_413 anf_414)
-           (let anf_415 (* coord_53 2.)
+          (let res_min_58 (min anf_413 anf_414)
+           (let anf_415 (* coord_57 2.)
             (let anf_416 (- anf_415 u_resolution)
-             (let uv_55 (/ anf_416 res_min_54)
+             (let uv_59 (/ anf_416 res_min_58)
               (let anf_417 (* u_mouse 2.)
                (let anf_418 (- anf_417 u_resolution)
-                (let mouseUV_56 (/ anf_418 res_min_54)
+                (let mouseUV_60 (/ anf_418 res_min_58)
                  (let anf_419 (vec3 0. 0. -4.)
-                  (let ro_63
-                   (rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56 anf_419)
-                   (let anf_420 (index uv_55 0)
-                    (let anf_421 (index uv_55 1)
+                  (let ro_67
+                   (rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60 anf_419)
+                   (let anf_420 (index uv_59 0)
+                    (let anf_421 (index uv_59 1)
                      (let anf_422 (vec3 anf_420 anf_421 1.5)
                       (let anf_423 (normalize anf_422)
-                       (let rd_64
-                        (rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56
+                       (let rd_68
+                        (rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60
                          anf_423)
-                        (let t_65 (march_46 ro_63 rd_64)
-                         (let _lv_tag_450 (. t_65 tag)
+                        (let t_69 (march_46 ro_67 rd_68)
+                         (let _lv_tag_450 (. t_69 tag)
                           (return
                            (switch _lv_tag_450 (1 (return (vec3 0. 0. 0.)))
                             (default
-                             (let t_66 (. t_65 Some_0)
-                              (let anf_424 (* rd_64 t_66)
-                               (let hitPos_67 (+ ro_63 anf_424)
-                                (let n_68 (getNormal_37 hitPos_67)
+                             (let t_70 (. t_69 Some_0)
+                              (let anf_424 (* rd_68 t_70)
+                               (let hitPos_71 (+ ro_67 anf_424)
+                                (let n_72 (getNormal_37 hitPos_71)
                                  (let anf_425 (vec3 1. 0.8 -0.5)
-                                  (let lightDir_69 (normalize anf_425)
-                                   (let anf_426 (dot n_68 lightDir_69)
-                                    (let diff_70 (max anf_426 0.)
-                                     (let ambient_71 0.08
-                                      (let anf_427 (length hitPos_67)
-                                       (let dir_72 (/ hitPos_67 anf_427)
-                                        (let anf_428 (* dir_72 3.)
-                                         (let rawHeight_73 (fbm_27 anf_428)
-                                          (let seaLevel_74 0.35
+                                  (let lightDir_73 (normalize anf_425)
+                                   (let anf_426 (dot n_72 lightDir_73)
+                                    (let diff_74 (max anf_426 0.)
+                                     (let ambient_75 0.08
+                                      (let anf_427 (length hitPos_71)
+                                       (let dir_76 (/ hitPos_71 anf_427)
+                                        (let anf_428 (* dir_76 3.)
+                                         (let rawHeight_77 (fbm_27 anf_428)
+                                          (let seaLevel_78 0.35
                                            (let anf_429
-                                            (- rawHeight_73 seaLevel_74)
-                                            (let anf_430 (- 1. seaLevel_74)
+                                            (- rawHeight_77 seaLevel_78)
+                                            (let anf_430 (- 1. seaLevel_78)
                                              (let anf_431 (/ anf_429 anf_430)
-                                              (let h_norm_75
+                                              (let h_norm_79
                                                (clamp anf_431 0. 1.)
-                                               (let deepColor_76
-                                                (vec3 0.02 0.05 0.2)
-                                                (let landColor_77
-                                                 (vec3 0.15 0.35 0.1)
-                                                 (let mountColor_78
-                                                  (vec3 0.4 0.3 0.2)
-                                                  (let snowColor_79
-                                                   (vec3 0.85 0.85 0.9)
-                                                   (let anf_432 (< h_norm_75 0.3)
-                                                    (let baseColor_80
-                                                     (if anf_432
-                                                      (let anf_433
-                                                       (/ h_norm_75 0.3)
+                                               (let anf_432 (< h_norm_79 0.3)
+                                                (let baseColor_80
+                                                 (if anf_432
+                                                  (let anf_433 (/ h_norm_79 0.3)
+                                                   (return
+                                                    (mix deepColor_53
+                                                     landColor_54 anf_433)))
+                                                  (let anf_434 (< h_norm_79 0.6)
+                                                   (return
+                                                    (if anf_434
+                                                     (let anf_435
+                                                      (- h_norm_79 0.3)
+                                                      (let anf_436
+                                                       (/ anf_435 0.3)
                                                        (return
-                                                        (mix deepColor_76
-                                                         landColor_77 anf_433)))
-                                                      (let anf_434
-                                                       (< h_norm_75 0.6)
+                                                        (mix landColor_54
+                                                         mountColor_55 anf_436))))
+                                                     (let anf_437
+                                                      (- h_norm_79 0.6)
+                                                      (let anf_438
+                                                       (/ anf_437 0.4)
                                                        (return
-                                                        (if anf_434
-                                                         (let anf_435
-                                                          (- h_norm_75 0.3)
-                                                          (let anf_436
-                                                           (/ anf_435 0.3)
-                                                           (return
-                                                            (mix landColor_77
-                                                             mountColor_78
-                                                             anf_436))))
-                                                         (let anf_437
-                                                          (- h_norm_75 0.6)
-                                                          (let anf_438
-                                                           (/ anf_437 0.4)
-                                                           (return
-                                                            (mix mountColor_78
-                                                             snowColor_79
-                                                             anf_438))))))))
-                                                     (let anf_439 (* rd_64 -1.)
-                                                      (let anf_440
-                                                       (dot n_68 anf_439)
-                                                       (let anf_441
-                                                        (max anf_440 0.)
-                                                        (let fresnel_81
-                                                         (- 1. anf_441)
-                                                         (let anf_442
-                                                          (* fresnel_81
-                                                           fresnel_81)
-                                                          (let anf_443
-                                                           (* anf_442 fresnel_81)
-                                                           (let rim_82
-                                                            (* anf_443 0.4)
-                                                            (let atmoColor_83
-                                                             (vec3 0.3 0.5 1.)
-                                                             (let anf_444
-                                                              (* diff_70 0.9)
-                                                              (let anf_445
-                                                               (+ anf_444
-                                                                ambient_71)
-                                                               (let anf_446
-                                                                (* baseColor_80
-                                                                 anf_445)
-                                                                (let anf_447
-                                                                 (* atmoColor_83
-                                                                  rim_82)
-                                                                 (return
-                                                                  (+ anf_446
-                                                                   anf_447)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+                                                        (mix mountColor_55
+                                                         snowColor_56 anf_438))))))))
+                                                 (let anf_439 (* rd_68 -1.)
+                                                  (let anf_440 (dot n_72 anf_439)
+                                                   (let anf_441 (max anf_440 0.)
+                                                    (let fresnel_81
+                                                     (- 1. anf_441)
+                                                     (let anf_442
+                                                      (* fresnel_81 fresnel_81)
+                                                      (let anf_443
+                                                       (* anf_442 fresnel_81)
+                                                       (let rim_82
+                                                        (* anf_443 0.4)
+                                                        (let atmoColor_83
+                                                         (vec3 0.3 0.5 1.)
+                                                         (let anf_444
+                                                          (* diff_74 0.9)
+                                                          (let anf_445
+                                                           (+ anf_444 ambient_75)
+                                                           (let anf_446
+                                                            (* baseColor_80
+                                                             anf_445)
+                                                            (let anf_447
+                                                             (* atmoColor_83
+                                                              rim_82)
+                                                             (return
+                                                              (+ anf_446 anf_447)))))))))))))))))))))))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
     === translate (planet.glml) ===
@@ -7040,96 +7194,96 @@ let%expect_test "compile examples" =
        (params (((TyVec 3) ro_47) ((TyVec 3) rd_48)))
        (ret_type (TyStruct v_option_float))
        (body ((return (march_49_319 rd_48 ro_47 0. 0)))))
-      (Function (name rotate_by_mouse_57_vec3_to_vec3_317_320) (desc ())
-       (params (((TyVec 2) mouseUV_56) ((TyVec 3) ray_58))) (ret_type (TyVec 3))
+      (Global Const (TyVec 3) deepColor_53 ((vec3 0.02 0.05 0.2)))
+      (Global Const (TyVec 3) landColor_54 ((vec3 0.15 0.35 0.1)))
+      (Global Const (TyVec 3) mountColor_55 ((vec3 0.4 0.3 0.2)))
+      (Global Const (TyVec 3) snowColor_56 ((vec3 0.85 0.85 0.9)))
+      (Function (name rotate_by_mouse_61_vec3_to_vec3_317_320) (desc ())
+       (params (((TyVec 2) mouseUV_60) ((TyVec 3) ray_62))) (ret_type (TyVec 3))
        (body
-        ((set () float anf_400 ((index mouseUV_56 1)))
+        ((set () float anf_400 ((index mouseUV_60 1)))
          (set () float anf_401 ((* -1. anf_400)))
-         (set () float rotX_59 ((* anf_401 1.5)))
-         (set () float anf_402 ((index ray_58 1)))
-         (set () float anf_403 ((index ray_58 2)))
+         (set () float rotX_63 ((* anf_401 1.5)))
+         (set () float anf_402 ((index ray_62 1)))
+         (set () float anf_403 ((index ray_62 2)))
          (set () vec2 anf_404 ((vec2 anf_402 anf_403)))
-         (set () vec2 ro_yz_60 ((rotate_0 anf_404 rotX_59)))
-         (set () float anf_405 ((index mouseUV_56 0)))
+         (set () vec2 ro_yz_64 ((rotate_0 anf_404 rotX_63)))
+         (set () float anf_405 ((index mouseUV_60 0)))
          (set () float anf_406 ((* -1. anf_405)))
-         (set () float rotY_61 ((* anf_406 1.5)))
-         (set () float anf_407 ((index ray_58 0)))
-         (set () float anf_408 ((index ro_yz_60 1)))
+         (set () float rotY_65 ((* anf_406 1.5)))
+         (set () float anf_407 ((index ray_62 0)))
+         (set () float anf_408 ((index ro_yz_64 1)))
          (set () vec2 anf_409 ((vec2 anf_407 anf_408)))
-         (set () vec2 ro_xz_62 ((rotate_0 anf_409 rotY_61)))
-         (set () float anf_410 ((index ro_xz_62 0)))
-         (set () float anf_411 ((index ro_yz_60 0)))
-         (set () float anf_412 ((index ro_xz_62 1)))
+         (set () vec2 ro_xz_66 ((rotate_0 anf_409 rotY_65)))
+         (set () float anf_410 ((index ro_xz_66 0)))
+         (set () float anf_411 ((index ro_yz_64 0)))
+         (set () float anf_412 ((index ro_xz_66 1)))
          (return (vec3 anf_410 anf_411 anf_412)))))
-      (Function (name main) (desc ()) (params (((TyVec 2) coord_53)))
+      (Function (name main) (desc ()) (params (((TyVec 2) coord_57)))
        (ret_type (TyVec 3))
        (body
         ((set () float anf_413 ((index u_resolution 0)))
          (set () float anf_414 ((index u_resolution 1)))
-         (set () float res_min_54 ((min anf_413 anf_414)))
-         (set () vec2 anf_415 ((* coord_53 2.)))
+         (set () float res_min_58 ((min anf_413 anf_414)))
+         (set () vec2 anf_415 ((* coord_57 2.)))
          (set () vec2 anf_416 ((- anf_415 u_resolution)))
-         (set () vec2 uv_55 ((/ anf_416 res_min_54)))
+         (set () vec2 uv_59 ((/ anf_416 res_min_58)))
          (set () vec2 anf_417 ((* u_mouse 2.)))
          (set () vec2 anf_418 ((- anf_417 u_resolution)))
-         (set () vec2 mouseUV_56 ((/ anf_418 res_min_54)))
+         (set () vec2 mouseUV_60 ((/ anf_418 res_min_58)))
          (set () vec3 anf_419 ((vec3 0. 0. -4.)))
-         (set () vec3 ro_63
-          ((rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56 anf_419)))
-         (set () float anf_420 ((index uv_55 0)))
-         (set () float anf_421 ((index uv_55 1)))
+         (set () vec3 ro_67
+          ((rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60 anf_419)))
+         (set () float anf_420 ((index uv_59 0)))
+         (set () float anf_421 ((index uv_59 1)))
          (set () vec3 anf_422 ((vec3 anf_420 anf_421 1.5)))
          (set () vec3 anf_423 ((normalize anf_422)))
-         (set () vec3 rd_64
-          ((rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56 anf_423)))
-         (set () v_option_float t_65 ((march_46 ro_63 rd_64)))
-         (set () int _lv_tag_450 ((. t_65 tag)))
+         (set () vec3 rd_68
+          ((rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60 anf_423)))
+         (set () v_option_float t_69 ((march_46 ro_67 rd_68)))
+         (set () int _lv_tag_450 ((. t_69 tag)))
          (switch _lv_tag_450 (1 (return (vec3 0. 0. 0.)) break)
-          (default (set () float t_66 ((. t_65 Some_0)))
-           (set () vec3 anf_424 ((* rd_64 t_66)))
-           (set () vec3 hitPos_67 ((+ ro_63 anf_424)))
-           (set () vec3 n_68 ((getNormal_37 hitPos_67)))
+          (default (set () float t_70 ((. t_69 Some_0)))
+           (set () vec3 anf_424 ((* rd_68 t_70)))
+           (set () vec3 hitPos_71 ((+ ro_67 anf_424)))
+           (set () vec3 n_72 ((getNormal_37 hitPos_71)))
            (set () vec3 anf_425 ((vec3 1. 0.8 -0.5)))
-           (set () vec3 lightDir_69 ((normalize anf_425)))
-           (set () float anf_426 ((dot n_68 lightDir_69)))
-           (set () float diff_70 ((max anf_426 0.)))
-           (set () float ambient_71 (0.08))
-           (set () float anf_427 ((length hitPos_67)))
-           (set () vec3 dir_72 ((/ hitPos_67 anf_427)))
-           (set () vec3 anf_428 ((* dir_72 3.)))
-           (set () float rawHeight_73 ((fbm_27 anf_428)))
-           (set () float seaLevel_74 (0.35))
-           (set () float anf_429 ((- rawHeight_73 seaLevel_74)))
-           (set () float anf_430 ((- 1. seaLevel_74)))
+           (set () vec3 lightDir_73 ((normalize anf_425)))
+           (set () float anf_426 ((dot n_72 lightDir_73)))
+           (set () float diff_74 ((max anf_426 0.)))
+           (set () float ambient_75 (0.08))
+           (set () float anf_427 ((length hitPos_71)))
+           (set () vec3 dir_76 ((/ hitPos_71 anf_427)))
+           (set () vec3 anf_428 ((* dir_76 3.)))
+           (set () float rawHeight_77 ((fbm_27 anf_428)))
+           (set () float seaLevel_78 (0.35))
+           (set () float anf_429 ((- rawHeight_77 seaLevel_78)))
+           (set () float anf_430 ((- 1. seaLevel_78)))
            (set () float anf_431 ((/ anf_429 anf_430)))
-           (set () float h_norm_75 ((clamp anf_431 0. 1.)))
-           (set () vec3 deepColor_76 ((vec3 0.02 0.05 0.2)))
-           (set () vec3 landColor_77 ((vec3 0.15 0.35 0.1)))
-           (set () vec3 mountColor_78 ((vec3 0.4 0.3 0.2)))
-           (set () vec3 snowColor_79 ((vec3 0.85 0.85 0.9)))
-           (set () bool anf_432 ((< h_norm_75 0.3)))
+           (set () float h_norm_79 ((clamp anf_431 0. 1.)))
+           (set () bool anf_432 ((< h_norm_79 0.3)))
            (set () vec3 baseColor_80 ())
            (if anf_432
-            (Block (set () float anf_433 ((/ h_norm_75 0.3)))
-             (set baseColor_80 (mix deepColor_76 landColor_77 anf_433)))
-            (Block (set () bool anf_434 ((< h_norm_75 0.6)))
+            (Block (set () float anf_433 ((/ h_norm_79 0.3)))
+             (set baseColor_80 (mix deepColor_53 landColor_54 anf_433)))
+            (Block (set () bool anf_434 ((< h_norm_79 0.6)))
              (if anf_434
-              (Block (set () float anf_435 ((- h_norm_75 0.3)))
+              (Block (set () float anf_435 ((- h_norm_79 0.3)))
                (set () float anf_436 ((/ anf_435 0.3)))
-               (set baseColor_80 (mix landColor_77 mountColor_78 anf_436)))
-              (Block (set () float anf_437 ((- h_norm_75 0.6)))
+               (set baseColor_80 (mix landColor_54 mountColor_55 anf_436)))
+              (Block (set () float anf_437 ((- h_norm_79 0.6)))
                (set () float anf_438 ((/ anf_437 0.4)))
-               (set baseColor_80 (mix mountColor_78 snowColor_79 anf_438))))))
-           (set () vec3 anf_439 ((* rd_64 -1.)))
-           (set () float anf_440 ((dot n_68 anf_439)))
+               (set baseColor_80 (mix mountColor_55 snowColor_56 anf_438))))))
+           (set () vec3 anf_439 ((* rd_68 -1.)))
+           (set () float anf_440 ((dot n_72 anf_439)))
            (set () float anf_441 ((max anf_440 0.)))
            (set () float fresnel_81 ((- 1. anf_441)))
            (set () float anf_442 ((* fresnel_81 fresnel_81)))
            (set () float anf_443 ((* anf_442 fresnel_81)))
            (set () float rim_82 ((* anf_443 0.4)))
            (set () vec3 atmoColor_83 ((vec3 0.3 0.5 1.)))
-           (set () float anf_444 ((* diff_70 0.9)))
-           (set () float anf_445 ((+ anf_444 ambient_71)))
+           (set () float anf_444 ((* diff_74 0.9)))
+           (set () float anf_445 ((+ anf_444 ambient_75)))
            (set () vec3 anf_446 ((* baseColor_80 anf_445)))
            (set () vec3 anf_447 ((* atmoColor_83 rim_82)))
            (return (+ anf_446 anf_447)) break)))))))
@@ -7290,96 +7444,96 @@ let%expect_test "compile examples" =
        (params (((TyVec 3) ro_47) ((TyVec 3) rd_48)))
        (ret_type (TyStruct v_option_float))
        (body ((return (march_49_319 rd_48 ro_47 0. 0)))))
-      (Function (name rotate_by_mouse_57_vec3_to_vec3_317_320) (desc ())
-       (params (((TyVec 2) mouseUV_56) ((TyVec 3) ray_58))) (ret_type (TyVec 3))
+      (Global Const (TyVec 3) deepColor_53 ((vec3 0.02 0.05 0.2)))
+      (Global Const (TyVec 3) landColor_54 ((vec3 0.15 0.35 0.1)))
+      (Global Const (TyVec 3) mountColor_55 ((vec3 0.4 0.3 0.2)))
+      (Global Const (TyVec 3) snowColor_56 ((vec3 0.85 0.85 0.9)))
+      (Function (name rotate_by_mouse_61_vec3_to_vec3_317_320) (desc ())
+       (params (((TyVec 2) mouseUV_60) ((TyVec 3) ray_62))) (ret_type (TyVec 3))
        (body
-        ((set () float anf_400 ((index mouseUV_56 1)))
+        ((set () float anf_400 ((index mouseUV_60 1)))
          (set () float anf_401 ((* -1. anf_400)))
-         (set () float rotX_59 ((* anf_401 1.5)))
-         (set () float anf_402 ((index ray_58 1)))
-         (set () float anf_403 ((index ray_58 2)))
+         (set () float rotX_63 ((* anf_401 1.5)))
+         (set () float anf_402 ((index ray_62 1)))
+         (set () float anf_403 ((index ray_62 2)))
          (set () vec2 anf_404 ((vec2 anf_402 anf_403)))
-         (set () vec2 ro_yz_60 ((rotate_0 anf_404 rotX_59)))
-         (set () float anf_405 ((index mouseUV_56 0)))
+         (set () vec2 ro_yz_64 ((rotate_0 anf_404 rotX_63)))
+         (set () float anf_405 ((index mouseUV_60 0)))
          (set () float anf_406 ((* -1. anf_405)))
-         (set () float rotY_61 ((* anf_406 1.5)))
-         (set () float anf_407 ((index ray_58 0)))
-         (set () float anf_408 ((index ro_yz_60 1)))
+         (set () float rotY_65 ((* anf_406 1.5)))
+         (set () float anf_407 ((index ray_62 0)))
+         (set () float anf_408 ((index ro_yz_64 1)))
          (set () vec2 anf_409 ((vec2 anf_407 anf_408)))
-         (set () vec2 ro_xz_62 ((rotate_0 anf_409 rotY_61)))
-         (set () float anf_410 ((index ro_xz_62 0)))
-         (set () float anf_411 ((index ro_yz_60 0)))
-         (set () float anf_412 ((index ro_xz_62 1)))
+         (set () vec2 ro_xz_66 ((rotate_0 anf_409 rotY_65)))
+         (set () float anf_410 ((index ro_xz_66 0)))
+         (set () float anf_411 ((index ro_yz_64 0)))
+         (set () float anf_412 ((index ro_xz_66 1)))
          (return (vec3 anf_410 anf_411 anf_412)))))
-      (Function (name main_pure) (desc ()) (params (((TyVec 2) coord_53)))
+      (Function (name main_pure) (desc ()) (params (((TyVec 2) coord_57)))
        (ret_type (TyVec 3))
        (body
         ((set () float anf_413 ((index u_resolution 0)))
          (set () float anf_414 ((index u_resolution 1)))
-         (set () float res_min_54 ((min anf_413 anf_414)))
-         (set () vec2 anf_415 ((* coord_53 2.)))
+         (set () float res_min_58 ((min anf_413 anf_414)))
+         (set () vec2 anf_415 ((* coord_57 2.)))
          (set () vec2 anf_416 ((- anf_415 u_resolution)))
-         (set () vec2 uv_55 ((/ anf_416 res_min_54)))
+         (set () vec2 uv_59 ((/ anf_416 res_min_58)))
          (set () vec2 anf_417 ((* u_mouse 2.)))
          (set () vec2 anf_418 ((- anf_417 u_resolution)))
-         (set () vec2 mouseUV_56 ((/ anf_418 res_min_54)))
+         (set () vec2 mouseUV_60 ((/ anf_418 res_min_58)))
          (set () vec3 anf_419 ((vec3 0. 0. -4.)))
-         (set () vec3 ro_63
-          ((rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56 anf_419)))
-         (set () float anf_420 ((index uv_55 0)))
-         (set () float anf_421 ((index uv_55 1)))
+         (set () vec3 ro_67
+          ((rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60 anf_419)))
+         (set () float anf_420 ((index uv_59 0)))
+         (set () float anf_421 ((index uv_59 1)))
          (set () vec3 anf_422 ((vec3 anf_420 anf_421 1.5)))
          (set () vec3 anf_423 ((normalize anf_422)))
-         (set () vec3 rd_64
-          ((rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56 anf_423)))
-         (set () v_option_float t_65 ((march_46 ro_63 rd_64)))
-         (set () int _lv_tag_450 ((. t_65 tag)))
+         (set () vec3 rd_68
+          ((rotate_by_mouse_61_vec3_to_vec3_317_320 mouseUV_60 anf_423)))
+         (set () v_option_float t_69 ((march_46 ro_67 rd_68)))
+         (set () int _lv_tag_450 ((. t_69 tag)))
          (switch _lv_tag_450 (1 (return (vec3 0. 0. 0.)) break)
-          (default (set () float t_66 ((. t_65 Some_0)))
-           (set () vec3 anf_424 ((* rd_64 t_66)))
-           (set () vec3 hitPos_67 ((+ ro_63 anf_424)))
-           (set () vec3 n_68 ((getNormal_37 hitPos_67)))
+          (default (set () float t_70 ((. t_69 Some_0)))
+           (set () vec3 anf_424 ((* rd_68 t_70)))
+           (set () vec3 hitPos_71 ((+ ro_67 anf_424)))
+           (set () vec3 n_72 ((getNormal_37 hitPos_71)))
            (set () vec3 anf_425 ((vec3 1. 0.8 -0.5)))
-           (set () vec3 lightDir_69 ((normalize anf_425)))
-           (set () float anf_426 ((dot n_68 lightDir_69)))
-           (set () float diff_70 ((max anf_426 0.)))
-           (set () float ambient_71 (0.08))
-           (set () float anf_427 ((length hitPos_67)))
-           (set () vec3 dir_72 ((/ hitPos_67 anf_427)))
-           (set () vec3 anf_428 ((* dir_72 3.)))
-           (set () float rawHeight_73 ((fbm_27 anf_428)))
-           (set () float seaLevel_74 (0.35))
-           (set () float anf_429 ((- rawHeight_73 seaLevel_74)))
-           (set () float anf_430 ((- 1. seaLevel_74)))
+           (set () vec3 lightDir_73 ((normalize anf_425)))
+           (set () float anf_426 ((dot n_72 lightDir_73)))
+           (set () float diff_74 ((max anf_426 0.)))
+           (set () float ambient_75 (0.08))
+           (set () float anf_427 ((length hitPos_71)))
+           (set () vec3 dir_76 ((/ hitPos_71 anf_427)))
+           (set () vec3 anf_428 ((* dir_76 3.)))
+           (set () float rawHeight_77 ((fbm_27 anf_428)))
+           (set () float seaLevel_78 (0.35))
+           (set () float anf_429 ((- rawHeight_77 seaLevel_78)))
+           (set () float anf_430 ((- 1. seaLevel_78)))
            (set () float anf_431 ((/ anf_429 anf_430)))
-           (set () float h_norm_75 ((clamp anf_431 0. 1.)))
-           (set () vec3 deepColor_76 ((vec3 0.02 0.05 0.2)))
-           (set () vec3 landColor_77 ((vec3 0.15 0.35 0.1)))
-           (set () vec3 mountColor_78 ((vec3 0.4 0.3 0.2)))
-           (set () vec3 snowColor_79 ((vec3 0.85 0.85 0.9)))
-           (set () bool anf_432 ((< h_norm_75 0.3)))
+           (set () float h_norm_79 ((clamp anf_431 0. 1.)))
+           (set () bool anf_432 ((< h_norm_79 0.3)))
            (set () vec3 baseColor_80 ())
            (if anf_432
-            (Block (set () float anf_433 ((/ h_norm_75 0.3)))
-             (set baseColor_80 (mix deepColor_76 landColor_77 anf_433)))
-            (Block (set () bool anf_434 ((< h_norm_75 0.6)))
+            (Block (set () float anf_433 ((/ h_norm_79 0.3)))
+             (set baseColor_80 (mix deepColor_53 landColor_54 anf_433)))
+            (Block (set () bool anf_434 ((< h_norm_79 0.6)))
              (if anf_434
-              (Block (set () float anf_435 ((- h_norm_75 0.3)))
+              (Block (set () float anf_435 ((- h_norm_79 0.3)))
                (set () float anf_436 ((/ anf_435 0.3)))
-               (set baseColor_80 (mix landColor_77 mountColor_78 anf_436)))
-              (Block (set () float anf_437 ((- h_norm_75 0.6)))
+               (set baseColor_80 (mix landColor_54 mountColor_55 anf_436)))
+              (Block (set () float anf_437 ((- h_norm_79 0.6)))
                (set () float anf_438 ((/ anf_437 0.4)))
-               (set baseColor_80 (mix mountColor_78 snowColor_79 anf_438))))))
-           (set () vec3 anf_439 ((* rd_64 -1.)))
-           (set () float anf_440 ((dot n_68 anf_439)))
+               (set baseColor_80 (mix mountColor_55 snowColor_56 anf_438))))))
+           (set () vec3 anf_439 ((* rd_68 -1.)))
+           (set () float anf_440 ((dot n_72 anf_439)))
            (set () float anf_441 ((max anf_440 0.)))
            (set () float fresnel_81 ((- 1. anf_441)))
            (set () float anf_442 ((* fresnel_81 fresnel_81)))
            (set () float anf_443 ((* anf_442 fresnel_81)))
            (set () float rim_82 ((* anf_443 0.4)))
            (set () vec3 atmoColor_83 ((vec3 0.3 0.5 1.)))
-           (set () float anf_444 ((* diff_70 0.9)))
-           (set () float anf_445 ((+ anf_444 ambient_71)))
+           (set () float anf_444 ((* diff_74 0.9)))
+           (set () float anf_445 ((+ anf_444 ambient_75)))
            (set () vec3 anf_446 ((* baseColor_80 anf_445)))
            (set () vec3 anf_447 ((* atmoColor_83 rim_82)))
            (return (+ anf_446 anf_447)) break)))))

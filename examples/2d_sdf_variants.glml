@@ -2,28 +2,37 @@
 #extern vec2 u_mouse
 #extern float u_time
 
+type sdf = vec2 -> float
+
 type shape =
   | Circle of float
   | Rect of float * float
   | Empty
 
-let sdf (s : shape) (p : vec2) =
-  match s with
-  | Circle r -> #length(p) - r
-  | Rect (w, h) ->
-    let d = #abs(p) - [w,h] in
-    #length(#max(d, [0, 0])) + #min(#max(d.0, d.1), 0.0)
-  | Empty -> 1.0
+let sdf_shape (s : shape) : sdf =
+  fun p ->
+    match s with
+    | Circle r -> #length(p) - r
+    | Rect (w, h) ->
+      let d = #abs(p) - [w,h] in
+      #length(#max(d, [0, 0])) + #min(#max(d.0, d.1), 0)
+    | Empty -> 1.0
+    
+let union (f : sdf) (f' : sdf) : sdf =
+  fun p -> #min(f p, f' p)
 
-let scene (p : vec2) =
-  let circle = sdf (Circle 0.3) p in
-  let rect = sdf (Rect (0.7, 0.1)) p in
-  #min(circle, rect)
+let scene : sdf =
+  let circle = sdf_shape (Circle 0.3) in
+  let rect = sdf_shape (Rect (0.7, 0.1)) in
+  union circle rect
 
 let get_uv coord =
   let top = 2 * coord - u_resolution in
   let bot = #min(u_resolution.0, u_resolution.1) in
   top / bot
+
+let orange = [0.9, 0.6, 0.3]
+let blue = [0.65, 0.85, 1.0]
 
 let main (coord : vec2) =
   let p = get_uv coord in
@@ -32,7 +41,7 @@ let main (coord : vec2) =
   let d = scene p in
 
   // Base coloring
-  let col = if d > 0 then [0.9, 0.6, 0.3] else [0.65, 0.85, 1.0] in
+  let col = if d > 0 then orange else blue in
 
   // Darken near surface and add rings
   let col =
