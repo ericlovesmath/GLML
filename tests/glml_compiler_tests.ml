@@ -3523,3 +3523,87 @@ let%expect_test "partial application stored as top level value" =
     }
     |}]
 ;;
+
+let%expect_test "regression - inferred type in higher-order local function" =
+  (* implicit t parameter, int path via call site
+
+     When func t is written without an explicit type annotation, the
+     inner let binding let app_t f = f t gets a polymorphic scheme
+     type with orphan constraint variables which caused issues *)
+  test
+    {|
+    let func t =
+      let app_t f = f t in
+      let x = app_t (fun t -> t + 1) in
+      [x, x]
+    let main (uv : vec2) =
+      let result = func 0 in
+      [0, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_21 {
+        int tag;
+    };
+    int dapply_20(DFn_21 dfn_23, int da_24) {
+        return (da_24 + 1);
+    }
+    int app_t_2_25(int t_1, DFn_21 f_3) {
+        return dapply_20(f_3, t_1);
+    }
+    vec2 func_0_int_to_vec2_19(int t_1) {
+        DFn_21 anf_26 = DFn_21(0);
+        int x_4 = app_t_2_25(t_1, anf_26);
+        float pf_27 = float(x_4);
+        float pf_28 = float(x_4);
+        return vec2(pf_27, pf_28);
+    }
+    vec3 main_pure(vec2 uv_6) {
+        vec2 result_7 = func_0_int_to_vec2_19(0);
+        return vec3(0., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* Float variant: t inferred as float *)
+  test
+    {|
+    let func t =
+      let app_t f = f t in
+      let x = app_t (fun t -> t + 1.0) in
+      [x, x, x]
+    let main (uv : vec2) = func 0.0
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_20 {
+        int tag;
+    };
+    float dapply_19(DFn_20 dfn_22, float da_23) {
+        return (da_23 + 1.);
+    }
+    float app_t_2_24(float t_1, DFn_20 f_3) {
+        return dapply_19(f_3, t_1);
+    }
+    vec3 func_0_float_to_vec3_18(float t_1) {
+        DFn_20 anf_25 = DFn_20(0);
+        float x_4 = app_t_2_24(t_1, anf_25);
+        return vec3(x_4, x_4, x_4);
+    }
+    vec3 main_pure(vec2 uv_6) {
+        return func_0_float_to_vec3_18(0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;

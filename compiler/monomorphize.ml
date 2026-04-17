@@ -414,6 +414,32 @@ let collect_var_usages (name : string) (t : Typecheck.term) : Typecheck.ty list 
   |> List.stable_dedup ~compare:(fun a b -> if Typecheck.equal_ty a b then 0 else 1)
 ;;
 
+(** For each polymorphic Let binding in [t], collect Eq constraints between
+    the binding's definition type and each usage type in the continuation.
+    These encode equality information that was solved away inside infer_binding
+    but not propagated to the outer term's type, allowing [instantiate_scheme] to
+    resolve "orphan" constraint variables. *)
+let collect_poly_let_eqs (t : Typecheck.term) : Typecheck.constr list =
+  fold_term
+    ~f:(fun acc t ->
+      match t.desc with
+      | Let (_, v, inner_constrs, bind, body) when not (is_concrete bind.ty) ->
+        let usages = collect_var_usages v body in
+        let eq_constrs =
+          List.filter_map usages ~f:(fun usage_ty ->
+            if Typecheck.equal_ty bind.ty usage_ty
+            then None
+            else Some { Typecheck.desc = Eq (bind.ty, usage_ty); loc = t.loc })
+        in
+        (* Also include the inner let's scheme constraints so that any variables
+           introduced by those constraints (like return-type vars) also get resolved
+           once the Eq constraints fix the parameter types. *)
+        eq_constrs @ inner_constrs @ acc
+      | _ -> acc)
+    []
+    t
+;;
+
 let map_cases_capture_avoiding
       ~(var : string)
       ~(f : Typecheck.term -> Typecheck.term)
@@ -508,10 +534,11 @@ let rec resolve_spec (env : env) (acc : acc) (name : string) (concrete_ty : Type
     (* Register in spec_map FIRST as cycle guard for recursive functions *)
     let acc = { acc with spec_map = add_spec acc.spec_map name concrete_ty spec_name } in
     let sub = subst ~poly:entry.poly_type ~concrete:concrete_ty in
+    let extra_constrs = collect_poly_let_eqs entry.poly_bind in
     let%bind body =
       Typecheck.instantiate_scheme
         ~structs:env.structs_for_constrs
-        entry.poly_constrs
+        (entry.poly_constrs @ extra_constrs)
         entry.poly_bind
         sub
     in
@@ -636,10 +663,12 @@ and rewrite_refs (env : env) (acc : acc) (t : Typecheck.term)
              ; loc = t.loc
              }))
             .desc ))
-    | Let (recur, v, constrs, bind, body) ->
+    | Let (recur, v, _, bind, body) ->
+      (* NOTE: Now that inner lets may be resolved early with concrete types,
+         their scheme constraints are already consumed, so we can ignore them *)
       let%bind acc, bind = rewrite_refs env acc bind in
       let%bind acc, body = rewrite_refs env acc body in
-      Ok (acc, Let (recur, v, constrs, bind, body))
+      Ok (acc, Let (recur, v, [], bind, body))
     | If (c, t, e) ->
       let%bind acc, c = rewrite_refs env acc c in
       let%bind acc, t = rewrite_refs env acc t in
