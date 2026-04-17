@@ -12,7 +12,7 @@ export const EXAMPLES: [string, string][] = [
   ["Metallic Liquid", warpedNoise],
   ["Raymarched Planet", raymarchedPlanet],
   ["Mandelbrot", mandelbrot],
-  ["2D SDFs + Variants", flatSDFViewer],
+  ["2D SDFs", flatSDFViewer],
   ["Raymarching", raymarch],
   ["Recursive Star", recursion],
   ["Mouse Tracking", mouseCircle],
