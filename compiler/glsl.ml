@@ -38,6 +38,7 @@ type binary_op =
 [@@deriving sexp_of]
 
 type builtin =
+  | Float
   | Sin
   | Cos
   | Tan

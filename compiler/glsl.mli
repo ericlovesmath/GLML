@@ -24,6 +24,7 @@ type binary_op =
 [@@deriving sexp_of, to_string]
 
 type builtin =
+  | Float
   | Sin
   | Cos
   | Tan

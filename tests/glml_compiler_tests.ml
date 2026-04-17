@@ -3425,3 +3425,27 @@ let%expect_test "regression - defunctionalization closure globals use correct da
     }
     |}]
 ;;
+
+let%expect_test "toplevel vectors of ints are treated as consts with builtin #floats" =
+  test
+    {|
+    let a = 10
+    let x = [a, a, a]
+    let main (coord : vec2) = x
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    const int a_0 = 10;
+    const vec3 x_1 = vec3(float(a_0), float(a_0), float(a_0));
+    vec3 main_pure(vec2 coord_2) {
+        return x_1;
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
