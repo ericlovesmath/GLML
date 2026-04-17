@@ -1000,6 +1000,92 @@ let%expect_test "compile examples" =
                                          (return col_24))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
+    === lift consts (2d_sdf_variants.glml) ===
+    (Program
+     ((TypeDef shape
+       (RecordDecl ((tag int) (Circle_0 float) (Rect_0 float) (Rect_1 float))))
+      : shape)
+     ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
+     ((Define (name sdf_0) (args ((s_1 shape) (p_2 (vec 2))))
+       (body
+        (let _lv_tag_155 (. s_1 tag)
+         (return
+          (switch _lv_tag_155
+           (0
+            (let r_3 (. s_1 Circle_0)
+             (let anf_119 (length p_2) (return (- anf_119 r_3)))))
+           (1
+            (let w_4 (. s_1 Rect_0)
+             (let h_5 (. s_1 Rect_1)
+              (let anf_120 (abs p_2)
+               (let anf_121 (vec2 w_4 h_5)
+                (let d_6 (- anf_120 anf_121)
+                 (let anf_122 (vec2 0. 0.)
+                  (let anf_123 (max d_6 anf_122)
+                   (let anf_124 (length anf_123)
+                    (let anf_125 (index d_6 0)
+                     (let anf_126 (index d_6 1)
+                      (let anf_127 (max anf_125 anf_126)
+                       (let anf_128 (min anf_127 0.)
+                        (return (+ anf_124 anf_128)))))))))))))))
+           (default (return 1.)))))))
+      : (shape -> ((vec 2) -> float)))
+     ((Define (name scene_7) (args ((p_8 (vec 2))))
+       (body
+        (let anf_129 (shape 0 0.3 0. 0.)
+         (let circle_9 (sdf_0 anf_129 p_8)
+          (let anf_130 (shape 1 0. 0.7 0.1)
+           (let rect_10 (sdf_0 anf_130 p_8) (return (min circle_9 rect_10))))))))
+      : ((vec 2) -> float))
+     ((Define (name get_uv_11_vec2_to_vec2_118) (args ((coord_12 (vec 2))))
+       (body
+        (let anf_131 (* 2. coord_12)
+         (let top_13 (- anf_131 u_resolution)
+          (let anf_132 (index u_resolution 0)
+           (let anf_133 (index u_resolution 1)
+            (let bot_14 (min anf_132 anf_133) (return (/ top_13 bot_14)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Define (name main) (args ((coord_15 (vec 2))))
+       (body
+        (let p_16 (get_uv_11_vec2_to_vec2_118 coord_15)
+         (let m_17 (get_uv_11_vec2_to_vec2_118 u_mouse)
+          (let d_18 (scene_7 p_16)
+           (let anf_134 (> d_18 0.)
+            (let col_19
+             (if anf_134 (return (vec3 0.9 0.6 0.3))
+              (return (vec3 0.65 0.85 1.)))
+             (let anf_135 (abs d_18)
+              (let anf_136 (* -6. anf_135)
+               (let anf_137 (exp anf_136)
+                (let darken_21 (- 1. anf_137)
+                 (let anf_138 (* 150. d_18)
+                  (let anf_139 (cos anf_138)
+                   (let anf_140 (* 0.2 anf_139)
+                    (let rings_22 (+ 0.8 anf_140)
+                     (let anf_141 (* col_19 darken_21)
+                      (let col_20 (* anf_141 rings_22)
+                       (let anf_142 (vec3 1. 1. 1.)
+                        (let anf_143 (abs d_18)
+                         (let anf_144 (smoothstep 0. 0.01 anf_143)
+                          (let anf_145 (- 1. anf_144)
+                           (let col_23 (mix col_20 anf_142 anf_145)
+                            (let anf_146 (scene_7 m_17)
+                             (let d_25 (abs anf_146)
+                              (let anf_147 (- p_16 m_17)
+                               (let dm_26 (length anf_147)
+                                (let anf_148 (- dm_26 d_25)
+                                 (let anf_149 (abs anf_148)
+                                  (let anf_150 (- anf_149 0.0025)
+                                   (let anf_151 (- dm_26 0.015)
+                                    (let d_27 (min anf_150 anf_151)
+                                     (let anf_152 (vec3 1. 1. 0.)
+                                      (let anf_153 (smoothstep 0. 0.005 d_27)
+                                       (let anf_154 (- 1. anf_153)
+                                        (let col_24 (mix col_23 anf_152 anf_154)
+                                         (return col_24))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
     === translate (2d_sdf_variants.glml) ===
     (Program
      ((Struct shape
@@ -1501,6 +1587,39 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === remove placeholder (checkerboard.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+     ((Const size_0 (return 5)) : int)
+     ((Define (name get_uv_1_vec2_to_vec2_38) (args ((coord_2 (vec 2))))
+       (body
+        (let anf_39 (* 2. coord_2)
+         (let top_3 (- anf_39 u_resolution)
+          (let anf_40 (index u_resolution 0)
+           (let anf_41 (index u_resolution 1)
+            (let bot_4 (min anf_40 anf_41) (return (/ top_3 bot_4)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Define (name main) (args ((coord_5 (vec 2))))
+       (body
+        (let uv_6 (get_uv_1_vec2_to_vec2_38 coord_5)
+         (let pf_52 (float size_0)
+          (let anf_42 (* uv_6 pf_52)
+           (let anf_43 (* 2. u_time)
+            (let anf_44 (vec2 anf_43 0.)
+             (let anf_45 (+ anf_42 anf_44)
+              (let c_7 (floor anf_45)
+               (let anf_46 (index c_7 0)
+                (let anf_47 (index c_7 1)
+                 (let checker_sum_8 (+ anf_46 anf_47)
+                  (let anf_48 (/ checker_sum_8 2.)
+                   (let anf_49 (floor anf_48)
+                    (let anf_50 (* anf_49 2.)
+                     (let is_even_9 (- checker_sum_8 anf_50)
+                      (let anf_51 (< is_even_9 0.5)
+                       (return
+                        (if anf_51 (return (vec3 0.2 0.2 0.2))
+                         (return (vec3 0.8 0.8 0.8)))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === lift consts (checkerboard.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Const size_0 (return 5)) : int)
      ((Define (name get_uv_1_vec2_to_vec2_38) (args ((coord_2 (vec 2))))
@@ -2420,6 +2539,89 @@ let%expect_test "compile examples" =
                                  (return (+ anf_119 0.5)))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
+    === lift consts (mandelbrot.glml) ===
+    (Program
+     ((TypeDef v_option_float (RecordDecl ((tag int) (Some_0 float)))) :
+      v_option_float)
+     ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+     ((Define (name mandel_2_vec2_to_int_to_v_option_float_84_85)
+       (args ((c_1 (vec 2)) (z_3 (vec 2)) (i_4 int)))
+       (body
+        (let _iter_120 0
+         (while (< _iter_120 1000)
+          (let anf_86 (> i_4 150)
+           (return
+            (if anf_86 (return (v_option_float 1 0.))
+             (let anf_87 (length z_3)
+              (let anf_88 (> anf_87 4.)
+               (return
+                (if anf_88
+                 (let anf_89 (length z_3)
+                  (let anf_90 (log2 anf_89)
+                   (let nu_5 (log2 anf_90)
+                    (let pf_123 (float i_4)
+                     (let anf_91 (- pf_123 nu_5)
+                      (let anf_92 (/ anf_91 150.)
+                       (return (v_option_float 0 anf_92))))))))
+                 (let anf_93 (index z_3 0)
+                  (let anf_94 (index z_3 0)
+                   (let anf_95 (* anf_93 anf_94)
+                    (let anf_96 (index z_3 1)
+                     (let anf_97 (index z_3 1)
+                      (let anf_98 (* anf_96 anf_97)
+                       (let zx_6 (- anf_95 anf_98)
+                        (let anf_99 (index z_3 0)
+                         (let anf_100 (* 2. anf_99)
+                          (let anf_101 (index z_3 1)
+                           (let zy_7 (* anf_100 anf_101)
+                            (let anf_102 (vec2 zx_6 zy_7)
+                             (let z_prime_8 (+ anf_102 c_1)
+                              (let anf_103 (+ i_4 1)
+                               (set c_1 c_1
+                                (set z_3 z_prime_8
+                                 (set i_4 anf_103
+                                  (let _iter_inc_121 (+ _iter_120 1)
+                                   (set _iter_120 _iter_inc_121 continue))))))))))))))))))))))))))
+          (placeholder _tmp_124 (return _tmp_124))))))
+      : ((vec 2) -> (int -> v_option_float)))
+     ((Define (name mandelbrot_0_vec2_to_v_option_float_83)
+       (args ((c_1 (vec 2))))
+       (body
+        (let anf_104 (vec2 0. 0.)
+         (return (mandel_2_vec2_to_int_to_v_option_float_84_85 c_1 anf_104 0)))))
+      : ((vec 2) -> v_option_float))
+     ((Define (name main) (args ((coord_9 (vec 2))))
+       (body
+        (let anf_105 (* 2. coord_9)
+         (let top_11 (- anf_105 u_resolution)
+          (let anf_106 (index u_resolution 0)
+           (let anf_107 (index u_resolution 1)
+            (let bot_12 (min anf_106 anf_107)
+             (let uv_10 (/ top_11 bot_12)
+              (let anf_108 (* u_time 0.4)
+               (let anf_109 (sin anf_108)
+                (let anf_110 (* anf_109 4.5)
+                 (let anf_111 (+ anf_110 3.5)
+                  (let zoom_13 (exp anf_111)
+                   (let anf_112 (vec2 -0.7453 0.1127)
+                    (let anf_113 (/ uv_10 zoom_13)
+                     (let seahorse_valley_14 (+ anf_112 anf_113)
+                      (let anf_114
+                       (mandelbrot_0_vec2_to_v_option_float_83
+                        seahorse_valley_14)
+                       (let _lv_tag_122 (. anf_114 tag)
+                        (return
+                         (switch _lv_tag_122 (1 (return (vec3 0. 0. 0.)))
+                          (default
+                           (let n_15 (. anf_114 Some_0)
+                            (let anf_115 (vec3 10. 20. 30.)
+                             (let anf_116 (* n_15 anf_115)
+                              (let anf_117 (+ anf_116 u_time)
+                               (let anf_118 (sin anf_117)
+                                (let anf_119 (* anf_118 0.5)
+                                 (return (+ anf_119 0.5)))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
     === translate (mandelbrot.glml) ===
     (Program
      ((Struct v_option_float ((TyInt tag) (TyFloat Some_0)))
@@ -2890,6 +3092,35 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === remove placeholder (mouse_circle.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
+     ((Extern u_time) : float)
+     ((Define (name get_uv_0_vec2_to_vec2_33) (args ((coord_1 (vec 2))))
+       (body
+        (let anf_34 (* 2. coord_1)
+         (let top_2 (- anf_34 u_resolution)
+          (let anf_35 (index u_resolution 0)
+           (let anf_36 (index u_resolution 1)
+            (let bot_3 (min anf_35 anf_36) (return (/ top_2 bot_3)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Define (name main) (args ((coord_4 (vec 2))))
+       (body
+        (let uv_5 (get_uv_0_vec2_to_vec2_33 coord_4)
+         (let anf_37 (* 2. u_mouse)
+          (let anf_38 (- anf_37 u_resolution)
+           (let anf_39 (index u_resolution 1)
+            (let mouseUV_6 (/ anf_38 anf_39)
+             (let anf_40 (* u_time 2.)
+              (let anf_41 (sin anf_40)
+               (let anf_42 (* anf_41 0.1)
+                (let radius_7 (+ anf_42 0.15)
+                 (let anf_43 (distance uv_5 mouseUV_6)
+                  (let anf_44 (< anf_43 radius_7)
+                   (return
+                    (if anf_44 (return (vec3 0. 0. 0.5))
+                     (return (vec3 0.5 0.5 1.)))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === lift consts (mouse_circle.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_mouse) : (vec 2))
      ((Extern u_time) : float)
      ((Define (name get_uv_0_vec2_to_vec2_33) (args ((coord_1 (vec 2))))
@@ -6352,6 +6583,308 @@ let%expect_test "compile examples" =
                                                                    anf_447)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
+    === lift consts (planet.glml) ===
+    (Program
+     ((TypeDef v_option_float (RecordDecl ((tag int) (Some_0 float)))) :
+      v_option_float)
+     ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+     ((Extern u_mouse) : (vec 2))
+     ((Define (name rotate_0) (args ((p_1 (vec 2)) (angle_2 float)))
+       (body
+        (let s_3 (sin angle_2)
+         (let c_4 (cos angle_2)
+          (let anf_321 (index p_1 0)
+           (let anf_322 (* anf_321 c_4)
+            (let anf_323 (index p_1 1)
+             (let anf_324 (* anf_323 s_3)
+              (let anf_325 (- anf_322 anf_324)
+               (let anf_326 (index p_1 0)
+                (let anf_327 (* anf_326 s_3)
+                 (let anf_328 (index p_1 1)
+                  (let anf_329 (* anf_328 c_4)
+                   (let anf_330 (+ anf_327 anf_329)
+                    (return (vec2 anf_325 anf_330))))))))))))))))
+      : ((vec 2) -> (float -> (vec 2))))
+     ((Define (name hash_10_318) (args ((p_11 (vec 3))))
+       (body
+        (let anf_331 (vec3 127.1 311.7 74.7)
+         (let d_12 (dot p_11 anf_331)
+          (let anf_332 (sin d_12)
+           (let anf_333 (* anf_332 43758.5453) (return (fract anf_333))))))))
+      : ((vec 3) -> float))
+     ((Define (name noise3d_5) (args ((p_6 (vec 3))))
+       (body
+        (let i_7 (floor p_6)
+         (let f_8 (fract p_6)
+          (let anf_334 (* f_8 f_8)
+           (let anf_335 (* 2. f_8)
+            (let anf_336 (- 3. anf_335)
+             (let u_9 (* anf_334 anf_336)
+              (let a_13 (hash_10_318 i_7)
+               (let anf_337 (vec3 1. 0. 0.)
+                (let anf_338 (+ i_7 anf_337)
+                 (let b_14 (hash_10_318 anf_338)
+                  (let anf_339 (vec3 0. 1. 0.)
+                   (let anf_340 (+ i_7 anf_339)
+                    (let c_15 (hash_10_318 anf_340)
+                     (let anf_341 (vec3 1. 1. 0.)
+                      (let anf_342 (+ i_7 anf_341)
+                       (let d_16 (hash_10_318 anf_342)
+                        (let anf_343 (vec3 0. 0. 1.)
+                         (let anf_344 (+ i_7 anf_343)
+                          (let e_17 (hash_10_318 anf_344)
+                           (let anf_345 (vec3 1. 0. 1.)
+                            (let anf_346 (+ i_7 anf_345)
+                             (let f_18 (hash_10_318 anf_346)
+                              (let anf_347 (vec3 0. 1. 1.)
+                               (let anf_348 (+ i_7 anf_347)
+                                (let g_19 (hash_10_318 anf_348)
+                                 (let anf_349 (vec3 1. 1. 1.)
+                                  (let anf_350 (+ i_7 anf_349)
+                                   (let h_20 (hash_10_318 anf_350)
+                                    (let anf_351 (index u_9 0)
+                                     (let ab_21 (mix a_13 b_14 anf_351)
+                                      (let anf_352 (index u_9 0)
+                                       (let cd_22 (mix c_15 d_16 anf_352)
+                                        (let anf_353 (index u_9 0)
+                                         (let ef_23 (mix e_17 f_18 anf_353)
+                                          (let anf_354 (index u_9 0)
+                                           (let gh_24 (mix g_19 h_20 anf_354)
+                                            (let anf_355 (index u_9 1)
+                                             (let abcd_25
+                                              (mix ab_21 cd_22 anf_355)
+                                              (let anf_356 (index u_9 1)
+                                               (let efgh_26
+                                                (mix ef_23 gh_24 anf_356)
+                                                (let anf_357 (index u_9 2)
+                                                 (return
+                                                  (mix abcd_25 efgh_26 anf_357)))))))))))))))))))))))))))))))))))))))))))))
+      : ((vec 3) -> float))
+     ((Define (name fbm_27) (args ((p_28 (vec 3))))
+       (body
+        (let anf_358 (* p_28 1.)
+         (let anf_359 (noise3d_5 anf_358)
+          (let anf_360 (* anf_359 0.5)
+           (let anf_361 (* p_28 2.)
+            (let anf_362 (noise3d_5 anf_361)
+             (let anf_363 (* anf_362 0.25)
+              (let anf_364 (+ anf_360 anf_363)
+               (let anf_365 (* p_28 4.)
+                (let anf_366 (noise3d_5 anf_365)
+                 (let anf_367 (* anf_366 0.125)
+                  (let anf_368 (+ anf_364 anf_367)
+                   (let anf_369 (* p_28 8.)
+                    (let anf_370 (noise3d_5 anf_369)
+                     (let anf_371 (* anf_370 0.0625)
+                      (let anf_372 (+ anf_368 anf_371)
+                       (let anf_373 (* p_28 16.)
+                        (let anf_374 (noise3d_5 anf_373)
+                         (let anf_375 (* anf_374 0.03125)
+                          (return (+ anf_372 anf_375))))))))))))))))))))))
+      : ((vec 3) -> float))
+     ((Define (name sdPlanet_29) (args ((p_30 (vec 3)) (radius_31 float)))
+       (body
+        (let len_32 (length p_30)
+         (let dir_33 (/ p_30 len_32)
+          (let anf_376 (* dir_33 3.)
+           (let anf_377 (fbm_27 anf_376)
+            (let terrain_34 (* anf_377 0.4)
+             (let anf_378 (- len_32 radius_31) (return (- anf_378 terrain_34))))))))))
+      : ((vec 3) -> (float -> float)))
+     ((Define (name map_35) (args ((p_36 (vec 3))))
+       (body (return (sdPlanet_29 p_36 1.5))))
+      : ((vec 3) -> float))
+     ((Define (name getNormal_37) (args ((p_38 (vec 3))))
+       (body
+        (let e_39 0.002
+         (let e_x_40 (vec3 e_39 0. 0.)
+          (let e_y_41 (vec3 0. e_39 0.)
+           (let e_z_42 (vec3 0. 0. e_39)
+            (let anf_379 (+ p_38 e_x_40)
+             (let anf_380 (map_35 anf_379)
+              (let anf_381 (- p_38 e_x_40)
+               (let anf_382 (map_35 anf_381)
+                (let dx_43 (- anf_380 anf_382)
+                 (let anf_383 (+ p_38 e_y_41)
+                  (let anf_384 (map_35 anf_383)
+                   (let anf_385 (- p_38 e_y_41)
+                    (let anf_386 (map_35 anf_385)
+                     (let dy_44 (- anf_384 anf_386)
+                      (let anf_387 (+ p_38 e_z_42)
+                       (let anf_388 (map_35 anf_387)
+                        (let anf_389 (- p_38 e_z_42)
+                         (let anf_390 (map_35 anf_389)
+                          (let dz_45 (- anf_388 anf_390)
+                           (let anf_391 (vec3 dx_43 dy_44 dz_45)
+                            (return (normalize anf_391))))))))))))))))))))))))
+      : ((vec 3) -> (vec 3)))
+     ((Define (name march_49_319)
+       (args ((rd_48 (vec 3)) (ro_47 (vec 3)) (t_50 float) (steps_51 int)))
+       (body
+        (let _iter_448 0
+         (while (< _iter_448 1000)
+          (let anf_392 (> steps_51 120)
+           (return
+            (if anf_392 (return (v_option_float 1 0.))
+             (let anf_393 (* rd_48 t_50)
+              (let anf_394 (+ ro_47 anf_393)
+               (let d_52 (map_35 anf_394)
+                (let anf_395 (< d_52 0.0005)
+                 (return
+                  (if anf_395 (return (v_option_float 0 t_50))
+                   (let anf_396 (> t_50 50.)
+                    (return
+                     (if anf_396 (return (v_option_float 1 0.))
+                      (let anf_397 (* d_52 0.8)
+                       (let anf_398 (+ t_50 anf_397)
+                        (let anf_399 (+ steps_51 1)
+                         (set rd_48 rd_48
+                          (set ro_47 ro_47
+                           (set t_50 anf_398
+                            (set steps_51 anf_399
+                             (let _iter_inc_449 (+ _iter_448 1)
+                              (set _iter_448 _iter_inc_449 continue)))))))))))))))))))))
+          (placeholder _tmp_451 (return _tmp_451))))))
+      : (float -> (int -> v_option_float)))
+     ((Define (name march_46) (args ((ro_47 (vec 3)) (rd_48 (vec 3))))
+       (body (return (march_49_319 rd_48 ro_47 0. 0))))
+      : ((vec 3) -> ((vec 3) -> v_option_float)))
+     ((Define (name rotate_by_mouse_57_vec3_to_vec3_317_320)
+       (args ((mouseUV_56 (vec 2)) (ray_58 (vec 3))))
+       (body
+        (let anf_400 (index mouseUV_56 1)
+         (let anf_401 (* -1. anf_400)
+          (let rotX_59 (* anf_401 1.5)
+           (let anf_402 (index ray_58 1)
+            (let anf_403 (index ray_58 2)
+             (let anf_404 (vec2 anf_402 anf_403)
+              (let ro_yz_60 (rotate_0 anf_404 rotX_59)
+               (let anf_405 (index mouseUV_56 0)
+                (let anf_406 (* -1. anf_405)
+                 (let rotY_61 (* anf_406 1.5)
+                  (let anf_407 (index ray_58 0)
+                   (let anf_408 (index ro_yz_60 1)
+                    (let anf_409 (vec2 anf_407 anf_408)
+                     (let ro_xz_62 (rotate_0 anf_409 rotY_61)
+                      (let anf_410 (index ro_xz_62 0)
+                       (let anf_411 (index ro_yz_60 0)
+                        (let anf_412 (index ro_xz_62 1)
+                         (return (vec3 anf_410 anf_411 anf_412)))))))))))))))))))))
+      : ((vec 3) -> (vec 3)))
+     ((Define (name main) (args ((coord_53 (vec 2))))
+       (body
+        (let anf_413 (index u_resolution 0)
+         (let anf_414 (index u_resolution 1)
+          (let res_min_54 (min anf_413 anf_414)
+           (let anf_415 (* coord_53 2.)
+            (let anf_416 (- anf_415 u_resolution)
+             (let uv_55 (/ anf_416 res_min_54)
+              (let anf_417 (* u_mouse 2.)
+               (let anf_418 (- anf_417 u_resolution)
+                (let mouseUV_56 (/ anf_418 res_min_54)
+                 (let anf_419 (vec3 0. 0. -4.)
+                  (let ro_63
+                   (rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56 anf_419)
+                   (let anf_420 (index uv_55 0)
+                    (let anf_421 (index uv_55 1)
+                     (let anf_422 (vec3 anf_420 anf_421 1.5)
+                      (let anf_423 (normalize anf_422)
+                       (let rd_64
+                        (rotate_by_mouse_57_vec3_to_vec3_317_320 mouseUV_56
+                         anf_423)
+                        (let t_65 (march_46 ro_63 rd_64)
+                         (let _lv_tag_450 (. t_65 tag)
+                          (return
+                           (switch _lv_tag_450 (1 (return (vec3 0. 0. 0.)))
+                            (default
+                             (let t_66 (. t_65 Some_0)
+                              (let anf_424 (* rd_64 t_66)
+                               (let hitPos_67 (+ ro_63 anf_424)
+                                (let n_68 (getNormal_37 hitPos_67)
+                                 (let anf_425 (vec3 1. 0.8 -0.5)
+                                  (let lightDir_69 (normalize anf_425)
+                                   (let anf_426 (dot n_68 lightDir_69)
+                                    (let diff_70 (max anf_426 0.)
+                                     (let ambient_71 0.08
+                                      (let anf_427 (length hitPos_67)
+                                       (let dir_72 (/ hitPos_67 anf_427)
+                                        (let anf_428 (* dir_72 3.)
+                                         (let rawHeight_73 (fbm_27 anf_428)
+                                          (let seaLevel_74 0.35
+                                           (let anf_429
+                                            (- rawHeight_73 seaLevel_74)
+                                            (let anf_430 (- 1. seaLevel_74)
+                                             (let anf_431 (/ anf_429 anf_430)
+                                              (let h_norm_75
+                                               (clamp anf_431 0. 1.)
+                                               (let deepColor_76
+                                                (vec3 0.02 0.05 0.2)
+                                                (let landColor_77
+                                                 (vec3 0.15 0.35 0.1)
+                                                 (let mountColor_78
+                                                  (vec3 0.4 0.3 0.2)
+                                                  (let snowColor_79
+                                                   (vec3 0.85 0.85 0.9)
+                                                   (let anf_432 (< h_norm_75 0.3)
+                                                    (let baseColor_80
+                                                     (if anf_432
+                                                      (let anf_433
+                                                       (/ h_norm_75 0.3)
+                                                       (return
+                                                        (mix deepColor_76
+                                                         landColor_77 anf_433)))
+                                                      (let anf_434
+                                                       (< h_norm_75 0.6)
+                                                       (return
+                                                        (if anf_434
+                                                         (let anf_435
+                                                          (- h_norm_75 0.3)
+                                                          (let anf_436
+                                                           (/ anf_435 0.3)
+                                                           (return
+                                                            (mix landColor_77
+                                                             mountColor_78
+                                                             anf_436))))
+                                                         (let anf_437
+                                                          (- h_norm_75 0.6)
+                                                          (let anf_438
+                                                           (/ anf_437 0.4)
+                                                           (return
+                                                            (mix mountColor_78
+                                                             snowColor_79
+                                                             anf_438))))))))
+                                                     (let anf_439 (* rd_64 -1.)
+                                                      (let anf_440
+                                                       (dot n_68 anf_439)
+                                                       (let anf_441
+                                                        (max anf_440 0.)
+                                                        (let fresnel_81
+                                                         (- 1. anf_441)
+                                                         (let anf_442
+                                                          (* fresnel_81
+                                                           fresnel_81)
+                                                          (let anf_443
+                                                           (* anf_442 fresnel_81)
+                                                           (let rim_82
+                                                            (* anf_443 0.4)
+                                                            (let atmoColor_83
+                                                             (vec3 0.3 0.5 1.)
+                                                             (let anf_444
+                                                              (* diff_70 0.9)
+                                                              (let anf_445
+                                                               (+ anf_444
+                                                                ambient_71)
+                                                               (let anf_446
+                                                                (* baseColor_80
+                                                                 anf_445)
+                                                                (let anf_447
+                                                                 (* atmoColor_83
+                                                                  rim_82)
+                                                                 (return
+                                                                  (+ anf_446
+                                                                   anf_447)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
     === translate (planet.glml) ===
     (Program
      ((Struct v_option_float ((TyInt tag) (TyFloat Some_0)))
@@ -7129,6 +7662,30 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === remove placeholder (rainbow.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+     ((Define (name get_uv_0_vec2_to_vec2_30) (args ((coord_1 (vec 2))))
+       (body
+        (let anf_31 (* 2. coord_1)
+         (let top_2 (- anf_31 u_resolution)
+          (let anf_32 (index u_resolution 0)
+           (let anf_33 (index u_resolution 1)
+            (let bot_3 (min anf_32 anf_33) (return (/ top_2 bot_3)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Define (name main) (args ((coord_4 (vec 2))))
+       (body
+        (let uv_5 (get_uv_0_vec2_to_vec2_30 coord_4)
+         (let anf_34 (index uv_5 0)
+          (let anf_35 (index uv_5 1)
+           (let anf_36 (+ anf_34 anf_35)
+            (let anf_37 (* 5. anf_36)
+             (let wave_6 (+ anf_37 u_time)
+              (let anf_38 (vec3 0. 2. 4.)
+               (let anf_39 (+ wave_6 anf_38)
+                (let anf_40 (sin anf_39)
+                 (let anf_41 (* anf_40 0.3) (return (+ anf_41 0.7))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === lift consts (rainbow.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Define (name get_uv_0_vec2_to_vec2_30) (args ((coord_1 (vec 2))))
        (body
@@ -9378,6 +9935,212 @@ let%expect_test "compile examples" =
                                                                   glow_49))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
       : ((vec 2) -> (vec 3))))
 
+    === lift consts (raymarch.glml) ===
+    (Program
+     ((TypeDef v_option_float (RecordDecl ((tag int) (Some_0 float)))) :
+      v_option_float)
+     ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+     ((Extern u_mouse) : (vec 2))
+     ((Define (name rotate_0) (args ((p_1 (vec 2)) (angle_2 float)))
+       (body
+        (let s_3 (sin angle_2)
+         (let c_4 (cos angle_2)
+          (let anf_193 (index p_1 0)
+           (let anf_194 (* anf_193 c_4)
+            (let anf_195 (index p_1 1)
+             (let anf_196 (* anf_195 s_3)
+              (let anf_197 (- anf_194 anf_196)
+               (let anf_198 (index p_1 0)
+                (let anf_199 (* anf_198 s_3)
+                 (let anf_200 (index p_1 1)
+                  (let anf_201 (* anf_200 c_4)
+                   (let anf_202 (+ anf_199 anf_201)
+                    (return (vec2 anf_197 anf_202))))))))))))))))
+      : ((vec 2) -> (float -> (vec 2))))
+     ((Define (name sMin_5) (args ((a_6 float) (b_7 float)))
+       (body
+        (let k_8 0.1
+         (let anf_203 (- b_7 a_6)
+          (let anf_204 (* 0.5 anf_203)
+           (let anf_205 (/ anf_204 k_8)
+            (let anf_206 (+ 0.5 anf_205)
+             (let h_9 (clamp anf_206 0. 1.)
+              (let anf_207 (mix b_7 a_6 h_9)
+               (let anf_208 (* k_8 h_9)
+                (let anf_209 (- 1. h_9)
+                 (let anf_210 (* anf_208 anf_209) (return (- anf_207 anf_210))))))))))))))
+      : (float -> (float -> float)))
+     ((Define (name palette_10) (args ((t_11 float)))
+       (body
+        (let cfg_12 (vec3 0.3 0.416 0.557)
+         (let anf_211 (+ cfg_12 t_11)
+          (let anf_212 (* anf_211 6.28318)
+           (let anf_213 (cos anf_212)
+            (let anf_214 (* anf_213 0.5) (return (+ anf_214 0.5)))))))))
+      : (float -> (vec 3)))
+     ((Define (name sdTorus_13) (args ((p_14 (vec 3)) (t_15 (vec 2))))
+       (body
+        (let anf_215 (index p_14 0)
+         (let anf_216 (index p_14 2)
+          (let anf_217 (vec2 anf_215 anf_216)
+           (let anf_218 (length anf_217)
+            (let anf_219 (index t_15 0)
+             (let anf_220 (- anf_218 anf_219)
+              (let anf_221 (index p_14 1)
+               (let q_16 (vec2 anf_220 anf_221)
+                (let anf_222 (length q_16)
+                 (let anf_223 (index t_15 1) (return (- anf_222 anf_223))))))))))))))
+      : ((vec 3) -> ((vec 2) -> float)))
+     ((Define (name map_17) (args ((p_18 (vec 3))))
+       (body
+        (let angle_19 (* u_time 2.)
+         (let anf_224 (index p_18 0)
+          (let anf_225 (index p_18 1)
+           (let anf_226 (vec2 anf_224 anf_225)
+            (let p_xy_20 (rotate_0 anf_226 angle_19)
+             (let anf_227 (index p_xy_20 0)
+              (let anf_228 (index p_xy_20 1)
+               (let anf_229 (index p_18 2)
+                (let p_prime_21 (vec3 anf_227 anf_228 anf_229)
+                 (let anf_230 (index p_prime_21 1)
+                  (let anf_231 (index p_prime_21 2)
+                   (let anf_232 (vec2 anf_230 anf_231)
+                    (let p_yz_22 (rotate_0 anf_232 angle_19)
+                     (let anf_233 (index p_prime_21 0)
+                      (let anf_234 (index p_yz_22 0)
+                       (let anf_235 (index p_yz_22 1)
+                        (let p_prime_23 (vec3 anf_233 anf_234 anf_235)
+                         (let anf_236 (vec2 1. 0.3)
+                          (let anf_237 (sdTorus_13 p_prime_23 anf_236)
+                           (let anf_238 (vec2 2. 0.5)
+                            (let anf_239 (sdTorus_13 p_18 anf_238)
+                             (return (sMin_5 anf_237 anf_239)))))))))))))))))))))))))
+      : ((vec 3) -> float))
+     ((Define (name march_27_192)
+       (args ((rd_26 (vec 3)) (ro_25 (vec 3)) (t_28 float) (steps_29 int)))
+       (body
+        (let _iter_286 0
+         (while (< _iter_286 1000)
+          (let anf_240 (> steps_29 80)
+           (return
+            (if anf_240 (return (v_option_float 1 0.))
+             (let anf_241 (* rd_26 t_28)
+              (let anf_242 (+ ro_25 anf_241)
+               (let d_30 (map_17 anf_242)
+                (let anf_243 (< d_30 0.001)
+                 (return
+                  (if anf_243 (return (v_option_float 0 t_28))
+                   (let anf_244 (> t_28 100.)
+                    (return
+                     (if anf_244 (return (v_option_float 1 0.))
+                      (let anf_245 (+ t_28 d_30)
+                       (let anf_246 (+ steps_29 1)
+                        (set rd_26 rd_26
+                         (set ro_25 ro_25
+                          (set t_28 anf_245
+                           (set steps_29 anf_246
+                            (let _iter_inc_287 (+ _iter_286 1)
+                             (set _iter_286 _iter_inc_287 continue))))))))))))))))))))
+          (placeholder _tmp_289 (return _tmp_289))))))
+      : (float -> (int -> v_option_float)))
+     ((Define (name march_24) (args ((ro_25 (vec 3)) (rd_26 (vec 3))))
+       (body (return (march_27_192 rd_26 ro_25 0. 0))))
+      : ((vec 3) -> ((vec 3) -> v_option_float)))
+     ((Define (name main) (args ((coord_31 (vec 2))))
+       (body
+        (let anf_247 (index u_resolution 0)
+         (let anf_248 (index u_resolution 1)
+          (let res_min_32 (min anf_247 anf_248)
+           (let anf_249 (* coord_31 2.)
+            (let anf_250 (- anf_249 u_resolution)
+             (let uv_33 (/ anf_250 res_min_32)
+              (let anf_251 (* u_mouse 2.)
+               (let anf_252 (- anf_251 u_resolution)
+                (let mouseUV_34 (/ anf_252 res_min_32)
+                 (let ro_init_35 (vec3 0. 0. -6.)
+                  (let anf_253 (index uv_33 0)
+                   (let anf_254 (index uv_33 1)
+                    (let anf_255 (vec3 anf_253 anf_254 1.)
+                     (let rd_init_36 (normalize anf_255)
+                      (let anf_256 (index mouseUV_34 1)
+                       (let rotX_37 (* -1. anf_256)
+                        (let anf_257 (index mouseUV_34 0)
+                         (let rotY_38 (* -1. anf_257)
+                          (let anf_258 (index ro_init_35 1)
+                           (let anf_259 (index ro_init_35 2)
+                            (let anf_260 (vec2 anf_258 anf_259)
+                             (let ro_yz_39 (rotate_0 anf_260 rotX_37)
+                              (let anf_261 (index rd_init_36 1)
+                               (let anf_262 (index rd_init_36 2)
+                                (let anf_263 (vec2 anf_261 anf_262)
+                                 (let rd_yz_40 (rotate_0 anf_263 rotX_37)
+                                  (let anf_264 (index ro_init_35 0)
+                                   (let anf_265 (index ro_yz_39 0)
+                                    (let anf_266 (index ro_yz_39 1)
+                                     (let ro_41 (vec3 anf_264 anf_265 anf_266)
+                                      (let anf_267 (index rd_init_36 0)
+                                       (let anf_268 (index rd_yz_40 0)
+                                        (let anf_269 (index rd_yz_40 1)
+                                         (let rd_42
+                                          (vec3 anf_267 anf_268 anf_269)
+                                          (let anf_270 (index ro_41 0)
+                                           (let anf_271 (index ro_41 2)
+                                            (let anf_272 (vec2 anf_270 anf_271)
+                                             (let ro_xz_43
+                                              (rotate_0 anf_272 rotY_38)
+                                              (let anf_273 (index rd_42 0)
+                                               (let anf_274 (index rd_42 2)
+                                                (let anf_275
+                                                 (vec2 anf_273 anf_274)
+                                                 (let rd_xz_44
+                                                  (rotate_0 anf_275 rotY_38)
+                                                  (let anf_276 (index ro_xz_43 0)
+                                                   (let anf_277 (index ro_41 1)
+                                                    (let anf_278
+                                                     (index ro_xz_43 1)
+                                                     (let ro_45
+                                                      (vec3 anf_276 anf_277
+                                                       anf_278)
+                                                      (let anf_279
+                                                       (index rd_xz_44 0)
+                                                       (let anf_280
+                                                        (index rd_42 1)
+                                                        (let anf_281
+                                                         (index rd_xz_44 1)
+                                                         (let rd_46
+                                                          (vec3 anf_279 anf_280
+                                                           anf_281)
+                                                          (let anf_282
+                                                           (march_24 ro_45 rd_46)
+                                                           (let _lv_tag_288
+                                                            (. anf_282 tag)
+                                                            (let col_47
+                                                             (switch _lv_tag_288
+                                                              (1
+                                                               (return
+                                                                (vec3 0.2 0.2
+                                                                 0.2)))
+                                                              (default
+                                                               (let t_48
+                                                                (. anf_282
+                                                                 Some_0)
+                                                                (let anf_283
+                                                                 (* t_48 0.3)
+                                                                 (return
+                                                                  (palette_10
+                                                                   anf_283))))))
+                                                             (let anf_284
+                                                              (- uv_33
+                                                               mouseUV_34)
+                                                              (let anf_285
+                                                               (length anf_284)
+                                                               (let glow_49
+                                                                (/ 0.02 anf_285)
+                                                                (return
+                                                                 (+ col_47
+                                                                  glow_49))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
     === translate (raymarch.glml) ===
     (Program
      ((Struct v_option_float ((TyInt tag) (TyFloat Some_0)))
@@ -10332,6 +11095,71 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === remove placeholder (recursion.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+     ((Define (name get_uv_0) (args ((coord_1 (vec 2))))
+       (body
+        (let anf_71 (* 2. coord_1)
+         (let top_2 (- anf_71 u_resolution)
+          (let anf_72 (index u_resolution 0)
+           (let anf_73 (index u_resolution 1)
+            (let bot_3 (min anf_72 anf_73) (return (/ top_2 bot_3)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Define (name rotate_4) (args ((angle_5 float)))
+       (body
+        (let s_6 (sin angle_5)
+         (let c_7 (cos angle_5)
+          (let anf_74 (* -1. s_6) (return (mat2x2 c_7 anf_74 s_6 c_7)))))))
+      : (float -> (mat 2 2)))
+     ((Define (name gcd_8_float_to_float_to_float_70)
+       (args ((a_9 float) (b_10 float)))
+       (body
+        (let _iter_93 0
+         (while (< _iter_93 1000)
+          (let anf_75 (< a_9 0.05)
+           (return
+            (if anf_75 (return b_10)
+             (let anf_76 (< b_10 0.05)
+              (return
+               (if anf_76 (return a_9)
+                (let anf_77 (> a_9 b_10)
+                 (return
+                  (if anf_77
+                   (let anf_78 (- a_9 b_10)
+                    (set a_9 anf_78
+                     (set b_10 b_10
+                      (let _iter_inc_94 (+ _iter_93 1)
+                       (set _iter_93 _iter_inc_94 continue)))))
+                   (let anf_79 (- b_10 a_9)
+                    (set a_9 a_9
+                     (set b_10 anf_79
+                      (let _iter_inc_95 (+ _iter_93 1)
+                       (set _iter_93 _iter_inc_95 continue))))))))))))))
+          (return 0.)))))
+      : (float -> (float -> float)))
+     ((Define (name main) (args ((coord_11 (vec 2))))
+       (body
+        (let uv_12 (get_uv_0 coord_11)
+         (let anf_80 (rotate_4 u_time)
+          (let uv_13 (* anf_80 uv_12)
+           (let anf_81 (index uv_13 0)
+            (let anf_82 (* u_time 2.)
+             (let anf_83 (sin anf_82)
+              (let anf_84 (* anf_81 anf_83)
+               (let anf_85 (* anf_84 2.)
+                (let x_14 (abs anf_85)
+                 (let anf_86 (index uv_13 1)
+                  (let anf_87 (* u_time 2.)
+                   (let anf_88 (sin anf_87)
+                    (let anf_89 (* anf_86 anf_88)
+                     (let anf_90 (* anf_89 2.)
+                      (let y_15 (abs anf_90)
+                       (let res_16 (gcd_8_float_to_float_to_float_70 x_14 y_15)
+                        (let anf_91 (* res_16 0.5)
+                         (let anf_92 (- 1. res_16)
+                          (return (vec3 res_16 anf_91 anf_92))))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === lift consts (recursion.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Define (name get_uv_0) (args ((coord_1 (vec 2))))
        (body
@@ -12070,6 +12898,162 @@ let%expect_test "compile examples" =
       : ((vec 2) -> (vec 3))))
 
     === remove placeholder (warped_noise.glml) ===
+    (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
+     ((Define (name smoothNoise_0) (args ((p_1 (vec 2))))
+       (body
+        (let i_2 (floor p_1)
+         (let pf_3 (- p_1 i_2)
+          (let anf_165 (* pf_3 pf_3)
+           (let anf_166 (* 2. pf_3)
+            (let anf_167 (- 3. anf_166)
+             (let inter_4 (* anf_165 anf_167)
+              (let v4_5 (vec4 0. 1. 27. 28.)
+               (let anf_168 (index i_2 0)
+                (let anf_169 (+ v4_5 anf_168)
+                 (let anf_170 (index i_2 1)
+                  (let anf_171 (* anf_170 27.)
+                   (let seed_6 (+ anf_169 anf_171)
+                    (let anf_172 (% seed_6 6.2831853)
+                     (let anf_173 (sin anf_172)
+                      (let anf_174 (* anf_173 200000.)
+                       (let hash_7 (fract anf_174)
+                        (let anf_175 (index hash_7 0)
+                         (let anf_176 (index hash_7 1)
+                          (let col0_8 (vec2 anf_175 anf_176)
+                           (let anf_177 (index hash_7 2)
+                            (let anf_178 (index hash_7 3)
+                             (let col1_9 (vec2 anf_177 anf_178)
+                              (let anf_179 (index inter_4 1)
+                               (let anf_180 (- 1. anf_179)
+                                (let anf_181 (* col0_8 anf_180)
+                                 (let anf_182 (index inter_4 1)
+                                  (let anf_183 (* col1_9 anf_182)
+                                   (let res_v_10 (+ anf_181 anf_183)
+                                    (let anf_184 (index inter_4 0)
+                                     (let anf_185 (- 1. anf_184)
+                                      (let anf_186 (index inter_4 0)
+                                       (let anf_187 (vec2 anf_185 anf_186)
+                                        (return (dot res_v_10 anf_187))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> float))
+     ((Define (name fractalNoise_11) (args ((p_12 (vec 2))))
+       (body
+        (let anf_188 (smoothNoise_0 p_12)
+         (let anf_189 (* anf_188 0.5333)
+          (let anf_190 (* p_12 2.)
+           (let anf_191 (smoothNoise_0 anf_190)
+            (let anf_192 (* anf_191 0.2667)
+             (let anf_193 (+ anf_189 anf_192)
+              (let anf_194 (* p_12 4.)
+               (let anf_195 (smoothNoise_0 anf_194)
+                (let anf_196 (* anf_195 0.1333)
+                 (let anf_197 (+ anf_193 anf_196)
+                  (let anf_198 (* p_12 8.)
+                   (let anf_199 (smoothNoise_0 anf_198)
+                    (let anf_200 (* anf_199 0.0667) (return (+ anf_197 anf_200)))))))))))))))))
+      : ((vec 2) -> float))
+     ((Define (name warpedNoise_13) (args ((p_14 (vec 2))))
+       (body
+        (let anf_201 (* -1. u_time)
+         (let anf_202 (vec2 u_time anf_201)
+          (let m_15 (* anf_202 0.5)
+           (let anf_203 (+ p_14 m_15)
+            (let x_16 (fractalNoise_11 anf_203)
+             (let anf_204 (index m_15 1)
+              (let anf_205 (index m_15 0)
+               (let anf_206 (vec2 anf_204 anf_205)
+                (let anf_207 (+ p_14 anf_206)
+                 (let anf_208 (+ anf_207 x_16)
+                  (let y_17 (fractalNoise_11 anf_208)
+                   (let anf_209 (- p_14 m_15)
+                    (let anf_210 (- anf_209 x_16)
+                     (let anf_211 (+ anf_210 y_17)
+                      (let z_18 (fractalNoise_11 anf_211)
+                       (let anf_212 (vec2 x_16 y_17)
+                        (let anf_213 (vec2 y_17 z_18)
+                         (let anf_214 (+ anf_212 anf_213)
+                          (let anf_215 (vec2 z_18 x_16)
+                           (let warp_19 (+ anf_214 anf_215)
+                            (let anf_216 (vec3 x_16 y_17 z_18)
+                             (let anf_217 (length anf_216)
+                              (let mag_20 (* anf_217 0.25)
+                               (let anf_218 (+ p_14 warp_19)
+                                (let anf_219 (+ anf_218 mag_20)
+                                 (return (fractalNoise_11 anf_219)))))))))))))))))))))))))))))
+      : ((vec 2) -> float))
+     ((Define (name main) (args ((coord_21 (vec 2))))
+       (body
+        (let anf_220 (* u_resolution 0.5)
+         (let anf_221 (- coord_21 anf_220)
+          (let anf_222 (index u_resolution 1)
+           (let uv_22 (/ anf_221 anf_222)
+            (let anf_223 (* uv_22 6.)
+             (let n_23 (warpedNoise_13 anf_223)
+              (let anf_224 (* uv_22 6.)
+               (let anf_225 (- anf_224 0.02)
+                (let n2_24 (warpedNoise_13 anf_225)
+                 (let anf_226 (- n2_24 n_23)
+                  (let anf_227 (max anf_226 0.)
+                   (let anf_228 (/ anf_227 0.02)
+                    (let bump_25 (* anf_228 0.7071)
+                     (let anf_229 (- n_23 n2_24)
+                      (let anf_230 (max anf_229 0.)
+                       (let anf_231 (/ anf_230 0.02)
+                        (let bump2_26 (* anf_231 0.7071)
+                         (let anf_232 (* bump_25 bump_25)
+                          (let anf_233 (pow bump_25 4.)
+                           (let anf_234 (* anf_233 0.5)
+                            (let b1_27 (+ anf_232 anf_234)
+                             (let anf_235 (* bump2_26 bump2_26)
+                              (let anf_236 (pow bump2_26 4.)
+                               (let anf_237 (* anf_236 0.5)
+                                (let b2_28 (+ anf_235 anf_237)
+                                 (let anf_238 (vec3 1. 0.7 0.6)
+                                  (let anf_239 (+ b1_27 b2_28)
+                                   (let anf_240 (* anf_239 0.4)
+                                    (let anf_241 (vec3 b1_27 anf_240 b2_28)
+                                     (let anf_242 (* anf_238 anf_241)
+                                      (let anf_243 (* anf_242 0.3)
+                                       (let base_col_29 (+ anf_243 0.5)
+                                        (let anf_244 (* n_23 n_23)
+                                         (let col_30 (* anf_244 base_col_29)
+                                          (let anf_245 (- uv_22 0.65)
+                                           (let spot1_dist_31 (length anf_245)
+                                            (let anf_246 (+ uv_22 0.5)
+                                             (let spot2_dist_32 (length anf_246)
+                                              (let anf_247 (vec3 0.8 0.4 1.)
+                                               (let anf_248 (* anf_247 0.35)
+                                                (let anf_249 (vec3 1. 0.5 0.2)
+                                                 (let anf_250
+                                                  (- 1. spot1_dist_31)
+                                                  (let anf_251
+                                                   (smoothstep 0. 1. anf_250)
+                                                   (let anf_252
+                                                    (* anf_249 anf_251)
+                                                    (let anf_253
+                                                     (vec3 0.2 0.4 1.)
+                                                     (let anf_254
+                                                      (- 1. spot2_dist_32)
+                                                      (let anf_255
+                                                       (smoothstep 0. 1. anf_254)
+                                                       (let anf_256
+                                                        (* anf_253 anf_255)
+                                                        (let anf_257
+                                                         (+ anf_252 anf_256)
+                                                         (let anf_258
+                                                          (* anf_257 5.)
+                                                          (let spot_logic_33
+                                                           (+ anf_248 anf_258)
+                                                           (let final_col_34
+                                                            (* col_30
+                                                             spot_logic_33)
+                                                            (let anf_259
+                                                             (max final_col_34
+                                                              0.)
+                                                             (return
+                                                              (sqrt anf_259)))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3))))
+
+    === lift consts (warped_noise.glml) ===
     (Program ((Extern u_resolution) : (vec 2)) ((Extern u_time) : float)
      ((Define (name smoothNoise_0) (args ((p_1 (vec 2))))
        (body

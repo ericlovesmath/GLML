@@ -1011,11 +1011,17 @@ let%expect_test "toplevel constant (atomic only)" =
     |};
   [%expect
     {|
-    [translate] at 2:5-2:34: top-level constant must be atomic
-      name: x_0
-      |
-    2 |     let x = #sin(1.0) + #cos(2.0)
-      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    const float x_0 = (sin(1.) + cos(2.));
+    vec3 main_pure(vec2 u_1) {
+        return vec3(x_0, x_0, x_0);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
     |}]
 ;;
 
@@ -3297,6 +3303,87 @@ let%expect_test "non-parametrized type aliases" =
     }
     vec3 main_pure(vec2 u_2) {
         return vec3(0., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "toplevel complex consts / promotion to zero-arg functions" =
+  test
+    {|
+    #extern float u_scale
+    let scale = u_scale
+    let pi = 3.14159
+    let main (coord : vec2) = [pi, pi, pi]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform float u_scale;
+    float scale_0() {
+        return u_scale;
+    }
+    const float pi_1 = 3.14159;
+    vec3 main_pure(vec2 coord_2) {
+        return vec3(pi_1, pi_1, pi_1);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    type v = { a : float }
+    let base = 2 + 1.0
+    let derived = { a = base * 2.0 }.a
+    let main (coord : vec2) = [derived, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct v {
+        float a;
+    };
+    const float base_0 = (2. + 1.);
+    const float derived_1 = v((base_0 * 2.)).a;
+    vec3 main_pure(vec2 coord_2) {
+        return vec3(derived_1, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+  |}];
+  test
+    {|
+    #extern bool u_flag
+    let chosen = if u_flag then 1.0 else 0.0
+    let main (coord : vec2) = [chosen, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform bool u_flag;
+    float chosen_0() {
+        if (u_flag) {
+            return 1.;
+        } else {
+            return 0.;
+        }
+    }
+    vec3 main_pure(vec2 coord_1) {
+        float _lc_2 = chosen_0();
+        return vec3(_lc_2, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
