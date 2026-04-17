@@ -5,6 +5,30 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 ## Bugs
 
 ```glml
+// Strange [translate] bug??
+type sdf = vec2 -> float
+let constant (r : float) : sdf = fun p -> r
+let union (f : sdf) _ r = f r
+let dup f g x = f (g x) (g x)
+let scene : sdf = dup union constant 0.3
+let main (coord : vec2) = [0, 0, 0]
+```
+
+```glml
+// [monomorphize]: unexpected TyVar after monomorphization
+// Error goes away when [t] is annotated as float
+let function t =
+  let app_t f = f t in
+  let x = app_t (fun t -> t + 1) in
+  [x, x]
+
+let main (uv : vec2) =
+  // Even when [t] is annotated, [0] can't be passed into [function]
+  let result = function 0.0 in
+  [0, 0, 0]
+```
+
+```glml
 let add (x : float) (y : float) = x + y
 
 let addn (n : float) = fun (x : float) -> add n x
@@ -15,42 +39,37 @@ let main (coord : vec2) =
   let r = f 1. in
   [r, 0, 0]
 ```
-
-```glml
-// Does not typecheck because return type wants type of last type in series of arrows
-let palette (a : vec3) (b : vec3) (c : vec3) (d : vec3) : (float -> vec3) =
-  fun t -> a + b * #cos(6.28318 * (c * t + d))
-```
 - main is mangled so make sure that doesn't happen, must be fixed to coord vec2
 
 ## Todo Tasks
 
+- More Demos: New examples with HOFs, IQ Palette, Beaver Logo
+- Type annotations for arbitrary terms and let bindings
+- Functions in structs and variants
+- Split up `let%expect_test` across files to parallelize them
+- Promotion with ints/floats (true coercion enforced rather than constraint)
+- Type aliases with parameters
 - Curried builtin functions for partial application
 - Auto Lift `f : float -> float` to work over vecs?
 - Update GLML screenshot
-- Move examples to toplevel consts
 - Pipe as syntactic sugar for application
-- `let x = u_time` compiles `const float x = u_time`, but that's not allowed though since `u_time` is an extern
 - Button to show GLSL output on mobile
 - Allow clicking through all passes in GLSL output window
 - Add builtin GLSL function callers or GLSL extern libraries
 - Add user definable constrained functions?
 - uintBitsToFloat instead of fat structs to represent variants, instead storing as uvec4 in raw bits
 - Reuse fields with same type for structs / defunctionalization
-- Validate if extern variables are in a constant term on output, which might not be possible?
 - Tuples and static arrays
-- Vectors can't be toplevel constants right now
 - `when` clause for match statements
 - matching on `vec`s, `mat`s and `struct`s
 - Nested destructing
 - Destructing in `let` bindings
-- `mat` should be exactly a `vec` of `vec`s, not a new form which makes it ambigious and prevents non-float vecs
+- `mat` should be exactly a `vec` of `vec`s, not a new form which makes it ambiguous and prevents non-float vecs
 - add types to new passes like `specialize_params`, also do some general refactoring?
 - Pathtracing example
 - Potentially some kind of recursive types like `type list['a] = Nil | Cons of 'a * list['a]`
-- Passing constraints to mono is a bit weird, they should concertize that in `typecheck` step
+- Passing constraints to mono is a bit weird, they should concretize that in `typecheck` step
 - Merging specialize and mono passes since they interplay like they're supposed to be the same pass
-- Type aliases
 - Mutual recursion
 - Make logo with GLML
 - Add a guide or overview to playground
@@ -90,7 +109,7 @@ let palette (a : vec3) (b : vec3) (c : vec3) (d : vec3) : (float -> vec3) =
 - Emit on compilation what data needs to be passed from host
 - Indexing vectors by arbitrary terms?
 - Differentiate int and float division explicitly
-- Have `int <: float` be a true subtype (currently can't assign `let (x : option[float) = Some 5`)
+- Have `int <: float` be a true subtype (currently can't assign `let (x : option[float]) = Some 5`)
 - WebGPU backend for computer shaders and SSBOs?
 
 ## Resources
