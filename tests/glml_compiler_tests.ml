@@ -4,11 +4,21 @@ open Glml_compiler
 let test source =
   match compile source with
   | Error err -> print_endline (Compiler_error.to_string_hum ~source err)
-  | Ok glsl -> print_endline glsl
+  | Ok glsl ->
+    (match Glsl_validator.validate_glsl glsl with
+     | None -> print_endline glsl
+     | Some err -> print_endline (">>> glslangValidator Error: " ^ err ^ "\n\n" ^ glsl))
 ;;
 
-(* TODO: What if we just print [main_pure] *)
 let test_term s = test ("let main (coord : vec2) = " ^ s)
+
+let%expect_test "Check glslangValidator status" =
+  Glsl_validator.glslang_validator_exists ()
+  |> Option.value ~default:"[glslValidator] is ready and will run on all tests!"
+  |> String.append "STATUS: "
+  |> print_endline;
+  [%expect {| STATUS: [glslValidator] is ready and will run on all tests! |}]
+;;
 
 let%expect_test "simple tests for compile_stlc" =
   test_term "let x = 2.0 in [ 12.0 * x + 10.0, 0.0, 0.0]";
@@ -2941,6 +2951,7 @@ let%expect_test "defunctionalization - partial application of first-class functi
     }
     |}];
   (* Partial application of first-class function passed to HOF *)
+  (* TODO: Fix this bug *)
   test
     {|
       let apply f x = f x
@@ -2952,6 +2963,10 @@ let%expect_test "defunctionalization - partial application of first-class functi
     |};
   [%expect
     {|
+    >>> glslangValidator Error: <input>
+    ERROR: 0:23: '' :  syntax error, unexpected IDENTIFIER, expecting RIGHT_PAREN
+    ERROR: 1 compilation errors.  No code generated.
+
     #version 300 es
     precision highp float;
     out vec4 fragColor;
