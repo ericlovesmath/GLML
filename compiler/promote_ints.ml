@@ -17,7 +17,7 @@ let coerce_atom (env : ty String.Map.t) (loc : Lexer.loc) (a : atom) : atom * bi
   | Int i -> { a with desc = Float (Float.of_int i) }, []
   | Var v when equal_ty (Map.find_exn env v) TyInt ->
     let v = Utils.fresh "pf" in
-    { a with desc = Var v }, [ v, { desc = App ("float", [ a ]); ty = TyFloat; loc } ]
+    { a with desc = Var v }, [ v, { desc = Builtin (Float, [ a ]); ty = TyFloat; loc } ]
   | _ -> a, []
 ;;
 
@@ -80,7 +80,11 @@ and promote_term (env : ty String.Map.t) (term : term) : term * bindings =
     let atoms, binds = coerce_atoms env loc atoms in
     { term with desc = Mat (n, m, atoms) }, binds
   | Builtin (f, atoms), (TyFloat | TyVec _ | TyMat _) ->
-    let atoms, binds = coerce_atoms env loc atoms in
+    let atoms, binds =
+      match f with
+      | Float -> atoms, []
+      | _ -> coerce_atoms env loc atoms
+    in
     { term with desc = Builtin (f, atoms) }, binds
   | Record (s, atoms), _ ->
     let atoms, binds =

@@ -688,6 +688,8 @@ and gen_term (env : env) (t : Stlc.term) : (term * constr list) Compiler_error.t
     let arg_tys = List.map args ~f:(fun a -> a.ty) in
     let%bind builtin_constrs =
       match b, arg_tys with
+      | Float, [ t ] ->
+        Ok [ constr (HasClass (Comparable, t)); constr (Eq (ty, TyFloat)) ]
       | ( ( Sin
           | Cos
           | Tan
