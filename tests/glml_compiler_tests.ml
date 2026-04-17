@@ -3391,3 +3391,46 @@ let%expect_test "toplevel complex consts / promotion to zero-arg functions" =
     }
     |}]
 ;;
+
+let%expect_test "regression - defunctionalization closure globals use correct dapply" =
+  (* closure global that captures a DFn *)
+  test
+    {|
+    let adder (x : float) : float -> float =
+      fun y -> x + y
+
+    let scene : float -> float =
+      adder 0.5
+
+    let main (coord : vec2) =
+      let d = scene coord.0 in
+      [d, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_14 {
+        int tag;
+        float lctor_15_0;
+    };
+    float adder_0(float x_1, float y_2) {
+        return (x_1 + y_2);
+    }
+    float dapply_13(DFn_14 dfn_16, float da_17) {
+        float ca_12 = dfn_16.lctor_15_0;
+        return adder_0(ca_12, da_17);
+    }
+    const DFn_14 scene_3 = DFn_14(0, 0.5);
+    vec3 main_pure(vec2 coord_4) {
+        float anf_18 = coord_4[0];
+        float d_5 = dapply_13(scene_3, anf_18);
+        return vec3(d_5, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
