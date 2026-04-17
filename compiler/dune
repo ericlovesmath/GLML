@@ -21,6 +21,7 @@
    lower_variants
    promote_ints
    remove_placeholder
+   lift_consts
    translate
    patch_main
    glsl)

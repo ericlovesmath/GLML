@@ -157,6 +157,51 @@ and translate_block (env : record_env) (anf : Remove_placeholder.anf)
   | Continue -> Ok [ Continue ]
 ;;
 
+(* TODO: Replace this sad generation logic to some special type in [lift_consts.ml].
+   Right now we have to explicitly fold and expand, but that shouldn't be necessary
+   if we just make a special kind of term that doesn't need inlining.
+
+   But maybe this is just fine...? *)
+let build_const_term body =
+  let subst_atom (subs : (string * term) list) (a : Remove_placeholder.atom) : term =
+    match a.desc with
+    | Var v ->
+      (match List.Assoc.find subs v ~equal:String.equal with
+       | Some t -> t
+       | None -> Var v)
+    | Float f -> Float f
+    | Int i -> Int i
+    | Bool b -> Bool b
+  in
+  let translate_const_term subs (t : Remove_placeholder.term) : term option =
+    let sa = subst_atom subs in
+    match t.desc with
+    | Atom a -> Some (sa a)
+    | Bop (op, l, r) -> Some (Bop (op, sa l, sa r))
+    | Vec (n, ts) -> Some (App ([%string "vec%{n#Int}"], List.map ts ~f:sa))
+    | Mat (x, y, ts) ->
+      let tname =
+        if x = y then [%string "mat%{x#Int}"] else [%string "mat%{x#Int}x%{y#Int}"]
+      in
+      Some (App (tname, List.map ts ~f:sa))
+    | Builtin (f, ts) -> Some (Builtin (f, List.map ts ~f:sa))
+    | Record (s, ts) -> Some (App (s, List.map ts ~f:sa))
+    | Index (a, i) -> Some (Index (sa a, i))
+    | Field (a, f) -> Some (Swizzle (sa a, f))
+    | App _ | If _ | Switch _ -> None
+  in
+  let rec eval_const subs (anf : Remove_placeholder.anf) : term option =
+    match anf.desc with
+    | Return t -> translate_const_term subs t
+    | Let (v, term, rest) ->
+      (match translate_const_term subs term with
+       | Some glsl_t -> eval_const ((v, glsl_t) :: subs) rest
+       | None -> None)
+    | _ -> None
+  in
+  eval_const [] body
+;;
+
 let translate (Program tops : Remove_placeholder.t) : Glsl.t Compiler_error.t =
   let%bind env =
     tops
@@ -185,58 +230,10 @@ let translate (Program tops : Remove_placeholder.t) : Glsl.t Compiler_error.t =
         let%bind body = translate_block env body in
         Ok (Function { name; desc = None; params; ret_type; body })
       | Const (name, body) ->
-        (* TODO: This is INCORRECT but temporarily lives here while we fix
-           toplevel consts, if we have intermediate bindings this does not handle it,
-           but this works enough to support the generated [DFn(...)] structs to
-           be folded into one line... this really needs to be improved in some way.
-
-           We HAVE to fix this to have real toplevel variables, especially the kinds
-           that aren't normally supported by GLSL like results of function calls.
-
-           Maybe ANF form was a mistake for our language. *)
-        let subst_atom subs (a : Remove_placeholder.atom) =
-          match a.desc with
-          | Var v ->
-            (match List.Assoc.find subs v ~equal:String.equal with
-             | Some a -> a
-             | None -> a)
-          | _ -> a
-        in
-        let subst_term subs (t : Remove_placeholder.term) =
-          let sa = subst_atom subs in
-          let desc =
-            match t.desc with
-            | Atom a -> Remove_placeholder.Atom (sa a)
-            | Bop (op, l, r) -> Bop (op, sa l, sa r)
-            | Vec (n, ts) -> Vec (n, List.map ts ~f:sa)
-            | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:sa)
-            | Index (a, i) -> Index (sa a, i)
-            | Builtin (b, ts) -> Builtin (b, List.map ts ~f:sa)
-            | App (f, ts) -> App (f, List.map ts ~f:sa)
-            | Record (s, ts) -> Record (s, List.map ts ~f:sa)
-            | Field (a, f) -> Field (sa a, f)
-            | If _ | Switch _ -> t.desc
-          in
-          { t with desc }
-        in
-        let rec eval_const subs (anf : Remove_placeholder.anf) =
-          match anf.desc with
-          | Return t -> Some (subst_term subs t)
-          | Let (v, { desc = Atom a; _ }, rest) -> eval_const ((v, a) :: subs) rest
-          | _ -> None
-        in
-        (match eval_const [] body with
-         | Some t ->
-           (match t.desc with
-            | If _ | Switch _ ->
-              Err.fail
-                "top-level constant must be atomic"
-                ~loc
-                ~d:[%message (name : string)]
-            | _ ->
-              let%bind ty = to_glsl_ty top.ty in
-              let%bind glsl_t = to_glsl_term t in
-              Ok (Global (Const, ty, name, Some glsl_t)))
+        (match build_const_term body with
+         | Some glsl_t ->
+           let%bind ty = to_glsl_ty top.ty in
+           Ok (Global (Const, ty, name, Some glsl_t))
          | None ->
            Err.fail "top-level constant must be atomic" ~loc ~d:[%message (name : string)])
       | Extern v ->
