@@ -578,8 +578,13 @@ let rec infer_binding
   let bind = subst_term sub_bind bind in
   let ctx = subst_context sub_bind env.ctx in
   let deferred = subst_constraints sub_bind deferred in
+  let returns_fn =
+    match ty_bind with
+    | TyArrow _ -> true
+    | _ -> false
+  in
   let scheme, remaining =
-    if is_value bind_stlc
+    if returns_fn || is_value bind_stlc
     then generalize ctx deferred ty_bind
     else ([], [], ty_bind), deferred
   in

@@ -2996,24 +2996,24 @@ let%expect_test "defunctionalization - partial application of first-class functi
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_17 {
+    struct DFn_20 {
         int tag;
-        int lctor_18_0;
+        int lctor_21_0;
     };
-    int dapply_16(DFn_17 dfn_19, int da_20) {
-        int x_2 = dfn_19.lctor_18_0;
-        return (x_2 + da_20);
+    int dapply_19(DFn_20 dfn_22, int da_23) {
+        int x_2 = dfn_22.lctor_21_0;
+        return (x_2 + da_23);
     }
-    DFn_17 mkinc_0_int_to_int_to_int_15(int n_1) {
+    DFn_20 mkinc_0_int_to_int_to_int_18(int n_1) {
         int x_2 = 1;
-        return DFn_17(0, x_2);
+        return DFn_20(0, x_2);
     }
     vec3 main_pure(vec2 uv_4) {
-        DFn_17 inc_5 = mkinc_0_int_to_int_to_int_15(0);
-        int anf_21 = dapply_16(inc_5, 2);
-        vec3 anf_22 = vec3(1., 1., 1.);
-        float pf_23 = float(anf_21);
-        return (pf_23 * anf_22);
+        DFn_20 inc_5_int_to_int_17 = mkinc_0_int_to_int_to_int_18(0);
+        int anf_24 = dapply_19(inc_5_int_to_int_17, 2);
+        vec3 anf_25 = vec3(1., 1., 1.);
+        float pf_26 = float(anf_24);
+        return (pf_26 * anf_25);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -3442,6 +3442,80 @@ let%expect_test "toplevel vectors of ints are treated as consts with builtin #fl
     const vec3 x_1 = vec3(float(a_0), float(a_0), float(a_0));
     vec3 main_pure(vec2 coord_2) {
         return x_1;
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "partial application stored as top level value" =
+  test
+    {|
+    let palette (a : vec3) = fun t -> #cos(a * t)
+    let warm = palette [0.5, 0.3, 0.1]
+    let main (coord : vec2) =
+      let a = (warm 2).0 in
+      [a, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_24 {
+        int tag;
+        vec3 lctor_25_0;
+    };
+    vec3 palette_0_vec3_to_int_to_vec3_20(vec3 a_1, int t_2) {
+        float pf_31 = float(t_2);
+        vec3 anf_28 = (a_1 * pf_31);
+        return cos(anf_28);
+    }
+    vec3 dapply_23(DFn_24 dfn_26, int da_27) {
+        vec3 ca_22 = dfn_26.lctor_25_0;
+        return palette_0_vec3_to_int_to_vec3_20(ca_22, da_27);
+    }
+    const DFn_24 warm_3_int_to_vec3_19 = DFn_24(0, vec3(0.5, 0.3, 0.1));
+    vec3 main_pure(vec2 coord_4) {
+        vec3 anf_30 = dapply_23(warm_3_int_to_vec3_19, 2);
+        float a_5 = anf_30[0];
+        return vec3(a_5, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+  |}];
+  test
+    {|
+    let add (x : float) (y : float) = x + y
+    let add5 = add 5.0
+    let main (coord : vec2) =
+      let r = add5 3.0 in
+      [r, r, r]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_12 {
+        int tag;
+        float lctor_13_0;
+    };
+    const DFn_12 add5_3 = DFn_12(0, 5.);
+    float add_0(float x_1, float y_2) {
+        return (x_1 + y_2);
+    }
+    float dapply_11(DFn_12 dfn_14, float da_15) {
+        float ca_10 = dfn_14.lctor_13_0;
+        return add_0(ca_10, da_15);
+    }
+    vec3 main_pure(vec2 coord_4) {
+        float r_5 = dapply_11(add5_3, 3.);
+        return vec3(r_5, r_5, r_5);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
