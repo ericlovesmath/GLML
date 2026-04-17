@@ -61,7 +61,7 @@ let list_passes_command =
 let main_command =
   Command.group
     ~summary:"GLML: A functional compiler targetting GLSL"
-    [ "compile", compile_command; "list-passes", list_passes_command ]
+    [ "build", compile_command; "list-passes", list_passes_command ]
 ;;
 
 let () = Command_unix.run main_command
