@@ -165,7 +165,10 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
   | Var v ->
     (match Map.find env v with
      | None -> make (Var v) []
-     | Some _ -> Err.fail "first-class functions are not supported" ~loc:t.loc)
+     | Some _ ->
+       Err.fail
+         "function-valued var in non-call position, should have defunctionalized"
+         ~loc:t.loc)
   | Float f -> make (Float f) []
   | Int i -> make (Int i) []
   | Bool b -> make (Bool b) []
@@ -246,7 +249,7 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
         (pat, body) :: acc_cases, acc_tops @ body_tops)
     in
     make (Match (scrutinee, List.rev cases)) (s_tops @ c_tops)
-  | Lam _ -> Err.fail "first-class anon functions are unsupported" ~loc:t.loc
+  | Lam _ -> Err.fail "Anonymous functions should have been defunctionalized" ~loc:t.loc
 ;;
 
 let lift_top (globals : String.Set.t) (top : Uncurry.top) : top list Compiler_error.t =

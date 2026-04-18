@@ -32,7 +32,6 @@ let main (coord : vec2) =
 - More Demos: New examples with HOFs, IQ Palette, Beaver Logo
 - Type annotations for arbitrary terms and let bindings
 - Functions in structs and variants
-- Split up `let%expect_test` across files to parallelize them
 - Promotion with ints/floats (true coercion enforced rather than constraint)
 - Type aliases with parameters
 - Curried builtin functions for partial application
