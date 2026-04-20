@@ -61,6 +61,8 @@ type constr_desc =
   | MulBroadcast of ty * ty * ty (** Matrix multiplication rules *)
   | IndexAccess of ty * int * ty (** Vector/Matrix indexing *)
   | FieldAccess of ty * string * ty (** Field access on a record *)
+  | Coerce of ty * ty
+  (** Coercion: first type is coercible to second (e.g. int -> float) *)
 
 type constr =
   { desc : constr_desc
@@ -103,6 +105,8 @@ let sexp_of_constr_desc = function
     List [ Atom "IndexAccess"; sexp_of_ty t; Atom (Int.to_string i); sexp_of_ty ret ]
   | FieldAccess (t, f, ret) ->
     List [ Atom "FieldAccess"; sexp_of_ty t; Atom f; sexp_of_ty ret ]
+  | Coerce (from_ty, to_ty) ->
+    List [ Atom "Coerce"; sexp_of_ty from_ty; sexp_of_ty to_ty ]
 ;;
 
 let sexp_of_constr (c : constr) = sexp_of_constr_desc c.desc
@@ -211,6 +215,7 @@ let subst_constraints (sub : substitution) (con : constr list) : constr list =
         MulBroadcast (subst_ty sub l, subst_ty sub r, subst_ty sub ret)
       | IndexAccess (t, i, ret) -> IndexAccess (subst_ty sub t, i, subst_ty sub ret)
       | FieldAccess (t, f, ret) -> FieldAccess (subst_ty sub t, f, subst_ty sub ret)
+      | Coerce (from_ty, to_ty) -> Coerce (subst_ty sub from_ty, subst_ty sub to_ty)
     in
     { c with desc })
 ;;
@@ -264,6 +269,7 @@ let ftv_of_constraint (c : constr) : String.Set.t =
     String.Set.union_list [ ftv_of_ty l; ftv_of_ty r; ftv_of_ty ret ]
   | IndexAccess (t, _, ret) | FieldAccess (t, _, ret) ->
     Set.union (ftv_of_ty t) (ftv_of_ty ret)
+  | Coerce (from_ty, to_ty) -> Set.union (ftv_of_ty from_ty) (ftv_of_ty to_ty)
 ;;
 
 let ftv_of_context (ctx : context) : String.Set.t =
@@ -338,6 +344,7 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t
   | (loc, TyVariant (s, args), TyVariant (s', args')) :: con
     when String.equal s s' && List.length args = List.length args' ->
     unify (List.map2_exn args args' ~f:(Tuple3.create loc) @ con)
+  | (_, TyInt, TyFloat) :: con | (_, TyFloat, TyInt) :: con -> unify con
   | (loc, ty, ty') :: con ->
     if equal_ty ty ty'
     then unify con
@@ -453,6 +460,13 @@ let resolve_constraints structs (constrs : constr list)
                 let field_ty = subst_ty sub field_ty in
                 aux deferred ((loc, ret, field_ty) :: eqs) rest))
        | ty -> Err.fail "field access on non-record type" ~loc ~d:[%message (ty : ty)])
+    | ({ desc = Coerce (from_ty, to_ty); loc } as _c) :: rest ->
+      if equal_ty from_ty to_ty
+      then aux deferred eqs rest
+      else (
+        match from_ty, to_ty with
+        | TyInt, TyFloat -> aux deferred eqs rest
+        | _ -> aux deferred ((loc, from_ty, to_ty) :: eqs) rest)
   in
   aux [] [] constrs
 ;;
