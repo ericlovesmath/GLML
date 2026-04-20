@@ -2636,3 +2636,165 @@ let%expect_test "toplevel complex consts / promotion to zero-arg functions" =
     }
     |}]
 ;;
+
+let%expect_test "ints in float contexts" =
+  (* int literal passed directly as float argument *)
+  test_term "let f (x : float) = x * 2.0 in [f 3, 0.0, 0.0]";
+  [%expect {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    float f_1_5(float x_2) {
+        return (x_2 * 2.);
+    }
+    vec3 main_pure(vec2 coord_0) {
+        float anf_6 = f_1_5(3.);
+        return vec3(anf_6, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* int literal in arithmetic with float — promotes left operand *)
+  test_term "let x = 1 + 2.0 in [x, x, x]";
+  [%expect {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 main_pure(vec2 coord_0) {
+        float x_1 = (1. + 2.);
+        return vec3(x_1, x_1, x_1);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* int variable passed to annotated float param *)
+  test_term "let n = 4 in let f (x : float) = x + 1.0 in [f n, 0.0, 0.0]";
+  [%expect {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    float f_2_6(float x_3) {
+        return (x_3 + 1.);
+    }
+    vec3 main_pure(vec2 coord_0) {
+        int n_1 = 4;
+        float pf_8 = float(n_1);
+        float anf_7 = f_2_6(pf_8);
+        return vec3(anf_7, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* int literals in vec3 literal *)
+  test_term "[1, 2, 3]";
+  [%expect {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 main_pure(vec2 coord_0) {
+        return vec3(1., 2., 3.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* int literal broadcast-multiplied with float *)
+  test_term "let v = [1.0, 2.0, 3.0] in [2 * v.0, 0.0, 0.0]";
+  [%expect {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 main_pure(vec2 coord_0) {
+        vec3 v_1 = vec3(1., 2., 3.);
+        float anf_4 = v_1[0];
+        float anf_5 = (2. * anf_4);
+        return vec3(anf_5, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* int extern in float arithmetic *)
+  test
+    {|
+    #extern int n
+    let main (u : vec2) = [n + 1.0, 0.0, 0.0]
+    |};
+  [%expect {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform int n;
+    vec3 main_pure(vec2 u_0) {
+        float pf_3 = float(n);
+        float anf_2 = (pf_3 + 1.);
+        return vec3(anf_2, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* int from if-expression used in float context *)
+  test_term "let r = if true then 1 else 2 in [r, 0.0, 0.0]";
+  [%expect {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 main_pure(vec2 coord_0) {
+        int r_1;
+        if (true) {
+            r_1 = 1;
+        } else {
+            r_1 = 2;
+        }
+        float pf_2 = float(r_1);
+        return vec3(pf_2, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* int literal passed to builtin expecting float *)
+  test_term "let s = #sin(0) in [s, 0.0, 0.0]";
+  [%expect {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 main_pure(vec2 coord_0) {
+        float s_1 = sin(0.);
+        return vec3(s_1, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* two int literals passed to two float params *)
+  test_term "let f (x : float) (y : float) = x + y in [f 1 2, 0.0, 0.0]";
+  [%expect {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    float f_1_7(float x_2, float y_3) {
+        return (x_2 + y_3);
+    }
+    vec3 main_pure(vec2 coord_0) {
+        float anf_8 = f_1_7(1., 2.);
+        return vec3(anf_8, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;

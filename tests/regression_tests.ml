@@ -886,6 +886,120 @@ let%expect_test "regression - partial application stored as top level value" =
     |}]
 ;;
 
+let%expect_test "regression - int promotion through closures / partial application" =
+  (* int literal passed to float param via partial application through closure *)
+  test
+    {|
+    let add (x : float) (y : float) = x + y
+    let addn (n : float) = fun (x : float) -> add n x
+    let main (coord : vec2) =
+      let f = addn 0 in
+      let r = f 1 in
+      [r, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_17 {
+        int tag;
+        int lctor_18_0;
+    };
+    float add_0(float x_1, float y_2) {
+        return (x_1 + y_2);
+    }
+    float addn_3(float n_4, float x_5) {
+        return add_0(n_4, x_5);
+    }
+    float dapply_16(DFn_17 dfn_19, float da_20) {
+        int ca_15 = dfn_19.lctor_18_0;
+        float pf_21 = float(ca_15);
+        return addn_3(pf_21, da_20);
+    }
+    vec3 main_pure(vec2 coord_6) {
+        DFn_17 f_7 = DFn_17(0, 0);
+        float r_8 = dapply_16(f_7, 1.);
+        return vec3(r_8, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* fully applied with int args — both promoted at call site *)
+  test
+    {|
+    let add (x : float) (y : float) = x + y
+    let addn (n : float) = fun (x : float) -> add n x
+    let main (coord : vec2) =
+      let r = addn 0 1 in
+      [r, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    float add_0(float x_1, float y_2) {
+        return (x_1 + y_2);
+    }
+    float addn_3(float n_4, float x_5) {
+        return add_0(n_4, x_5);
+    }
+    vec3 main_pure(vec2 coord_6) {
+        float r_7 = addn_3(0., 1.);
+        return vec3(r_7, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* int variable captured in closure then passed to float param *)
+  test
+    {|
+    let add (x : float) (y : float) = x + y
+    let addn (n : float) = fun (x : float) -> add n x
+    let main (coord : vec2) =
+      let n = 5 in
+      let f = addn n in
+      let r = f 1 in
+      [r, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_18 {
+        int tag;
+        int lctor_19_0;
+    };
+    float add_0(float x_1, float y_2) {
+        return (x_1 + y_2);
+    }
+    float addn_3(float n_4, float x_5) {
+        return add_0(n_4, x_5);
+    }
+    float dapply_17(DFn_18 dfn_20, float da_21) {
+        int ca_16 = dfn_20.lctor_19_0;
+        float pf_22 = float(ca_16);
+        return addn_3(pf_22, da_21);
+    }
+    vec3 main_pure(vec2 coord_6) {
+        int n_7 = 5;
+        DFn_18 f_8 = DFn_18(0, n_7);
+        float r_9 = dapply_17(f_8, 1.);
+        return vec3(r_9, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
 let%expect_test "regression - inferred type in higher-order local function" =
   (* implicit t parameter, int path via call site
 

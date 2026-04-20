@@ -35,6 +35,7 @@ type constr_desc =
   | MulBroadcast of ty * ty * ty
   | IndexAccess of ty * int * ty
   | FieldAccess of ty * string * ty
+  | Coerce of ty * ty
 [@@deriving sexp_of]
 
 type constr =

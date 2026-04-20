@@ -86,6 +86,31 @@ and promote_term (env : ty String.Map.t) (term : term) : term * bindings =
       | _ -> coerce_atoms env loc atoms
     in
     { term with desc = Builtin (f, atoms) }, binds
+  | App (f, atoms), _ ->
+    (* TODO: Explicitly fail here and bubble a [Err] *)
+    let fn_param_tys =
+      match Map.find env f with
+      | Some ty ->
+        let rec collect = function
+          | TyArrow (p, rest) -> p :: collect rest
+          | _ -> []
+        in
+        collect ty
+      | None -> []
+    in
+    let atoms, binds =
+      (* TODO: Explicitly fail here and bubble a [Err] *)
+      List.mapi atoms ~f:(fun i a ->
+        let should_coerce =
+          match List.nth fn_param_tys i with
+          | Some TyFloat -> true
+          | _ -> equal_ty a.ty TyFloat
+        in
+        if should_coerce then coerce_atom env loc a else a, [])
+      |> List.unzip
+      |> Tuple2.map_snd ~f:List.concat
+    in
+    { term with desc = App (f, atoms) }, binds
   | Record (s, atoms), _ ->
     let atoms, binds =
       atoms
