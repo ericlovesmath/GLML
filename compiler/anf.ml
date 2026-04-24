@@ -36,7 +36,7 @@ type term_desc =
   | Record of string * atom list
   | Field of atom * string
   | Variant of string * string * atom list
-  | Match of atom * (Stlc.pat * anf) list
+  | Match of atom * (Frontend.pat * anf) list
 
 and term =
   { desc : term_desc
@@ -73,7 +73,7 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | Variant (ty_name, ctor, args) ->
     List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_atom)
   | Match (scrutinee, cases) ->
-    let sexp_of_case (pat, body) = List [ Stlc.sexp_of_pat pat; sexp_of_anf body ] in
+    let sexp_of_case (pat, body) = List [ Frontend.sexp_of_pat pat; sexp_of_anf body ] in
     List (Atom "match" :: sexp_of_atom scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
@@ -88,7 +88,7 @@ and sexp_of_anf t = sexp_of_anf_desc t.desc
 type top_desc =
   | Define of
       { name : string
-      ; recur : Stlc.recur
+      ; recur : Frontend.recur
       ; args : (string * Monomorphize.ty) list
       ; body : anf
       ; ret_ty : Monomorphize.ty
@@ -104,7 +104,7 @@ let sexp_of_top_desc = function
     in
     List
       [ Atom "Define"
-      ; Stlc.sexp_of_recur recur
+      ; Frontend.sexp_of_recur recur
       ; List [ Atom "name"; Atom name ]
       ; List [ Atom "args"; List args_sexp ]
       ; List [ Atom "body"; sexp_of_anf body ]

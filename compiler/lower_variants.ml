@@ -141,7 +141,7 @@ let find_tag (ctors : (string * ty list) list) (ctor : string) : int Compiler_er
   |> Err.of_option "unknown ctor" ~d:[%message (ctor : string)]
 ;;
 
-let find_catchall (cases : (Stlc.pat * _) list) =
+let find_catchall (cases : (Frontend.pat * _) list) =
   List.find_map cases ~f:(fun (pat, body) ->
     match pat with
     | PatVar v -> Some (v, body)
@@ -262,7 +262,7 @@ and lower_anf (tenv : type_env) (anf : Tail_call.anf) : anf Compiler_error.t =
 and lower_variant_match
       (tenv : type_env)
       (scrut : Anf.atom)
-      (cases : (Stlc.pat * Tail_call.anf) list)
+      (cases : (Frontend.pat * Tail_call.anf) list)
       (result_ty : ty)
       (loc : Lexer.loc)
       (k : term -> anf)
@@ -287,7 +287,7 @@ and lower_variant_match
   let ctor_cases =
     List.filter_map cases ~f:(fun (pat, body) ->
       match pat with
-      | Stlc.PatCtor (ctor, vars) -> Some (ctor, vars, body)
+      | PatCtor (ctor, vars) -> Some (ctor, vars, body)
       | _ -> None)
   in
   let catchall_case = find_catchall cases in
@@ -327,7 +327,7 @@ and lower_variant_match
 and lower_bool_match
       (tenv : type_env)
       (scrut : Anf.atom)
-      (cases : (Stlc.pat * Tail_call.anf) list)
+      (cases : (Frontend.pat * Tail_call.anf) list)
       (result_ty : ty)
       (loc : Lexer.loc)
       (k : term -> anf)
@@ -354,7 +354,7 @@ and lower_bool_match
 and lower_int_match
       (tenv : type_env)
       (scrut : Anf.atom)
-      (cases : (Stlc.pat * Tail_call.anf) list)
+      (cases : (Frontend.pat * Tail_call.anf) list)
       (result_ty : ty)
       (loc : Lexer.loc)
       (k : term -> anf)
@@ -391,7 +391,7 @@ and lower_int_match
 and lower_float_match
       (tenv : type_env)
       (scrut : Anf.atom)
-      (cases : (Stlc.pat * Tail_call.anf) list)
+      (cases : (Frontend.pat * Tail_call.anf) list)
       (result_ty : ty)
       (loc : Lexer.loc)
       (k : term -> anf)
@@ -401,7 +401,7 @@ and lower_float_match
   let float_cases =
     List.filter_map cases ~f:(fun (pat, body) ->
       match pat with
-      | Stlc.PatLitFloat f -> Some (f, body)
+      | PatLitFloat f -> Some (f, body)
       | _ -> None)
   in
   let default_case = find_catchall cases in
@@ -446,7 +446,7 @@ and lower_float_match
 and lower_match
       (tenv : type_env)
       (scrut : Anf.atom)
-      (cases : (Stlc.pat * Tail_call.anf) list)
+      (cases : (Frontend.pat * Tail_call.anf) list)
       (result_ty : ty)
       (loc : Lexer.loc)
       (k : term -> anf)
@@ -456,7 +456,7 @@ and lower_match
   let kind =
     List.find_map cases ~f:(fun (pat, _) ->
       match pat with
-      | Stlc.PatVar _ -> None
+      | PatVar _ -> None
       | _ -> Some pat)
   in
   match kind with

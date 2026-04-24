@@ -18,7 +18,7 @@ type term_desc =
   | Mat of int * int * term list
   | Lam of string * term
   | App of term * term
-  | Let of Stlc.recur * string * term * term
+  | Let of Frontend.recur * string * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -26,7 +26,7 @@ type term_desc =
   | Record of string * term list
   | Field of term * string
   | Variant of string * string * term list
-  | Match of term * (Stlc.pat * term) list
+  | Match of term * (Frontend.pat * term) list
 [@@deriving sexp_of]
 
 and term =
@@ -42,7 +42,7 @@ type type_decl =
 [@@deriving sexp_of]
 
 type top_desc =
-  | Define of Stlc.recur * string * term
+  | Define of Frontend.recur * string * term
   | Extern of string
   | TypeDef of string * type_decl
 [@@deriving sexp_of]

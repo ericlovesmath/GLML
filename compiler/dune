@@ -9,6 +9,8 @@
    lexer
    chomp
    parser
+
+   frontend
    stlc
    uniquify
    typecheck

@@ -22,7 +22,7 @@ type term_desc =
   | Record of string * term list
   | Field of term * string
   | Variant of string * string * term list
-  | Match of term * (Stlc.pat * term) list
+  | Match of term * (Frontend.pat * term) list
 
 and term =
   { desc : term_desc
@@ -54,7 +54,7 @@ let rec sexp_of_term_desc = function
   | Variant (ty_name, ctor, args) ->
     List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_term)
   | Match (scrutinee, cases) ->
-    let sexp_of_case (pat, body) = List [ Stlc.sexp_of_pat pat; sexp_of_term body ] in
+    let sexp_of_case (pat, body) = List [ Frontend.sexp_of_pat pat; sexp_of_term body ] in
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
@@ -62,7 +62,7 @@ and sexp_of_term t = sexp_of_term_desc t.desc
 type top_desc =
   | Define of
       { name : string
-      ; recur : Stlc.recur
+      ; recur : Frontend.recur
       ; args : (string * Monomorphize.ty) list
       ; body : term
       ; ret_ty : Monomorphize.ty
@@ -78,7 +78,7 @@ let sexp_of_top_desc = function
     in
     List
       [ Atom "Define"
-      ; Stlc.sexp_of_recur recur
+      ; Frontend.sexp_of_recur recur
       ; List [ Atom "name"; Atom name ]
       ; List [ Atom "args"; List args_sexp ]
       ; List [ Atom "body"; sexp_of_term body ]
@@ -134,7 +134,7 @@ let free_vars (env : env) (t : Uncurry.term) : Monomorphize.ty String.Map.t =
     | Match (scrutinee, cases) ->
       let fv_cases =
         List.map cases ~f:(fun (pat, body) ->
-          let vars = Stlc.pat_bound_vars pat in
+          let vars = Frontend.pat_bound_vars pat in
           List.fold vars ~init:(fv body) ~f:Map.remove)
       in
       union_list (fv scrutinee :: fv_cases)

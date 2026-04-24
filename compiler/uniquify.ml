@@ -88,7 +88,7 @@ let rec uniquify_term (ctx : env) (t : term) : term Compiler_error.t =
               (* TODO: Evil evil exn that I'm too lazy to thread a [List.fold_result] *)
               List.fold2_exn vs vs' ~init:ctx ~f:(fun c v v' -> Map.set c ~key:v ~data:v')
             in
-            PatCtor (ctor, vs'), ctx
+            Frontend.PatCtor (ctor, vs'), ctx
           | PatVar v ->
             let v' = Utils.fresh v in
             PatVar v', Map.set ctx ~key:v ~data:v'

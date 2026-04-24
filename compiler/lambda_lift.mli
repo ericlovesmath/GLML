@@ -14,7 +14,7 @@ type term_desc =
   | Record of string * term list
   | Field of term * string
   | Variant of string * string * term list
-  | Match of term * (Stlc.pat * term) list
+  | Match of term * (Frontend.pat * term) list
 [@@deriving sexp_of]
 
 and term =
@@ -27,7 +27,7 @@ and term =
 type top_desc =
   | Define of
       { name : string
-      ; recur : Stlc.recur
+      ; recur : Frontend.recur
       ; args : (string * Monomorphize.ty) list
       ; body : term
       ; ret_ty : Monomorphize.ty

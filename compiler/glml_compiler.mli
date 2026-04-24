@@ -4,7 +4,8 @@ module Compiler_error = Compiler_error
 (** Passes in compiler available to be dumped *)
 module Passes : sig
   type t =
-    | Stlc
+    | Frontend
+    | Desugar
     | Uniquify
     | Typecheck
     | Monomorphize

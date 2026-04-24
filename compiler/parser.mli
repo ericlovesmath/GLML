@@ -1,2 +1,2 @@
-(** Parser for Stlc.t *)
-val glml_p : Stlc.t Chomp.t
+(** Parser for GLML *)
+val glml_p : Frontend.t Chomp.t

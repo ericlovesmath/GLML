@@ -1,5 +1,5 @@
 open Core
-open Stlc
+open Frontend
 open Lexer
 open Chomp
 open Chomp.Let_syntax
