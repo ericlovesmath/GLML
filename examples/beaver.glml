@@ -1,0 +1,152 @@
+#extern vec2 u_resolution
+
+// Palette
+let bg_col    = [0.13, 0.48, 0.30]
+let bg_dark   = [0.09, 0.36, 0.22]
+let brown     = [0.55, 0.34, 0.16]
+let brown_lt  = [0.68, 0.46, 0.24]
+let brown_dk  = [0.38, 0.22, 0.08]
+let drk_brown = [0.22, 0.11, 0.03]
+let cream     = [0.95, 0.89, 0.74]
+let cream_dk  = [0.78, 0.68, 0.50]
+let pink      = [0.92, 0.62, 0.60]
+let pink_dk   = [0.75, 0.42, 0.42]
+let black     = [0.06, 0.04, 0.03]
+let wht       = [1.00, 0.97, 0.93]
+let tooth_yel = [0.92, 0.85, 0.60]
+
+let get_uv coord =
+  let top = 2 * coord - u_resolution in
+  let bot = #min(u_resolution.0, u_resolution.1) in
+  top / bot
+
+// Shift p by offset — used to avoid repeating (p - offset) everywhere
+let at (offset : vec2) (p : vec2) = p - offset
+
+// SDF functions with p last so they work nicely with pipe + partial application
+let ellipse (ab : vec2) (p : vec2) = #length(p / ab) - 1
+
+let circle (r : float) (p : vec2) = #length(p) - r
+
+let box (b : vec2) (p : vec2) =
+  let d = #abs(p) - b in
+  #length(#max(d, [0, 0])) + #min(#max(d.0, d.1), 0)
+
+let rot (a : float) (p : vec2) =
+  let c = #cos(a) in
+  let s = #sin(a) in
+  [c * p.0 - s * p.1, s * p.0 + c * p.1]
+
+let smin (a : float) (b : float) (k : float) =
+  let h = #max(k - #abs(a - b), 0) / k in
+  #min(a, b) - h * h * k * 0.25
+
+let smax (a : float) (b : float) (k : float) =
+  let h = #max(k - #abs(a - b), 0) / k in
+  #max(a, b) + h * h * k * 0.25
+
+// Paint shape_col inside d < 0, bg outside (anti-aliased edge)
+let paint (d : float) (shape_col : vec3) (bg : vec3) =
+  #mix(shape_col, bg, #smoothstep(-0.005, 0.005, d))
+
+// Paint with a soft inner shadow near the edge for depth
+let paint_shaded (d : float) (shape_col : vec3) (shadow_col : vec3) (shadow_depth : float) (bg : vec3) =
+  let base = #mix(shape_col, bg, #smoothstep(-0.005, 0.005, d)) in
+  let shade = #smoothstep(-shadow_depth, 0, d) in
+  #mix(base, #mix(shape_col, shadow_col, shade * 0.55), #smoothstep(0.005, -0.005, d))
+
+let main (coord : vec2) =
+  let p = get_uv coord / 1.5 in
+
+  // Tail
+  let tp          = p |> at [0.28, -0.28] |> rot (-0.35) in
+  let tail        = tp |> ellipse [0.22, 0.085] in
+  let tsx         = #abs(#sin((tp.0 + tp.1) * 38.0)) - 0.55 in
+  let tsy         = #abs(#sin((tp.0 - tp.1) * 38.0)) - 0.55 in
+  let tail_scales = #max(tail + 0.01, #min(tsx, tsy) * 0.015) in
+  let tail_rim    = #max(tail, -(tail + 0.018)) in
+
+  // Body, Head, Cheeks
+  let body              = p |> at [0.0, -0.16] |> ellipse [0.25, 0.26] in
+  let head              = p |> at [0.0,  0.20] |> ellipse [0.22, 0.20] in
+  let torso             = smin body head 0.10 in
+  let cheek_l           = p |> at [-0.14, 0.11] |> circle 0.10 in
+  let cheek_r           = p |> at [ 0.14, 0.11] |> circle 0.10 in
+  let cheeks            = #min(cheek_l, cheek_r) in
+  let torso_with_cheeks = smin torso cheeks 0.06 in
+
+  // Face features
+  let muzzle   = p |> at [0.0,  0.09]    |> ellipse [0.13,  0.095] in
+  let belly    = p |> at [0.0, -0.20]    |> ellipse [0.15,  0.17 ] in
+  let ear_l    = p |> at [-0.175, 0.355] |> circle 0.075 in
+  let ear_r    = p |> at [ 0.175, 0.355] |> circle 0.075 in
+  let ear_in_l = p |> at [-0.175, 0.345] |> ellipse [0.035, 0.042] in
+  let ear_in_r = p |> at [ 0.175, 0.345] |> ellipse [0.035, 0.042] in
+  let arm_l    = p |> at [-0.23, -0.09]  |> ellipse [0.065, 0.09] in
+  let arm_r    = p |> at [ 0.23, -0.09]  |> ellipse [0.065, 0.09] in
+  let paw_l    = p |> at [-0.28, -0.19]  |> circle 0.055 in
+  let paw_r    = p |> at [ 0.28, -0.19]  |> circle 0.055 in
+  let foot_l   = p |> at [-0.13, -0.42]  |> ellipse [0.095, 0.048] in
+  let foot_r   = p |> at [ 0.13, -0.42]  |> ellipse [0.095, 0.048] in
+
+  // Teeth
+  let tooth_l = p |> at [-0.028, 0.035] |> box [0.022, 0.050] in
+  let tooth_r = p |> at [ 0.028, 0.035] |> box [0.022, 0.050] in
+  let teeth   = #min(tooth_l, tooth_r) in
+  let groove  = p |> at [0.0, 0.035]    |> box [0.005, 0.050] in
+
+  // Nose
+  let nose    = p |> at [0.0,    0.135] |> ellipse [0.038, 0.028] in
+  let nose_hi = p |> at [-0.012, 0.142] |> ellipse [0.012, 0.008] in
+
+  // Eyes
+  let eye_l = p |> at [-0.095, 0.255] |> circle 0.040 in
+  let eye_r = p |> at [ 0.095, 0.255] |> circle 0.040 in
+  let hi_l  = p |> at [-0.082, 0.270] |> circle 0.014 in
+  let hi_r  = p |> at [ 0.108, 0.270] |> circle 0.014 in
+  let hi_l2 = p |> at [-0.105, 0.245] |> circle 0.006 in
+  let hi_r2 = p |> at [ 0.085, 0.245] |> circle 0.006 in
+
+  // Eyebrows
+  let brow_l = p |> at [-0.095, 0.315] |> rot   0.15  |> ellipse [0.035, 0.010] in
+  let brow_r = p |> at [ 0.095, 0.315] |> rot (-0.15) |> ellipse [0.035, 0.010] in
+
+  // Background vignette
+  let vig = #smoothstep(0.3, 1.1, #length(p)) in
+  let col = #mix(bg_col, bg_dark, vig) in
+
+  // Ground shadow
+  let shadow_d       = p |> at [0.02, -0.45] |> ellipse [0.38, 0.055] in
+  let shadow_falloff = #smoothstep(0.08, -0.02, shadow_d) in
+  let col = #mix(col, [0.06, 0.28, 0.16], shadow_falloff * 0.55) in
+
+  // Composing colors
+  col
+  |> paint tail        brown_dk
+  |> paint tail_rim    drk_brown
+  |> paint tail_scales drk_brown
+  |> paint foot_l      drk_brown
+  |> paint foot_r      drk_brown
+  |> paint arm_l       brown_dk
+  |> paint arm_r       brown_dk
+  |> paint_shaded torso_with_cheeks brown    brown_dk 0.08
+  |> paint_shaded belly             cream    cream_dk 0.05
+  |> paint paw_l       cream
+  |> paint paw_r       cream
+  |> paint ear_l       brown
+  |> paint ear_r       brown
+  |> paint ear_in_l    pink
+  |> paint ear_in_r    pink
+  |> paint muzzle      cream
+  |> paint brow_l      drk_brown
+  |> paint brow_r      drk_brown
+  |> paint teeth       tooth_yel
+  |> paint groove      brown_dk
+  |> paint nose        drk_brown
+  |> paint nose_hi     brown_lt
+  |> paint eye_l       black
+  |> paint eye_r       black
+  |> paint hi_l        wht
+  |> paint hi_r        wht
+  |> paint hi_l2       wht
+  |> paint hi_r2       wht
