@@ -8,6 +8,12 @@ module Err = Compiler_error.Pass (struct
 
 type env = string String.Map.t
 
+let fresh v ctx =
+  let v' = Utils.fresh v in
+  let ctx = Map.set ctx ~key:v ~data:v' in
+  v', ctx
+;;
+
 let rec uniquify_term (ctx : env) (t : term) : term Compiler_error.t =
   let pure desc : term Compiler_error.t = Ok { desc; loc = t.loc } in
   let aux = uniquify_term ctx in
@@ -21,24 +27,22 @@ let rec uniquify_term (ctx : env) (t : term) : term Compiler_error.t =
     in
     pure (Var v)
   | Lam (v, ty, body) ->
-    let v' = Utils.fresh v in
-    let ctx = Map.set ctx ~key:v ~data:v' in
+    let v, ctx = fresh v ctx in
     let%bind body = uniquify_term ctx body in
-    pure (Lam (v', ty, body))
+    pure (Lam (v, ty, body))
   | App (f, x) ->
     let%bind f = aux f in
     let%bind x = aux x in
     pure (App (f, x))
   | Let (recur, v, return_ty, bind, body) ->
-    let v' = Utils.fresh v in
-    let ctx' = Map.set ctx ~key:v ~data:v' in
+    let v, ctx' = fresh v ctx in
     let%bind bind =
       match recur with
       | Nonrec -> uniquify_term ctx bind
       | Rec _ -> uniquify_term ctx' bind
     in
     let%bind body = uniquify_term ctx' body in
-    pure (Let (recur, v', return_ty, bind, body))
+    pure (Let (recur, v, return_ty, bind, body))
   | If (c, t, f) ->
     let%bind c = aux c in
     let%bind t = aux t in
@@ -90,9 +94,29 @@ let rec uniquify_term (ctx : env) (t : term) : term Compiler_error.t =
             in
             Frontend.PatCtor (ctor, vs'), ctx
           | PatVar v ->
-            let v' = Utils.fresh v in
-            PatVar v', Map.set ctx ~key:v ~data:v'
+            let v, ctx = fresh v ctx in
+            PatVar v, ctx
           | PatLitBool _ | PatLitInt _ | PatLitFloat _ -> pat, ctx
+          | PatBracket pats ->
+            let ctx, pats =
+              List.fold_map pats ~init:ctx ~f:(fun ctx p ->
+                match p with
+                | PatVar v ->
+                  let v, ctx = fresh v ctx in
+                  ctx, Frontend.PatVar v
+                | PatBracket inner ->
+                  let ctx, inner =
+                    List.fold_map inner ~init:ctx ~f:(fun ctx p ->
+                      match p with
+                      | PatVar v ->
+                        let v, ctx = fresh v ctx in
+                        ctx, Frontend.PatVar v
+                      | _ -> ctx, p)
+                  in
+                  ctx, PatBracket inner
+                | _ -> ctx, p)
+            in
+            Frontend.PatBracket pats, ctx
         in
         let%map body = uniquify_term ctx body in
         pat, body)

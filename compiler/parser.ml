@@ -50,23 +50,25 @@ let between brace_type p =
 ;;
 
 (** Match patterns *)
-let pat_p =
-  (let%bind ctor = constructor_p in
-   let%bind vars =
-     between `Paren (commas ident_p) <|> (ident_p >>| fun v -> [ v ]) <|> return []
-   in
-   return (PatCtor (ctor, vars)))
-  <|> tok TRUE *> return (PatLitBool true)
-  <|> tok FALSE *> return (PatLitBool false)
-  <|> (float_p >>| fun f -> PatLitFloat f)
-  <|> (num_p >>| fun n -> PatLitInt n)
-  <|> tok SUB
-      *> commit
-           (float_p
-            >>| (fun f -> PatLitFloat (-.f))
-            <|> (num_p >>| fun n -> PatLitInt (-n)))
-  <|> (ident_p >>| fun v -> PatVar v)
-  <??> "pat"
+let rec pat_p st =
+  ((let%bind ctor = constructor_p in
+    let%bind vars =
+      between `Paren (commas ident_p) <|> (ident_p >>| fun v -> [ v ]) <|> return []
+    in
+    return (PatCtor (ctor, vars)))
+   <|> tok TRUE *> return (PatLitBool true)
+   <|> tok FALSE *> return (PatLitBool false)
+   <|> (float_p >>| fun f -> PatLitFloat f)
+   <|> (num_p >>| fun n -> PatLitInt n)
+   <|> tok SUB
+       *> commit
+            (float_p
+             >>| (fun f -> PatLitFloat (-.f))
+             <|> (num_p >>| fun n -> PatLitInt (-n)))
+   <|> (between `Bracket (commas pat_p) >>| fun pats -> PatBracket pats)
+   <|> (ident_p >>| fun v -> PatVar v)
+   <??> "pat")
+    st
 ;;
 
 let ty_vec_p =
@@ -506,6 +508,7 @@ let%expect_test "term parse tests" =
   test "match x with | true -> a | _ -> b";
   test "match x with | -1 -> a | 23 -> b | var -> c";
   test "match x with | -1. -> a | 0. -> b | 2.4 -> c | _ -> d";
+  test "match x with | [a, b] -> a | [[1, 2], [2]] -> b";
   test "function | Constr x -> a | Alt b -> b";
   test "function | true -> a | _ -> b";
   test "function | -1 -> a | 23 -> b | var -> c";
@@ -533,6 +536,7 @@ let%expect_test "term parse tests" =
     (match x (true a) (_ b))
     (match x (-1 a) (23 b) (var c))
     (match x (-1. a) (0. b) (2.4 c) (_ d))
+    (match x ((bracket a b) a) ((bracket (bracket 1 2) (bracket 2)) b))
     (function ((Constr x) a) ((Alt b) b))
     (function (true a) (_ b))
     (function (-1 a) (23 b) (var c))

@@ -2932,3 +2932,64 @@ let%expect_test "pipe operator" =
     }
     |}]
 ;;
+
+let%expect_test "bracket pattern matching" =
+  test
+    {|
+    let f = function
+      | [x, _, z] -> x + z
+
+    let g = function
+      | [[a, b], [c, d]] -> a + d
+
+    let h (v : vec2) : float = match v with | [x, y] -> x + y
+
+    let main (coord : vec2) : vec3 =
+      let a = f [coord.0, coord.1, 0.0] in
+      let b = g [[1.0, 0.0], [0.0, 1.0]] in
+      let c = h coord in
+      [a, b, c]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    float f_0(vec3 _fn_arg_1) {
+        float x_2 = _fn_arg_1[0];
+        float _x_3 = _fn_arg_1[1];
+        float z_4 = _fn_arg_1[2];
+        return (x_2 + z_4);
+    }
+    float g_5(mat2 _fn_arg_6) {
+        vec2 _lv_col_39 = _fn_arg_6[0];
+        float a_7 = _lv_col_39[0];
+        vec2 _lv_col_38 = _fn_arg_6[0];
+        float b_8 = _lv_col_38[1];
+        vec2 _lv_col_37 = _fn_arg_6[1];
+        float c_9 = _lv_col_37[0];
+        vec2 _lv_col_36 = _fn_arg_6[1];
+        float d_10 = _lv_col_36[1];
+        return (a_7 + d_10);
+    }
+    float h_11(vec2 v_12) {
+        float x_13 = v_12[0];
+        float y_14 = v_12[1];
+        return (x_13 + y_14);
+    }
+    vec3 main_pure(vec2 coord_15) {
+        float anf_32 = coord_15[0];
+        float anf_33 = coord_15[1];
+        vec3 anf_34 = vec3(anf_32, anf_33, 0.);
+        float a_16 = f_0(anf_34);
+        mat2 anf_35 = mat2(1., 0., 0., 1.);
+        float b_17 = g_5(anf_35);
+        float c_18 = h_11(coord_15);
+        return vec3(a_16, b_17, c_18);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
