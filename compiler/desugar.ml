@@ -195,6 +195,22 @@ let rec desugar_term_desc (td : Frontend.term_desc) : term_desc Compiler_error.t
            p, t))
     in
     Ok (Match (scrutinee, cases))
+  | Function cases ->
+    (* function | pat -> e | pat' -> e'
+       => fun _v -> match _v with | pat -> e | pat' -> e' *)
+    let fresh_var = "_fn_arg" in
+    let%bind cases =
+      Compiler_error.all
+        (List.map cases ~f:(fun (p, t) ->
+           let%map t = desugar_term t in
+           p, t))
+    in
+    let match_term : term =
+      { desc = Match ({ desc = Var fresh_var; loc = Lexer.init_loc }, cases)
+      ; loc = Lexer.init_loc
+      }
+    in
+    Ok (Lam (fresh_var, None, match_term))
 
 and desugar_term (t : Frontend.term) : term Compiler_error.t =
   let%map desc = desugar_term_desc t.desc in

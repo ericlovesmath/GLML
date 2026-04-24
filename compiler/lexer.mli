@@ -20,6 +20,7 @@ type token =
   | REC
   | IN
   | FUN
+  | FUNCTION
   | BAR
   | MATCH
   | WITH
