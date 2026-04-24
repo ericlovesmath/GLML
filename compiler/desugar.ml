@@ -153,6 +153,11 @@ let rec desugar_term_desc (td : Frontend.term_desc) : term_desc Compiler_error.t
     let%bind f = desugar_term f in
     let%bind x = desugar_term x in
     return (App (f, x))
+  | Pipe (l, r) ->
+    (* x |> f   =>   f x *)
+    let%bind l = desugar_term l in
+    let%bind r = desugar_term r in
+    return (App (r, l))
   | Let (r, v, ty_opt, bind, body) ->
     let%bind bind = desugar_term bind in
     let%bind body = desugar_term body in

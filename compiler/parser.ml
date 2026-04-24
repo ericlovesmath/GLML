@@ -459,7 +459,7 @@ and term_postfix_p =
   let op_p = dot_op_p <|> app_op_p in
   (postfix_chain term_head_p op_p <??> "term_postfix_chain") st
 
-and term_p =
+and term_base_p =
   fun st ->
   (term_let_p
    <|> term_if_p
@@ -467,9 +467,20 @@ and term_p =
    <|> term_function_p
    <|> term_match_p
    <|> List.fold_left bop_levels ~init:term_postfix_p ~f:chainl1
-   <??> "term")
+   <??> "term_base")
     st
-;;
+
+and term_pipe_p =
+  fun st ->
+  ((let%bind init = term_base_p in
+    let%bind pipes = many (tok PIPE *> term_base_p) in
+    return
+      (List.fold_left pipes ~init ~f:(fun l r ->
+         { desc = Pipe (l, r); loc = Lexer.merge_loc l.loc r.loc })))
+   <??> "term_pipe")
+    st
+
+and term_p = fun st -> (term_pipe_p <??> "term") st
 
 let%expect_test "term parse tests" =
   let test = test sexp_of_term term_p in
@@ -613,6 +624,25 @@ let%expect_test "regression test, sequential non-parenthesized terms" =
     [parser]: run_stream_not_fully_consumed
     (vec2 1. (let x 2. x))
     (if true 1. (+ 2. 3.))
+    |}]
+;;
+
+let%expect_test "pipe operator tests" =
+  let test = test sexp_of_term term_p in
+  test "x |> f";
+  test "x |> f |> g";
+  test "1.0 |> fun (x : float) -> #sin(x)";
+  test "x |> f y";
+  test "x |> f |> g |> h";
+  test "(a + b) |> f";
+  [%expect
+    {|
+    (x |> f)
+    ((x |> f) |> g)
+    (1. |> (lambda (x (float)) (sin x)))
+    (x |> (app f y))
+    (((x |> f) |> g) |> h)
+    ((+ a b) |> f)
     |}]
 ;;
 

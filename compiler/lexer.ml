@@ -46,6 +46,7 @@ type token =
   | PERCENT
   | LAND
   | LOR
+  | PIPE
   | EXTERN
   | TYPE
   | OF
@@ -173,6 +174,7 @@ let read_lexeme (t : t) : token Or_error.t =
        skip t;
        (match peek t with
         | Some '|' -> consume LOR
+        | Some '>' -> consume PIPE
         | _ -> Ok BAR)
      | '&' ->
        skip t;
@@ -263,7 +265,7 @@ let%expect_test "lexer" =
   test "true false = -> ( ) . < >";
   test "{ } ; : , if then else let";
   test "in fun | match with { } function";
-  test "bool int float ' 'a 10 s_var let type of";
+  test "bool int float ' 'a 10 s_var let type of |>";
   test "+ - / * # <= >= % && || extern vec2 mat3x3";
   test "1.23 0.45 6. -1.";
   test "Constructor";
@@ -272,7 +274,7 @@ let%expect_test "lexer" =
     (Ok (TRUE FALSE EQ ARROW LPAREN RPAREN DOT LANGLE RANGLE))
     (Ok (LCURLY RCURLY SEMI COLON COMMA IF THEN ELSE LET))
     (Ok (IN FUN BAR MATCH WITH LCURLY RCURLY FUNCTION))
-    (Ok (BOOL INT FLOAT TICK (TYVAR a) (NUMERIC 10) (ID s_var) LET TYPE OF))
+    (Ok (BOOL INT FLOAT TICK (TYVAR a) (NUMERIC 10) (ID s_var) LET TYPE OF PIPE))
     (Ok (ADD SUB DIV MUL HASH LEQ GEQ PERCENT LAND LOR EXTERN (VEC 2) (MAT 3 3)))
     (Ok ((FLOAT_LIT 1.23) (FLOAT_LIT 0.45) (FLOAT_LIT 6) SUB (FLOAT_LIT 1)))
     (Ok ((CONSTRUCTOR Constructor)))

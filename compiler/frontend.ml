@@ -67,6 +67,7 @@ type term_desc =
   | Mat of int * int * term list
   | Lam of string * ty option * term
   | App of term * term
+  | Pipe of term * term
   | Let of recur * string * ty option * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
@@ -97,6 +98,7 @@ let rec sexp_of_term_desc = function
     let ty = Option.sexp_of_t sexp_of_ty ty_opt in
     List [ Atom "lambda"; List [ Atom v; ty ]; sexp_of_term body ]
   | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
+  | Pipe (l, r) -> List [ sexp_of_term l; Atom "|>"; sexp_of_term r ]
   | Let (Rec n, v, None, bind, body) ->
     let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
     List [ Atom "let"; rec_tag; Atom v; sexp_of_term bind; sexp_of_term body ]
