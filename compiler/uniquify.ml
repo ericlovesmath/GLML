@@ -1,5 +1,5 @@
 open Core
-open Stlc
+open Desugar
 open Compiler_error.Let_syntax
 
 module Err = Compiler_error.Pass (struct

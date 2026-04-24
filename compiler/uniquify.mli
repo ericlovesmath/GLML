@@ -1,2 +1,2 @@
 (** Removes duplicate names, preventing cases of shadowing *)
-val uniquify : Stlc.t -> Stlc.t Compiler_error.t
+val uniquify : Desugar.t -> Desugar.t Compiler_error.t

@@ -120,4 +120,4 @@ val instantiate_scheme
     - Type Inference with Constrained Types: [https://www.cs.tufts.edu/~nr/cs257/archive/martin-odersky/hmx.pdf]
     - Demystifying Typeclasses: [https://okmij.org/ftp/Computation/typeclass.html]
     *)
-val typecheck : Stlc.t -> t Compiler_error.t
+val typecheck : Desugar.t -> t Compiler_error.t

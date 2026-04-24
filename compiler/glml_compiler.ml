@@ -37,10 +37,10 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   let%bind tokens = Lexer.lex (Lexer.init s) in
   let%bind t = Chomp.run Parser.glml_p tokens in
   trace Frontend (Frontend.sexp_of_t t);
-  let%bind t = Stlc.desugar t in
-  trace Desugar (Stlc.sexp_of_t t);
+  let%bind t = Desugar.desugar t in
+  trace Desugar (Desugar.sexp_of_t t);
   let%bind t = Uniquify.uniquify t in
-  trace Uniquify (Stlc.sexp_of_t t);
+  trace Uniquify (Desugar.sexp_of_t t);
   let%bind t = Typecheck.typecheck t in
   trace Typecheck (Typecheck.sexp_of_t t);
   let%bind t = Monomorphize.monomorphize t in
