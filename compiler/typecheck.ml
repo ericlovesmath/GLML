@@ -3,7 +3,6 @@
 
 open Core
 open Sexplib.Sexp
-open Stlc
 open Compiler_error.Let_syntax
 
 module Err = Compiler_error.Pass (struct
@@ -78,7 +77,7 @@ type term_desc =
   | Mat of int * int * term list
   | Lam of string * term
   | App of term * term
-  | Let of recur * string * constr list * term * term
+  | Let of Frontend.recur * string * constr list * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -86,7 +85,7 @@ type term_desc =
   | Record of string * term list
   | Field of term * string
   | Variant of string * string * term list
-  | Match of term * (Stlc.pat * term) list
+  | Match of term * (Frontend.pat * term) list
 
 and term =
   { desc : term_desc
@@ -151,13 +150,13 @@ let rec sexp_of_term_desc = function
   | Variant (ty_name, ctor, args) ->
     List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_term)
   | Match (scrutinee, cases) ->
-    let sexp_of_case (pat, body) = List [ Stlc.sexp_of_pat pat; sexp_of_term body ] in
+    let sexp_of_case (pat, body) = List [ Frontend.sexp_of_pat pat; sexp_of_term body ] in
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = List [ sexp_of_term_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
 
 type top_desc =
-  | Define of recur * string * term
+  | Define of Frontend.recur * string * term
   | Extern of string
   | TypeDef of string * type_decl
 [@@deriving sexp_of]
@@ -186,7 +185,7 @@ type context = type_scheme String.Map.t
 
 (** Threaded state for typechecker *)
 type env =
-  { aliases : Stlc.ty String.Map.t
+  { aliases : Frontend.ty String.Map.t
   ; structs : (string list * (string * ty) list) String.Map.t
   ; variants : (string list * (string * ty list) list) String.Map.t
   ; ctx : context
@@ -516,14 +515,14 @@ let rec is_value (t : Stlc.term) : bool =
   | App _ | If _ | Bop _ | Builtin _ | Match _ -> false
 ;;
 
-let rec resolve_stlc_ty (env : env) (t : Stlc.ty) : ty Compiler_error.t =
+let rec resolve_stlc_ty (env : env) (t : Frontend.ty) : ty Compiler_error.t =
   let resolve = resolve_stlc_ty env in
   let resolve_variant_or_struct name args =
     if Map.mem env.variants name
     then Ok (TyVariant (name, args))
     else if Map.mem env.structs name
     then Ok (TyRecord (name, args))
-    else Err.fail "type not a variant or record" ~d:[%message (t : Stlc.ty)]
+    else Err.fail "type not a variant or record" ~d:[%message (t : Frontend.ty)]
   in
   match t with
   | TyName name ->
@@ -553,9 +552,9 @@ let rec infer_binding
           (env : env)
           (loc : Lexer.loc)
           (bind_stlc : Stlc.term)
-          (recur : recur)
+          (recur : Frontend.recur)
           (v : string)
-          (return_ty : Stlc.ty option)
+          (return_ty : Frontend.ty option)
   : (term * ty * env * constr list * constr list) Compiler_error.t
   =
   let%bind return_ty =
@@ -942,7 +941,7 @@ and gen_term (env : env) (t : Stlc.term) : (term * constr list) Compiler_error.t
         | _ -> false)
     in
     let kind_of_pat = function
-      | PatCtor _ -> Some `MatchVariant
+      | Frontend.PatCtor _ -> Some `MatchVariant
       | PatLitBool _ -> Some `MatchBool
       | PatLitInt _ -> Some `MatchInt
       | PatLitFloat _ -> Some `MatchFloat
@@ -980,7 +979,7 @@ and gen_term (env : env) (t : Stlc.term) : (term * constr list) Compiler_error.t
     in
     let prim_ctx_for_pat ty pat =
       match pat with
-      | PatVar v -> Ok (Map.set env.ctx ~key:v ~data:([], [], ty))
+      | Frontend.PatVar v -> Ok (Map.set env.ctx ~key:v ~data:([], [], ty))
       | _ -> Ok env.ctx
     in
     let require_catchall msg = if has_catchall then Ok () else Err.fail msg ~loc in
@@ -1004,10 +1003,10 @@ and gen_term (env : env) (t : Stlc.term) : (term * constr list) Compiler_error.t
          then Ok ()
          else (
            let has_true =
-             List.exists cases ~f:(fun (p, _) -> equal_pat p (PatLitBool true))
+             List.exists cases ~f:(fun (p, _) -> Frontend.equal_pat p (PatLitBool true))
            in
            let has_false =
-             List.exists cases ~f:(fun (p, _) -> equal_pat p (PatLitBool false))
+             List.exists cases ~f:(fun (p, _) -> Frontend.equal_pat p (PatLitBool false))
            in
            if has_true && has_false
            then Ok ()

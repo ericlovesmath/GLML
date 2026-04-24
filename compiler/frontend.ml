@@ -1,18 +1,61 @@
 open Core
 open Sexplib.Sexp
-open Frontend
-open Compiler_error.Let_syntax
 
-module Err = Compiler_error.Pass (struct
-    let name = "desugar"
-  end)
+type pat =
+  | PatCtor of string * string list
+  | PatLitBool of bool
+  | PatLitInt of int
+  | PatLitFloat of float
+  | PatVar of string
+[@@deriving equal]
 
-(* ===== Types ===== *)
+let sexp_of_pat = function
+  | PatCtor (ctor, vars) -> List (List.map (ctor :: vars) ~f:(fun v -> Atom v))
+  | PatLitBool b -> Atom (Bool.to_string b)
+  | PatLitInt n -> Atom (Int.to_string n)
+  | PatLitFloat f -> Atom (Float.to_string f)
+  | PatVar v -> Atom v
+;;
+
+let pat_bound_vars = function
+  | PatCtor (_, vs) -> vs
+  | PatLitBool _ | PatLitInt _ | PatLitFloat _ -> []
+  | PatVar v -> [ v ]
+;;
+
+type ty =
+  | TyFloat
+  | TyInt
+  | TyBool
+  | TyVec of int
+  | TyMat of int * int
+  | TyArrow of ty * ty
+  | TyName of string
+  | TyVar of string
+  | TyApp of string * ty list
+[@@deriving equal]
+
+let rec sexp_of_ty = function
+  | TyFloat -> Atom "float"
+  | TyInt -> Atom "int"
+  | TyBool -> Atom "bool"
+  | TyVec i -> List [ Atom "vec"; Atom (Int.to_string i) ]
+  | TyMat (x, y) -> List [ Atom "mat"; Atom (Int.to_string x); Atom (Int.to_string y) ]
+  | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
+  | TyName s -> Atom s
+  | TyVar v -> Atom ("'" ^ v)
+  | TyApp (s, args) -> List (Atom s :: List.map args ~f:sexp_of_ty)
+;;
 
 type type_decl =
   | RecordDecl of (string * ty) list
   | VariantDecl of (string * ty list) list
   | AliasDecl of ty
+[@@deriving sexp_of]
+
+type recur =
+  | Rec of int
+  | Nonrec
 [@@deriving sexp_of]
 
 type term_desc =
@@ -24,7 +67,7 @@ type term_desc =
   | Mat of int * int * term list
   | Lam of string * ty option * term
   | App of term * term
-  | Let of Frontend.recur * string * ty option * term * term
+  | Let of recur * string * ty option * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -32,7 +75,7 @@ type term_desc =
   | Record of (string * term) list
   | Field of term * string
   | Variant of string * term list
-  | Match of term * (Frontend.pat * term) list
+  | Match of term * (pat * term) list
 
 and term =
   { desc : term_desc
@@ -89,7 +132,7 @@ let rec sexp_of_term_desc = function
   | Variant (ctor, args) ->
     List (Atom "Variant" :: Atom ctor :: List.map args ~f:sexp_of_term)
   | Match (scrutinee, cases) ->
-    let sexp_of_case (pat, body) = List [ Frontend.sexp_of_pat pat; sexp_of_term body ] in
+    let sexp_of_case (pat, body) = List [ sexp_of_pat pat; sexp_of_term body ] in
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
@@ -124,98 +167,3 @@ let sexp_of_top_desc = function
 let sexp_of_top t = sexp_of_top_desc t.desc
 
 type t = Program of top list [@@deriving sexp_of]
-
-(* ===== Desugaring Logic ===== *)
-
-let desugar_type_decl (td : Frontend.type_decl) : type_decl =
-  match td with
-  | RecordDecl fields -> RecordDecl fields
-  | VariantDecl ctors -> VariantDecl ctors
-  | AliasDecl t -> AliasDecl t
-;;
-
-let rec desugar_term_desc (td : Frontend.term_desc) : term_desc Compiler_error.t =
-  match td with
-  | Var v -> Ok (Var v)
-  | Float f -> Ok (Float f)
-  | Int n -> Ok (Int n)
-  | Bool b -> Ok (Bool b)
-  | Vec (n, ts) ->
-    let%map ts = Compiler_error.all (List.map ~f:desugar_term ts) in
-    Vec (n, ts)
-  | Mat (x, y, ts) ->
-    let%map ts = Compiler_error.all (List.map ~f:desugar_term ts) in
-    Mat (x, y, ts)
-  | Lam (v, ty_opt, body) ->
-    let%map body = desugar_term body in
-    Lam (v, ty_opt, body)
-  | App (f, x) ->
-    let%bind f = desugar_term f in
-    let%bind x = desugar_term x in
-    return (App (f, x))
-  | Let (r, v, ty_opt, bind, body) ->
-    let%bind bind = desugar_term bind in
-    let%bind body = desugar_term body in
-    return (Let (r, v, ty_opt, bind, body))
-  | If (c, t, e) ->
-    let%bind c = desugar_term c in
-    let%bind t = desugar_term t in
-    let%bind e = desugar_term e in
-    return (If (c, t, e))
-  | Bop (op, l, r) ->
-    let%bind l = desugar_term l in
-    let%bind r = desugar_term r in
-    return (Bop (op, l, r))
-  | Index (t, i) ->
-    let%map t = desugar_term t in
-    Index (t, i)
-  | Builtin (b, ts) ->
-    let%map ts = Compiler_error.all (List.map ~f:desugar_term ts) in
-    Builtin (b, ts)
-  | Record fields ->
-    let%map fields =
-      Compiler_error.all
-        (List.map fields ~f:(fun (s, t) ->
-           let%map t = desugar_term t in
-           s, t))
-    in
-    Record fields
-  | Field (t, f) ->
-    let%map t = desugar_term t in
-    Field (t, f)
-  | Variant (ctor, args) ->
-    let%map args = Compiler_error.all (List.map ~f:desugar_term args) in
-    Variant (ctor, args)
-  | Match (scrutinee, cases) ->
-    let%bind scrutinee = desugar_term scrutinee in
-    let%bind cases =
-      Compiler_error.all
-        (List.map cases ~f:(fun (p, t) ->
-           let%map t = desugar_term t in
-           p, t))
-    in
-    Ok (Match (scrutinee, cases))
-
-and desugar_term (t : Frontend.term) : term Compiler_error.t =
-  let%map desc = desugar_term_desc t.desc in
-  ({ desc; loc = t.loc } : term)
-;;
-
-let desugar_top_desc (td : Frontend.top_desc) : top_desc Compiler_error.t =
-  match td with
-  | Define (r, v, ty_opt, t) ->
-    let%map t = desugar_term t in
-    Define (r, v, ty_opt, t)
-  | Extern (ty, v) -> Ok (Extern (ty, v))
-  | TypeDef (name, params, decl) -> Ok (TypeDef (name, params, desugar_type_decl decl))
-;;
-
-let desugar_top (t : Frontend.top) : top Compiler_error.t =
-  let%map desc = desugar_top_desc t.desc in
-  { desc; loc = t.loc }
-;;
-
-let desugar (Program tops : Frontend.t) : t Compiler_error.t =
-  let%map tops = Compiler_error.all (List.map ~f:desugar_top tops) in
-  Program tops
-;;

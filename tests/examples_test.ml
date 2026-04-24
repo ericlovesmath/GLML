@@ -27,7 +27,53 @@ let%expect_test "compile examples" =
     {|
     ====== COMPILING EXAMPLE 2d_sdf_variants.glml ======
 
-    === stlc (2d_sdf_variants.glml) ===
+    === frontend (2d_sdf_variants.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Extern (vec 2) u_mouse)
+      (Extern float u_time) (TypeDef sdf (AliasDecl ((vec 2) -> float)))
+      (TypeDef shape
+       (VariantDecl ((Circle (float)) (Rect (float float)) (Empty ()))))
+      (Define Nonrec sdf_shape (: (shape -> sdf))
+       (lambda (s (shape))
+        (lambda (p ())
+         (match s ((Circle r) (- (length p) r))
+          ((Rect w h)
+           (let d (- (abs p) (vec2 w h))
+            (+ (length (max d (vec2 0 0))) (min (max (index d 0) (index d 1)) 0))))
+          ((Empty) 1.)))))
+      (Define Nonrec union (: (sdf -> (sdf -> sdf)))
+       (lambda (f (sdf))
+        (lambda (f' (sdf)) (lambda (p ()) (min (app f p) (app f' p))))))
+      (Define Nonrec scene (: sdf)
+       (let circle (app sdf_shape (Variant Circle 0.3))
+        (let rect (app sdf_shape (Variant Rect 0.7 0.1))
+         (app (app union circle) rect))))
+      (Define Nonrec get_uv
+       (lambda (coord ())
+        (let top (- (* 2 coord) u_resolution)
+         (let bot (min (index u_resolution 0) (index u_resolution 1))
+          (/ top bot)))))
+      (Define Nonrec orange (vec3 0.9 0.6 0.3))
+      (Define Nonrec blue (vec3 0.65 0.85 1.))
+      (Define Nonrec main
+       (lambda (coord ((vec 2)))
+        (let p (app get_uv coord)
+         (let m (app get_uv u_mouse)
+          (let d (app scene p)
+           (let col (if (> d 0) orange blue)
+            (let col
+             (let darken (- 1 (exp (* -6 (abs d))))
+              (let rings (+ 0.8 (* 0.2 (cos (* 150 d))))
+               (* (* col darken) rings)))
+             (let col (mix col (vec3 1 1 1) (- 1 (smoothstep 0 0.01 (abs d))))
+              (let col
+               (let d (abs (app scene m))
+                (let dm (length (- p m))
+                 (let d (min (- (abs (- dm d)) 0.0025) (- dm 0.015))
+                  (mix col (vec3 1 1 0) (- 1 (smoothstep 0 0.005 d))))))
+               col)))))))))))
+
+    === desugar (2d_sdf_variants.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern (vec 2) u_mouse)
       (Extern float u_time) (TypeDef sdf (AliasDecl ((vec 2) -> float)))
@@ -1725,7 +1771,23 @@ let%expect_test "compile examples" =
 
     ====== COMPILING EXAMPLE checkerboard.glml ======
 
-    === stlc (checkerboard.glml) ===
+    === frontend (checkerboard.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Extern float u_time) (Define Nonrec size 5)
+      (Define Nonrec get_uv
+       (lambda (coord ())
+        (let top (- (* 2 coord) u_resolution)
+         (let bot (min (index u_resolution 0) (index u_resolution 1))
+          (/ top bot)))))
+      (Define Nonrec main
+       (lambda (coord ((vec 2)))
+        (let uv (app get_uv coord)
+         (let c (floor (+ (* uv size) (vec2 (* 2 u_time) 0)))
+          (let checker_sum (+ (index c 0) (index c 1))
+           (let is_even (- checker_sum (* (floor (/ checker_sum 2)) 2))
+            (if (< is_even 0.5) (vec3 0.2 0.2 0.2) (vec3 0.8 0.8 0.8))))))))))
+
+    === desugar (checkerboard.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time) (Define Nonrec size 5)
       (Define Nonrec get_uv
@@ -2235,7 +2297,34 @@ let%expect_test "compile examples" =
 
     ====== COMPILING EXAMPLE mandelbrot.glml ======
 
-    === stlc (mandelbrot.glml) ===
+    === frontend (mandelbrot.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Extern float u_time)
+      (TypeDef option[a] (VariantDecl ((Some ('a)) (None ()))))
+      (Define Nonrec mandelbrot
+       (lambda (c ())
+        (let (rec 1000) mandel
+         (lambda (z ())
+          (lambda (i ())
+           (if (> i 150) (Variant None)
+            (if (> (length z) 4)
+             (let nu (log2 (log2 (length z))) (Variant Some (/ (- i nu) 150)))
+             (let zx (- (* (index z 0) (index z 0)) (* (index z 1) (index z 1)))
+              (let zy (* (* 2 (index z 0)) (index z 1))
+               (let z' (+ (vec2 zx zy) c) (app (app mandel z') (+ i 1)))))))))
+         (app (app mandel (vec2 0 0)) 0))))
+      (Define Nonrec main
+       (lambda (coord ((vec 2)))
+        (let uv
+         (let top (- (* 2 coord) u_resolution)
+          (let bot (min (index u_resolution 0) (index u_resolution 1))
+           (/ top bot)))
+         (let zoom (exp (+ (* (sin (* u_time 0.4)) 4.5) 3.5))
+          (let seahorse_valley (+ (vec2 -0.7453 0.1127) (/ uv zoom))
+           (match (app mandelbrot seahorse_valley) ((None) (vec3 0 0 0))
+            ((Some n) (+ (* (sin (+ (* n (vec3 10 20 30)) u_time)) 0.5) 0.5))))))))))
+
+    === desugar (mandelbrot.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time)
       (TypeDef option[a] (VariantDecl ((Some ('a)) (None ()))))
@@ -3353,7 +3442,24 @@ let%expect_test "compile examples" =
 
     ====== COMPILING EXAMPLE mouse_circle.glml ======
 
-    === stlc (mouse_circle.glml) ===
+    === frontend (mouse_circle.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Extern (vec 2) u_mouse)
+      (Extern float u_time)
+      (Define Nonrec get_uv
+       (lambda (coord ())
+        (let top (- (* 2 coord) u_resolution)
+         (let bot (min (index u_resolution 0) (index u_resolution 1))
+          (/ top bot)))))
+      (Define Nonrec main
+       (lambda (coord ((vec 2)))
+        (let uv (app get_uv coord)
+         (let mouseUV (/ (- (* 2 u_mouse) u_resolution) (index u_resolution 1))
+          (let radius (+ (* (sin (* u_time 2)) 0.1) 0.15)
+           (if (< (distance uv mouseUV) radius) (vec3 0. 0. 0.5)
+            (vec3 0.5 0.5 1.)))))))))
+
+    === desugar (mouse_circle.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern (vec 2) u_mouse)
       (Extern float u_time)
@@ -3829,7 +3935,127 @@ let%expect_test "compile examples" =
 
     ====== COMPILING EXAMPLE planet.glml ======
 
-    === stlc (planet.glml) ===
+    === frontend (planet.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Extern float u_time)
+      (Extern (vec 2) u_mouse)
+      (TypeDef option[a] (VariantDecl ((Some ('a)) (None ()))))
+      (Define Nonrec rotate
+       (lambda (p ((vec 2)))
+        (lambda (angle (float))
+         (let s (sin angle)
+          (let c (cos angle)
+           (vec2 (- (* (index p 0) c) (* (index p 1) s))
+            (+ (* (index p 0) s) (* (index p 1) c))))))))
+      (Define Nonrec noise3d
+       (lambda (p ((vec 3)))
+        (let i (floor p)
+         (let f (fract p)
+          (let u (* (* f f) (- 3 (* 2 f)))
+           (let hash
+            (lambda (p ((vec 3)))
+             (let d (dot p (vec3 127.1 311.7 74.7))
+              (fract (* (sin d) 43758.5453))))
+            (let a (app hash i)
+             (let b (app hash (+ i (vec3 1 0 0)))
+              (let c (app hash (+ i (vec3 0 1 0)))
+               (let d (app hash (+ i (vec3 1 1 0)))
+                (let e (app hash (+ i (vec3 0 0 1)))
+                 (let f (app hash (+ i (vec3 1 0 1)))
+                  (let g (app hash (+ i (vec3 0 1 1)))
+                   (let h (app hash (+ i (vec3 1 1 1)))
+                    (let ab (mix a b (index u 0))
+                     (let cd (mix c d (index u 0))
+                      (let ef (mix e f (index u 0))
+                       (let gh (mix g h (index u 0))
+                        (let abcd (mix ab cd (index u 1))
+                         (let efgh (mix ef gh (index u 1))
+                          (mix abcd efgh (index u 2))))))))))))))))))))))
+      (Define Nonrec fbm
+       (lambda (p ((vec 3)))
+        (+
+         (+
+          (+ (+ (* (app noise3d (* p 1)) 0.5) (* (app noise3d (* p 2)) 0.25))
+           (* (app noise3d (* p 4)) 0.125))
+          (* (app noise3d (* p 8)) 0.0625))
+         (* (app noise3d (* p 16)) 0.03125))))
+      (Define Nonrec sdPlanet
+       (lambda (p ((vec 3)))
+        (lambda (radius (float))
+         (let len (length p)
+          (let dir (/ p len)
+           (let terrain (* (app fbm (* dir 3)) 0.4) (- (- len radius) terrain)))))))
+      (Define Nonrec map (lambda (p ((vec 3))) (app (app sdPlanet p) 1.5)))
+      (Define Nonrec getNormal
+       (lambda (p ((vec 3)))
+        (let e 0.002
+         (let e_x (vec3 e 0 0)
+          (let e_y (vec3 0 e 0)
+           (let e_z (vec3 0 0 e)
+            (let dx (- (app map (+ p e_x)) (app map (- p e_x)))
+             (let dy (- (app map (+ p e_y)) (app map (- p e_y)))
+              (let dz (- (app map (+ p e_z)) (app map (- p e_z)))
+               (normalize (vec3 dx dy dz)))))))))))
+      (Define Nonrec march (: ((vec 3) -> ((vec 3) -> (option float))))
+       (lambda (ro ((vec 3)))
+        (lambda (rd ((vec 3)))
+         (let (rec 1000) march (: (float -> (int -> (option float))))
+          (lambda (t (float))
+           (lambda (steps (int))
+            (if (> steps 120) (Variant None)
+             (let d (app map (+ ro (* rd t)))
+              (if (< d 0.0005) (Variant Some t)
+               (if (> t 50.) (Variant None)
+                (app (app march (+ t (* d 0.8))) (+ steps 1))))))))
+          (app (app march 0.) 0)))))
+      (Define Nonrec deepColor (vec3 0.02 0.05 0.2))
+      (Define Nonrec landColor (vec3 0.15 0.35 0.1))
+      (Define Nonrec mountColor (vec3 0.4 0.3 0.2))
+      (Define Nonrec snowColor (vec3 0.85 0.85 0.9))
+      (Define Nonrec main
+       (lambda (coord ((vec 2)))
+        (let res_min (min (index u_resolution 0) (index u_resolution 1))
+         (let uv (/ (- (* coord 2) u_resolution) res_min)
+          (let mouseUV (/ (- (* u_mouse 2) u_resolution) res_min)
+           (let rotate_by_mouse
+            (lambda (ray ())
+             (let rotX (* (* -1 (index mouseUV 1)) 1.5)
+              (let ro_yz
+               (app (app rotate (vec2 (index ray 1) (index ray 2))) rotX)
+               (let rotY (* (* -1 (index mouseUV 0)) 1.5)
+                (let ro_xz
+                 (app (app rotate (vec2 (index ray 0) (index ro_yz 1))) rotY)
+                 (vec3 (index ro_xz 0) (index ro_yz 0) (index ro_xz 1)))))))
+            (let ro (app rotate_by_mouse (vec3 0 0 -4))
+             (let rd
+              (app rotate_by_mouse
+               (normalize (vec3 (index uv 0) (index uv 1) 1.5)))
+              (let t (app (app march ro) rd)
+               (match t ((None) (vec3 0 0 0))
+                ((Some t)
+                 (let hitPos (+ ro (* rd t))
+                  (let n (app getNormal hitPos)
+                   (let lightDir (normalize (vec3 1. 0.8 -0.5))
+                    (let diff (max (dot n lightDir) 0)
+                     (let ambient 0.08
+                      (let dir (/ hitPos (length hitPos))
+                       (let rawHeight (app fbm (* dir 3.))
+                        (let seaLevel 0.35
+                         (let h_norm
+                          (clamp (/ (- rawHeight seaLevel) (- 1 seaLevel)) 0 1)
+                          (let baseColor
+                           (if (< h_norm 0.3)
+                            (mix deepColor landColor (/ h_norm 0.3))
+                            (if (< h_norm 0.6)
+                             (mix landColor mountColor (/ (- h_norm 0.3) 0.3))
+                             (mix mountColor snowColor (/ (- h_norm 0.6) 0.4))))
+                           (let fresnel (- 1 (max (dot n (* rd -1)) 0))
+                            (let rim (* (* (* fresnel fresnel) fresnel) 0.4)
+                             (let atmoColor (vec3 0.3 0.5 1.)
+                              (+ (* baseColor (+ (* diff 0.9) ambient))
+                               (* atmoColor rim))))))))))))))))))))))))))))
+
+    === desugar (planet.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time)
       (Extern (vec 2) u_mouse)
@@ -8105,7 +8331,21 @@ let%expect_test "compile examples" =
 
     ====== COMPILING EXAMPLE rainbow.glml ======
 
-    === stlc (rainbow.glml) ===
+    === frontend (rainbow.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Extern float u_time)
+      (Define Nonrec get_uv
+       (lambda (coord ())
+        (let top (- (* 2 coord) u_resolution)
+         (let bot (min (index u_resolution 0) (index u_resolution 1))
+          (/ top bot)))))
+      (Define Nonrec main
+       (lambda (coord ((vec 2)))
+        (let uv (app get_uv coord)
+         (let wave (+ (* 5 (+ (index uv 0) (index uv 1))) u_time)
+          (+ (* (sin (+ wave (vec3 0 2 4))) 0.3) 0.7)))))))
+
+    === desugar (rainbow.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time)
       (Define Nonrec get_uv
@@ -8523,7 +8763,87 @@ let%expect_test "compile examples" =
 
     ====== COMPILING EXAMPLE raymarch.glml ======
 
-    === stlc (raymarch.glml) ===
+    === frontend (raymarch.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Extern float u_time)
+      (Extern (vec 2) u_mouse)
+      (TypeDef option[a] (VariantDecl ((Some ('a)) (None ()))))
+      (Define Nonrec rotate
+       (lambda (p ((vec 2)))
+        (lambda (angle (float))
+         (let s (sin angle)
+          (let c (cos angle)
+           (vec2 (- (* (index p 0) c) (* (index p 1) s))
+            (+ (* (index p 0) s) (* (index p 1) c))))))))
+      (Define Nonrec sMin
+       (lambda (a (float))
+        (lambda (b (float))
+         (let k 0.1
+          (let h (clamp (+ 0.5 (/ (* 0.5 (- b a)) k)) 0 1)
+           (- (mix b a h) (* (* k h) (- 1 h))))))))
+      (Define Nonrec palette
+       (lambda (t (float))
+        (let cfg (vec3 0.3 0.416 0.557)
+         (+ (* (cos (* (+ cfg t) 6.28318)) 0.5) 0.5))))
+      (Define Nonrec sdTorus
+       (lambda (p ((vec 3)))
+        (lambda (t ((vec 2)))
+         (let q
+          (vec2 (- (length (vec2 (index p 0) (index p 2))) (index t 0))
+           (index p 1))
+          (- (length q) (index t 1))))))
+      (Define Nonrec map
+       (lambda (p ((vec 3)))
+        (let angle (* u_time 2)
+         (let p_xy (app (app rotate (vec2 (index p 0) (index p 1))) angle)
+          (let p' (vec3 (index p_xy 0) (index p_xy 1) (index p 2))
+           (let p_yz (app (app rotate (vec2 (index p' 1) (index p' 2))) angle)
+            (let p' (vec3 (index p' 0) (index p_yz 0) (index p_yz 1))
+             (app (app sMin (app (app sdTorus p') (vec2 1 0.3)))
+              (app (app sdTorus p) (vec2 2 0.5))))))))))
+      (Define Nonrec march (: ((vec 3) -> ((vec 3) -> (option float))))
+       (lambda (ro ((vec 3)))
+        (lambda (rd ((vec 3)))
+         (let (rec 1000) march
+          (lambda (t (float))
+           (lambda (steps (int))
+            (if (> steps 80) (Variant None)
+             (let d (app map (+ ro (* rd t)))
+              (if (< d 0.001) (Variant Some t)
+               (if (> t 100.) (Variant None)
+                (app (app march (+ t d)) (+ steps 1))))))))
+          (app (app march 0.) 0)))))
+      (Define Nonrec main
+       (lambda (coord ((vec 2)))
+        (let res_min (min (index u_resolution 0) (index u_resolution 1))
+         (let uv (/ (- (* coord 2) u_resolution) res_min)
+          (let mouseUV (/ (- (* u_mouse 2) u_resolution) res_min)
+           (let ro_init (vec3 0 0 -6)
+            (let rd_init (normalize (vec3 (index uv 0) (index uv 1) 1))
+             (let rotX (* -1 (index mouseUV 1))
+              (let rotY (* -1 (index mouseUV 0))
+               (let ro_yz
+                (app (app rotate (vec2 (index ro_init 1) (index ro_init 2)))
+                 rotX)
+                (let rd_yz
+                 (app (app rotate (vec2 (index rd_init 1) (index rd_init 2)))
+                  rotX)
+                 (let ro (vec3 (index ro_init 0) (index ro_yz 0) (index ro_yz 1))
+                  (let rd
+                   (vec3 (index rd_init 0) (index rd_yz 0) (index rd_yz 1))
+                   (let ro_xz
+                    (app (app rotate (vec2 (index ro 0) (index ro 2))) rotY)
+                    (let rd_xz
+                     (app (app rotate (vec2 (index rd 0) (index rd 2))) rotY)
+                     (let ro (vec3 (index ro_xz 0) (index ro 1) (index ro_xz 1))
+                      (let rd (vec3 (index rd_xz 0) (index rd 1) (index rd_xz 1))
+                       (let col
+                        (match (app (app march ro) rd)
+                         ((None) (vec3 0.2 0.2 0.2))
+                         ((Some t) (app palette (* t 0.3))))
+                        (let glow (/ 0.02 (length (- uv mouseUV))) (+ col glow))))))))))))))))))))))
+
+    === desugar (raymarch.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time)
       (Extern (vec 2) u_mouse)
@@ -11436,7 +11756,32 @@ let%expect_test "compile examples" =
 
     ====== COMPILING EXAMPLE recursion.glml ======
 
-    === stlc (recursion.glml) ===
+    === frontend (recursion.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Extern float u_time)
+      (Define Nonrec get_uv
+       (lambda (coord ((vec 2)))
+        (let top (- (* 2 coord) u_resolution)
+         (let bot (min (index u_resolution 0) (index u_resolution 1))
+          (/ top bot)))))
+      (Define Nonrec rotate
+       (lambda (angle (float))
+        (let s (sin angle) (let c (cos angle) (mat2x2 c (* -1 s) s c)))))
+      (Define (Rec 1000) gcd
+       (lambda (a ())
+        (lambda (b ())
+         (if (< a 0.05) b
+          (if (< b 0.05) a
+           (if (> a b) (app (app gcd (- a b)) b) (app (app gcd a) (- b a))))))))
+      (Define Nonrec main
+       (lambda (coord ((vec 2)))
+        (let uv (app get_uv coord)
+         (let uv (* (app rotate u_time) uv)
+          (let x (abs (* (* (index uv 0) (sin (* u_time 2))) 2))
+           (let y (abs (* (* (index uv 1) (sin (* u_time 2))) 2))
+            (let res (app (app gcd x) y) (vec3 res (* res 0.5) (- 1 res)))))))))))
+
+    === desugar (recursion.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time)
       (Define Nonrec get_uv
@@ -12390,7 +12735,62 @@ let%expect_test "compile examples" =
 
     ====== COMPILING EXAMPLE warped_noise.glml ======
 
-    === stlc (warped_noise.glml) ===
+    === frontend (warped_noise.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Extern float u_time)
+      (Define Nonrec smoothNoise
+       (lambda (p ((vec 2)))
+        (let i (floor p)
+         (let pf (- p i)
+          (let inter (* (* pf pf) (- 3 (* 2 pf)))
+           (let v4 (vec4 0 1 27 28)
+            (let seed (+ (+ v4 (index i 0)) (* (index i 1) 27))
+             (let hash (fract (* (sin (% seed 6.2831853)) 200000))
+              (let col0 (vec2 (index hash 0) (index hash 1))
+               (let col1 (vec2 (index hash 2) (index hash 3))
+                (let res_v
+                 (+ (* col0 (- 1. (index inter 1))) (* col1 (index inter 1)))
+                 (dot res_v (vec2 (- 1. (index inter 0)) (index inter 0))))))))))))))
+      (Define Nonrec fractalNoise
+       (lambda (p ())
+        (+
+         (+
+          (+ (* (app smoothNoise p) 0.5333) (* (app smoothNoise (* p 2)) 0.2667))
+          (* (app smoothNoise (* p 4)) 0.1333))
+         (* (app smoothNoise (* p 8)) 0.0667))))
+      (Define Nonrec warpedNoise
+       (lambda (p ((vec 2)))
+        (let m (* (vec2 u_time (* -1 u_time)) 0.5)
+         (let x (app fractalNoise (+ p m))
+          (let y (app fractalNoise (+ (+ p (vec2 (index m 1) (index m 0))) x))
+           (let z (app fractalNoise (+ (- (- p m) x) y))
+            (let warp (+ (+ (vec2 x y) (vec2 y z)) (vec2 z x))
+             (let mag (* (length (vec3 x y z)) 0.25)
+              (app fractalNoise (+ (+ p warp) mag))))))))))
+      (Define Nonrec main
+       (lambda (coord ((vec 2)))
+        (let uv (/ (- coord (* u_resolution 0.5)) (index u_resolution 1))
+         (let n (app warpedNoise (* uv 6))
+          (let n2 (app warpedNoise (- (* uv 6) 0.02))
+           (let bump (* (/ (max (- n2 n) 0) 0.02) 0.7071)
+            (let bump2 (* (/ (max (- n n2) 0) 0.02) 0.7071)
+             (let b1 (+ (* bump bump) (* (pow bump 4) 0.5))
+              (let b2 (+ (* bump2 bump2) (* (pow bump2 4) 0.5))
+               (let base_col
+                (+ (* (* (vec3 1. 0.7 0.6) (vec3 b1 (* (+ b1 b2) 0.4) b2)) 0.3)
+                 0.5)
+                (let col (* (* n n) base_col)
+                 (let spot1_dist (length (- uv 0.65))
+                  (let spot2_dist (length (+ uv 0.5))
+                   (let spot_logic
+                    (+ (* (vec3 0.8 0.4 1.) 0.35)
+                     (*
+                      (+ (* (vec3 1. 0.5 0.2) (smoothstep 0 1 (- 1 spot1_dist)))
+                       (* (vec3 0.2 0.4 1.) (smoothstep 0 1 (- 1 spot2_dist))))
+                      5))
+                    (let final_col (* col spot_logic) (sqrt (max final_col 0)))))))))))))))))))
+
+    === desugar (warped_noise.glml) ===
     (Program
      ((Extern (vec 2) u_resolution) (Extern float u_time)
       (Define Nonrec smoothNoise

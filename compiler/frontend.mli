@@ -1,9 +1,35 @@
-open Frontend
+type pat =
+  | PatCtor of string * string list
+  | PatLitBool of bool
+  | PatLitInt of int
+  | PatLitFloat of float
+  | PatVar of string
+[@@deriving sexp_of, equal]
+
+val pat_bound_vars : pat -> string list
+
+type ty =
+  | TyFloat
+  | TyInt
+  | TyBool
+  | TyVec of int
+  | TyMat of int * int
+  | TyArrow of ty * ty
+  | TyName of string
+  | TyVar of string
+  | TyApp of string * ty list
+[@@deriving sexp_of, equal]
 
 type type_decl =
   | RecordDecl of (string * ty) list
   | VariantDecl of (string * ty list) list
   | AliasDecl of ty
+[@@deriving sexp_of]
+
+type recur =
+  (** NOTE: [int] is for the maximum number of recs allowed *)
+  | Rec of int
+  | Nonrec
 [@@deriving sexp_of]
 
 type term_desc =
@@ -46,6 +72,3 @@ type top =
 [@@deriving sexp_of]
 
 type t = Program of top list [@@deriving sexp_of]
-
-(** Desugars GLML code into simpler AST *)
-val desugar : Frontend.t -> t Compiler_error.t

@@ -123,7 +123,7 @@ let free_vars_of (globals : String.Set.t) (excluded : String.Set.t) (t : Uncurry
     | Match (scrut, cases) ->
       let fv_cases =
         List.map cases ~f:(fun (pat, body) ->
-          let vars = Stlc.pat_bound_vars pat in
+          let vars = Frontend.pat_bound_vars pat in
           let bound = List.fold vars ~init:bound ~f:Set.add in
           fv bound body)
       in
@@ -162,7 +162,7 @@ let rec subst_vars (subs : (string * string) list) (t : Uncurry.term) : Uncurry.
     | Variant (tn, c, args) -> Variant (tn, c, List.map args ~f:rw)
     | Match (scrut, cases) ->
       let rw_case (pat, body) =
-        let bound = Stlc.pat_bound_vars pat in
+        let bound = Frontend.pat_bound_vars pat in
         let subs =
           List.filter subs ~f:(fun (k, _) -> not (List.mem bound k ~equal:String.equal))
         in
@@ -204,7 +204,7 @@ let rec is_used_as_value (var_name : string) (t : Uncurry.term) : bool =
   | Match (scrut, cases) ->
     is_used scrut
     || List.exists cases ~f:(fun (pat, body) ->
-      (not (List.mem (Stlc.pat_bound_vars pat) var_name ~equal:String.equal))
+      (not (List.mem (Frontend.pat_bound_vars pat) var_name ~equal:String.equal))
       && is_used body)
 ;;
 
@@ -344,7 +344,7 @@ let gen_apply_fn info : Uncurry.top =
     List.filter_map info.entries ~f:(fun entry ->
       match entry with
       | LambdaEntry e ->
-        let pat = Stlc.PatCtor (e.ctor_name, List.map e.captured ~f:fst) in
+        let pat = Frontend.PatCtor (e.ctor_name, List.map e.captured ~f:fst) in
         let subs =
           List.map2_exn (List.map e.params ~f:fst) arg_vars ~f:(fun old_v new_v ->
             old_v, new_v)
@@ -352,7 +352,7 @@ let gen_apply_fn info : Uncurry.top =
         let body = subst_vars subs e.body in
         Some (pat, body)
       | GlobalEntry e ->
-        let pat = Stlc.PatCtor (e.ctor_name, []) in
+        let pat = Frontend.PatCtor (e.ctor_name, []) in
         let arg_terms =
           List.map2_exn arg_vars info.arg_tys ~f:(fun v ty ->
             ({ desc = Var v; ty; loc = e.loc } : Uncurry.term))
@@ -379,10 +379,7 @@ let gen_apply_fn info : Uncurry.top =
   let fn_body : Uncurry.term =
     { desc = Lam (apply_params, match_term); ty = apply_ty; loc = first_loc }
   in
-  { desc = Define (Stlc.Nonrec, info.apply_name, fn_body)
-  ; ty = apply_ty
-  ; loc = first_loc
-  }
+  { desc = Define (Nonrec, info.apply_name, fn_body); ty = apply_ty; loc = first_loc }
 ;;
 
 let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurry.term)
@@ -682,7 +679,7 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
     let reg, scrut = rw reg scrut in
     let reg, cases =
       List.fold_map cases ~init:reg ~f:(fun reg (pat, body) ->
-        let bound = Stlc.pat_bound_vars pat in
+        let bound = Frontend.pat_bound_vars pat in
         let case_ctx =
           { ctx with
             env = List.fold bound ~init:ctx.env ~f:Map.remove

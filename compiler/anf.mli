@@ -25,7 +25,7 @@ type term_desc =
   | Record of string * atom list
   | Field of atom * string
   | Variant of string * string * atom list
-  | Match of atom * (Stlc.pat * anf) list
+  | Match of atom * (Frontend.pat * anf) list
 [@@deriving sexp_of]
 
 and term =
@@ -50,7 +50,7 @@ and anf =
 type top_desc =
   | Define of
       { name : string
-      ; recur : Stlc.recur
+      ; recur : Frontend.recur
       ; args : (string * Monomorphize.ty) list
       ; body : anf
       ; ret_ty : Monomorphize.ty
