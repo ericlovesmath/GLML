@@ -503,7 +503,7 @@ let instantiate_scheme ?(structs = String.Map.empty) constrs term sub =
 ;;
 
 (** Value restriction check for generalization. *)
-let rec is_value (t : Stlc.term) : bool =
+let rec is_value (t : Desugar.term) : bool =
   match t.desc with
   | Float _ | Int _ | Bool _ | Var _ | Lam _ -> true
   | Vec (_, ts) -> List.for_all ts ~f:is_value
@@ -551,7 +551,7 @@ let rec resolve_stlc_ty (env : env) (t : Frontend.ty) : ty Compiler_error.t =
 let rec infer_binding
           (env : env)
           (loc : Lexer.loc)
-          (bind_stlc : Stlc.term)
+          (bind_stlc : Desugar.term)
           (recur : Frontend.recur)
           (v : string)
           (return_ty : Frontend.ty option)
@@ -606,7 +606,7 @@ let rec infer_binding
   let env = { env with ctx } in
   Ok (bind, ty_bind, env, scheme_constrs, remaining)
 
-and gen_term (env : env) (t : Stlc.term) : (term * constr list) Compiler_error.t =
+and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_error.t =
   let loc = t.loc in
   let make desc ty constrs = Ok (({ desc; ty; loc } : term), constrs) in
   let constr desc = { desc; loc } in
@@ -1132,7 +1132,7 @@ and gen_term (env : env) (t : Stlc.term) : (term * constr list) Compiler_error.t
          | PatLitBool _ | PatLitInt _ | PatLitFloat _ -> Ok env.ctx))
 ;;
 
-let typecheck (Program terms : Stlc.t) : t Compiler_error.t =
+let typecheck (Program terms : Desugar.t) : t Compiler_error.t =
   let%map _, tops =
     List.fold_result
       terms
