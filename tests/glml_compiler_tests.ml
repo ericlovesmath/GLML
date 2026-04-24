@@ -2892,3 +2892,43 @@ let%expect_test "function keyword desugaring" =
     }
     |}]
 ;;
+
+let%expect_test "pipe operator" =
+  test
+    {|
+    let f (x : float) : float = x + 1.0
+    let g (x : float) : float = x * 2.0
+    let main (u : vec2) =
+      let n = 1.0 |> fun x -> x * 2.0 in
+      [2.0 |> f |> g, n, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_15 {
+        int tag;
+    };
+    float dapply_14(DFn_15 dfn_17, float da_18) {
+        return (da_18 * 2.);
+    }
+    float f_0(float x_1) {
+        return (x_1 + 1.);
+    }
+    float g_2(float x_3) {
+        return (x_3 * 2.);
+    }
+    vec3 main_pure(vec2 u_4) {
+        DFn_15 anf_19 = DFn_15(0);
+        float n_5 = dapply_14(anf_19, 1.);
+        float anf_20 = f_0(2.);
+        float anf_21 = g_2(anf_20);
+        return vec3(anf_21, n_5, 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;

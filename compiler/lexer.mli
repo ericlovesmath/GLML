@@ -43,6 +43,7 @@ type token =
   | PERCENT
   | LAND
   | LOR
+  | PIPE
   | EXTERN
   | TYPE
   | OF

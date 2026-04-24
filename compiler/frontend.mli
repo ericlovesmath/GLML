@@ -41,6 +41,7 @@ type term_desc =
   | Mat of int * int * term list
   | Lam of string * ty option * term
   | App of term * term
+  | Pipe of term * term
   | Let of recur * string * ty option * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
