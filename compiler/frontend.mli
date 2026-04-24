@@ -4,6 +4,7 @@ type pat =
   | PatLitInt of int
   | PatLitFloat of float
   | PatVar of string
+  | PatBracket of pat list
 [@@deriving sexp_of, equal]
 
 val pat_bound_vars : pat -> string list

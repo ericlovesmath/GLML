@@ -946,6 +946,7 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
       | PatLitInt _ -> Some `MatchInt
       | PatLitFloat _ -> Some `MatchFloat
       | PatVar _ -> None
+      | PatBracket _ -> Some `MatchBracket
     in
     let first_kind = List.find_map cases ~f:(fun (p, _) -> kind_of_pat p) in
     (* Validate no mixing of pattern kinds *)
@@ -1046,6 +1047,58 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
            ~sexp_of_dup:(fun f -> [%message (f : float)])
        in
        typecheck_cases ~scrutinee_ty:TyFloat ~ctx_for_pat:(prim_ctx_for_pat TyFloat)
+     | Some `MatchBracket ->
+       let infer_scrutinee_ty () =
+         List.find_map cases ~f:(fun (pat, _) ->
+           match pat with
+           | PatBracket pats ->
+             Some
+               (match List.hd pats with
+                | Some (PatBracket inner) ->
+                  Ok (TyMat (List.length inner, List.length pats))
+                | _ -> Ok (TyVec (List.length pats)))
+           | _ -> None)
+         |> Err.of_option "MatchBracket with no bracket pattern" ~loc
+         |> Compiler_error.join
+       in
+       let%bind scrutinee_ty =
+         match scrutinee.ty with
+         | (TyVec _ | TyMat _) as ty -> Ok ty
+         | TyVar _ -> infer_scrutinee_ty ()
+         | _ -> Err.fail "bracket pattern requires vec or mat scrutinee" ~loc
+       in
+       let bind_var ctx v ty =
+         if String.equal v "_" then ctx else Map.set ctx ~key:v ~data:([], [], ty)
+       in
+       let ctx_for_pat pat =
+         match pat, scrutinee_ty with
+         | Frontend.PatVar v, ty -> Ok (bind_var env.ctx v ty)
+         | Frontend.PatBracket pats, TyVec n ->
+           if List.length pats <> n
+           then Err.fail "vec pattern has wrong number of elements" ~loc
+           else
+             List.fold_result pats ~init:env.ctx ~f:(fun ctx p ->
+               match p with
+               | Frontend.PatVar v -> Ok (bind_var ctx v TyFloat)
+               | _ -> Err.fail "vec element pattern must be a variable" ~loc)
+         | Frontend.PatBracket col_pats, TyMat (r, c) ->
+           if List.length col_pats <> c
+           then Err.fail "mat pattern has wrong number of columns" ~loc
+           else
+             List.fold_result col_pats ~init:env.ctx ~f:(fun ctx col_pat ->
+               match col_pat with
+               | Frontend.PatBracket row_pats ->
+                 if List.length row_pats <> r
+                 then Err.fail "mat column pattern has wrong number of rows" ~loc
+                 else
+                   List.fold_result row_pats ~init:ctx ~f:(fun ctx p ->
+                     match p with
+                     | Frontend.PatVar v -> Ok (bind_var ctx v TyFloat)
+                     | _ -> Err.fail "mat element pattern must be a variable" ~loc)
+               | _ -> Err.fail "mat column pattern must be a bracket pattern" ~loc)
+         | _ -> Err.fail "unexpected pattern in bracket match" ~loc
+       in
+       typecheck_cases ~scrutinee_ty ~ctx_for_pat
      | Some `MatchVariant ->
        let%bind variant_name, variant_params, variant_ctors =
          let find_from_ty ty =
@@ -1129,7 +1182,7 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
                (List.fold2_exn vars expected_arg_tys ~init:env.ctx ~f:(fun ctx v ty ->
                   Map.set ctx ~key:v ~data:([], [], ty)))
          | PatVar v -> Ok (Map.set env.ctx ~key:v ~data:([], [], scrutinee_ty))
-         | PatLitBool _ | PatLitInt _ | PatLitFloat _ -> Ok env.ctx))
+         | PatLitBool _ | PatLitInt _ | PatLitFloat _ | PatBracket _ -> Ok env.ctx))
 ;;
 
 let typecheck (Program terms : Desugar.t) : t Compiler_error.t =
