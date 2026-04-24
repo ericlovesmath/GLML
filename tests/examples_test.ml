@@ -1769,6 +1769,12050 @@ let%expect_test "compile examples" =
     }
 
 
+    ====== COMPILING EXAMPLE beaver.glml ======
+
+    === frontend (beaver.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Define Nonrec bg_col (vec3 0.13 0.48 0.3))
+      (Define Nonrec bg_dark (vec3 0.09 0.36 0.22))
+      (Define Nonrec brown (vec3 0.55 0.34 0.16))
+      (Define Nonrec brown_lt (vec3 0.68 0.46 0.24))
+      (Define Nonrec brown_dk (vec3 0.38 0.22 0.08))
+      (Define Nonrec drk_brown (vec3 0.22 0.11 0.03))
+      (Define Nonrec cream (vec3 0.95 0.89 0.74))
+      (Define Nonrec cream_dk (vec3 0.78 0.68 0.5))
+      (Define Nonrec pink (vec3 0.92 0.62 0.6))
+      (Define Nonrec pink_dk (vec3 0.75 0.42 0.42))
+      (Define Nonrec black (vec3 0.06 0.04 0.03))
+      (Define Nonrec wht (vec3 1. 0.97 0.93))
+      (Define Nonrec tooth_yel (vec3 0.92 0.85 0.6))
+      (Define Nonrec get_uv
+       (lambda (coord ())
+        (let top (- (* 2 coord) u_resolution)
+         (let bot (min (index u_resolution 0) (index u_resolution 1))
+          (/ top bot)))))
+      (Define Nonrec at
+       (lambda (offset ((vec 2))) (lambda (p ((vec 2))) (- p offset))))
+      (Define Nonrec ellipse
+       (lambda (ab ((vec 2))) (lambda (p ((vec 2))) (- (length (/ p ab)) 1))))
+      (Define Nonrec circle
+       (lambda (r (float)) (lambda (p ((vec 2))) (- (length p) r))))
+      (Define Nonrec box
+       (lambda (b ((vec 2)))
+        (lambda (p ((vec 2)))
+         (let d (- (abs p) b)
+          (+ (length (max d (vec2 0 0))) (min (max (index d 0) (index d 1)) 0))))))
+      (Define Nonrec rot
+       (lambda (a (float))
+        (lambda (p ((vec 2)))
+         (let c (cos a)
+          (let s (sin a)
+           (vec2 (- (* c (index p 0)) (* s (index p 1)))
+            (+ (* s (index p 0)) (* c (index p 1)))))))))
+      (Define Nonrec smin
+       (lambda (a (float))
+        (lambda (b (float))
+         (lambda (k (float))
+          (let h (/ (max (- k (abs (- a b))) 0) k)
+           (- (min a b) (* (* (* h h) k) 0.25)))))))
+      (Define Nonrec smax
+       (lambda (a (float))
+        (lambda (b (float))
+         (lambda (k (float))
+          (let h (/ (max (- k (abs (- a b))) 0) k)
+           (+ (max a b) (* (* (* h h) k) 0.25)))))))
+      (Define Nonrec paint
+       (lambda (d (float))
+        (lambda (shape_col ((vec 3)))
+         (lambda (bg ((vec 3))) (mix shape_col bg (smoothstep -0.005 0.005 d))))))
+      (Define Nonrec paint_shaded
+       (lambda (d (float))
+        (lambda (shape_col ((vec 3)))
+         (lambda (shadow_col ((vec 3)))
+          (lambda (shadow_depth (float))
+           (lambda (bg ((vec 3)))
+            (let base (mix shape_col bg (smoothstep -0.005 0.005 d))
+             (let shade (smoothstep (* -1 shadow_depth) 0 d)
+              (mix base (mix shape_col shadow_col (* shade 0.55))
+               (smoothstep 0.005 -0.005 d))))))))))
+      (Define Nonrec main
+       (lambda (coord ((vec 2)))
+        (let p (/ (app get_uv coord) 1.5)
+         (let tp ((p |> (app at (vec2 0.28 -0.28))) |> (app rot -0.35))
+          (let tail (tp |> (app ellipse (vec2 0.22 0.085)))
+           (let tsx (- (abs (sin (* (+ (index tp 0) (index tp 1)) 38.))) 0.55)
+            (let tsy (- (abs (sin (* (- (index tp 0) (index tp 1)) 38.))) 0.55)
+             (let tail_scales (max (+ tail 0.01) (* (min tsx tsy) 0.015))
+              (let tail_rim (max tail (* -1 (+ tail 0.018)))
+               (let body
+                ((p |> (app at (vec2 0. -0.16))) |>
+                 (app ellipse (vec2 0.25 0.26)))
+                (let head
+                 ((p |> (app at (vec2 0. 0.2))) |> (app ellipse (vec2 0.22 0.2)))
+                 (let torso (app (app (app smin body) head) 0.1)
+                  (let cheek_l
+                   ((p |> (app at (vec2 -0.14 0.11))) |> (app circle 0.1))
+                   (let cheek_r
+                    ((p |> (app at (vec2 0.14 0.11))) |> (app circle 0.1))
+                    (let cheeks (min cheek_l cheek_r)
+                     (let torso_with_cheeks
+                      (app (app (app smin torso) cheeks) 0.06)
+                      (let muzzle
+                       ((p |> (app at (vec2 0. 0.09))) |>
+                        (app ellipse (vec2 0.13 0.095)))
+                       (let belly
+                        ((p |> (app at (vec2 0. -0.2))) |>
+                         (app ellipse (vec2 0.15 0.17)))
+                        (let ear_l
+                         ((p |> (app at (vec2 -0.175 0.355))) |>
+                          (app circle 0.075))
+                         (let ear_r
+                          ((p |> (app at (vec2 0.175 0.355))) |>
+                           (app circle 0.075))
+                          (let ear_in_l
+                           ((p |> (app at (vec2 -0.175 0.345))) |>
+                            (app ellipse (vec2 0.035 0.042)))
+                           (let ear_in_r
+                            ((p |> (app at (vec2 0.175 0.345))) |>
+                             (app ellipse (vec2 0.035 0.042)))
+                            (let arm_l
+                             ((p |> (app at (vec2 -0.23 -0.09))) |>
+                              (app ellipse (vec2 0.065 0.09)))
+                             (let arm_r
+                              ((p |> (app at (vec2 0.23 -0.09))) |>
+                               (app ellipse (vec2 0.065 0.09)))
+                              (let paw_l
+                               ((p |> (app at (vec2 -0.28 -0.19))) |>
+                                (app circle 0.055))
+                               (let paw_r
+                                ((p |> (app at (vec2 0.28 -0.19))) |>
+                                 (app circle 0.055))
+                                (let foot_l
+                                 ((p |> (app at (vec2 -0.13 -0.42))) |>
+                                  (app ellipse (vec2 0.095 0.048)))
+                                 (let foot_r
+                                  ((p |> (app at (vec2 0.13 -0.42))) |>
+                                   (app ellipse (vec2 0.095 0.048)))
+                                  (let tooth_l
+                                   ((p |> (app at (vec2 -0.028 0.035))) |>
+                                    (app box (vec2 0.022 0.05)))
+                                   (let tooth_r
+                                    ((p |> (app at (vec2 0.028 0.035))) |>
+                                     (app box (vec2 0.022 0.05)))
+                                    (let teeth (min tooth_l tooth_r)
+                                     (let groove
+                                      ((p |> (app at (vec2 0. 0.035))) |>
+                                       (app box (vec2 0.005 0.05)))
+                                      (let nose
+                                       ((p |> (app at (vec2 0. 0.135))) |>
+                                        (app ellipse (vec2 0.038 0.028)))
+                                       (let nose_hi
+                                        ((p |> (app at (vec2 -0.012 0.142))) |>
+                                         (app ellipse (vec2 0.012 0.008)))
+                                        (let eye_l
+                                         ((p |> (app at (vec2 -0.095 0.255))) |>
+                                          (app circle 0.04))
+                                         (let eye_r
+                                          ((p |> (app at (vec2 0.095 0.255))) |>
+                                           (app circle 0.04))
+                                          (let hi_l
+                                           ((p |> (app at (vec2 -0.082 0.27))) |>
+                                            (app circle 0.014))
+                                           (let hi_r
+                                            ((p |> (app at (vec2 0.108 0.27))) |>
+                                             (app circle 0.014))
+                                            (let hi_l2
+                                             ((p |> (app at (vec2 -0.105 0.245)))
+                                              |> (app circle 0.006))
+                                             (let hi_r2
+                                              ((p |> (app at (vec2 0.085 0.245)))
+                                               |> (app circle 0.006))
+                                              (let brow_l
+                                               (((p |>
+                                                  (app at (vec2 -0.095 0.315)))
+                                                 |> (app rot 0.15))
+                                                |>
+                                                (app ellipse (vec2 0.035 0.01)))
+                                               (let brow_r
+                                                (((p |>
+                                                   (app at (vec2 0.095 0.315)))
+                                                  |> (app rot -0.15))
+                                                 |>
+                                                 (app ellipse (vec2 0.035 0.01)))
+                                                (let vig
+                                                 (smoothstep 0.3 1.1 (length p))
+                                                 (let col
+                                                  (mix bg_col bg_dark vig)
+                                                  (let shadow_d
+                                                   ((p |>
+                                                     (app at (vec2 0.02 -0.45)))
+                                                    |>
+                                                    (app ellipse
+                                                     (vec2 0.38 0.055)))
+                                                   (let shadow_falloff
+                                                    (smoothstep 0.08 -0.02
+                                                     shadow_d)
+                                                    (let col
+                                                     (mix col
+                                                      (vec3 0.06 0.28 0.16)
+                                                      (* shadow_falloff 0.55))
+                                                     ((((((((((((((((((((((((((((col
+                                                                        |>
+                                                                        (app
+                                                                        (app
+                                                                        paint
+                                                                        tail)
+                                                                        brown_dk))
+                                                                        |>
+                                                                        (app
+                                                                        (app
+                                                                        paint
+                                                                        tail_rim)
+                                                                        drk_brown))
+                                                                        |>
+                                                                        (app
+                                                                        (app
+                                                                        paint
+                                                                        tail_scales)
+                                                                        drk_brown))
+                                                                        |>
+                                                                        (app
+                                                                        (app
+                                                                        paint
+                                                                        foot_l)
+                                                                        drk_brown))
+                                                                        |>
+                                                                        (app
+                                                                        (app
+                                                                        paint
+                                                                        foot_r)
+                                                                        drk_brown))
+                                                                        |>
+                                                                        (app
+                                                                        (app
+                                                                        paint
+                                                                        arm_l)
+                                                                        brown_dk))
+                                                                        |>
+                                                                        (app
+                                                                        (app
+                                                                        paint
+                                                                        arm_r)
+                                                                        brown_dk))
+                                                                        |>
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint_shaded
+                                                                        torso_with_cheeks)
+                                                                        brown)
+                                                                        brown_dk)
+                                                                        0.08)) |>
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint_shaded
+                                                                        belly)
+                                                                        cream)
+                                                                        cream_dk)
+                                                                        0.05)) |>
+                                                                        (app
+                                                                        (app
+                                                                        paint
+                                                                        paw_l)
+                                                                        cream))
+                                                                       |>
+                                                                       (app
+                                                                        (app
+                                                                        paint
+                                                                        paw_r)
+                                                                        cream))
+                                                                      |>
+                                                                      (app
+                                                                       (app paint
+                                                                        ear_l)
+                                                                       brown))
+                                                                     |>
+                                                                     (app
+                                                                      (app paint
+                                                                       ear_r)
+                                                                      brown))
+                                                                    |>
+                                                                    (app
+                                                                     (app paint
+                                                                      ear_in_l)
+                                                                     pink))
+                                                                   |>
+                                                                   (app
+                                                                    (app paint
+                                                                     ear_in_r)
+                                                                    pink))
+                                                                  |>
+                                                                  (app
+                                                                   (app paint
+                                                                    muzzle)
+                                                                   cream))
+                                                                 |>
+                                                                 (app
+                                                                  (app paint
+                                                                   brow_l)
+                                                                  drk_brown))
+                                                                |>
+                                                                (app
+                                                                 (app paint
+                                                                  brow_r)
+                                                                 drk_brown))
+                                                               |>
+                                                               (app
+                                                                (app paint teeth)
+                                                                tooth_yel))
+                                                              |>
+                                                              (app
+                                                               (app paint groove)
+                                                               brown_dk))
+                                                             |>
+                                                             (app
+                                                              (app paint nose)
+                                                              drk_brown))
+                                                            |>
+                                                            (app
+                                                             (app paint nose_hi)
+                                                             brown_lt))
+                                                           |>
+                                                           (app (app paint eye_l)
+                                                            black))
+                                                          |>
+                                                          (app (app paint eye_r)
+                                                           black))
+                                                         |>
+                                                         (app (app paint hi_l)
+                                                          wht))
+                                                        |>
+                                                        (app (app paint hi_r)
+                                                         wht))
+                                                       |>
+                                                       (app (app paint hi_l2)
+                                                        wht))
+                                                      |>
+                                                      (app (app paint hi_r2) wht)))))))))))))))))))))))))))))))))))))))))))))))))))
+
+    === desugar (beaver.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Define Nonrec bg_col (vec3 0.13 0.48 0.3))
+      (Define Nonrec bg_dark (vec3 0.09 0.36 0.22))
+      (Define Nonrec brown (vec3 0.55 0.34 0.16))
+      (Define Nonrec brown_lt (vec3 0.68 0.46 0.24))
+      (Define Nonrec brown_dk (vec3 0.38 0.22 0.08))
+      (Define Nonrec drk_brown (vec3 0.22 0.11 0.03))
+      (Define Nonrec cream (vec3 0.95 0.89 0.74))
+      (Define Nonrec cream_dk (vec3 0.78 0.68 0.5))
+      (Define Nonrec pink (vec3 0.92 0.62 0.6))
+      (Define Nonrec pink_dk (vec3 0.75 0.42 0.42))
+      (Define Nonrec black (vec3 0.06 0.04 0.03))
+      (Define Nonrec wht (vec3 1. 0.97 0.93))
+      (Define Nonrec tooth_yel (vec3 0.92 0.85 0.6))
+      (Define Nonrec get_uv
+       (lambda (coord ())
+        (let top (- (* 2 coord) u_resolution)
+         (let bot (min (index u_resolution 0) (index u_resolution 1))
+          (/ top bot)))))
+      (Define Nonrec at
+       (lambda (offset ((vec 2))) (lambda (p ((vec 2))) (- p offset))))
+      (Define Nonrec ellipse
+       (lambda (ab ((vec 2))) (lambda (p ((vec 2))) (- (length (/ p ab)) 1))))
+      (Define Nonrec circle
+       (lambda (r (float)) (lambda (p ((vec 2))) (- (length p) r))))
+      (Define Nonrec box
+       (lambda (b ((vec 2)))
+        (lambda (p ((vec 2)))
+         (let d (- (abs p) b)
+          (+ (length (max d (vec2 0 0))) (min (max (index d 0) (index d 1)) 0))))))
+      (Define Nonrec rot
+       (lambda (a (float))
+        (lambda (p ((vec 2)))
+         (let c (cos a)
+          (let s (sin a)
+           (vec2 (- (* c (index p 0)) (* s (index p 1)))
+            (+ (* s (index p 0)) (* c (index p 1)))))))))
+      (Define Nonrec smin
+       (lambda (a (float))
+        (lambda (b (float))
+         (lambda (k (float))
+          (let h (/ (max (- k (abs (- a b))) 0) k)
+           (- (min a b) (* (* (* h h) k) 0.25)))))))
+      (Define Nonrec smax
+       (lambda (a (float))
+        (lambda (b (float))
+         (lambda (k (float))
+          (let h (/ (max (- k (abs (- a b))) 0) k)
+           (+ (max a b) (* (* (* h h) k) 0.25)))))))
+      (Define Nonrec paint
+       (lambda (d (float))
+        (lambda (shape_col ((vec 3)))
+         (lambda (bg ((vec 3))) (mix shape_col bg (smoothstep -0.005 0.005 d))))))
+      (Define Nonrec paint_shaded
+       (lambda (d (float))
+        (lambda (shape_col ((vec 3)))
+         (lambda (shadow_col ((vec 3)))
+          (lambda (shadow_depth (float))
+           (lambda (bg ((vec 3)))
+            (let base (mix shape_col bg (smoothstep -0.005 0.005 d))
+             (let shade (smoothstep (* -1 shadow_depth) 0 d)
+              (mix base (mix shape_col shadow_col (* shade 0.55))
+               (smoothstep 0.005 -0.005 d))))))))))
+      (Define Nonrec main
+       (lambda (coord ((vec 2)))
+        (let p (/ (app get_uv coord) 1.5)
+         (let tp (app (app rot -0.35) (app (app at (vec2 0.28 -0.28)) p))
+          (let tail (app (app ellipse (vec2 0.22 0.085)) tp)
+           (let tsx (- (abs (sin (* (+ (index tp 0) (index tp 1)) 38.))) 0.55)
+            (let tsy (- (abs (sin (* (- (index tp 0) (index tp 1)) 38.))) 0.55)
+             (let tail_scales (max (+ tail 0.01) (* (min tsx tsy) 0.015))
+              (let tail_rim (max tail (* -1 (+ tail 0.018)))
+               (let body
+                (app (app ellipse (vec2 0.25 0.26))
+                 (app (app at (vec2 0. -0.16)) p))
+                (let head
+                 (app (app ellipse (vec2 0.22 0.2))
+                  (app (app at (vec2 0. 0.2)) p))
+                 (let torso (app (app (app smin body) head) 0.1)
+                  (let cheek_l
+                   (app (app circle 0.1) (app (app at (vec2 -0.14 0.11)) p))
+                   (let cheek_r
+                    (app (app circle 0.1) (app (app at (vec2 0.14 0.11)) p))
+                    (let cheeks (min cheek_l cheek_r)
+                     (let torso_with_cheeks
+                      (app (app (app smin torso) cheeks) 0.06)
+                      (let muzzle
+                       (app (app ellipse (vec2 0.13 0.095))
+                        (app (app at (vec2 0. 0.09)) p))
+                       (let belly
+                        (app (app ellipse (vec2 0.15 0.17))
+                         (app (app at (vec2 0. -0.2)) p))
+                        (let ear_l
+                         (app (app circle 0.075)
+                          (app (app at (vec2 -0.175 0.355)) p))
+                         (let ear_r
+                          (app (app circle 0.075)
+                           (app (app at (vec2 0.175 0.355)) p))
+                          (let ear_in_l
+                           (app (app ellipse (vec2 0.035 0.042))
+                            (app (app at (vec2 -0.175 0.345)) p))
+                           (let ear_in_r
+                            (app (app ellipse (vec2 0.035 0.042))
+                             (app (app at (vec2 0.175 0.345)) p))
+                            (let arm_l
+                             (app (app ellipse (vec2 0.065 0.09))
+                              (app (app at (vec2 -0.23 -0.09)) p))
+                             (let arm_r
+                              (app (app ellipse (vec2 0.065 0.09))
+                               (app (app at (vec2 0.23 -0.09)) p))
+                              (let paw_l
+                               (app (app circle 0.055)
+                                (app (app at (vec2 -0.28 -0.19)) p))
+                               (let paw_r
+                                (app (app circle 0.055)
+                                 (app (app at (vec2 0.28 -0.19)) p))
+                                (let foot_l
+                                 (app (app ellipse (vec2 0.095 0.048))
+                                  (app (app at (vec2 -0.13 -0.42)) p))
+                                 (let foot_r
+                                  (app (app ellipse (vec2 0.095 0.048))
+                                   (app (app at (vec2 0.13 -0.42)) p))
+                                  (let tooth_l
+                                   (app (app box (vec2 0.022 0.05))
+                                    (app (app at (vec2 -0.028 0.035)) p))
+                                   (let tooth_r
+                                    (app (app box (vec2 0.022 0.05))
+                                     (app (app at (vec2 0.028 0.035)) p))
+                                    (let teeth (min tooth_l tooth_r)
+                                     (let groove
+                                      (app (app box (vec2 0.005 0.05))
+                                       (app (app at (vec2 0. 0.035)) p))
+                                      (let nose
+                                       (app (app ellipse (vec2 0.038 0.028))
+                                        (app (app at (vec2 0. 0.135)) p))
+                                       (let nose_hi
+                                        (app (app ellipse (vec2 0.012 0.008))
+                                         (app (app at (vec2 -0.012 0.142)) p))
+                                        (let eye_l
+                                         (app (app circle 0.04)
+                                          (app (app at (vec2 -0.095 0.255)) p))
+                                         (let eye_r
+                                          (app (app circle 0.04)
+                                           (app (app at (vec2 0.095 0.255)) p))
+                                          (let hi_l
+                                           (app (app circle 0.014)
+                                            (app (app at (vec2 -0.082 0.27)) p))
+                                           (let hi_r
+                                            (app (app circle 0.014)
+                                             (app (app at (vec2 0.108 0.27)) p))
+                                            (let hi_l2
+                                             (app (app circle 0.006)
+                                              (app (app at (vec2 -0.105 0.245))
+                                               p))
+                                             (let hi_r2
+                                              (app (app circle 0.006)
+                                               (app (app at (vec2 0.085 0.245))
+                                                p))
+                                              (let brow_l
+                                               (app
+                                                (app ellipse (vec2 0.035 0.01))
+                                                (app (app rot 0.15)
+                                                 (app
+                                                  (app at (vec2 -0.095 0.315)) p)))
+                                               (let brow_r
+                                                (app
+                                                 (app ellipse (vec2 0.035 0.01))
+                                                 (app (app rot -0.15)
+                                                  (app
+                                                   (app at (vec2 0.095 0.315)) p)))
+                                                (let vig
+                                                 (smoothstep 0.3 1.1 (length p))
+                                                 (let col
+                                                  (mix bg_col bg_dark vig)
+                                                  (let shadow_d
+                                                   (app
+                                                    (app ellipse
+                                                     (vec2 0.38 0.055))
+                                                    (app
+                                                     (app at (vec2 0.02 -0.45))
+                                                     p))
+                                                   (let shadow_falloff
+                                                    (smoothstep 0.08 -0.02
+                                                     shadow_d)
+                                                    (let col
+                                                     (mix col
+                                                      (vec3 0.06 0.28 0.16)
+                                                      (* shadow_falloff 0.55))
+                                                     (app
+                                                      (app (app paint hi_r2) wht)
+                                                      (app
+                                                       (app (app paint hi_l2)
+                                                        wht)
+                                                       (app
+                                                        (app (app paint hi_r)
+                                                         wht)
+                                                        (app
+                                                         (app (app paint hi_l)
+                                                          wht)
+                                                         (app
+                                                          (app (app paint eye_r)
+                                                           black)
+                                                          (app
+                                                           (app (app paint eye_l)
+                                                            black)
+                                                           (app
+                                                            (app
+                                                             (app paint nose_hi)
+                                                             brown_lt)
+                                                            (app
+                                                             (app
+                                                              (app paint nose)
+                                                              drk_brown)
+                                                             (app
+                                                              (app
+                                                               (app paint groove)
+                                                               brown_dk)
+                                                              (app
+                                                               (app
+                                                                (app paint teeth)
+                                                                tooth_yel)
+                                                               (app
+                                                                (app
+                                                                 (app paint
+                                                                  brow_r)
+                                                                 drk_brown)
+                                                                (app
+                                                                 (app
+                                                                  (app paint
+                                                                   brow_l)
+                                                                  drk_brown)
+                                                                 (app
+                                                                  (app
+                                                                   (app paint
+                                                                    muzzle)
+                                                                   cream)
+                                                                  (app
+                                                                   (app
+                                                                    (app paint
+                                                                     ear_in_r)
+                                                                    pink)
+                                                                   (app
+                                                                    (app
+                                                                     (app paint
+                                                                      ear_in_l)
+                                                                     pink)
+                                                                    (app
+                                                                     (app
+                                                                      (app paint
+                                                                       ear_r)
+                                                                      brown)
+                                                                     (app
+                                                                      (app
+                                                                       (app paint
+                                                                        ear_l)
+                                                                       brown)
+                                                                      (app
+                                                                       (app
+                                                                        (app
+                                                                        paint
+                                                                        paw_r)
+                                                                        cream)
+                                                                       (app
+                                                                        (app
+                                                                        (app
+                                                                        paint
+                                                                        paw_l)
+                                                                        cream)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint_shaded
+                                                                        belly)
+                                                                        cream)
+                                                                        cream_dk)
+                                                                        0.05)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint_shaded
+                                                                        torso_with_cheeks)
+                                                                        brown)
+                                                                        brown_dk)
+                                                                        0.08)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint
+                                                                        arm_r)
+                                                                        brown_dk)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint
+                                                                        arm_l)
+                                                                        brown_dk)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint
+                                                                        foot_r)
+                                                                        drk_brown)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint
+                                                                        foot_l)
+                                                                        drk_brown)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint
+                                                                        tail_scales)
+                                                                        drk_brown)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint
+                                                                        tail_rim)
+                                                                        drk_brown)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint
+                                                                        tail)
+                                                                        brown_dk)
+                                                                        col)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+
+    === uniquify (beaver.glml) ===
+    (Program
+     ((Extern (vec 2) u_resolution) (Define Nonrec bg_col_0 (vec3 0.13 0.48 0.3))
+      (Define Nonrec bg_dark_1 (vec3 0.09 0.36 0.22))
+      (Define Nonrec brown_2 (vec3 0.55 0.34 0.16))
+      (Define Nonrec brown_lt_3 (vec3 0.68 0.46 0.24))
+      (Define Nonrec brown_dk_4 (vec3 0.38 0.22 0.08))
+      (Define Nonrec drk_brown_5 (vec3 0.22 0.11 0.03))
+      (Define Nonrec cream_6 (vec3 0.95 0.89 0.74))
+      (Define Nonrec cream_dk_7 (vec3 0.78 0.68 0.5))
+      (Define Nonrec pink_8 (vec3 0.92 0.62 0.6))
+      (Define Nonrec pink_dk_9 (vec3 0.75 0.42 0.42))
+      (Define Nonrec black_10 (vec3 0.06 0.04 0.03))
+      (Define Nonrec wht_11 (vec3 1. 0.97 0.93))
+      (Define Nonrec tooth_yel_12 (vec3 0.92 0.85 0.6))
+      (Define Nonrec get_uv_13
+       (lambda (coord_14 ())
+        (let top_15 (- (* 2 coord_14) u_resolution)
+         (let bot_16 (min (index u_resolution 0) (index u_resolution 1))
+          (/ top_15 bot_16)))))
+      (Define Nonrec at_17
+       (lambda (offset_18 ((vec 2)))
+        (lambda (p_19 ((vec 2))) (- p_19 offset_18))))
+      (Define Nonrec ellipse_20
+       (lambda (ab_21 ((vec 2)))
+        (lambda (p_22 ((vec 2))) (- (length (/ p_22 ab_21)) 1))))
+      (Define Nonrec circle_23
+       (lambda (r_24 (float)) (lambda (p_25 ((vec 2))) (- (length p_25) r_24))))
+      (Define Nonrec box_26
+       (lambda (b_27 ((vec 2)))
+        (lambda (p_28 ((vec 2)))
+         (let d_29 (- (abs p_28) b_27)
+          (+ (length (max d_29 (vec2 0 0)))
+           (min (max (index d_29 0) (index d_29 1)) 0))))))
+      (Define Nonrec rot_30
+       (lambda (a_31 (float))
+        (lambda (p_32 ((vec 2)))
+         (let c_33 (cos a_31)
+          (let s_34 (sin a_31)
+           (vec2 (- (* c_33 (index p_32 0)) (* s_34 (index p_32 1)))
+            (+ (* s_34 (index p_32 0)) (* c_33 (index p_32 1)))))))))
+      (Define Nonrec smin_35
+       (lambda (a_36 (float))
+        (lambda (b_37 (float))
+         (lambda (k_38 (float))
+          (let h_39 (/ (max (- k_38 (abs (- a_36 b_37))) 0) k_38)
+           (- (min a_36 b_37) (* (* (* h_39 h_39) k_38) 0.25)))))))
+      (Define Nonrec smax_40
+       (lambda (a_41 (float))
+        (lambda (b_42 (float))
+         (lambda (k_43 (float))
+          (let h_44 (/ (max (- k_43 (abs (- a_41 b_42))) 0) k_43)
+           (+ (max a_41 b_42) (* (* (* h_44 h_44) k_43) 0.25)))))))
+      (Define Nonrec paint_45
+       (lambda (d_46 (float))
+        (lambda (shape_col_47 ((vec 3)))
+         (lambda (bg_48 ((vec 3)))
+          (mix shape_col_47 bg_48 (smoothstep -0.005 0.005 d_46))))))
+      (Define Nonrec paint_shaded_49
+       (lambda (d_50 (float))
+        (lambda (shape_col_51 ((vec 3)))
+         (lambda (shadow_col_52 ((vec 3)))
+          (lambda (shadow_depth_53 (float))
+           (lambda (bg_54 ((vec 3)))
+            (let base_55 (mix shape_col_51 bg_54 (smoothstep -0.005 0.005 d_50))
+             (let shade_56 (smoothstep (* -1 shadow_depth_53) 0 d_50)
+              (mix base_55 (mix shape_col_51 shadow_col_52 (* shade_56 0.55))
+               (smoothstep 0.005 -0.005 d_50))))))))))
+      (Define Nonrec main
+       (lambda (coord_57 ((vec 2)))
+        (let p_58 (/ (app get_uv_13 coord_57) 1.5)
+         (let tp_59
+          (app (app rot_30 -0.35) (app (app at_17 (vec2 0.28 -0.28)) p_58))
+          (let tail_60 (app (app ellipse_20 (vec2 0.22 0.085)) tp_59)
+           (let tsx_61
+            (- (abs (sin (* (+ (index tp_59 0) (index tp_59 1)) 38.))) 0.55)
+            (let tsy_62
+             (- (abs (sin (* (- (index tp_59 0) (index tp_59 1)) 38.))) 0.55)
+             (let tail_scales_63
+              (max (+ tail_60 0.01) (* (min tsx_61 tsy_62) 0.015))
+              (let tail_rim_64 (max tail_60 (* -1 (+ tail_60 0.018)))
+               (let body_65
+                (app (app ellipse_20 (vec2 0.25 0.26))
+                 (app (app at_17 (vec2 0. -0.16)) p_58))
+                (let head_66
+                 (app (app ellipse_20 (vec2 0.22 0.2))
+                  (app (app at_17 (vec2 0. 0.2)) p_58))
+                 (let torso_67 (app (app (app smin_35 body_65) head_66) 0.1)
+                  (let cheek_l_68
+                   (app (app circle_23 0.1)
+                    (app (app at_17 (vec2 -0.14 0.11)) p_58))
+                   (let cheek_r_69
+                    (app (app circle_23 0.1)
+                     (app (app at_17 (vec2 0.14 0.11)) p_58))
+                    (let cheeks_70 (min cheek_l_68 cheek_r_69)
+                     (let torso_with_cheeks_71
+                      (app (app (app smin_35 torso_67) cheeks_70) 0.06)
+                      (let muzzle_72
+                       (app (app ellipse_20 (vec2 0.13 0.095))
+                        (app (app at_17 (vec2 0. 0.09)) p_58))
+                       (let belly_73
+                        (app (app ellipse_20 (vec2 0.15 0.17))
+                         (app (app at_17 (vec2 0. -0.2)) p_58))
+                        (let ear_l_74
+                         (app (app circle_23 0.075)
+                          (app (app at_17 (vec2 -0.175 0.355)) p_58))
+                         (let ear_r_75
+                          (app (app circle_23 0.075)
+                           (app (app at_17 (vec2 0.175 0.355)) p_58))
+                          (let ear_in_l_76
+                           (app (app ellipse_20 (vec2 0.035 0.042))
+                            (app (app at_17 (vec2 -0.175 0.345)) p_58))
+                           (let ear_in_r_77
+                            (app (app ellipse_20 (vec2 0.035 0.042))
+                             (app (app at_17 (vec2 0.175 0.345)) p_58))
+                            (let arm_l_78
+                             (app (app ellipse_20 (vec2 0.065 0.09))
+                              (app (app at_17 (vec2 -0.23 -0.09)) p_58))
+                             (let arm_r_79
+                              (app (app ellipse_20 (vec2 0.065 0.09))
+                               (app (app at_17 (vec2 0.23 -0.09)) p_58))
+                              (let paw_l_80
+                               (app (app circle_23 0.055)
+                                (app (app at_17 (vec2 -0.28 -0.19)) p_58))
+                               (let paw_r_81
+                                (app (app circle_23 0.055)
+                                 (app (app at_17 (vec2 0.28 -0.19)) p_58))
+                                (let foot_l_82
+                                 (app (app ellipse_20 (vec2 0.095 0.048))
+                                  (app (app at_17 (vec2 -0.13 -0.42)) p_58))
+                                 (let foot_r_83
+                                  (app (app ellipse_20 (vec2 0.095 0.048))
+                                   (app (app at_17 (vec2 0.13 -0.42)) p_58))
+                                  (let tooth_l_84
+                                   (app (app box_26 (vec2 0.022 0.05))
+                                    (app (app at_17 (vec2 -0.028 0.035)) p_58))
+                                   (let tooth_r_85
+                                    (app (app box_26 (vec2 0.022 0.05))
+                                     (app (app at_17 (vec2 0.028 0.035)) p_58))
+                                    (let teeth_86 (min tooth_l_84 tooth_r_85)
+                                     (let groove_87
+                                      (app (app box_26 (vec2 0.005 0.05))
+                                       (app (app at_17 (vec2 0. 0.035)) p_58))
+                                      (let nose_88
+                                       (app (app ellipse_20 (vec2 0.038 0.028))
+                                        (app (app at_17 (vec2 0. 0.135)) p_58))
+                                       (let nose_hi_89
+                                        (app (app ellipse_20 (vec2 0.012 0.008))
+                                         (app (app at_17 (vec2 -0.012 0.142))
+                                          p_58))
+                                        (let eye_l_90
+                                         (app (app circle_23 0.04)
+                                          (app (app at_17 (vec2 -0.095 0.255))
+                                           p_58))
+                                         (let eye_r_91
+                                          (app (app circle_23 0.04)
+                                           (app (app at_17 (vec2 0.095 0.255))
+                                            p_58))
+                                          (let hi_l_92
+                                           (app (app circle_23 0.014)
+                                            (app (app at_17 (vec2 -0.082 0.27))
+                                             p_58))
+                                           (let hi_r_93
+                                            (app (app circle_23 0.014)
+                                             (app (app at_17 (vec2 0.108 0.27))
+                                              p_58))
+                                            (let hi_l2_94
+                                             (app (app circle_23 0.006)
+                                              (app
+                                               (app at_17 (vec2 -0.105 0.245))
+                                               p_58))
+                                             (let hi_r2_95
+                                              (app (app circle_23 0.006)
+                                               (app
+                                                (app at_17 (vec2 0.085 0.245))
+                                                p_58))
+                                              (let brow_l_96
+                                               (app
+                                                (app ellipse_20
+                                                 (vec2 0.035 0.01))
+                                                (app (app rot_30 0.15)
+                                                 (app
+                                                  (app at_17 (vec2 -0.095 0.315))
+                                                  p_58)))
+                                               (let brow_r_97
+                                                (app
+                                                 (app ellipse_20
+                                                  (vec2 0.035 0.01))
+                                                 (app (app rot_30 -0.15)
+                                                  (app
+                                                   (app at_17 (vec2 0.095 0.315))
+                                                   p_58)))
+                                                (let vig_98
+                                                 (smoothstep 0.3 1.1
+                                                  (length p_58))
+                                                 (let col_99
+                                                  (mix bg_col_0 bg_dark_1 vig_98)
+                                                  (let shadow_d_100
+                                                   (app
+                                                    (app ellipse_20
+                                                     (vec2 0.38 0.055))
+                                                    (app
+                                                     (app at_17
+                                                      (vec2 0.02 -0.45))
+                                                     p_58))
+                                                   (let shadow_falloff_101
+                                                    (smoothstep 0.08 -0.02
+                                                     shadow_d_100)
+                                                    (let col_102
+                                                     (mix col_99
+                                                      (vec3 0.06 0.28 0.16)
+                                                      (* shadow_falloff_101 0.55))
+                                                     (app
+                                                      (app
+                                                       (app paint_45 hi_r2_95)
+                                                       wht_11)
+                                                      (app
+                                                       (app
+                                                        (app paint_45 hi_l2_94)
+                                                        wht_11)
+                                                       (app
+                                                        (app
+                                                         (app paint_45 hi_r_93)
+                                                         wht_11)
+                                                        (app
+                                                         (app
+                                                          (app paint_45 hi_l_92)
+                                                          wht_11)
+                                                         (app
+                                                          (app
+                                                           (app paint_45
+                                                            eye_r_91)
+                                                           black_10)
+                                                          (app
+                                                           (app
+                                                            (app paint_45
+                                                             eye_l_90)
+                                                            black_10)
+                                                           (app
+                                                            (app
+                                                             (app paint_45
+                                                              nose_hi_89)
+                                                             brown_lt_3)
+                                                            (app
+                                                             (app
+                                                              (app paint_45
+                                                               nose_88)
+                                                              drk_brown_5)
+                                                             (app
+                                                              (app
+                                                               (app paint_45
+                                                                groove_87)
+                                                               brown_dk_4)
+                                                              (app
+                                                               (app
+                                                                (app paint_45
+                                                                 teeth_86)
+                                                                tooth_yel_12)
+                                                               (app
+                                                                (app
+                                                                 (app paint_45
+                                                                  brow_r_97)
+                                                                 drk_brown_5)
+                                                                (app
+                                                                 (app
+                                                                  (app paint_45
+                                                                   brow_l_96)
+                                                                  drk_brown_5)
+                                                                 (app
+                                                                  (app
+                                                                   (app paint_45
+                                                                    muzzle_72)
+                                                                   cream_6)
+                                                                  (app
+                                                                   (app
+                                                                    (app paint_45
+                                                                     ear_in_r_77)
+                                                                    pink_8)
+                                                                   (app
+                                                                    (app
+                                                                     (app
+                                                                      paint_45
+                                                                      ear_in_l_76)
+                                                                     pink_8)
+                                                                    (app
+                                                                     (app
+                                                                      (app
+                                                                       paint_45
+                                                                       ear_r_75)
+                                                                      brown_2)
+                                                                     (app
+                                                                      (app
+                                                                       (app
+                                                                        paint_45
+                                                                        ear_l_74)
+                                                                       brown_2)
+                                                                      (app
+                                                                       (app
+                                                                        (app
+                                                                        paint_45
+                                                                        paw_r_81)
+                                                                        cream_6)
+                                                                       (app
+                                                                        (app
+                                                                        (app
+                                                                        paint_45
+                                                                        paw_l_80)
+                                                                        cream_6)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint_shaded_49
+                                                                        belly_73)
+                                                                        cream_6)
+                                                                        cream_dk_7)
+                                                                        0.05)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint_shaded_49
+                                                                        torso_with_cheeks_71)
+                                                                        brown_2)
+                                                                        brown_dk_4)
+                                                                        0.08)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint_45
+                                                                        arm_r_79)
+                                                                        brown_dk_4)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint_45
+                                                                        arm_l_78)
+                                                                        brown_dk_4)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint_45
+                                                                        foot_r_83)
+                                                                        drk_brown_5)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint_45
+                                                                        foot_l_82)
+                                                                        drk_brown_5)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint_45
+                                                                        tail_scales_63)
+                                                                        drk_brown_5)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint_45
+                                                                        tail_rim_64)
+                                                                        drk_brown_5)
+                                                                        (app
+                                                                        (app
+                                                                        (app
+                                                                        paint_45
+                                                                        tail_60)
+                                                                        brown_dk_4)
+                                                                        col_102)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+
+    === typecheck (beaver.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2))
+      ((Define Nonrec bg_col_0
+        ((vec3 (0.13 : float) (0.48 : float) (0.3 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec bg_dark_1
+        ((vec3 (0.09 : float) (0.36 : float) (0.22 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec brown_2
+        ((vec3 (0.55 : float) (0.34 : float) (0.16 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec brown_lt_3
+        ((vec3 (0.68 : float) (0.46 : float) (0.24 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec brown_dk_4
+        ((vec3 (0.38 : float) (0.22 : float) (0.08 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec drk_brown_5
+        ((vec3 (0.22 : float) (0.11 : float) (0.03 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec cream_6
+        ((vec3 (0.95 : float) (0.89 : float) (0.74 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec cream_dk_7
+        ((vec3 (0.78 : float) (0.68 : float) (0.5 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec pink_8
+        ((vec3 (0.92 : float) (0.62 : float) (0.6 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec pink_dk_9
+        ((vec3 (0.75 : float) (0.42 : float) (0.42 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec black_10
+        ((vec3 (0.06 : float) (0.04 : float) (0.03 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec wht_11
+        ((vec3 (1. : float) (0.97 : float) (0.93 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec tooth_yel_12
+        ((vec3 (0.92 : float) (0.85 : float) (0.6 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec get_uv_13
+        ((lambda coord_14
+          ((let top_15
+            ((- ((* (2 : int) (coord_14 : 'v_103)) : 'v_104)
+              (u_resolution : (vec 2)))
+             : 'v_105)
+            ((let bot_16
+              ((min ((index (u_resolution : (vec 2)) 0) : float)
+                ((index (u_resolution : (vec 2)) 1) : float))
+               : float)
+              ((/ (top_15 : 'v_105) (bot_16 : float)) : 'v_110))
+             : 'v_110))
+           : 'v_110))
+         : ('v_103 -> 'v_110)))
+       :
+       (forall
+        ((Broadcast 'v_104 (vec 2) 'v_105) (MulBroadcast int 'v_103 'v_104)
+         (MulBroadcast 'v_105 float 'v_110))
+        ('v_103 -> 'v_110)))
+      ((Define Nonrec at_17
+        ((lambda offset_18
+          ((lambda p_19 ((- (p_19 : (vec 2)) (offset_18 : (vec 2))) : (vec 2))) :
+           ((vec 2) -> (vec 2))))
+         : ((vec 2) -> ((vec 2) -> (vec 2)))))
+       : ((vec 2) -> ((vec 2) -> (vec 2))))
+      ((Define Nonrec ellipse_20
+        ((lambda ab_21
+          ((lambda p_22
+            ((-
+              ((length ((/ (p_22 : (vec 2)) (ab_21 : (vec 2))) : (vec 2))) :
+               float)
+              (1 : int))
+             : float))
+           : ((vec 2) -> float)))
+         : ((vec 2) -> ((vec 2) -> float))))
+       : ((vec 2) -> ((vec 2) -> float)))
+      ((Define Nonrec circle_23
+        ((lambda r_24
+          ((lambda p_25
+            ((- ((length (p_25 : (vec 2))) : float) (r_24 : float)) : float))
+           : ((vec 2) -> float)))
+         : (float -> ((vec 2) -> float))))
+       : (float -> ((vec 2) -> float)))
+      ((Define Nonrec box_26
+        ((lambda b_27
+          ((lambda p_28
+            ((let d_29
+              ((- ((abs (p_28 : (vec 2))) : (vec 2)) (b_27 : (vec 2))) : (vec 2))
+              ((+
+                ((length
+                  ((max (d_29 : (vec 2)) ((vec2 (0 : int) (0 : int)) : (vec 2)))
+                   : (vec 2)))
+                 : float)
+                ((min
+                  ((max ((index (d_29 : (vec 2)) 0) : float)
+                    ((index (d_29 : (vec 2)) 1) : float))
+                   : float)
+                  (0 : int))
+                 : float))
+               : float))
+             : float))
+           : ((vec 2) -> float)))
+         : ((vec 2) -> ((vec 2) -> float))))
+       : ((vec 2) -> ((vec 2) -> float)))
+      ((Define Nonrec rot_30
+        ((lambda a_31
+          ((lambda p_32
+            ((let c_33 ((cos (a_31 : float)) : float)
+              ((let s_34 ((sin (a_31 : float)) : float)
+                ((vec2
+                  ((-
+                    ((* (c_33 : float) ((index (p_32 : (vec 2)) 0) : float)) :
+                     float)
+                    ((* (s_34 : float) ((index (p_32 : (vec 2)) 1) : float)) :
+                     float))
+                   : float)
+                  ((+
+                    ((* (s_34 : float) ((index (p_32 : (vec 2)) 0) : float)) :
+                     float)
+                    ((* (c_33 : float) ((index (p_32 : (vec 2)) 1) : float)) :
+                     float))
+                   : float))
+                 : (vec 2)))
+               : (vec 2)))
+             : (vec 2)))
+           : ((vec 2) -> (vec 2))))
+         : (float -> ((vec 2) -> (vec 2)))))
+       : (float -> ((vec 2) -> (vec 2))))
+      ((Define Nonrec smin_35
+        ((lambda a_36
+          ((lambda b_37
+            ((lambda k_38
+              ((let h_39
+                ((/
+                  ((max
+                    ((- (k_38 : float)
+                      ((abs ((- (a_36 : float) (b_37 : float)) : float)) : float))
+                     : float)
+                    (0 : int))
+                   : float)
+                  (k_38 : float))
+                 : float)
+                ((- ((min (a_36 : float) (b_37 : float)) : float)
+                  ((*
+                    ((* ((* (h_39 : float) (h_39 : float)) : float)
+                      (k_38 : float))
+                     : float)
+                    (0.25 : float))
+                   : float))
+                 : float))
+               : float))
+             : (float -> float)))
+           : (float -> (float -> float))))
+         : (float -> (float -> (float -> float)))))
+       : (float -> (float -> (float -> float))))
+      ((Define Nonrec smax_40
+        ((lambda a_41
+          ((lambda b_42
+            ((lambda k_43
+              ((let h_44
+                ((/
+                  ((max
+                    ((- (k_43 : float)
+                      ((abs ((- (a_41 : float) (b_42 : float)) : float)) : float))
+                     : float)
+                    (0 : int))
+                   : float)
+                  (k_43 : float))
+                 : float)
+                ((+ ((max (a_41 : float) (b_42 : float)) : float)
+                  ((*
+                    ((* ((* (h_44 : float) (h_44 : float)) : float)
+                      (k_43 : float))
+                     : float)
+                    (0.25 : float))
+                   : float))
+                 : float))
+               : float))
+             : (float -> float)))
+           : (float -> (float -> float))))
+         : (float -> (float -> (float -> float)))))
+       : (float -> (float -> (float -> float))))
+      ((Define Nonrec paint_45
+        ((lambda d_46
+          ((lambda shape_col_47
+            ((lambda bg_48
+              ((mix (shape_col_47 : (vec 3)) (bg_48 : (vec 3))
+                ((smoothstep (-0.005 : float) (0.005 : float) (d_46 : float)) :
+                 float))
+               : (vec 3)))
+             : ((vec 3) -> (vec 3))))
+           : ((vec 3) -> ((vec 3) -> (vec 3)))))
+         : (float -> ((vec 3) -> ((vec 3) -> (vec 3))))))
+       : (float -> ((vec 3) -> ((vec 3) -> (vec 3)))))
+      ((Define Nonrec paint_shaded_49
+        ((lambda d_50
+          ((lambda shape_col_51
+            ((lambda shadow_col_52
+              ((lambda shadow_depth_53
+                ((lambda bg_54
+                  ((let base_55
+                    ((mix (shape_col_51 : (vec 3)) (bg_54 : (vec 3))
+                      ((smoothstep (-0.005 : float) (0.005 : float)
+                        (d_50 : float))
+                       : float))
+                     : (vec 3))
+                    ((let shade_56
+                      ((smoothstep
+                        ((* (-1 : int) (shadow_depth_53 : float)) : float)
+                        (0 : int) (d_50 : float))
+                       : float)
+                      ((mix (base_55 : (vec 3))
+                        ((mix (shape_col_51 : (vec 3)) (shadow_col_52 : (vec 3))
+                          ((* (shade_56 : float) (0.55 : float)) : float))
+                         : (vec 3))
+                        ((smoothstep (0.005 : float) (-0.005 : float)
+                          (d_50 : float))
+                         : float))
+                       : (vec 3)))
+                     : (vec 3)))
+                   : (vec 3)))
+                 : ((vec 3) -> (vec 3))))
+               : (float -> ((vec 3) -> (vec 3)))))
+             : ((vec 3) -> (float -> ((vec 3) -> (vec 3))))))
+           : ((vec 3) -> ((vec 3) -> (float -> ((vec 3) -> (vec 3)))))))
+         : (float -> ((vec 3) -> ((vec 3) -> (float -> ((vec 3) -> (vec 3))))))))
+       : (float -> ((vec 3) -> ((vec 3) -> (float -> ((vec 3) -> (vec 3)))))))
+      ((Define Nonrec main
+        ((lambda coord_57
+          ((let p_58
+            ((/
+              ((app (get_uv_13 : ((vec 2) -> (vec 2))) (coord_57 : (vec 2))) :
+               (vec 2))
+              (1.5 : float))
+             : (vec 2))
+            ((let tp_59
+              ((app
+                ((app (rot_30 : (float -> ((vec 2) -> (vec 2)))) (-0.35 : float))
+                 : ((vec 2) -> (vec 2)))
+                ((app
+                  ((app (at_17 : ((vec 2) -> ((vec 2) -> (vec 2))))
+                    ((vec2 (0.28 : float) (-0.28 : float)) : (vec 2)))
+                   : ((vec 2) -> (vec 2)))
+                  (p_58 : (vec 2)))
+                 : (vec 2)))
+               : (vec 2))
+              ((let tail_60
+                ((app
+                  ((app (ellipse_20 : ((vec 2) -> ((vec 2) -> float)))
+                    ((vec2 (0.22 : float) (0.085 : float)) : (vec 2)))
+                   : ((vec 2) -> float))
+                  (tp_59 : (vec 2)))
+                 : float)
+                ((let tsx_61
+                  ((-
+                    ((abs
+                      ((sin
+                        ((*
+                          ((+ ((index (tp_59 : (vec 2)) 0) : float)
+                            ((index (tp_59 : (vec 2)) 1) : float))
+                           : float)
+                          (38. : float))
+                         : float))
+                       : float))
+                     : float)
+                    (0.55 : float))
+                   : float)
+                  ((let tsy_62
+                    ((-
+                      ((abs
+                        ((sin
+                          ((*
+                            ((- ((index (tp_59 : (vec 2)) 0) : float)
+                              ((index (tp_59 : (vec 2)) 1) : float))
+                             : float)
+                            (38. : float))
+                           : float))
+                         : float))
+                       : float)
+                      (0.55 : float))
+                     : float)
+                    ((let tail_scales_63
+                      ((max ((+ (tail_60 : float) (0.01 : float)) : float)
+                        ((* ((min (tsx_61 : float) (tsy_62 : float)) : float)
+                          (0.015 : float))
+                         : float))
+                       : float)
+                      ((let tail_rim_64
+                        ((max (tail_60 : float)
+                          ((* (-1 : int)
+                            ((+ (tail_60 : float) (0.018 : float)) : float))
+                           : float))
+                         : float)
+                        ((let body_65
+                          ((app
+                            ((app (ellipse_20 : ((vec 2) -> ((vec 2) -> float)))
+                              ((vec2 (0.25 : float) (0.26 : float)) : (vec 2)))
+                             : ((vec 2) -> float))
+                            ((app
+                              ((app (at_17 : ((vec 2) -> ((vec 2) -> (vec 2))))
+                                ((vec2 (0. : float) (-0.16 : float)) : (vec 2)))
+                               : ((vec 2) -> (vec 2)))
+                              (p_58 : (vec 2)))
+                             : (vec 2)))
+                           : float)
+                          ((let head_66
+                            ((app
+                              ((app
+                                (ellipse_20 : ((vec 2) -> ((vec 2) -> float)))
+                                ((vec2 (0.22 : float) (0.2 : float)) : (vec 2)))
+                               : ((vec 2) -> float))
+                              ((app
+                                ((app (at_17 : ((vec 2) -> ((vec 2) -> (vec 2))))
+                                  ((vec2 (0. : float) (0.2 : float)) : (vec 2)))
+                                 : ((vec 2) -> (vec 2)))
+                                (p_58 : (vec 2)))
+                               : (vec 2)))
+                             : float)
+                            ((let torso_67
+                              ((app
+                                ((app
+                                  ((app
+                                    (smin_35 :
+                                     (float -> (float -> (float -> float))))
+                                    (body_65 : float))
+                                   : (float -> (float -> float)))
+                                  (head_66 : float))
+                                 : (float -> float))
+                                (0.1 : float))
+                               : float)
+                              ((let cheek_l_68
+                                ((app
+                                  ((app
+                                    (circle_23 : (float -> ((vec 2) -> float)))
+                                    (0.1 : float))
+                                   : ((vec 2) -> float))
+                                  ((app
+                                    ((app
+                                      (at_17 : ((vec 2) -> ((vec 2) -> (vec 2))))
+                                      ((vec2 (-0.14 : float) (0.11 : float)) :
+                                       (vec 2)))
+                                     : ((vec 2) -> (vec 2)))
+                                    (p_58 : (vec 2)))
+                                   : (vec 2)))
+                                 : float)
+                                ((let cheek_r_69
+                                  ((app
+                                    ((app
+                                      (circle_23 : (float -> ((vec 2) -> float)))
+                                      (0.1 : float))
+                                     : ((vec 2) -> float))
+                                    ((app
+                                      ((app
+                                        (at_17 :
+                                         ((vec 2) -> ((vec 2) -> (vec 2))))
+                                        ((vec2 (0.14 : float) (0.11 : float)) :
+                                         (vec 2)))
+                                       : ((vec 2) -> (vec 2)))
+                                      (p_58 : (vec 2)))
+                                     : (vec 2)))
+                                   : float)
+                                  ((let cheeks_70
+                                    ((min (cheek_l_68 : float)
+                                      (cheek_r_69 : float))
+                                     : float)
+                                    ((let torso_with_cheeks_71
+                                      ((app
+                                        ((app
+                                          ((app
+                                            (smin_35 :
+                                             (float ->
+                                              (float -> (float -> float))))
+                                            (torso_67 : float))
+                                           : (float -> (float -> float)))
+                                          (cheeks_70 : float))
+                                         : (float -> float))
+                                        (0.06 : float))
+                                       : float)
+                                      ((let muzzle_72
+                                        ((app
+                                          ((app
+                                            (ellipse_20 :
+                                             ((vec 2) -> ((vec 2) -> float)))
+                                            ((vec2 (0.13 : float)
+                                              (0.095 : float))
+                                             : (vec 2)))
+                                           : ((vec 2) -> float))
+                                          ((app
+                                            ((app
+                                              (at_17 :
+                                               ((vec 2) -> ((vec 2) -> (vec 2))))
+                                              ((vec2 (0. : float) (0.09 : float))
+                                               : (vec 2)))
+                                             : ((vec 2) -> (vec 2)))
+                                            (p_58 : (vec 2)))
+                                           : (vec 2)))
+                                         : float)
+                                        ((let belly_73
+                                          ((app
+                                            ((app
+                                              (ellipse_20 :
+                                               ((vec 2) -> ((vec 2) -> float)))
+                                              ((vec2 (0.15 : float)
+                                                (0.17 : float))
+                                               : (vec 2)))
+                                             : ((vec 2) -> float))
+                                            ((app
+                                              ((app
+                                                (at_17 :
+                                                 ((vec 2) ->
+                                                  ((vec 2) -> (vec 2))))
+                                                ((vec2 (0. : float)
+                                                  (-0.2 : float))
+                                                 : (vec 2)))
+                                               : ((vec 2) -> (vec 2)))
+                                              (p_58 : (vec 2)))
+                                             : (vec 2)))
+                                           : float)
+                                          ((let ear_l_74
+                                            ((app
+                                              ((app
+                                                (circle_23 :
+                                                 (float -> ((vec 2) -> float)))
+                                                (0.075 : float))
+                                               : ((vec 2) -> float))
+                                              ((app
+                                                ((app
+                                                  (at_17 :
+                                                   ((vec 2) ->
+                                                    ((vec 2) -> (vec 2))))
+                                                  ((vec2 (-0.175 : float)
+                                                    (0.355 : float))
+                                                   : (vec 2)))
+                                                 : ((vec 2) -> (vec 2)))
+                                                (p_58 : (vec 2)))
+                                               : (vec 2)))
+                                             : float)
+                                            ((let ear_r_75
+                                              ((app
+                                                ((app
+                                                  (circle_23 :
+                                                   (float -> ((vec 2) -> float)))
+                                                  (0.075 : float))
+                                                 : ((vec 2) -> float))
+                                                ((app
+                                                  ((app
+                                                    (at_17 :
+                                                     ((vec 2) ->
+                                                      ((vec 2) -> (vec 2))))
+                                                    ((vec2 (0.175 : float)
+                                                      (0.355 : float))
+                                                     : (vec 2)))
+                                                   : ((vec 2) -> (vec 2)))
+                                                  (p_58 : (vec 2)))
+                                                 : (vec 2)))
+                                               : float)
+                                              ((let ear_in_l_76
+                                                ((app
+                                                  ((app
+                                                    (ellipse_20 :
+                                                     ((vec 2) ->
+                                                      ((vec 2) -> float)))
+                                                    ((vec2 (0.035 : float)
+                                                      (0.042 : float))
+                                                     : (vec 2)))
+                                                   : ((vec 2) -> float))
+                                                  ((app
+                                                    ((app
+                                                      (at_17 :
+                                                       ((vec 2) ->
+                                                        ((vec 2) -> (vec 2))))
+                                                      ((vec2 (-0.175 : float)
+                                                        (0.345 : float))
+                                                       : (vec 2)))
+                                                     : ((vec 2) -> (vec 2)))
+                                                    (p_58 : (vec 2)))
+                                                   : (vec 2)))
+                                                 : float)
+                                                ((let ear_in_r_77
+                                                  ((app
+                                                    ((app
+                                                      (ellipse_20 :
+                                                       ((vec 2) ->
+                                                        ((vec 2) -> float)))
+                                                      ((vec2 (0.035 : float)
+                                                        (0.042 : float))
+                                                       : (vec 2)))
+                                                     : ((vec 2) -> float))
+                                                    ((app
+                                                      ((app
+                                                        (at_17 :
+                                                         ((vec 2) ->
+                                                          ((vec 2) -> (vec 2))))
+                                                        ((vec2 (0.175 : float)
+                                                          (0.345 : float))
+                                                         : (vec 2)))
+                                                       : ((vec 2) -> (vec 2)))
+                                                      (p_58 : (vec 2)))
+                                                     : (vec 2)))
+                                                   : float)
+                                                  ((let arm_l_78
+                                                    ((app
+                                                      ((app
+                                                        (ellipse_20 :
+                                                         ((vec 2) ->
+                                                          ((vec 2) -> float)))
+                                                        ((vec2 (0.065 : float)
+                                                          (0.09 : float))
+                                                         : (vec 2)))
+                                                       : ((vec 2) -> float))
+                                                      ((app
+                                                        ((app
+                                                          (at_17 :
+                                                           ((vec 2) ->
+                                                            ((vec 2) -> (vec 2))))
+                                                          ((vec2 (-0.23 : float)
+                                                            (-0.09 : float))
+                                                           : (vec 2)))
+                                                         : ((vec 2) -> (vec 2)))
+                                                        (p_58 : (vec 2)))
+                                                       : (vec 2)))
+                                                     : float)
+                                                    ((let arm_r_79
+                                                      ((app
+                                                        ((app
+                                                          (ellipse_20 :
+                                                           ((vec 2) ->
+                                                            ((vec 2) -> float)))
+                                                          ((vec2 (0.065 : float)
+                                                            (0.09 : float))
+                                                           : (vec 2)))
+                                                         : ((vec 2) -> float))
+                                                        ((app
+                                                          ((app
+                                                            (at_17 :
+                                                             ((vec 2) ->
+                                                              ((vec 2) ->
+                                                               (vec 2))))
+                                                            ((vec2 (0.23 : float)
+                                                              (-0.09 : float))
+                                                             : (vec 2)))
+                                                           :
+                                                           ((vec 2) -> (vec 2)))
+                                                          (p_58 : (vec 2)))
+                                                         : (vec 2)))
+                                                       : float)
+                                                      ((let paw_l_80
+                                                        ((app
+                                                          ((app
+                                                            (circle_23 :
+                                                             (float ->
+                                                              ((vec 2) -> float)))
+                                                            (0.055 : float))
+                                                           : ((vec 2) -> float))
+                                                          ((app
+                                                            ((app
+                                                              (at_17 :
+                                                               ((vec 2) ->
+                                                                ((vec 2) ->
+                                                                 (vec 2))))
+                                                              ((vec2
+                                                                (-0.28 : float)
+                                                                (-0.19 : float))
+                                                               : (vec 2)))
+                                                             :
+                                                             ((vec 2) -> (vec 2)))
+                                                            (p_58 : (vec 2)))
+                                                           : (vec 2)))
+                                                         : float)
+                                                        ((let paw_r_81
+                                                          ((app
+                                                            ((app
+                                                              (circle_23 :
+                                                               (float ->
+                                                                ((vec 2) ->
+                                                                 float)))
+                                                              (0.055 : float))
+                                                             :
+                                                             ((vec 2) -> float))
+                                                            ((app
+                                                              ((app
+                                                                (at_17 :
+                                                                 ((vec 2) ->
+                                                                  ((vec 2) ->
+                                                                   (vec 2))))
+                                                                ((vec2
+                                                                  (0.28 : float)
+                                                                  (-0.19 : float))
+                                                                 : (vec 2)))
+                                                               :
+                                                               ((vec 2) ->
+                                                                (vec 2)))
+                                                              (p_58 : (vec 2)))
+                                                             : (vec 2)))
+                                                           : float)
+                                                          ((let foot_l_82
+                                                            ((app
+                                                              ((app
+                                                                (ellipse_20 :
+                                                                 ((vec 2) ->
+                                                                  ((vec 2) ->
+                                                                   float)))
+                                                                ((vec2
+                                                                  (0.095 : float)
+                                                                  (0.048 : float))
+                                                                 : (vec 2)))
+                                                               :
+                                                               ((vec 2) -> float))
+                                                              ((app
+                                                                ((app
+                                                                  (at_17 :
+                                                                   ((vec 2) ->
+                                                                    ((vec 2) ->
+                                                                     (vec 2))))
+                                                                  ((vec2
+                                                                    (-0.13 :
+                                                                     float)
+                                                                    (-0.42 :
+                                                                     float))
+                                                                   : (vec 2)))
+                                                                 :
+                                                                 ((vec 2) ->
+                                                                  (vec 2)))
+                                                                (p_58 : (vec 2)))
+                                                               : (vec 2)))
+                                                             : float)
+                                                            ((let foot_r_83
+                                                              ((app
+                                                                ((app
+                                                                  (ellipse_20 :
+                                                                   ((vec 2) ->
+                                                                    ((vec 2) ->
+                                                                     float)))
+                                                                  ((vec2
+                                                                    (0.095 :
+                                                                     float)
+                                                                    (0.048 :
+                                                                     float))
+                                                                   : (vec 2)))
+                                                                 :
+                                                                 ((vec 2) ->
+                                                                  float))
+                                                                ((app
+                                                                  ((app
+                                                                    (at_17 :
+                                                                     ((vec 2) ->
+                                                                      ((vec 2) ->
+                                                                       (vec 2))))
+                                                                    ((vec2
+                                                                      (0.13 :
+                                                                       float)
+                                                                      (-0.42 :
+                                                                       float))
+                                                                     : (vec 2)))
+                                                                   :
+                                                                   ((vec 2) ->
+                                                                    (vec 2)))
+                                                                  (p_58 :
+                                                                   (vec 2)))
+                                                                 : (vec 2)))
+                                                               : float)
+                                                              ((let tooth_l_84
+                                                                ((app
+                                                                  ((app
+                                                                    (box_26 :
+                                                                     ((vec 2) ->
+                                                                      ((vec 2) ->
+                                                                       float)))
+                                                                    ((vec2
+                                                                      (0.022 :
+                                                                       float)
+                                                                      (0.05 :
+                                                                       float))
+                                                                     : (vec 2)))
+                                                                   :
+                                                                   ((vec 2) ->
+                                                                    float))
+                                                                  ((app
+                                                                    ((app
+                                                                      (at_17 :
+                                                                       ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                      ((vec2
+                                                                        (-0.028 :
+                                                                        float)
+                                                                        (0.035 :
+                                                                        float))
+                                                                       :
+                                                                       (vec 2)))
+                                                                     :
+                                                                     ((vec 2) ->
+                                                                      (vec 2)))
+                                                                    (p_58 :
+                                                                     (vec 2)))
+                                                                   : (vec 2)))
+                                                                 : float)
+                                                                ((let tooth_r_85
+                                                                  ((app
+                                                                    ((app
+                                                                      (box_26 :
+                                                                       ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                      ((vec2
+                                                                        (0.022 :
+                                                                        float)
+                                                                        (0.05 :
+                                                                        float))
+                                                                       :
+                                                                       (vec 2)))
+                                                                     :
+                                                                     ((vec 2) ->
+                                                                      float))
+                                                                    ((app
+                                                                      ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (0.028 :
+                                                                        float)
+                                                                        (0.035 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                       :
+                                                                       ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                      (p_58 :
+                                                                       (vec 2)))
+                                                                     : (vec 2)))
+                                                                   : float)
+                                                                  ((let teeth_86
+                                                                    ((min
+                                                                      (tooth_l_84
+                                                                       : float)
+                                                                      (tooth_r_85
+                                                                       : float))
+                                                                     : float)
+                                                                    ((let
+                                                                      groove_87
+                                                                      ((app
+                                                                        ((app
+                                                                        (box_26 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        ((vec2
+                                                                        (0.005 :
+                                                                        float)
+                                                                        (0.05 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (0. :
+                                                                        float)
+                                                                        (0.035 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                       : float)
+                                                                      ((let
+                                                                        nose_88
+                                                                        ((app
+                                                                        ((app
+                                                                        (ellipse_20
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        ((vec2
+                                                                        (0.038 :
+                                                                        float)
+                                                                        (0.028 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (0. :
+                                                                        float)
+                                                                        (0.135 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        nose_hi_89
+                                                                        ((app
+                                                                        ((app
+                                                                        (ellipse_20
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        ((vec2
+                                                                        (0.012 :
+                                                                        float)
+                                                                        (0.008 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (-0.012 :
+                                                                        float)
+                                                                        (0.142 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        eye_l_90
+                                                                        ((app
+                                                                        ((app
+                                                                        (circle_23
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        (0.04 :
+                                                                        float)) :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (-0.095 :
+                                                                        float)
+                                                                        (0.255 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        eye_r_91
+                                                                        ((app
+                                                                        ((app
+                                                                        (circle_23
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        (0.04 :
+                                                                        float)) :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (0.095 :
+                                                                        float)
+                                                                        (0.255 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        hi_l_92
+                                                                        ((app
+                                                                        ((app
+                                                                        (circle_23
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        (0.014 :
+                                                                        float)) :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (-0.082 :
+                                                                        float)
+                                                                        (0.27 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        hi_r_93
+                                                                        ((app
+                                                                        ((app
+                                                                        (circle_23
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        (0.014 :
+                                                                        float)) :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (0.108 :
+                                                                        float)
+                                                                        (0.27 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        hi_l2_94
+                                                                        ((app
+                                                                        ((app
+                                                                        (circle_23
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        (0.006 :
+                                                                        float)) :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (-0.105 :
+                                                                        float)
+                                                                        (0.245 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        hi_r2_95
+                                                                        ((app
+                                                                        ((app
+                                                                        (circle_23
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        (0.006 :
+                                                                        float)) :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (0.085 :
+                                                                        float)
+                                                                        (0.245 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        brow_l_96
+                                                                        ((app
+                                                                        ((app
+                                                                        (ellipse_20
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        ((vec2
+                                                                        (0.035 :
+                                                                        float)
+                                                                        (0.01 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (rot_30 :
+                                                                        (float ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        (0.15 :
+                                                                        float)) :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (-0.095 :
+                                                                        float)
+                                                                        (0.315 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        brow_r_97
+                                                                        ((app
+                                                                        ((app
+                                                                        (ellipse_20
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        ((vec2
+                                                                        (0.035 :
+                                                                        float)
+                                                                        (0.01 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (rot_30 :
+                                                                        (float ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        (-0.15 :
+                                                                        float)) :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (0.095 :
+                                                                        float)
+                                                                        (0.315 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        vig_98
+                                                                        ((smoothstep
+                                                                        (0.3 :
+                                                                        float)
+                                                                        (1.1 :
+                                                                        float)
+                                                                        ((length
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        : float))
+                                                                        : float)
+                                                                        ((let
+                                                                        col_99
+                                                                        ((mix
+                                                                        (bg_col_0
+                                                                        :
+                                                                        (vec 3))
+                                                                        (bg_dark_1
+                                                                        :
+                                                                        (vec 3))
+                                                                        (vig_98 :
+                                                                        float)) :
+                                                                        (vec 3))
+                                                                        ((let
+                                                                        shadow_d_100
+                                                                        ((app
+                                                                        ((app
+                                                                        (ellipse_20
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        ((vec2
+                                                                        (0.38 :
+                                                                        float)
+                                                                        (0.055 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (0.02 :
+                                                                        float)
+                                                                        (-0.45 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        shadow_falloff_101
+                                                                        ((smoothstep
+                                                                        (0.08 :
+                                                                        float)
+                                                                        (-0.02 :
+                                                                        float)
+                                                                        (shadow_d_100
+                                                                        : float))
+                                                                        : float)
+                                                                        ((let
+                                                                        col_102
+                                                                        ((mix
+                                                                        (col_99 :
+                                                                        (vec 3))
+                                                                        ((vec3
+                                                                        (0.06 :
+                                                                        float)
+                                                                        (0.28 :
+                                                                        float)
+                                                                        (0.16 :
+                                                                        float)) :
+                                                                        (vec 3))
+                                                                        ((*
+                                                                        (shadow_falloff_101
+                                                                        : float)
+                                                                        (0.55 :
+                                                                        float)) :
+                                                                        float)) :
+                                                                        (vec 3))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (hi_r2_95
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (wht_11 :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (hi_l2_94
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (wht_11 :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (hi_r_93
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (wht_11 :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (hi_l_92
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (wht_11 :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (eye_r_91
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (black_10
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (eye_l_90
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (black_10
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (nose_hi_89
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (brown_lt_3
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (nose_88
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (drk_brown_5
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (groove_87
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (brown_dk_4
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (teeth_86
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (tooth_yel_12
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (brow_r_97
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (drk_brown_5
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (brow_l_96
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (drk_brown_5
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (muzzle_72
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (cream_6
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (ear_in_r_77
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (pink_8 :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (ear_in_l_76
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (pink_8 :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (ear_r_75
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (brown_2
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (ear_l_74
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (brown_2
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (paw_r_81
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (cream_6
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (paw_l_80
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (cream_6
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_shaded_49
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))))
+                                                                        (belly_73
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))))
+                                                                        (cream_6
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (cream_dk_7
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (0.05 :
+                                                                        float)) :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_shaded_49
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))))
+                                                                        (torso_with_cheeks_71
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))))
+                                                                        (brown_2
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (brown_dk_4
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (0.08 :
+                                                                        float)) :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (arm_r_79
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (brown_dk_4
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (arm_l_78
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (brown_dk_4
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (foot_r_83
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (drk_brown_5
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (foot_l_82
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (drk_brown_5
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (tail_scales_63
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (drk_brown_5
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (tail_rim_64
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (drk_brown_5
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (tail_60
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (brown_dk_4
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        (col_102
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                       :
+                                                                       (vec 3)))
+                                                                     : (vec 3)))
+                                                                   : (vec 3)))
+                                                                 : (vec 3)))
+                                                               : (vec 3)))
+                                                             : (vec 3)))
+                                                           : (vec 3)))
+                                                         : (vec 3)))
+                                                       : (vec 3)))
+                                                     : (vec 3)))
+                                                   : (vec 3)))
+                                                 : (vec 3)))
+                                               : (vec 3)))
+                                             : (vec 3)))
+                                           : (vec 3)))
+                                         : (vec 3)))
+                                       : (vec 3)))
+                                     : (vec 3)))
+                                   : (vec 3)))
+                                 : (vec 3)))
+                               : (vec 3)))
+                             : (vec 3)))
+                           : (vec 3)))
+                         : (vec 3)))
+                       : (vec 3)))
+                     : (vec 3)))
+                   : (vec 3)))
+                 : (vec 3)))
+               : (vec 3)))
+             : (vec 3)))
+           : (vec 3)))
+         : ((vec 2) -> (vec 3))))
+       : ((vec 2) -> (vec 3)))))
+
+    === monomorphize (beaver.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2))
+      ((Define Nonrec bg_col_0
+        ((vec3 (0.13 : float) (0.48 : float) (0.3 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec bg_dark_1
+        ((vec3 (0.09 : float) (0.36 : float) (0.22 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec brown_2
+        ((vec3 (0.55 : float) (0.34 : float) (0.16 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec brown_lt_3
+        ((vec3 (0.68 : float) (0.46 : float) (0.24 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec brown_dk_4
+        ((vec3 (0.38 : float) (0.22 : float) (0.08 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec drk_brown_5
+        ((vec3 (0.22 : float) (0.11 : float) (0.03 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec cream_6
+        ((vec3 (0.95 : float) (0.89 : float) (0.74 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec cream_dk_7
+        ((vec3 (0.78 : float) (0.68 : float) (0.5 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec pink_8
+        ((vec3 (0.92 : float) (0.62 : float) (0.6 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec pink_dk_9
+        ((vec3 (0.75 : float) (0.42 : float) (0.42 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec black_10
+        ((vec3 (0.06 : float) (0.04 : float) (0.03 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec wht_11
+        ((vec3 (1. : float) (0.97 : float) (0.93 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec tooth_yel_12
+        ((vec3 (0.92 : float) (0.85 : float) (0.6 : float)) : (vec 3)))
+       : (vec 3))
+      ((Define Nonrec at_17
+        ((lambda offset_18
+          ((lambda p_19 ((- (p_19 : (vec 2)) (offset_18 : (vec 2))) : (vec 2))) :
+           ((vec 2) -> (vec 2))))
+         : ((vec 2) -> ((vec 2) -> (vec 2)))))
+       : ((vec 2) -> ((vec 2) -> (vec 2))))
+      ((Define Nonrec ellipse_20
+        ((lambda ab_21
+          ((lambda p_22
+            ((-
+              ((length ((/ (p_22 : (vec 2)) (ab_21 : (vec 2))) : (vec 2))) :
+               float)
+              (1 : int))
+             : float))
+           : ((vec 2) -> float)))
+         : ((vec 2) -> ((vec 2) -> float))))
+       : ((vec 2) -> ((vec 2) -> float)))
+      ((Define Nonrec circle_23
+        ((lambda r_24
+          ((lambda p_25
+            ((- ((length (p_25 : (vec 2))) : float) (r_24 : float)) : float))
+           : ((vec 2) -> float)))
+         : (float -> ((vec 2) -> float))))
+       : (float -> ((vec 2) -> float)))
+      ((Define Nonrec box_26
+        ((lambda b_27
+          ((lambda p_28
+            ((let d_29
+              ((- ((abs (p_28 : (vec 2))) : (vec 2)) (b_27 : (vec 2))) : (vec 2))
+              ((+
+                ((length
+                  ((max (d_29 : (vec 2)) ((vec2 (0 : int) (0 : int)) : (vec 2)))
+                   : (vec 2)))
+                 : float)
+                ((min
+                  ((max ((index (d_29 : (vec 2)) 0) : float)
+                    ((index (d_29 : (vec 2)) 1) : float))
+                   : float)
+                  (0 : int))
+                 : float))
+               : float))
+             : float))
+           : ((vec 2) -> float)))
+         : ((vec 2) -> ((vec 2) -> float))))
+       : ((vec 2) -> ((vec 2) -> float)))
+      ((Define Nonrec rot_30
+        ((lambda a_31
+          ((lambda p_32
+            ((let c_33 ((cos (a_31 : float)) : float)
+              ((let s_34 ((sin (a_31 : float)) : float)
+                ((vec2
+                  ((-
+                    ((* (c_33 : float) ((index (p_32 : (vec 2)) 0) : float)) :
+                     float)
+                    ((* (s_34 : float) ((index (p_32 : (vec 2)) 1) : float)) :
+                     float))
+                   : float)
+                  ((+
+                    ((* (s_34 : float) ((index (p_32 : (vec 2)) 0) : float)) :
+                     float)
+                    ((* (c_33 : float) ((index (p_32 : (vec 2)) 1) : float)) :
+                     float))
+                   : float))
+                 : (vec 2)))
+               : (vec 2)))
+             : (vec 2)))
+           : ((vec 2) -> (vec 2))))
+         : (float -> ((vec 2) -> (vec 2)))))
+       : (float -> ((vec 2) -> (vec 2))))
+      ((Define Nonrec smin_35
+        ((lambda a_36
+          ((lambda b_37
+            ((lambda k_38
+              ((let h_39
+                ((/
+                  ((max
+                    ((- (k_38 : float)
+                      ((abs ((- (a_36 : float) (b_37 : float)) : float)) : float))
+                     : float)
+                    (0 : int))
+                   : float)
+                  (k_38 : float))
+                 : float)
+                ((- ((min (a_36 : float) (b_37 : float)) : float)
+                  ((*
+                    ((* ((* (h_39 : float) (h_39 : float)) : float)
+                      (k_38 : float))
+                     : float)
+                    (0.25 : float))
+                   : float))
+                 : float))
+               : float))
+             : (float -> float)))
+           : (float -> (float -> float))))
+         : (float -> (float -> (float -> float)))))
+       : (float -> (float -> (float -> float))))
+      ((Define Nonrec smax_40
+        ((lambda a_41
+          ((lambda b_42
+            ((lambda k_43
+              ((let h_44
+                ((/
+                  ((max
+                    ((- (k_43 : float)
+                      ((abs ((- (a_41 : float) (b_42 : float)) : float)) : float))
+                     : float)
+                    (0 : int))
+                   : float)
+                  (k_43 : float))
+                 : float)
+                ((+ ((max (a_41 : float) (b_42 : float)) : float)
+                  ((*
+                    ((* ((* (h_44 : float) (h_44 : float)) : float)
+                      (k_43 : float))
+                     : float)
+                    (0.25 : float))
+                   : float))
+                 : float))
+               : float))
+             : (float -> float)))
+           : (float -> (float -> float))))
+         : (float -> (float -> (float -> float)))))
+       : (float -> (float -> (float -> float))))
+      ((Define Nonrec paint_45
+        ((lambda d_46
+          ((lambda shape_col_47
+            ((lambda bg_48
+              ((mix (shape_col_47 : (vec 3)) (bg_48 : (vec 3))
+                ((smoothstep (-0.005 : float) (0.005 : float) (d_46 : float)) :
+                 float))
+               : (vec 3)))
+             : ((vec 3) -> (vec 3))))
+           : ((vec 3) -> ((vec 3) -> (vec 3)))))
+         : (float -> ((vec 3) -> ((vec 3) -> (vec 3))))))
+       : (float -> ((vec 3) -> ((vec 3) -> (vec 3)))))
+      ((Define Nonrec paint_shaded_49
+        ((lambda d_50
+          ((lambda shape_col_51
+            ((lambda shadow_col_52
+              ((lambda shadow_depth_53
+                ((lambda bg_54
+                  ((let base_55
+                    ((mix (shape_col_51 : (vec 3)) (bg_54 : (vec 3))
+                      ((smoothstep (-0.005 : float) (0.005 : float)
+                        (d_50 : float))
+                       : float))
+                     : (vec 3))
+                    ((let shade_56
+                      ((smoothstep
+                        ((* (-1 : int) (shadow_depth_53 : float)) : float)
+                        (0 : int) (d_50 : float))
+                       : float)
+                      ((mix (base_55 : (vec 3))
+                        ((mix (shape_col_51 : (vec 3)) (shadow_col_52 : (vec 3))
+                          ((* (shade_56 : float) (0.55 : float)) : float))
+                         : (vec 3))
+                        ((smoothstep (0.005 : float) (-0.005 : float)
+                          (d_50 : float))
+                         : float))
+                       : (vec 3)))
+                     : (vec 3)))
+                   : (vec 3)))
+                 : ((vec 3) -> (vec 3))))
+               : (float -> ((vec 3) -> (vec 3)))))
+             : ((vec 3) -> (float -> ((vec 3) -> (vec 3))))))
+           : ((vec 3) -> ((vec 3) -> (float -> ((vec 3) -> (vec 3)))))))
+         : (float -> ((vec 3) -> ((vec 3) -> (float -> ((vec 3) -> (vec 3))))))))
+       : (float -> ((vec 3) -> ((vec 3) -> (float -> ((vec 3) -> (vec 3)))))))
+      ((Define Nonrec get_uv_13_vec2_to_vec2_476
+        ((lambda coord_14
+          ((let top_15
+            ((- ((* (2 : int) (coord_14 : (vec 2))) : (vec 2))
+              (u_resolution : (vec 2)))
+             : (vec 2))
+            ((let bot_16
+              ((min ((index (u_resolution : (vec 2)) 0) : float)
+                ((index (u_resolution : (vec 2)) 1) : float))
+               : float)
+              ((/ (top_15 : (vec 2)) (bot_16 : float)) : (vec 2)))
+             : (vec 2)))
+           : (vec 2)))
+         : ((vec 2) -> (vec 2))))
+       : ((vec 2) -> (vec 2)))
+      ((Define Nonrec main
+        ((lambda coord_57
+          ((let p_58
+            ((/
+              ((app (get_uv_13_vec2_to_vec2_476 : ((vec 2) -> (vec 2)))
+                (coord_57 : (vec 2)))
+               : (vec 2))
+              (1.5 : float))
+             : (vec 2))
+            ((let tp_59
+              ((app
+                ((app (rot_30 : (float -> ((vec 2) -> (vec 2)))) (-0.35 : float))
+                 : ((vec 2) -> (vec 2)))
+                ((app
+                  ((app (at_17 : ((vec 2) -> ((vec 2) -> (vec 2))))
+                    ((vec2 (0.28 : float) (-0.28 : float)) : (vec 2)))
+                   : ((vec 2) -> (vec 2)))
+                  (p_58 : (vec 2)))
+                 : (vec 2)))
+               : (vec 2))
+              ((let tail_60
+                ((app
+                  ((app (ellipse_20 : ((vec 2) -> ((vec 2) -> float)))
+                    ((vec2 (0.22 : float) (0.085 : float)) : (vec 2)))
+                   : ((vec 2) -> float))
+                  (tp_59 : (vec 2)))
+                 : float)
+                ((let tsx_61
+                  ((-
+                    ((abs
+                      ((sin
+                        ((*
+                          ((+ ((index (tp_59 : (vec 2)) 0) : float)
+                            ((index (tp_59 : (vec 2)) 1) : float))
+                           : float)
+                          (38. : float))
+                         : float))
+                       : float))
+                     : float)
+                    (0.55 : float))
+                   : float)
+                  ((let tsy_62
+                    ((-
+                      ((abs
+                        ((sin
+                          ((*
+                            ((- ((index (tp_59 : (vec 2)) 0) : float)
+                              ((index (tp_59 : (vec 2)) 1) : float))
+                             : float)
+                            (38. : float))
+                           : float))
+                         : float))
+                       : float)
+                      (0.55 : float))
+                     : float)
+                    ((let tail_scales_63
+                      ((max ((+ (tail_60 : float) (0.01 : float)) : float)
+                        ((* ((min (tsx_61 : float) (tsy_62 : float)) : float)
+                          (0.015 : float))
+                         : float))
+                       : float)
+                      ((let tail_rim_64
+                        ((max (tail_60 : float)
+                          ((* (-1 : int)
+                            ((+ (tail_60 : float) (0.018 : float)) : float))
+                           : float))
+                         : float)
+                        ((let body_65
+                          ((app
+                            ((app (ellipse_20 : ((vec 2) -> ((vec 2) -> float)))
+                              ((vec2 (0.25 : float) (0.26 : float)) : (vec 2)))
+                             : ((vec 2) -> float))
+                            ((app
+                              ((app (at_17 : ((vec 2) -> ((vec 2) -> (vec 2))))
+                                ((vec2 (0. : float) (-0.16 : float)) : (vec 2)))
+                               : ((vec 2) -> (vec 2)))
+                              (p_58 : (vec 2)))
+                             : (vec 2)))
+                           : float)
+                          ((let head_66
+                            ((app
+                              ((app
+                                (ellipse_20 : ((vec 2) -> ((vec 2) -> float)))
+                                ((vec2 (0.22 : float) (0.2 : float)) : (vec 2)))
+                               : ((vec 2) -> float))
+                              ((app
+                                ((app (at_17 : ((vec 2) -> ((vec 2) -> (vec 2))))
+                                  ((vec2 (0. : float) (0.2 : float)) : (vec 2)))
+                                 : ((vec 2) -> (vec 2)))
+                                (p_58 : (vec 2)))
+                               : (vec 2)))
+                             : float)
+                            ((let torso_67
+                              ((app
+                                ((app
+                                  ((app
+                                    (smin_35 :
+                                     (float -> (float -> (float -> float))))
+                                    (body_65 : float))
+                                   : (float -> (float -> float)))
+                                  (head_66 : float))
+                                 : (float -> float))
+                                (0.1 : float))
+                               : float)
+                              ((let cheek_l_68
+                                ((app
+                                  ((app
+                                    (circle_23 : (float -> ((vec 2) -> float)))
+                                    (0.1 : float))
+                                   : ((vec 2) -> float))
+                                  ((app
+                                    ((app
+                                      (at_17 : ((vec 2) -> ((vec 2) -> (vec 2))))
+                                      ((vec2 (-0.14 : float) (0.11 : float)) :
+                                       (vec 2)))
+                                     : ((vec 2) -> (vec 2)))
+                                    (p_58 : (vec 2)))
+                                   : (vec 2)))
+                                 : float)
+                                ((let cheek_r_69
+                                  ((app
+                                    ((app
+                                      (circle_23 : (float -> ((vec 2) -> float)))
+                                      (0.1 : float))
+                                     : ((vec 2) -> float))
+                                    ((app
+                                      ((app
+                                        (at_17 :
+                                         ((vec 2) -> ((vec 2) -> (vec 2))))
+                                        ((vec2 (0.14 : float) (0.11 : float)) :
+                                         (vec 2)))
+                                       : ((vec 2) -> (vec 2)))
+                                      (p_58 : (vec 2)))
+                                     : (vec 2)))
+                                   : float)
+                                  ((let cheeks_70
+                                    ((min (cheek_l_68 : float)
+                                      (cheek_r_69 : float))
+                                     : float)
+                                    ((let torso_with_cheeks_71
+                                      ((app
+                                        ((app
+                                          ((app
+                                            (smin_35 :
+                                             (float ->
+                                              (float -> (float -> float))))
+                                            (torso_67 : float))
+                                           : (float -> (float -> float)))
+                                          (cheeks_70 : float))
+                                         : (float -> float))
+                                        (0.06 : float))
+                                       : float)
+                                      ((let muzzle_72
+                                        ((app
+                                          ((app
+                                            (ellipse_20 :
+                                             ((vec 2) -> ((vec 2) -> float)))
+                                            ((vec2 (0.13 : float)
+                                              (0.095 : float))
+                                             : (vec 2)))
+                                           : ((vec 2) -> float))
+                                          ((app
+                                            ((app
+                                              (at_17 :
+                                               ((vec 2) -> ((vec 2) -> (vec 2))))
+                                              ((vec2 (0. : float) (0.09 : float))
+                                               : (vec 2)))
+                                             : ((vec 2) -> (vec 2)))
+                                            (p_58 : (vec 2)))
+                                           : (vec 2)))
+                                         : float)
+                                        ((let belly_73
+                                          ((app
+                                            ((app
+                                              (ellipse_20 :
+                                               ((vec 2) -> ((vec 2) -> float)))
+                                              ((vec2 (0.15 : float)
+                                                (0.17 : float))
+                                               : (vec 2)))
+                                             : ((vec 2) -> float))
+                                            ((app
+                                              ((app
+                                                (at_17 :
+                                                 ((vec 2) ->
+                                                  ((vec 2) -> (vec 2))))
+                                                ((vec2 (0. : float)
+                                                  (-0.2 : float))
+                                                 : (vec 2)))
+                                               : ((vec 2) -> (vec 2)))
+                                              (p_58 : (vec 2)))
+                                             : (vec 2)))
+                                           : float)
+                                          ((let ear_l_74
+                                            ((app
+                                              ((app
+                                                (circle_23 :
+                                                 (float -> ((vec 2) -> float)))
+                                                (0.075 : float))
+                                               : ((vec 2) -> float))
+                                              ((app
+                                                ((app
+                                                  (at_17 :
+                                                   ((vec 2) ->
+                                                    ((vec 2) -> (vec 2))))
+                                                  ((vec2 (-0.175 : float)
+                                                    (0.355 : float))
+                                                   : (vec 2)))
+                                                 : ((vec 2) -> (vec 2)))
+                                                (p_58 : (vec 2)))
+                                               : (vec 2)))
+                                             : float)
+                                            ((let ear_r_75
+                                              ((app
+                                                ((app
+                                                  (circle_23 :
+                                                   (float -> ((vec 2) -> float)))
+                                                  (0.075 : float))
+                                                 : ((vec 2) -> float))
+                                                ((app
+                                                  ((app
+                                                    (at_17 :
+                                                     ((vec 2) ->
+                                                      ((vec 2) -> (vec 2))))
+                                                    ((vec2 (0.175 : float)
+                                                      (0.355 : float))
+                                                     : (vec 2)))
+                                                   : ((vec 2) -> (vec 2)))
+                                                  (p_58 : (vec 2)))
+                                                 : (vec 2)))
+                                               : float)
+                                              ((let ear_in_l_76
+                                                ((app
+                                                  ((app
+                                                    (ellipse_20 :
+                                                     ((vec 2) ->
+                                                      ((vec 2) -> float)))
+                                                    ((vec2 (0.035 : float)
+                                                      (0.042 : float))
+                                                     : (vec 2)))
+                                                   : ((vec 2) -> float))
+                                                  ((app
+                                                    ((app
+                                                      (at_17 :
+                                                       ((vec 2) ->
+                                                        ((vec 2) -> (vec 2))))
+                                                      ((vec2 (-0.175 : float)
+                                                        (0.345 : float))
+                                                       : (vec 2)))
+                                                     : ((vec 2) -> (vec 2)))
+                                                    (p_58 : (vec 2)))
+                                                   : (vec 2)))
+                                                 : float)
+                                                ((let ear_in_r_77
+                                                  ((app
+                                                    ((app
+                                                      (ellipse_20 :
+                                                       ((vec 2) ->
+                                                        ((vec 2) -> float)))
+                                                      ((vec2 (0.035 : float)
+                                                        (0.042 : float))
+                                                       : (vec 2)))
+                                                     : ((vec 2) -> float))
+                                                    ((app
+                                                      ((app
+                                                        (at_17 :
+                                                         ((vec 2) ->
+                                                          ((vec 2) -> (vec 2))))
+                                                        ((vec2 (0.175 : float)
+                                                          (0.345 : float))
+                                                         : (vec 2)))
+                                                       : ((vec 2) -> (vec 2)))
+                                                      (p_58 : (vec 2)))
+                                                     : (vec 2)))
+                                                   : float)
+                                                  ((let arm_l_78
+                                                    ((app
+                                                      ((app
+                                                        (ellipse_20 :
+                                                         ((vec 2) ->
+                                                          ((vec 2) -> float)))
+                                                        ((vec2 (0.065 : float)
+                                                          (0.09 : float))
+                                                         : (vec 2)))
+                                                       : ((vec 2) -> float))
+                                                      ((app
+                                                        ((app
+                                                          (at_17 :
+                                                           ((vec 2) ->
+                                                            ((vec 2) -> (vec 2))))
+                                                          ((vec2 (-0.23 : float)
+                                                            (-0.09 : float))
+                                                           : (vec 2)))
+                                                         : ((vec 2) -> (vec 2)))
+                                                        (p_58 : (vec 2)))
+                                                       : (vec 2)))
+                                                     : float)
+                                                    ((let arm_r_79
+                                                      ((app
+                                                        ((app
+                                                          (ellipse_20 :
+                                                           ((vec 2) ->
+                                                            ((vec 2) -> float)))
+                                                          ((vec2 (0.065 : float)
+                                                            (0.09 : float))
+                                                           : (vec 2)))
+                                                         : ((vec 2) -> float))
+                                                        ((app
+                                                          ((app
+                                                            (at_17 :
+                                                             ((vec 2) ->
+                                                              ((vec 2) ->
+                                                               (vec 2))))
+                                                            ((vec2 (0.23 : float)
+                                                              (-0.09 : float))
+                                                             : (vec 2)))
+                                                           :
+                                                           ((vec 2) -> (vec 2)))
+                                                          (p_58 : (vec 2)))
+                                                         : (vec 2)))
+                                                       : float)
+                                                      ((let paw_l_80
+                                                        ((app
+                                                          ((app
+                                                            (circle_23 :
+                                                             (float ->
+                                                              ((vec 2) -> float)))
+                                                            (0.055 : float))
+                                                           : ((vec 2) -> float))
+                                                          ((app
+                                                            ((app
+                                                              (at_17 :
+                                                               ((vec 2) ->
+                                                                ((vec 2) ->
+                                                                 (vec 2))))
+                                                              ((vec2
+                                                                (-0.28 : float)
+                                                                (-0.19 : float))
+                                                               : (vec 2)))
+                                                             :
+                                                             ((vec 2) -> (vec 2)))
+                                                            (p_58 : (vec 2)))
+                                                           : (vec 2)))
+                                                         : float)
+                                                        ((let paw_r_81
+                                                          ((app
+                                                            ((app
+                                                              (circle_23 :
+                                                               (float ->
+                                                                ((vec 2) ->
+                                                                 float)))
+                                                              (0.055 : float))
+                                                             :
+                                                             ((vec 2) -> float))
+                                                            ((app
+                                                              ((app
+                                                                (at_17 :
+                                                                 ((vec 2) ->
+                                                                  ((vec 2) ->
+                                                                   (vec 2))))
+                                                                ((vec2
+                                                                  (0.28 : float)
+                                                                  (-0.19 : float))
+                                                                 : (vec 2)))
+                                                               :
+                                                               ((vec 2) ->
+                                                                (vec 2)))
+                                                              (p_58 : (vec 2)))
+                                                             : (vec 2)))
+                                                           : float)
+                                                          ((let foot_l_82
+                                                            ((app
+                                                              ((app
+                                                                (ellipse_20 :
+                                                                 ((vec 2) ->
+                                                                  ((vec 2) ->
+                                                                   float)))
+                                                                ((vec2
+                                                                  (0.095 : float)
+                                                                  (0.048 : float))
+                                                                 : (vec 2)))
+                                                               :
+                                                               ((vec 2) -> float))
+                                                              ((app
+                                                                ((app
+                                                                  (at_17 :
+                                                                   ((vec 2) ->
+                                                                    ((vec 2) ->
+                                                                     (vec 2))))
+                                                                  ((vec2
+                                                                    (-0.13 :
+                                                                     float)
+                                                                    (-0.42 :
+                                                                     float))
+                                                                   : (vec 2)))
+                                                                 :
+                                                                 ((vec 2) ->
+                                                                  (vec 2)))
+                                                                (p_58 : (vec 2)))
+                                                               : (vec 2)))
+                                                             : float)
+                                                            ((let foot_r_83
+                                                              ((app
+                                                                ((app
+                                                                  (ellipse_20 :
+                                                                   ((vec 2) ->
+                                                                    ((vec 2) ->
+                                                                     float)))
+                                                                  ((vec2
+                                                                    (0.095 :
+                                                                     float)
+                                                                    (0.048 :
+                                                                     float))
+                                                                   : (vec 2)))
+                                                                 :
+                                                                 ((vec 2) ->
+                                                                  float))
+                                                                ((app
+                                                                  ((app
+                                                                    (at_17 :
+                                                                     ((vec 2) ->
+                                                                      ((vec 2) ->
+                                                                       (vec 2))))
+                                                                    ((vec2
+                                                                      (0.13 :
+                                                                       float)
+                                                                      (-0.42 :
+                                                                       float))
+                                                                     : (vec 2)))
+                                                                   :
+                                                                   ((vec 2) ->
+                                                                    (vec 2)))
+                                                                  (p_58 :
+                                                                   (vec 2)))
+                                                                 : (vec 2)))
+                                                               : float)
+                                                              ((let tooth_l_84
+                                                                ((app
+                                                                  ((app
+                                                                    (box_26 :
+                                                                     ((vec 2) ->
+                                                                      ((vec 2) ->
+                                                                       float)))
+                                                                    ((vec2
+                                                                      (0.022 :
+                                                                       float)
+                                                                      (0.05 :
+                                                                       float))
+                                                                     : (vec 2)))
+                                                                   :
+                                                                   ((vec 2) ->
+                                                                    float))
+                                                                  ((app
+                                                                    ((app
+                                                                      (at_17 :
+                                                                       ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                      ((vec2
+                                                                        (-0.028 :
+                                                                        float)
+                                                                        (0.035 :
+                                                                        float))
+                                                                       :
+                                                                       (vec 2)))
+                                                                     :
+                                                                     ((vec 2) ->
+                                                                      (vec 2)))
+                                                                    (p_58 :
+                                                                     (vec 2)))
+                                                                   : (vec 2)))
+                                                                 : float)
+                                                                ((let tooth_r_85
+                                                                  ((app
+                                                                    ((app
+                                                                      (box_26 :
+                                                                       ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                      ((vec2
+                                                                        (0.022 :
+                                                                        float)
+                                                                        (0.05 :
+                                                                        float))
+                                                                       :
+                                                                       (vec 2)))
+                                                                     :
+                                                                     ((vec 2) ->
+                                                                      float))
+                                                                    ((app
+                                                                      ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (0.028 :
+                                                                        float)
+                                                                        (0.035 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                       :
+                                                                       ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                      (p_58 :
+                                                                       (vec 2)))
+                                                                     : (vec 2)))
+                                                                   : float)
+                                                                  ((let teeth_86
+                                                                    ((min
+                                                                      (tooth_l_84
+                                                                       : float)
+                                                                      (tooth_r_85
+                                                                       : float))
+                                                                     : float)
+                                                                    ((let
+                                                                      groove_87
+                                                                      ((app
+                                                                        ((app
+                                                                        (box_26 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        ((vec2
+                                                                        (0.005 :
+                                                                        float)
+                                                                        (0.05 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (0. :
+                                                                        float)
+                                                                        (0.035 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                       : float)
+                                                                      ((let
+                                                                        nose_88
+                                                                        ((app
+                                                                        ((app
+                                                                        (ellipse_20
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        ((vec2
+                                                                        (0.038 :
+                                                                        float)
+                                                                        (0.028 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (0. :
+                                                                        float)
+                                                                        (0.135 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        nose_hi_89
+                                                                        ((app
+                                                                        ((app
+                                                                        (ellipse_20
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        ((vec2
+                                                                        (0.012 :
+                                                                        float)
+                                                                        (0.008 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (-0.012 :
+                                                                        float)
+                                                                        (0.142 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        eye_l_90
+                                                                        ((app
+                                                                        ((app
+                                                                        (circle_23
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        (0.04 :
+                                                                        float)) :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (-0.095 :
+                                                                        float)
+                                                                        (0.255 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        eye_r_91
+                                                                        ((app
+                                                                        ((app
+                                                                        (circle_23
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        (0.04 :
+                                                                        float)) :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (0.095 :
+                                                                        float)
+                                                                        (0.255 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        hi_l_92
+                                                                        ((app
+                                                                        ((app
+                                                                        (circle_23
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        (0.014 :
+                                                                        float)) :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (-0.082 :
+                                                                        float)
+                                                                        (0.27 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        hi_r_93
+                                                                        ((app
+                                                                        ((app
+                                                                        (circle_23
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        (0.014 :
+                                                                        float)) :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (0.108 :
+                                                                        float)
+                                                                        (0.27 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        hi_l2_94
+                                                                        ((app
+                                                                        ((app
+                                                                        (circle_23
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        (0.006 :
+                                                                        float)) :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (-0.105 :
+                                                                        float)
+                                                                        (0.245 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        hi_r2_95
+                                                                        ((app
+                                                                        ((app
+                                                                        (circle_23
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        (0.006 :
+                                                                        float)) :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (0.085 :
+                                                                        float)
+                                                                        (0.245 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        brow_l_96
+                                                                        ((app
+                                                                        ((app
+                                                                        (ellipse_20
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        ((vec2
+                                                                        (0.035 :
+                                                                        float)
+                                                                        (0.01 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (rot_30 :
+                                                                        (float ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        (0.15 :
+                                                                        float)) :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (-0.095 :
+                                                                        float)
+                                                                        (0.315 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        brow_r_97
+                                                                        ((app
+                                                                        ((app
+                                                                        (ellipse_20
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        ((vec2
+                                                                        (0.035 :
+                                                                        float)
+                                                                        (0.01 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (rot_30 :
+                                                                        (float ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        (-0.15 :
+                                                                        float)) :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (0.095 :
+                                                                        float)
+                                                                        (0.315 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        vig_98
+                                                                        ((smoothstep
+                                                                        (0.3 :
+                                                                        float)
+                                                                        (1.1 :
+                                                                        float)
+                                                                        ((length
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        : float))
+                                                                        : float)
+                                                                        ((let
+                                                                        col_99
+                                                                        ((mix
+                                                                        (bg_col_0
+                                                                        :
+                                                                        (vec 3))
+                                                                        (bg_dark_1
+                                                                        :
+                                                                        (vec 3))
+                                                                        (vig_98 :
+                                                                        float)) :
+                                                                        (vec 3))
+                                                                        ((let
+                                                                        shadow_d_100
+                                                                        ((app
+                                                                        ((app
+                                                                        (ellipse_20
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        -> float)))
+                                                                        ((vec2
+                                                                        (0.38 :
+                                                                        float)
+                                                                        (0.055 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        -> float))
+                                                                        ((app
+                                                                        ((app
+                                                                        (at_17 :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2))))
+                                                                        ((vec2
+                                                                        (0.02 :
+                                                                        float)
+                                                                        (-0.45 :
+                                                                        float)) :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        ((vec 2)
+                                                                        ->
+                                                                        (vec 2)))
+                                                                        (p_58 :
+                                                                        (vec 2)))
+                                                                        :
+                                                                        (vec 2)))
+                                                                        : float)
+                                                                        ((let
+                                                                        shadow_falloff_101
+                                                                        ((smoothstep
+                                                                        (0.08 :
+                                                                        float)
+                                                                        (-0.02 :
+                                                                        float)
+                                                                        (shadow_d_100
+                                                                        : float))
+                                                                        : float)
+                                                                        ((let
+                                                                        col_102
+                                                                        ((mix
+                                                                        (col_99 :
+                                                                        (vec 3))
+                                                                        ((vec3
+                                                                        (0.06 :
+                                                                        float)
+                                                                        (0.28 :
+                                                                        float)
+                                                                        (0.16 :
+                                                                        float)) :
+                                                                        (vec 3))
+                                                                        ((*
+                                                                        (shadow_falloff_101
+                                                                        : float)
+                                                                        (0.55 :
+                                                                        float)) :
+                                                                        float)) :
+                                                                        (vec 3))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (hi_r2_95
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (wht_11 :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (hi_l2_94
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (wht_11 :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (hi_r_93
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (wht_11 :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (hi_l_92
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (wht_11 :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (eye_r_91
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (black_10
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (eye_l_90
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (black_10
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (nose_hi_89
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (brown_lt_3
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (nose_88
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (drk_brown_5
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (groove_87
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (brown_dk_4
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (teeth_86
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (tooth_yel_12
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (brow_r_97
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (drk_brown_5
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (brow_l_96
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (drk_brown_5
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (muzzle_72
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (cream_6
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (ear_in_r_77
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (pink_8 :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (ear_in_l_76
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (pink_8 :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (ear_r_75
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (brown_2
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (ear_l_74
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (brown_2
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (paw_r_81
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (cream_6
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (paw_l_80
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (cream_6
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_shaded_49
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))))
+                                                                        (belly_73
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))))
+                                                                        (cream_6
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (cream_dk_7
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (0.05 :
+                                                                        float)) :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_shaded_49
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))))
+                                                                        (torso_with_cheeks_71
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))))
+                                                                        (brown_2
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (brown_dk_4
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (0.08 :
+                                                                        float)) :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (arm_r_79
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (brown_dk_4
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (arm_l_78
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (brown_dk_4
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (foot_r_83
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (drk_brown_5
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (foot_l_82
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (drk_brown_5
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (tail_scales_63
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (drk_brown_5
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (tail_rim_64
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (drk_brown_5
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        ((app
+                                                                        ((app
+                                                                        ((app
+                                                                        (paint_45
+                                                                        :
+                                                                        (float ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))))
+                                                                        (tail_60
+                                                                        : float))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3))))
+                                                                        (brown_dk_4
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        ((vec 3)
+                                                                        ->
+                                                                        (vec 3)))
+                                                                        (col_102
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                        :
+                                                                        (vec 3)))
+                                                                       :
+                                                                       (vec 3)))
+                                                                     : (vec 3)))
+                                                                   : (vec 3)))
+                                                                 : (vec 3)))
+                                                               : (vec 3)))
+                                                             : (vec 3)))
+                                                           : (vec 3)))
+                                                         : (vec 3)))
+                                                       : (vec 3)))
+                                                     : (vec 3)))
+                                                   : (vec 3)))
+                                                 : (vec 3)))
+                                               : (vec 3)))
+                                             : (vec 3)))
+                                           : (vec 3)))
+                                         : (vec 3)))
+                                       : (vec 3)))
+                                     : (vec 3)))
+                                   : (vec 3)))
+                                 : (vec 3)))
+                               : (vec 3)))
+                             : (vec 3)))
+                           : (vec 3)))
+                         : (vec 3)))
+                       : (vec 3)))
+                     : (vec 3)))
+                   : (vec 3)))
+                 : (vec 3)))
+               : (vec 3)))
+             : (vec 3)))
+           : (vec 3)))
+         : ((vec 2) -> (vec 3))))
+       : ((vec 2) -> (vec 3)))))
+
+    === uncurry (beaver.glml) ===
+    (Program
+     (((Extern u_resolution) : (vec 2))
+      ((Define Nonrec bg_col_0 (vec3 0.13 0.48 0.3)) : (vec 3))
+      ((Define Nonrec bg_dark_1 (vec3 0.09 0.36 0.22)) : (vec 3))
+      ((Define Nonrec brown_2 (vec3 0.55 0.34 0.16)) : (vec 3))
+      ((Define Nonrec brown_lt_3 (vec3 0.68 0.46 0.24)) : (vec 3))
+      ((Define Nonrec brown_dk_4 (vec3 0.38 0.22 0.08)) : (vec 3))
+      ((Define Nonrec drk_brown_5 (vec3 0.22 0.11 0.03)) : (vec 3))
+      ((Define Nonrec cream_6 (vec3 0.95 0.89 0.74)) : (vec 3))
+      ((Define Nonrec cream_dk_7 (vec3 0.78 0.68 0.5)) : (vec 3))
+      ((Define Nonrec pink_8 (vec3 0.92 0.62 0.6)) : (vec 3))
+      ((Define Nonrec pink_dk_9 (vec3 0.75 0.42 0.42)) : (vec 3))
+      ((Define Nonrec black_10 (vec3 0.06 0.04 0.03)) : (vec 3))
+      ((Define Nonrec wht_11 (vec3 1. 0.97 0.93)) : (vec 3))
+      ((Define Nonrec tooth_yel_12 (vec3 0.92 0.85 0.6)) : (vec 3))
+      ((Define Nonrec at_17
+        (lambda ((offset_18 (vec 2)) (p_19 (vec 2))) (- p_19 offset_18)))
+       : ((vec 2) -> ((vec 2) -> (vec 2))))
+      ((Define Nonrec ellipse_20
+        (lambda ((ab_21 (vec 2)) (p_22 (vec 2))) (- (length (/ p_22 ab_21)) 1)))
+       : ((vec 2) -> ((vec 2) -> float)))
+      ((Define Nonrec circle_23
+        (lambda ((r_24 float) (p_25 (vec 2))) (- (length p_25) r_24)))
+       : (float -> ((vec 2) -> float)))
+      ((Define Nonrec box_26
+        (lambda ((b_27 (vec 2)) (p_28 (vec 2)))
+         (let d_29 (- (abs p_28) b_27)
+          (+ (length (max d_29 (vec2 0 0)))
+           (min (max (index d_29 0) (index d_29 1)) 0)))))
+       : ((vec 2) -> ((vec 2) -> float)))
+      ((Define Nonrec rot_30
+        (lambda ((a_31 float) (p_32 (vec 2)))
+         (let c_33 (cos a_31)
+          (let s_34 (sin a_31)
+           (vec2 (- (* c_33 (index p_32 0)) (* s_34 (index p_32 1)))
+            (+ (* s_34 (index p_32 0)) (* c_33 (index p_32 1))))))))
+       : (float -> ((vec 2) -> (vec 2))))
+      ((Define Nonrec smin_35
+        (lambda ((a_36 float) (b_37 float) (k_38 float))
+         (let h_39 (/ (max (- k_38 (abs (- a_36 b_37))) 0) k_38)
+          (- (min a_36 b_37) (* (* (* h_39 h_39) k_38) 0.25)))))
+       : (float -> (float -> (float -> float))))
+      ((Define Nonrec smax_40
+        (lambda ((a_41 float) (b_42 float) (k_43 float))
+         (let h_44 (/ (max (- k_43 (abs (- a_41 b_42))) 0) k_43)
+          (+ (max a_41 b_42) (* (* (* h_44 h_44) k_43) 0.25)))))
+       : (float -> (float -> (float -> float))))
+      ((Define Nonrec paint_45
+        (lambda ((d_46 float) (shape_col_47 (vec 3)) (bg_48 (vec 3)))
+         (mix shape_col_47 bg_48 (smoothstep -0.005 0.005 d_46))))
+       : (float -> ((vec 3) -> ((vec 3) -> (vec 3)))))
+      ((Define Nonrec paint_shaded_49
+        (lambda
+         ((d_50 float) (shape_col_51 (vec 3)) (shadow_col_52 (vec 3))
+          (shadow_depth_53 float) (bg_54 (vec 3)))
+         (let base_55 (mix shape_col_51 bg_54 (smoothstep -0.005 0.005 d_50))
+          (let shade_56 (smoothstep (* -1 shadow_depth_53) 0 d_50)
+           (mix base_55 (mix shape_col_51 shadow_col_52 (* shade_56 0.55))
+            (smoothstep 0.005 -0.005 d_50))))))
+       : (float -> ((vec 3) -> ((vec 3) -> (float -> ((vec 3) -> (vec 3)))))))
+      ((Define Nonrec get_uv_13_vec2_to_vec2_476
+        (lambda ((coord_14 (vec 2)))
+         (let top_15 (- (* 2 coord_14) u_resolution)
+          (let bot_16 (min (index u_resolution 0) (index u_resolution 1))
+           (/ top_15 bot_16)))))
+       : ((vec 2) -> (vec 2)))
+      ((Define Nonrec main
+        (lambda ((coord_57 (vec 2)))
+         (let p_58 (/ (app get_uv_13_vec2_to_vec2_476 coord_57) 1.5)
+          (let tp_59 (app rot_30 -0.35 (app at_17 (vec2 0.28 -0.28) p_58))
+           (let tail_60 (app ellipse_20 (vec2 0.22 0.085) tp_59)
+            (let tsx_61
+             (- (abs (sin (* (+ (index tp_59 0) (index tp_59 1)) 38.))) 0.55)
+             (let tsy_62
+              (- (abs (sin (* (- (index tp_59 0) (index tp_59 1)) 38.))) 0.55)
+              (let tail_scales_63
+               (max (+ tail_60 0.01) (* (min tsx_61 tsy_62) 0.015))
+               (let tail_rim_64 (max tail_60 (* -1 (+ tail_60 0.018)))
+                (let body_65
+                 (app ellipse_20 (vec2 0.25 0.26)
+                  (app at_17 (vec2 0. -0.16) p_58))
+                 (let head_66
+                  (app ellipse_20 (vec2 0.22 0.2) (app at_17 (vec2 0. 0.2) p_58))
+                  (let torso_67 (app smin_35 body_65 head_66 0.1)
+                   (let cheek_l_68
+                    (app circle_23 0.1 (app at_17 (vec2 -0.14 0.11) p_58))
+                    (let cheek_r_69
+                     (app circle_23 0.1 (app at_17 (vec2 0.14 0.11) p_58))
+                     (let cheeks_70 (min cheek_l_68 cheek_r_69)
+                      (let torso_with_cheeks_71
+                       (app smin_35 torso_67 cheeks_70 0.06)
+                       (let muzzle_72
+                        (app ellipse_20 (vec2 0.13 0.095)
+                         (app at_17 (vec2 0. 0.09) p_58))
+                        (let belly_73
+                         (app ellipse_20 (vec2 0.15 0.17)
+                          (app at_17 (vec2 0. -0.2) p_58))
+                         (let ear_l_74
+                          (app circle_23 0.075
+                           (app at_17 (vec2 -0.175 0.355) p_58))
+                          (let ear_r_75
+                           (app circle_23 0.075
+                            (app at_17 (vec2 0.175 0.355) p_58))
+                           (let ear_in_l_76
+                            (app ellipse_20 (vec2 0.035 0.042)
+                             (app at_17 (vec2 -0.175 0.345) p_58))
+                            (let ear_in_r_77
+                             (app ellipse_20 (vec2 0.035 0.042)
+                              (app at_17 (vec2 0.175 0.345) p_58))
+                             (let arm_l_78
+                              (app ellipse_20 (vec2 0.065 0.09)
+                               (app at_17 (vec2 -0.23 -0.09) p_58))
+                              (let arm_r_79
+                               (app ellipse_20 (vec2 0.065 0.09)
+                                (app at_17 (vec2 0.23 -0.09) p_58))
+                               (let paw_l_80
+                                (app circle_23 0.055
+                                 (app at_17 (vec2 -0.28 -0.19) p_58))
+                                (let paw_r_81
+                                 (app circle_23 0.055
+                                  (app at_17 (vec2 0.28 -0.19) p_58))
+                                 (let foot_l_82
+                                  (app ellipse_20 (vec2 0.095 0.048)
+                                   (app at_17 (vec2 -0.13 -0.42) p_58))
+                                  (let foot_r_83
+                                   (app ellipse_20 (vec2 0.095 0.048)
+                                    (app at_17 (vec2 0.13 -0.42) p_58))
+                                   (let tooth_l_84
+                                    (app box_26 (vec2 0.022 0.05)
+                                     (app at_17 (vec2 -0.028 0.035) p_58))
+                                    (let tooth_r_85
+                                     (app box_26 (vec2 0.022 0.05)
+                                      (app at_17 (vec2 0.028 0.035) p_58))
+                                     (let teeth_86 (min tooth_l_84 tooth_r_85)
+                                      (let groove_87
+                                       (app box_26 (vec2 0.005 0.05)
+                                        (app at_17 (vec2 0. 0.035) p_58))
+                                       (let nose_88
+                                        (app ellipse_20 (vec2 0.038 0.028)
+                                         (app at_17 (vec2 0. 0.135) p_58))
+                                        (let nose_hi_89
+                                         (app ellipse_20 (vec2 0.012 0.008)
+                                          (app at_17 (vec2 -0.012 0.142) p_58))
+                                         (let eye_l_90
+                                          (app circle_23 0.04
+                                           (app at_17 (vec2 -0.095 0.255) p_58))
+                                          (let eye_r_91
+                                           (app circle_23 0.04
+                                            (app at_17 (vec2 0.095 0.255) p_58))
+                                           (let hi_l_92
+                                            (app circle_23 0.014
+                                             (app at_17 (vec2 -0.082 0.27) p_58))
+                                            (let hi_r_93
+                                             (app circle_23 0.014
+                                              (app at_17 (vec2 0.108 0.27) p_58))
+                                             (let hi_l2_94
+                                              (app circle_23 0.006
+                                               (app at_17 (vec2 -0.105 0.245)
+                                                p_58))
+                                              (let hi_r2_95
+                                               (app circle_23 0.006
+                                                (app at_17 (vec2 0.085 0.245)
+                                                 p_58))
+                                               (let brow_l_96
+                                                (app ellipse_20 (vec2 0.035 0.01)
+                                                 (app rot_30 0.15
+                                                  (app at_17 (vec2 -0.095 0.315)
+                                                   p_58)))
+                                                (let brow_r_97
+                                                 (app ellipse_20
+                                                  (vec2 0.035 0.01)
+                                                  (app rot_30 -0.15
+                                                   (app at_17 (vec2 0.095 0.315)
+                                                    p_58)))
+                                                 (let vig_98
+                                                  (smoothstep 0.3 1.1
+                                                   (length p_58))
+                                                  (let col_99
+                                                   (mix bg_col_0 bg_dark_1
+                                                    vig_98)
+                                                   (let shadow_d_100
+                                                    (app ellipse_20
+                                                     (vec2 0.38 0.055)
+                                                     (app at_17 (vec2 0.02 -0.45)
+                                                      p_58))
+                                                    (let shadow_falloff_101
+                                                     (smoothstep 0.08 -0.02
+                                                      shadow_d_100)
+                                                     (let col_102
+                                                      (mix col_99
+                                                       (vec3 0.06 0.28 0.16)
+                                                       (* shadow_falloff_101
+                                                        0.55))
+                                                      (app paint_45 hi_r2_95
+                                                       wht_11
+                                                       (app paint_45 hi_l2_94
+                                                        wht_11
+                                                        (app paint_45 hi_r_93
+                                                         wht_11
+                                                         (app paint_45 hi_l_92
+                                                          wht_11
+                                                          (app paint_45 eye_r_91
+                                                           black_10
+                                                           (app paint_45 eye_l_90
+                                                            black_10
+                                                            (app paint_45
+                                                             nose_hi_89
+                                                             brown_lt_3
+                                                             (app paint_45
+                                                              nose_88 drk_brown_5
+                                                              (app paint_45
+                                                               groove_87
+                                                               brown_dk_4
+                                                               (app paint_45
+                                                                teeth_86
+                                                                tooth_yel_12
+                                                                (app paint_45
+                                                                 brow_r_97
+                                                                 drk_brown_5
+                                                                 (app paint_45
+                                                                  brow_l_96
+                                                                  drk_brown_5
+                                                                  (app paint_45
+                                                                   muzzle_72
+                                                                   cream_6
+                                                                   (app paint_45
+                                                                    ear_in_r_77
+                                                                    pink_8
+                                                                    (app paint_45
+                                                                     ear_in_l_76
+                                                                     pink_8
+                                                                     (app
+                                                                      paint_45
+                                                                      ear_r_75
+                                                                      brown_2
+                                                                      (app
+                                                                       paint_45
+                                                                       ear_l_74
+                                                                       brown_2
+                                                                       (app
+                                                                        paint_45
+                                                                        paw_r_81
+                                                                        cream_6
+                                                                        (app
+                                                                        paint_45
+                                                                        paw_l_80
+                                                                        cream_6
+                                                                        (app
+                                                                        paint_shaded_49
+                                                                        belly_73
+                                                                        cream_6
+                                                                        cream_dk_7
+                                                                        0.05
+                                                                        (app
+                                                                        paint_shaded_49
+                                                                        torso_with_cheeks_71
+                                                                        brown_2
+                                                                        brown_dk_4
+                                                                        0.08
+                                                                        (app
+                                                                        paint_45
+                                                                        arm_r_79
+                                                                        brown_dk_4
+                                                                        (app
+                                                                        paint_45
+                                                                        arm_l_78
+                                                                        brown_dk_4
+                                                                        (app
+                                                                        paint_45
+                                                                        foot_r_83
+                                                                        drk_brown_5
+                                                                        (app
+                                                                        paint_45
+                                                                        foot_l_82
+                                                                        drk_brown_5
+                                                                        (app
+                                                                        paint_45
+                                                                        tail_scales_63
+                                                                        drk_brown_5
+                                                                        (app
+                                                                        paint_45
+                                                                        tail_rim_64
+                                                                        drk_brown_5
+                                                                        (app
+                                                                        paint_45
+                                                                        tail_60
+                                                                        brown_dk_4
+                                                                        col_102)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+       : ((vec 2) -> (vec 3)))))
+
+    === defunctionalize (beaver.glml) ===
+    (Program
+     (((Define Nonrec at_17
+        (lambda ((offset_18 (vec 2)) (p_19 (vec 2))) (- p_19 offset_18)))
+       : ((vec 2) -> ((vec 2) -> (vec 2))))
+      ((Define Nonrec bg_col_0 (vec3 0.13 0.48 0.3)) : (vec 3))
+      ((Define Nonrec bg_dark_1 (vec3 0.09 0.36 0.22)) : (vec 3))
+      ((Define Nonrec black_10 (vec3 0.06 0.04 0.03)) : (vec 3))
+      ((Define Nonrec box_26
+        (lambda ((b_27 (vec 2)) (p_28 (vec 2)))
+         (let d_29 (- (abs p_28) b_27)
+          (+ (length (max d_29 (vec2 0 0)))
+           (min (max (index d_29 0) (index d_29 1)) 0)))))
+       : ((vec 2) -> ((vec 2) -> float)))
+      ((Define Nonrec brown_2 (vec3 0.55 0.34 0.16)) : (vec 3))
+      ((Define Nonrec brown_dk_4 (vec3 0.38 0.22 0.08)) : (vec 3))
+      ((Define Nonrec brown_lt_3 (vec3 0.68 0.46 0.24)) : (vec 3))
+      ((Define Nonrec circle_23
+        (lambda ((r_24 float) (p_25 (vec 2))) (- (length p_25) r_24)))
+       : (float -> ((vec 2) -> float)))
+      ((Define Nonrec cream_6 (vec3 0.95 0.89 0.74)) : (vec 3))
+      ((Define Nonrec cream_dk_7 (vec3 0.78 0.68 0.5)) : (vec 3))
+      ((Define Nonrec drk_brown_5 (vec3 0.22 0.11 0.03)) : (vec 3))
+      ((Define Nonrec ellipse_20
+        (lambda ((ab_21 (vec 2)) (p_22 (vec 2))) (- (length (/ p_22 ab_21)) 1)))
+       : ((vec 2) -> ((vec 2) -> float)))
+      ((Define Nonrec paint_45
+        (lambda ((d_46 float) (shape_col_47 (vec 3)) (bg_48 (vec 3)))
+         (mix shape_col_47 bg_48 (smoothstep -0.005 0.005 d_46))))
+       : (float -> ((vec 3) -> ((vec 3) -> (vec 3)))))
+      ((Define Nonrec paint_shaded_49
+        (lambda
+         ((d_50 float) (shape_col_51 (vec 3)) (shadow_col_52 (vec 3))
+          (shadow_depth_53 float) (bg_54 (vec 3)))
+         (let base_55 (mix shape_col_51 bg_54 (smoothstep -0.005 0.005 d_50))
+          (let shade_56 (smoothstep (* -1 shadow_depth_53) 0 d_50)
+           (mix base_55 (mix shape_col_51 shadow_col_52 (* shade_56 0.55))
+            (smoothstep 0.005 -0.005 d_50))))))
+       : (float -> ((vec 3) -> ((vec 3) -> (float -> ((vec 3) -> (vec 3)))))))
+      ((Define Nonrec pink_8 (vec3 0.92 0.62 0.6)) : (vec 3))
+      ((Define Nonrec rot_30
+        (lambda ((a_31 float) (p_32 (vec 2)))
+         (let c_33 (cos a_31)
+          (let s_34 (sin a_31)
+           (vec2 (- (* c_33 (index p_32 0)) (* s_34 (index p_32 1)))
+            (+ (* s_34 (index p_32 0)) (* c_33 (index p_32 1))))))))
+       : (float -> ((vec 2) -> (vec 2))))
+      ((Define Nonrec smin_35
+        (lambda ((a_36 float) (b_37 float) (k_38 float))
+         (let h_39 (/ (max (- k_38 (abs (- a_36 b_37))) 0) k_38)
+          (- (min a_36 b_37) (* (* (* h_39 h_39) k_38) 0.25)))))
+       : (float -> (float -> (float -> float))))
+      ((Define Nonrec tooth_yel_12 (vec3 0.92 0.85 0.6)) : (vec 3))
+      ((Extern u_resolution) : (vec 2))
+      ((Define Nonrec get_uv_13_vec2_to_vec2_476
+        (lambda ((coord_14 (vec 2)))
+         (let top_15 (- (* 2 coord_14) u_resolution)
+          (let bot_16 (min (index u_resolution 0) (index u_resolution 1))
+           (/ top_15 bot_16)))))
+       : ((vec 2) -> (vec 2)))
+      ((Define Nonrec wht_11 (vec3 1. 0.97 0.93)) : (vec 3))
+      ((Define Nonrec main
+        (lambda ((coord_57 (vec 2)))
+         (let p_58 (/ (app get_uv_13_vec2_to_vec2_476 coord_57) 1.5)
+          (let tp_59 (app rot_30 -0.35 (app at_17 (vec2 0.28 -0.28) p_58))
+           (let tail_60 (app ellipse_20 (vec2 0.22 0.085) tp_59)
+            (let tsx_61
+             (- (abs (sin (* (+ (index tp_59 0) (index tp_59 1)) 38.))) 0.55)
+             (let tsy_62
+              (- (abs (sin (* (- (index tp_59 0) (index tp_59 1)) 38.))) 0.55)
+              (let tail_scales_63
+               (max (+ tail_60 0.01) (* (min tsx_61 tsy_62) 0.015))
+               (let tail_rim_64 (max tail_60 (* -1 (+ tail_60 0.018)))
+                (let body_65
+                 (app ellipse_20 (vec2 0.25 0.26)
+                  (app at_17 (vec2 0. -0.16) p_58))
+                 (let head_66
+                  (app ellipse_20 (vec2 0.22 0.2) (app at_17 (vec2 0. 0.2) p_58))
+                  (let torso_67 (app smin_35 body_65 head_66 0.1)
+                   (let cheek_l_68
+                    (app circle_23 0.1 (app at_17 (vec2 -0.14 0.11) p_58))
+                    (let cheek_r_69
+                     (app circle_23 0.1 (app at_17 (vec2 0.14 0.11) p_58))
+                     (let cheeks_70 (min cheek_l_68 cheek_r_69)
+                      (let torso_with_cheeks_71
+                       (app smin_35 torso_67 cheeks_70 0.06)
+                       (let muzzle_72
+                        (app ellipse_20 (vec2 0.13 0.095)
+                         (app at_17 (vec2 0. 0.09) p_58))
+                        (let belly_73
+                         (app ellipse_20 (vec2 0.15 0.17)
+                          (app at_17 (vec2 0. -0.2) p_58))
+                         (let ear_l_74
+                          (app circle_23 0.075
+                           (app at_17 (vec2 -0.175 0.355) p_58))
+                          (let ear_r_75
+                           (app circle_23 0.075
+                            (app at_17 (vec2 0.175 0.355) p_58))
+                           (let ear_in_l_76
+                            (app ellipse_20 (vec2 0.035 0.042)
+                             (app at_17 (vec2 -0.175 0.345) p_58))
+                            (let ear_in_r_77
+                             (app ellipse_20 (vec2 0.035 0.042)
+                              (app at_17 (vec2 0.175 0.345) p_58))
+                             (let arm_l_78
+                              (app ellipse_20 (vec2 0.065 0.09)
+                               (app at_17 (vec2 -0.23 -0.09) p_58))
+                              (let arm_r_79
+                               (app ellipse_20 (vec2 0.065 0.09)
+                                (app at_17 (vec2 0.23 -0.09) p_58))
+                               (let paw_l_80
+                                (app circle_23 0.055
+                                 (app at_17 (vec2 -0.28 -0.19) p_58))
+                                (let paw_r_81
+                                 (app circle_23 0.055
+                                  (app at_17 (vec2 0.28 -0.19) p_58))
+                                 (let foot_l_82
+                                  (app ellipse_20 (vec2 0.095 0.048)
+                                   (app at_17 (vec2 -0.13 -0.42) p_58))
+                                  (let foot_r_83
+                                   (app ellipse_20 (vec2 0.095 0.048)
+                                    (app at_17 (vec2 0.13 -0.42) p_58))
+                                   (let tooth_l_84
+                                    (app box_26 (vec2 0.022 0.05)
+                                     (app at_17 (vec2 -0.028 0.035) p_58))
+                                    (let tooth_r_85
+                                     (app box_26 (vec2 0.022 0.05)
+                                      (app at_17 (vec2 0.028 0.035) p_58))
+                                     (let teeth_86 (min tooth_l_84 tooth_r_85)
+                                      (let groove_87
+                                       (app box_26 (vec2 0.005 0.05)
+                                        (app at_17 (vec2 0. 0.035) p_58))
+                                       (let nose_88
+                                        (app ellipse_20 (vec2 0.038 0.028)
+                                         (app at_17 (vec2 0. 0.135) p_58))
+                                        (let nose_hi_89
+                                         (app ellipse_20 (vec2 0.012 0.008)
+                                          (app at_17 (vec2 -0.012 0.142) p_58))
+                                         (let eye_l_90
+                                          (app circle_23 0.04
+                                           (app at_17 (vec2 -0.095 0.255) p_58))
+                                          (let eye_r_91
+                                           (app circle_23 0.04
+                                            (app at_17 (vec2 0.095 0.255) p_58))
+                                           (let hi_l_92
+                                            (app circle_23 0.014
+                                             (app at_17 (vec2 -0.082 0.27) p_58))
+                                            (let hi_r_93
+                                             (app circle_23 0.014
+                                              (app at_17 (vec2 0.108 0.27) p_58))
+                                             (let hi_l2_94
+                                              (app circle_23 0.006
+                                               (app at_17 (vec2 -0.105 0.245)
+                                                p_58))
+                                              (let hi_r2_95
+                                               (app circle_23 0.006
+                                                (app at_17 (vec2 0.085 0.245)
+                                                 p_58))
+                                               (let brow_l_96
+                                                (app ellipse_20 (vec2 0.035 0.01)
+                                                 (app rot_30 0.15
+                                                  (app at_17 (vec2 -0.095 0.315)
+                                                   p_58)))
+                                                (let brow_r_97
+                                                 (app ellipse_20
+                                                  (vec2 0.035 0.01)
+                                                  (app rot_30 -0.15
+                                                   (app at_17 (vec2 0.095 0.315)
+                                                    p_58)))
+                                                 (let vig_98
+                                                  (smoothstep 0.3 1.1
+                                                   (length p_58))
+                                                  (let col_99
+                                                   (mix bg_col_0 bg_dark_1
+                                                    vig_98)
+                                                   (let shadow_d_100
+                                                    (app ellipse_20
+                                                     (vec2 0.38 0.055)
+                                                     (app at_17 (vec2 0.02 -0.45)
+                                                      p_58))
+                                                    (let shadow_falloff_101
+                                                     (smoothstep 0.08 -0.02
+                                                      shadow_d_100)
+                                                     (let col_102
+                                                      (mix col_99
+                                                       (vec3 0.06 0.28 0.16)
+                                                       (* shadow_falloff_101
+                                                        0.55))
+                                                      (app paint_45 hi_r2_95
+                                                       wht_11
+                                                       (app paint_45 hi_l2_94
+                                                        wht_11
+                                                        (app paint_45 hi_r_93
+                                                         wht_11
+                                                         (app paint_45 hi_l_92
+                                                          wht_11
+                                                          (app paint_45 eye_r_91
+                                                           black_10
+                                                           (app paint_45 eye_l_90
+                                                            black_10
+                                                            (app paint_45
+                                                             nose_hi_89
+                                                             brown_lt_3
+                                                             (app paint_45
+                                                              nose_88 drk_brown_5
+                                                              (app paint_45
+                                                               groove_87
+                                                               brown_dk_4
+                                                               (app paint_45
+                                                                teeth_86
+                                                                tooth_yel_12
+                                                                (app paint_45
+                                                                 brow_r_97
+                                                                 drk_brown_5
+                                                                 (app paint_45
+                                                                  brow_l_96
+                                                                  drk_brown_5
+                                                                  (app paint_45
+                                                                   muzzle_72
+                                                                   cream_6
+                                                                   (app paint_45
+                                                                    ear_in_r_77
+                                                                    pink_8
+                                                                    (app paint_45
+                                                                     ear_in_l_76
+                                                                     pink_8
+                                                                     (app
+                                                                      paint_45
+                                                                      ear_r_75
+                                                                      brown_2
+                                                                      (app
+                                                                       paint_45
+                                                                       ear_l_74
+                                                                       brown_2
+                                                                       (app
+                                                                        paint_45
+                                                                        paw_r_81
+                                                                        cream_6
+                                                                        (app
+                                                                        paint_45
+                                                                        paw_l_80
+                                                                        cream_6
+                                                                        (app
+                                                                        paint_shaded_49
+                                                                        belly_73
+                                                                        cream_6
+                                                                        cream_dk_7
+                                                                        0.05
+                                                                        (app
+                                                                        paint_shaded_49
+                                                                        torso_with_cheeks_71
+                                                                        brown_2
+                                                                        brown_dk_4
+                                                                        0.08
+                                                                        (app
+                                                                        paint_45
+                                                                        arm_r_79
+                                                                        brown_dk_4
+                                                                        (app
+                                                                        paint_45
+                                                                        arm_l_78
+                                                                        brown_dk_4
+                                                                        (app
+                                                                        paint_45
+                                                                        foot_r_83
+                                                                        drk_brown_5
+                                                                        (app
+                                                                        paint_45
+                                                                        foot_l_82
+                                                                        drk_brown_5
+                                                                        (app
+                                                                        paint_45
+                                                                        tail_scales_63
+                                                                        drk_brown_5
+                                                                        (app
+                                                                        paint_45
+                                                                        tail_rim_64
+                                                                        drk_brown_5
+                                                                        (app
+                                                                        paint_45
+                                                                        tail_60
+                                                                        brown_dk_4
+                                                                        col_102)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+       : ((vec 2) -> (vec 3)))
+      ((Define Nonrec pink_dk_9 (vec3 0.75 0.42 0.42)) : (vec 3))
+      ((Define Nonrec smax_40
+        (lambda ((a_41 float) (b_42 float) (k_43 float))
+         (let h_44 (/ (max (- k_43 (abs (- a_41 b_42))) 0) k_43)
+          (+ (max a_41 b_42) (* (* (* h_44 h_44) k_43) 0.25)))))
+       : (float -> (float -> (float -> float))))))
+
+    === lambda lift (beaver.glml) ===
+    (Program
+     ((Define Nonrec (name at_17) (args ((offset_18 (vec 2)) (p_19 (vec 2))))
+       (body (- p_19 offset_18)))
+      : ((vec 2) -> ((vec 2) -> (vec 2))))
+     ((Const bg_col_0 (vec3 0.13 0.48 0.3)) : (vec 3))
+     ((Const bg_dark_1 (vec3 0.09 0.36 0.22)) : (vec 3))
+     ((Const black_10 (vec3 0.06 0.04 0.03)) : (vec 3))
+     ((Define Nonrec (name box_26) (args ((b_27 (vec 2)) (p_28 (vec 2))))
+       (body
+        (let d_29 (- (abs p_28) b_27)
+         (+ (length (max d_29 (vec2 0 0)))
+          (min (max (index d_29 0) (index d_29 1)) 0)))))
+      : ((vec 2) -> ((vec 2) -> float)))
+     ((Const brown_2 (vec3 0.55 0.34 0.16)) : (vec 3))
+     ((Const brown_dk_4 (vec3 0.38 0.22 0.08)) : (vec 3))
+     ((Const brown_lt_3 (vec3 0.68 0.46 0.24)) : (vec 3))
+     ((Define Nonrec (name circle_23) (args ((r_24 float) (p_25 (vec 2))))
+       (body (- (length p_25) r_24)))
+      : (float -> ((vec 2) -> float)))
+     ((Const cream_6 (vec3 0.95 0.89 0.74)) : (vec 3))
+     ((Const cream_dk_7 (vec3 0.78 0.68 0.5)) : (vec 3))
+     ((Const drk_brown_5 (vec3 0.22 0.11 0.03)) : (vec 3))
+     ((Define Nonrec (name ellipse_20) (args ((ab_21 (vec 2)) (p_22 (vec 2))))
+       (body (- (length (/ p_22 ab_21)) 1)))
+      : ((vec 2) -> ((vec 2) -> float)))
+     ((Define Nonrec (name paint_45)
+       (args ((d_46 float) (shape_col_47 (vec 3)) (bg_48 (vec 3))))
+       (body (mix shape_col_47 bg_48 (smoothstep -0.005 0.005 d_46))))
+      : (float -> ((vec 3) -> ((vec 3) -> (vec 3)))))
+     ((Define Nonrec (name paint_shaded_49)
+       (args
+        ((d_50 float) (shape_col_51 (vec 3)) (shadow_col_52 (vec 3))
+         (shadow_depth_53 float) (bg_54 (vec 3))))
+       (body
+        (let base_55 (mix shape_col_51 bg_54 (smoothstep -0.005 0.005 d_50))
+         (let shade_56 (smoothstep (* -1 shadow_depth_53) 0 d_50)
+          (mix base_55 (mix shape_col_51 shadow_col_52 (* shade_56 0.55))
+           (smoothstep 0.005 -0.005 d_50))))))
+      : (float -> ((vec 3) -> ((vec 3) -> (float -> ((vec 3) -> (vec 3)))))))
+     ((Const pink_8 (vec3 0.92 0.62 0.6)) : (vec 3))
+     ((Define Nonrec (name rot_30) (args ((a_31 float) (p_32 (vec 2))))
+       (body
+        (let c_33 (cos a_31)
+         (let s_34 (sin a_31)
+          (vec2 (- (* c_33 (index p_32 0)) (* s_34 (index p_32 1)))
+           (+ (* s_34 (index p_32 0)) (* c_33 (index p_32 1))))))))
+      : (float -> ((vec 2) -> (vec 2))))
+     ((Define Nonrec (name smin_35)
+       (args ((a_36 float) (b_37 float) (k_38 float)))
+       (body
+        (let h_39 (/ (max (- k_38 (abs (- a_36 b_37))) 0) k_38)
+         (- (min a_36 b_37) (* (* (* h_39 h_39) k_38) 0.25)))))
+      : (float -> (float -> (float -> float))))
+     ((Const tooth_yel_12 (vec3 0.92 0.85 0.6)) : (vec 3))
+     ((Extern u_resolution) : (vec 2))
+     ((Define Nonrec (name get_uv_13_vec2_to_vec2_476)
+       (args ((coord_14 (vec 2))))
+       (body
+        (let top_15 (- (* 2 coord_14) u_resolution)
+         (let bot_16 (min (index u_resolution 0) (index u_resolution 1))
+          (/ top_15 bot_16)))))
+      : ((vec 2) -> (vec 2)))
+     ((Const wht_11 (vec3 1. 0.97 0.93)) : (vec 3))
+     ((Define Nonrec (name main) (args ((coord_57 (vec 2))))
+       (body
+        (let p_58 (/ (app get_uv_13_vec2_to_vec2_476 coord_57) 1.5)
+         (let tp_59 (app rot_30 -0.35 (app at_17 (vec2 0.28 -0.28) p_58))
+          (let tail_60 (app ellipse_20 (vec2 0.22 0.085) tp_59)
+           (let tsx_61
+            (- (abs (sin (* (+ (index tp_59 0) (index tp_59 1)) 38.))) 0.55)
+            (let tsy_62
+             (- (abs (sin (* (- (index tp_59 0) (index tp_59 1)) 38.))) 0.55)
+             (let tail_scales_63
+              (max (+ tail_60 0.01) (* (min tsx_61 tsy_62) 0.015))
+              (let tail_rim_64 (max tail_60 (* -1 (+ tail_60 0.018)))
+               (let body_65
+                (app ellipse_20 (vec2 0.25 0.26)
+                 (app at_17 (vec2 0. -0.16) p_58))
+                (let head_66
+                 (app ellipse_20 (vec2 0.22 0.2) (app at_17 (vec2 0. 0.2) p_58))
+                 (let torso_67 (app smin_35 body_65 head_66 0.1)
+                  (let cheek_l_68
+                   (app circle_23 0.1 (app at_17 (vec2 -0.14 0.11) p_58))
+                   (let cheek_r_69
+                    (app circle_23 0.1 (app at_17 (vec2 0.14 0.11) p_58))
+                    (let cheeks_70 (min cheek_l_68 cheek_r_69)
+                     (let torso_with_cheeks_71
+                      (app smin_35 torso_67 cheeks_70 0.06)
+                      (let muzzle_72
+                       (app ellipse_20 (vec2 0.13 0.095)
+                        (app at_17 (vec2 0. 0.09) p_58))
+                       (let belly_73
+                        (app ellipse_20 (vec2 0.15 0.17)
+                         (app at_17 (vec2 0. -0.2) p_58))
+                        (let ear_l_74
+                         (app circle_23 0.075
+                          (app at_17 (vec2 -0.175 0.355) p_58))
+                         (let ear_r_75
+                          (app circle_23 0.075
+                           (app at_17 (vec2 0.175 0.355) p_58))
+                          (let ear_in_l_76
+                           (app ellipse_20 (vec2 0.035 0.042)
+                            (app at_17 (vec2 -0.175 0.345) p_58))
+                           (let ear_in_r_77
+                            (app ellipse_20 (vec2 0.035 0.042)
+                             (app at_17 (vec2 0.175 0.345) p_58))
+                            (let arm_l_78
+                             (app ellipse_20 (vec2 0.065 0.09)
+                              (app at_17 (vec2 -0.23 -0.09) p_58))
+                             (let arm_r_79
+                              (app ellipse_20 (vec2 0.065 0.09)
+                               (app at_17 (vec2 0.23 -0.09) p_58))
+                              (let paw_l_80
+                               (app circle_23 0.055
+                                (app at_17 (vec2 -0.28 -0.19) p_58))
+                               (let paw_r_81
+                                (app circle_23 0.055
+                                 (app at_17 (vec2 0.28 -0.19) p_58))
+                                (let foot_l_82
+                                 (app ellipse_20 (vec2 0.095 0.048)
+                                  (app at_17 (vec2 -0.13 -0.42) p_58))
+                                 (let foot_r_83
+                                  (app ellipse_20 (vec2 0.095 0.048)
+                                   (app at_17 (vec2 0.13 -0.42) p_58))
+                                  (let tooth_l_84
+                                   (app box_26 (vec2 0.022 0.05)
+                                    (app at_17 (vec2 -0.028 0.035) p_58))
+                                   (let tooth_r_85
+                                    (app box_26 (vec2 0.022 0.05)
+                                     (app at_17 (vec2 0.028 0.035) p_58))
+                                    (let teeth_86 (min tooth_l_84 tooth_r_85)
+                                     (let groove_87
+                                      (app box_26 (vec2 0.005 0.05)
+                                       (app at_17 (vec2 0. 0.035) p_58))
+                                      (let nose_88
+                                       (app ellipse_20 (vec2 0.038 0.028)
+                                        (app at_17 (vec2 0. 0.135) p_58))
+                                       (let nose_hi_89
+                                        (app ellipse_20 (vec2 0.012 0.008)
+                                         (app at_17 (vec2 -0.012 0.142) p_58))
+                                        (let eye_l_90
+                                         (app circle_23 0.04
+                                          (app at_17 (vec2 -0.095 0.255) p_58))
+                                         (let eye_r_91
+                                          (app circle_23 0.04
+                                           (app at_17 (vec2 0.095 0.255) p_58))
+                                          (let hi_l_92
+                                           (app circle_23 0.014
+                                            (app at_17 (vec2 -0.082 0.27) p_58))
+                                           (let hi_r_93
+                                            (app circle_23 0.014
+                                             (app at_17 (vec2 0.108 0.27) p_58))
+                                            (let hi_l2_94
+                                             (app circle_23 0.006
+                                              (app at_17 (vec2 -0.105 0.245)
+                                               p_58))
+                                             (let hi_r2_95
+                                              (app circle_23 0.006
+                                               (app at_17 (vec2 0.085 0.245)
+                                                p_58))
+                                              (let brow_l_96
+                                               (app ellipse_20 (vec2 0.035 0.01)
+                                                (app rot_30 0.15
+                                                 (app at_17 (vec2 -0.095 0.315)
+                                                  p_58)))
+                                               (let brow_r_97
+                                                (app ellipse_20 (vec2 0.035 0.01)
+                                                 (app rot_30 -0.15
+                                                  (app at_17 (vec2 0.095 0.315)
+                                                   p_58)))
+                                                (let vig_98
+                                                 (smoothstep 0.3 1.1
+                                                  (length p_58))
+                                                 (let col_99
+                                                  (mix bg_col_0 bg_dark_1 vig_98)
+                                                  (let shadow_d_100
+                                                   (app ellipse_20
+                                                    (vec2 0.38 0.055)
+                                                    (app at_17 (vec2 0.02 -0.45)
+                                                     p_58))
+                                                   (let shadow_falloff_101
+                                                    (smoothstep 0.08 -0.02
+                                                     shadow_d_100)
+                                                    (let col_102
+                                                     (mix col_99
+                                                      (vec3 0.06 0.28 0.16)
+                                                      (* shadow_falloff_101 0.55))
+                                                     (app paint_45 hi_r2_95
+                                                      wht_11
+                                                      (app paint_45 hi_l2_94
+                                                       wht_11
+                                                       (app paint_45 hi_r_93
+                                                        wht_11
+                                                        (app paint_45 hi_l_92
+                                                         wht_11
+                                                         (app paint_45 eye_r_91
+                                                          black_10
+                                                          (app paint_45 eye_l_90
+                                                           black_10
+                                                           (app paint_45
+                                                            nose_hi_89 brown_lt_3
+                                                            (app paint_45 nose_88
+                                                             drk_brown_5
+                                                             (app paint_45
+                                                              groove_87
+                                                              brown_dk_4
+                                                              (app paint_45
+                                                               teeth_86
+                                                               tooth_yel_12
+                                                               (app paint_45
+                                                                brow_r_97
+                                                                drk_brown_5
+                                                                (app paint_45
+                                                                 brow_l_96
+                                                                 drk_brown_5
+                                                                 (app paint_45
+                                                                  muzzle_72
+                                                                  cream_6
+                                                                  (app paint_45
+                                                                   ear_in_r_77
+                                                                   pink_8
+                                                                   (app paint_45
+                                                                    ear_in_l_76
+                                                                    pink_8
+                                                                    (app paint_45
+                                                                     ear_r_75
+                                                                     brown_2
+                                                                     (app
+                                                                      paint_45
+                                                                      ear_l_74
+                                                                      brown_2
+                                                                      (app
+                                                                       paint_45
+                                                                       paw_r_81
+                                                                       cream_6
+                                                                       (app
+                                                                        paint_45
+                                                                        paw_l_80
+                                                                        cream_6
+                                                                        (app
+                                                                        paint_shaded_49
+                                                                        belly_73
+                                                                        cream_6
+                                                                        cream_dk_7
+                                                                        0.05
+                                                                        (app
+                                                                        paint_shaded_49
+                                                                        torso_with_cheeks_71
+                                                                        brown_2
+                                                                        brown_dk_4
+                                                                        0.08
+                                                                        (app
+                                                                        paint_45
+                                                                        arm_r_79
+                                                                        brown_dk_4
+                                                                        (app
+                                                                        paint_45
+                                                                        arm_l_78
+                                                                        brown_dk_4
+                                                                        (app
+                                                                        paint_45
+                                                                        foot_r_83
+                                                                        drk_brown_5
+                                                                        (app
+                                                                        paint_45
+                                                                        foot_l_82
+                                                                        drk_brown_5
+                                                                        (app
+                                                                        paint_45
+                                                                        tail_scales_63
+                                                                        drk_brown_5
+                                                                        (app
+                                                                        paint_45
+                                                                        tail_rim_64
+                                                                        drk_brown_5
+                                                                        (app
+                                                                        paint_45
+                                                                        tail_60
+                                                                        brown_dk_4
+                                                                        col_102)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3)))
+     ((Const pink_dk_9 (vec3 0.75 0.42 0.42)) : (vec 3))
+     ((Define Nonrec (name smax_40)
+       (args ((a_41 float) (b_42 float) (k_43 float)))
+       (body
+        (let h_44 (/ (max (- k_43 (abs (- a_41 b_42))) 0) k_43)
+         (+ (max a_41 b_42) (* (* (* h_44 h_44) k_43) 0.25)))))
+      : (float -> (float -> (float -> float)))))
+
+    === anf (beaver.glml) ===
+    (Program
+     ((Define Nonrec (name at_17) (args ((offset_18 (vec 2)) (p_19 (vec 2))))
+       (body (return (- p_19 offset_18))))
+      : ((vec 2) -> ((vec 2) -> (vec 2))))
+     ((Const bg_col_0 (return (vec3 0.13 0.48 0.3))) : (vec 3))
+     ((Const bg_dark_1 (return (vec3 0.09 0.36 0.22))) : (vec 3))
+     ((Const black_10 (return (vec3 0.06 0.04 0.03))) : (vec 3))
+     ((Define Nonrec (name box_26) (args ((b_27 (vec 2)) (p_28 (vec 2))))
+       (body
+        (let anf_477 (abs p_28)
+         (let d_29 (- anf_477 b_27)
+          (let anf_478 (vec2 0 0)
+           (let anf_479 (max d_29 anf_478)
+            (let anf_480 (length anf_479)
+             (let anf_481 (index d_29 0)
+              (let anf_482 (index d_29 1)
+               (let anf_483 (max anf_481 anf_482)
+                (let anf_484 (min anf_483 0) (return (+ anf_480 anf_484)))))))))))))
+      : ((vec 2) -> ((vec 2) -> float)))
+     ((Const brown_2 (return (vec3 0.55 0.34 0.16))) : (vec 3))
+     ((Const brown_dk_4 (return (vec3 0.38 0.22 0.08))) : (vec 3))
+     ((Const brown_lt_3 (return (vec3 0.68 0.46 0.24))) : (vec 3))
+     ((Define Nonrec (name circle_23) (args ((r_24 float) (p_25 (vec 2))))
+       (body (let anf_485 (length p_25) (return (- anf_485 r_24)))))
+      : (float -> ((vec 2) -> float)))
+     ((Const cream_6 (return (vec3 0.95 0.89 0.74))) : (vec 3))
+     ((Const cream_dk_7 (return (vec3 0.78 0.68 0.5))) : (vec 3))
+     ((Const drk_brown_5 (return (vec3 0.22 0.11 0.03))) : (vec 3))
+     ((Define Nonrec (name ellipse_20) (args ((ab_21 (vec 2)) (p_22 (vec 2))))
+       (body
+        (let anf_486 (/ p_22 ab_21)
+         (let anf_487 (length anf_486) (return (- anf_487 1))))))
+      : ((vec 2) -> ((vec 2) -> float)))
+     ((Define Nonrec (name paint_45)
+       (args ((d_46 float) (shape_col_47 (vec 3)) (bg_48 (vec 3))))
+       (body
+        (let anf_488 (smoothstep -0.005 0.005 d_46)
+         (return (mix shape_col_47 bg_48 anf_488)))))
+      : (float -> ((vec 3) -> ((vec 3) -> (vec 3)))))
+     ((Define Nonrec (name paint_shaded_49)
+       (args
+        ((d_50 float) (shape_col_51 (vec 3)) (shadow_col_52 (vec 3))
+         (shadow_depth_53 float) (bg_54 (vec 3))))
+       (body
+        (let anf_489 (smoothstep -0.005 0.005 d_50)
+         (let base_55 (mix shape_col_51 bg_54 anf_489)
+          (let anf_490 (* -1 shadow_depth_53)
+           (let shade_56 (smoothstep anf_490 0 d_50)
+            (let anf_491 (* shade_56 0.55)
+             (let anf_492 (mix shape_col_51 shadow_col_52 anf_491)
+              (let anf_493 (smoothstep 0.005 -0.005 d_50)
+               (return (mix base_55 anf_492 anf_493)))))))))))
+      : (float -> ((vec 3) -> ((vec 3) -> (float -> ((vec 3) -> (vec 3)))))))
+     ((Const pink_8 (return (vec3 0.92 0.62 0.6))) : (vec 3))
+     ((Define Nonrec (name rot_30) (args ((a_31 float) (p_32 (vec 2))))
+       (body
+        (let c_33 (cos a_31)
+         (let s_34 (sin a_31)
+          (let anf_494 (index p_32 0)
+           (let anf_495 (* c_33 anf_494)
+            (let anf_496 (index p_32 1)
+             (let anf_497 (* s_34 anf_496)
+              (let anf_498 (- anf_495 anf_497)
+               (let anf_499 (index p_32 0)
+                (let anf_500 (* s_34 anf_499)
+                 (let anf_501 (index p_32 1)
+                  (let anf_502 (* c_33 anf_501)
+                   (let anf_503 (+ anf_500 anf_502)
+                    (return (vec2 anf_498 anf_503))))))))))))))))
+      : (float -> ((vec 2) -> (vec 2))))
+     ((Define Nonrec (name smin_35)
+       (args ((a_36 float) (b_37 float) (k_38 float)))
+       (body
+        (let anf_504 (- a_36 b_37)
+         (let anf_505 (abs anf_504)
+          (let anf_506 (- k_38 anf_505)
+           (let anf_507 (max anf_506 0)
+            (let h_39 (/ anf_507 k_38)
+             (let anf_508 (min a_36 b_37)
+              (let anf_509 (* h_39 h_39)
+               (let anf_510 (* anf_509 k_38)
+                (let anf_511 (* anf_510 0.25) (return (- anf_508 anf_511)))))))))))))
+      : (float -> (float -> (float -> float))))
+     ((Const tooth_yel_12 (return (vec3 0.92 0.85 0.6))) : (vec 3))
+     ((Extern u_resolution) : (vec 2))
+     ((Define Nonrec (name get_uv_13_vec2_to_vec2_476)
+       (args ((coord_14 (vec 2))))
+       (body
+        (let anf_512 (* 2 coord_14)
+         (let top_15 (- anf_512 u_resolution)
+          (let anf_513 (index u_resolution 0)
+           (let anf_514 (index u_resolution 1)
+            (let bot_16 (min anf_513 anf_514) (return (/ top_15 bot_16)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Const wht_11 (return (vec3 1. 0.97 0.93))) : (vec 3))
+     ((Define Nonrec (name main) (args ((coord_57 (vec 2))))
+       (body
+        (let anf_515 (get_uv_13_vec2_to_vec2_476 coord_57)
+         (let p_58 (/ anf_515 1.5)
+          (let anf_516 (vec2 0.28 -0.28)
+           (let anf_517 (at_17 anf_516 p_58)
+            (let tp_59 (rot_30 -0.35 anf_517)
+             (let anf_518 (vec2 0.22 0.085)
+              (let tail_60 (ellipse_20 anf_518 tp_59)
+               (let anf_519 (index tp_59 0)
+                (let anf_520 (index tp_59 1)
+                 (let anf_521 (+ anf_519 anf_520)
+                  (let anf_522 (* anf_521 38.)
+                   (let anf_523 (sin anf_522)
+                    (let anf_524 (abs anf_523)
+                     (let tsx_61 (- anf_524 0.55)
+                      (let anf_525 (index tp_59 0)
+                       (let anf_526 (index tp_59 1)
+                        (let anf_527 (- anf_525 anf_526)
+                         (let anf_528 (* anf_527 38.)
+                          (let anf_529 (sin anf_528)
+                           (let anf_530 (abs anf_529)
+                            (let tsy_62 (- anf_530 0.55)
+                             (let anf_531 (+ tail_60 0.01)
+                              (let anf_532 (min tsx_61 tsy_62)
+                               (let anf_533 (* anf_532 0.015)
+                                (let tail_scales_63 (max anf_531 anf_533)
+                                 (let anf_534 (+ tail_60 0.018)
+                                  (let anf_535 (* -1 anf_534)
+                                   (let tail_rim_64 (max tail_60 anf_535)
+                                    (let anf_536 (vec2 0.25 0.26)
+                                     (let anf_537 (vec2 0. -0.16)
+                                      (let anf_538 (at_17 anf_537 p_58)
+                                       (let body_65 (ellipse_20 anf_536 anf_538)
+                                        (let anf_539 (vec2 0.22 0.2)
+                                         (let anf_540 (vec2 0. 0.2)
+                                          (let anf_541 (at_17 anf_540 p_58)
+                                           (let head_66
+                                            (ellipse_20 anf_539 anf_541)
+                                            (let torso_67
+                                             (smin_35 body_65 head_66 0.1)
+                                             (let anf_542 (vec2 -0.14 0.11)
+                                              (let anf_543 (at_17 anf_542 p_58)
+                                               (let cheek_l_68
+                                                (circle_23 0.1 anf_543)
+                                                (let anf_544 (vec2 0.14 0.11)
+                                                 (let anf_545
+                                                  (at_17 anf_544 p_58)
+                                                  (let cheek_r_69
+                                                   (circle_23 0.1 anf_545)
+                                                   (let cheeks_70
+                                                    (min cheek_l_68 cheek_r_69)
+                                                    (let torso_with_cheeks_71
+                                                     (smin_35 torso_67 cheeks_70
+                                                      0.06)
+                                                     (let anf_546
+                                                      (vec2 0.13 0.095)
+                                                      (let anf_547 (vec2 0. 0.09)
+                                                       (let anf_548
+                                                        (at_17 anf_547 p_58)
+                                                        (let muzzle_72
+                                                         (ellipse_20 anf_546
+                                                          anf_548)
+                                                         (let anf_549
+                                                          (vec2 0.15 0.17)
+                                                          (let anf_550
+                                                           (vec2 0. -0.2)
+                                                           (let anf_551
+                                                            (at_17 anf_550 p_58)
+                                                            (let belly_73
+                                                             (ellipse_20 anf_549
+                                                              anf_551)
+                                                             (let anf_552
+                                                              (vec2 -0.175 0.355)
+                                                              (let anf_553
+                                                               (at_17 anf_552
+                                                                p_58)
+                                                               (let ear_l_74
+                                                                (circle_23 0.075
+                                                                 anf_553)
+                                                                (let anf_554
+                                                                 (vec2 0.175
+                                                                  0.355)
+                                                                 (let anf_555
+                                                                  (at_17 anf_554
+                                                                   p_58)
+                                                                  (let ear_r_75
+                                                                   (circle_23
+                                                                    0.075
+                                                                    anf_555)
+                                                                   (let anf_556
+                                                                    (vec2 0.035
+                                                                     0.042)
+                                                                    (let anf_557
+                                                                     (vec2 -0.175
+                                                                      0.345)
+                                                                     (let anf_558
+                                                                      (at_17
+                                                                       anf_557
+                                                                       p_58)
+                                                                      (let
+                                                                       ear_in_l_76
+                                                                       (ellipse_20
+                                                                        anf_556
+                                                                        anf_558)
+                                                                       (let
+                                                                        anf_559
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.042)
+                                                                        (let
+                                                                        anf_560
+                                                                        (vec2
+                                                                        0.175
+                                                                        0.345)
+                                                                        (let
+                                                                        anf_561
+                                                                        (at_17
+                                                                        anf_560
+                                                                        p_58)
+                                                                        (let
+                                                                        ear_in_r_77
+                                                                        (ellipse_20
+                                                                        anf_559
+                                                                        anf_561)
+                                                                        (let
+                                                                        anf_562
+                                                                        (vec2
+                                                                        0.065
+                                                                        0.09)
+                                                                        (let
+                                                                        anf_563
+                                                                        (vec2
+                                                                        -0.23
+                                                                        -0.09)
+                                                                        (let
+                                                                        anf_564
+                                                                        (at_17
+                                                                        anf_563
+                                                                        p_58)
+                                                                        (let
+                                                                        arm_l_78
+                                                                        (ellipse_20
+                                                                        anf_562
+                                                                        anf_564)
+                                                                        (let
+                                                                        anf_565
+                                                                        (vec2
+                                                                        0.065
+                                                                        0.09)
+                                                                        (let
+                                                                        anf_566
+                                                                        (vec2
+                                                                        0.23
+                                                                        -0.09)
+                                                                        (let
+                                                                        anf_567
+                                                                        (at_17
+                                                                        anf_566
+                                                                        p_58)
+                                                                        (let
+                                                                        arm_r_79
+                                                                        (ellipse_20
+                                                                        anf_565
+                                                                        anf_567)
+                                                                        (let
+                                                                        anf_568
+                                                                        (vec2
+                                                                        -0.28
+                                                                        -0.19)
+                                                                        (let
+                                                                        anf_569
+                                                                        (at_17
+                                                                        anf_568
+                                                                        p_58)
+                                                                        (let
+                                                                        paw_l_80
+                                                                        (circle_23
+                                                                        0.055
+                                                                        anf_569)
+                                                                        (let
+                                                                        anf_570
+                                                                        (vec2
+                                                                        0.28
+                                                                        -0.19)
+                                                                        (let
+                                                                        anf_571
+                                                                        (at_17
+                                                                        anf_570
+                                                                        p_58)
+                                                                        (let
+                                                                        paw_r_81
+                                                                        (circle_23
+                                                                        0.055
+                                                                        anf_571)
+                                                                        (let
+                                                                        anf_572
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.048)
+                                                                        (let
+                                                                        anf_573
+                                                                        (vec2
+                                                                        -0.13
+                                                                        -0.42)
+                                                                        (let
+                                                                        anf_574
+                                                                        (at_17
+                                                                        anf_573
+                                                                        p_58)
+                                                                        (let
+                                                                        foot_l_82
+                                                                        (ellipse_20
+                                                                        anf_572
+                                                                        anf_574)
+                                                                        (let
+                                                                        anf_575
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.048)
+                                                                        (let
+                                                                        anf_576
+                                                                        (vec2
+                                                                        0.13
+                                                                        -0.42)
+                                                                        (let
+                                                                        anf_577
+                                                                        (at_17
+                                                                        anf_576
+                                                                        p_58)
+                                                                        (let
+                                                                        foot_r_83
+                                                                        (ellipse_20
+                                                                        anf_575
+                                                                        anf_577)
+                                                                        (let
+                                                                        anf_578
+                                                                        (vec2
+                                                                        0.022
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_579
+                                                                        (vec2
+                                                                        -0.028
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_580
+                                                                        (at_17
+                                                                        anf_579
+                                                                        p_58)
+                                                                        (let
+                                                                        tooth_l_84
+                                                                        (box_26
+                                                                        anf_578
+                                                                        anf_580)
+                                                                        (let
+                                                                        anf_581
+                                                                        (vec2
+                                                                        0.022
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_582
+                                                                        (vec2
+                                                                        0.028
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_583
+                                                                        (at_17
+                                                                        anf_582
+                                                                        p_58)
+                                                                        (let
+                                                                        tooth_r_85
+                                                                        (box_26
+                                                                        anf_581
+                                                                        anf_583)
+                                                                        (let
+                                                                        teeth_86
+                                                                        (min
+                                                                        tooth_l_84
+                                                                        tooth_r_85)
+                                                                        (let
+                                                                        anf_584
+                                                                        (vec2
+                                                                        0.005
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_585
+                                                                        (vec2 0.
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_586
+                                                                        (at_17
+                                                                        anf_585
+                                                                        p_58)
+                                                                        (let
+                                                                        groove_87
+                                                                        (box_26
+                                                                        anf_584
+                                                                        anf_586)
+                                                                        (let
+                                                                        anf_587
+                                                                        (vec2
+                                                                        0.038
+                                                                        0.028)
+                                                                        (let
+                                                                        anf_588
+                                                                        (vec2 0.
+                                                                        0.135)
+                                                                        (let
+                                                                        anf_589
+                                                                        (at_17
+                                                                        anf_588
+                                                                        p_58)
+                                                                        (let
+                                                                        nose_88
+                                                                        (ellipse_20
+                                                                        anf_587
+                                                                        anf_589)
+                                                                        (let
+                                                                        anf_590
+                                                                        (vec2
+                                                                        0.012
+                                                                        0.008)
+                                                                        (let
+                                                                        anf_591
+                                                                        (vec2
+                                                                        -0.012
+                                                                        0.142)
+                                                                        (let
+                                                                        anf_592
+                                                                        (at_17
+                                                                        anf_591
+                                                                        p_58)
+                                                                        (let
+                                                                        nose_hi_89
+                                                                        (ellipse_20
+                                                                        anf_590
+                                                                        anf_592)
+                                                                        (let
+                                                                        anf_593
+                                                                        (vec2
+                                                                        -0.095
+                                                                        0.255)
+                                                                        (let
+                                                                        anf_594
+                                                                        (at_17
+                                                                        anf_593
+                                                                        p_58)
+                                                                        (let
+                                                                        eye_l_90
+                                                                        (circle_23
+                                                                        0.04
+                                                                        anf_594)
+                                                                        (let
+                                                                        anf_595
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.255)
+                                                                        (let
+                                                                        anf_596
+                                                                        (at_17
+                                                                        anf_595
+                                                                        p_58)
+                                                                        (let
+                                                                        eye_r_91
+                                                                        (circle_23
+                                                                        0.04
+                                                                        anf_596)
+                                                                        (let
+                                                                        anf_597
+                                                                        (vec2
+                                                                        -0.082
+                                                                        0.27)
+                                                                        (let
+                                                                        anf_598
+                                                                        (at_17
+                                                                        anf_597
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_l_92
+                                                                        (circle_23
+                                                                        0.014
+                                                                        anf_598)
+                                                                        (let
+                                                                        anf_599
+                                                                        (vec2
+                                                                        0.108
+                                                                        0.27)
+                                                                        (let
+                                                                        anf_600
+                                                                        (at_17
+                                                                        anf_599
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_r_93
+                                                                        (circle_23
+                                                                        0.014
+                                                                        anf_600)
+                                                                        (let
+                                                                        anf_601
+                                                                        (vec2
+                                                                        -0.105
+                                                                        0.245)
+                                                                        (let
+                                                                        anf_602
+                                                                        (at_17
+                                                                        anf_601
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_l2_94
+                                                                        (circle_23
+                                                                        0.006
+                                                                        anf_602)
+                                                                        (let
+                                                                        anf_603
+                                                                        (vec2
+                                                                        0.085
+                                                                        0.245)
+                                                                        (let
+                                                                        anf_604
+                                                                        (at_17
+                                                                        anf_603
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_r2_95
+                                                                        (circle_23
+                                                                        0.006
+                                                                        anf_604)
+                                                                        (let
+                                                                        anf_605
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.01)
+                                                                        (let
+                                                                        anf_606
+                                                                        (vec2
+                                                                        -0.095
+                                                                        0.315)
+                                                                        (let
+                                                                        anf_607
+                                                                        (at_17
+                                                                        anf_606
+                                                                        p_58)
+                                                                        (let
+                                                                        anf_608
+                                                                        (rot_30
+                                                                        0.15
+                                                                        anf_607)
+                                                                        (let
+                                                                        brow_l_96
+                                                                        (ellipse_20
+                                                                        anf_605
+                                                                        anf_608)
+                                                                        (let
+                                                                        anf_609
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.01)
+                                                                        (let
+                                                                        anf_610
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.315)
+                                                                        (let
+                                                                        anf_611
+                                                                        (at_17
+                                                                        anf_610
+                                                                        p_58)
+                                                                        (let
+                                                                        anf_612
+                                                                        (rot_30
+                                                                        -0.15
+                                                                        anf_611)
+                                                                        (let
+                                                                        brow_r_97
+                                                                        (ellipse_20
+                                                                        anf_609
+                                                                        anf_612)
+                                                                        (let
+                                                                        anf_613
+                                                                        (length
+                                                                        p_58)
+                                                                        (let
+                                                                        vig_98
+                                                                        (smoothstep
+                                                                        0.3 1.1
+                                                                        anf_613)
+                                                                        (let
+                                                                        col_99
+                                                                        (mix
+                                                                        bg_col_0
+                                                                        bg_dark_1
+                                                                        vig_98)
+                                                                        (let
+                                                                        anf_614
+                                                                        (vec2
+                                                                        0.38
+                                                                        0.055)
+                                                                        (let
+                                                                        anf_615
+                                                                        (vec2
+                                                                        0.02
+                                                                        -0.45)
+                                                                        (let
+                                                                        anf_616
+                                                                        (at_17
+                                                                        anf_615
+                                                                        p_58)
+                                                                        (let
+                                                                        shadow_d_100
+                                                                        (ellipse_20
+                                                                        anf_614
+                                                                        anf_616)
+                                                                        (let
+                                                                        shadow_falloff_101
+                                                                        (smoothstep
+                                                                        0.08
+                                                                        -0.02
+                                                                        shadow_d_100)
+                                                                        (let
+                                                                        anf_617
+                                                                        (vec3
+                                                                        0.06 0.28
+                                                                        0.16)
+                                                                        (let
+                                                                        anf_618
+                                                                        (*
+                                                                        shadow_falloff_101
+                                                                        0.55)
+                                                                        (let
+                                                                        col_102
+                                                                        (mix
+                                                                        col_99
+                                                                        anf_617
+                                                                        anf_618)
+                                                                        (let
+                                                                        anf_619
+                                                                        (paint_45
+                                                                        tail_60
+                                                                        brown_dk_4
+                                                                        col_102)
+                                                                        (let
+                                                                        anf_620
+                                                                        (paint_45
+                                                                        tail_rim_64
+                                                                        drk_brown_5
+                                                                        anf_619)
+                                                                        (let
+                                                                        anf_621
+                                                                        (paint_45
+                                                                        tail_scales_63
+                                                                        drk_brown_5
+                                                                        anf_620)
+                                                                        (let
+                                                                        anf_622
+                                                                        (paint_45
+                                                                        foot_l_82
+                                                                        drk_brown_5
+                                                                        anf_621)
+                                                                        (let
+                                                                        anf_623
+                                                                        (paint_45
+                                                                        foot_r_83
+                                                                        drk_brown_5
+                                                                        anf_622)
+                                                                        (let
+                                                                        anf_624
+                                                                        (paint_45
+                                                                        arm_l_78
+                                                                        brown_dk_4
+                                                                        anf_623)
+                                                                        (let
+                                                                        anf_625
+                                                                        (paint_45
+                                                                        arm_r_79
+                                                                        brown_dk_4
+                                                                        anf_624)
+                                                                        (let
+                                                                        anf_626
+                                                                        (paint_shaded_49
+                                                                        torso_with_cheeks_71
+                                                                        brown_2
+                                                                        brown_dk_4
+                                                                        0.08
+                                                                        anf_625)
+                                                                        (let
+                                                                        anf_627
+                                                                        (paint_shaded_49
+                                                                        belly_73
+                                                                        cream_6
+                                                                        cream_dk_7
+                                                                        0.05
+                                                                        anf_626)
+                                                                        (let
+                                                                        anf_628
+                                                                        (paint_45
+                                                                        paw_l_80
+                                                                        cream_6
+                                                                        anf_627)
+                                                                        (let
+                                                                        anf_629
+                                                                        (paint_45
+                                                                        paw_r_81
+                                                                        cream_6
+                                                                        anf_628)
+                                                                        (let
+                                                                        anf_630
+                                                                        (paint_45
+                                                                        ear_l_74
+                                                                        brown_2
+                                                                        anf_629)
+                                                                        (let
+                                                                        anf_631
+                                                                        (paint_45
+                                                                        ear_r_75
+                                                                        brown_2
+                                                                        anf_630)
+                                                                        (let
+                                                                        anf_632
+                                                                        (paint_45
+                                                                        ear_in_l_76
+                                                                        pink_8
+                                                                        anf_631)
+                                                                        (let
+                                                                        anf_633
+                                                                        (paint_45
+                                                                        ear_in_r_77
+                                                                        pink_8
+                                                                        anf_632)
+                                                                        (let
+                                                                        anf_634
+                                                                        (paint_45
+                                                                        muzzle_72
+                                                                        cream_6
+                                                                        anf_633)
+                                                                        (let
+                                                                        anf_635
+                                                                        (paint_45
+                                                                        brow_l_96
+                                                                        drk_brown_5
+                                                                        anf_634)
+                                                                        (let
+                                                                        anf_636
+                                                                        (paint_45
+                                                                        brow_r_97
+                                                                        drk_brown_5
+                                                                        anf_635)
+                                                                        (let
+                                                                        anf_637
+                                                                        (paint_45
+                                                                        teeth_86
+                                                                        tooth_yel_12
+                                                                        anf_636)
+                                                                        (let
+                                                                        anf_638
+                                                                        (paint_45
+                                                                        groove_87
+                                                                        brown_dk_4
+                                                                        anf_637)
+                                                                        (let
+                                                                        anf_639
+                                                                        (paint_45
+                                                                        nose_88
+                                                                        drk_brown_5
+                                                                        anf_638)
+                                                                        (let
+                                                                        anf_640
+                                                                        (paint_45
+                                                                        nose_hi_89
+                                                                        brown_lt_3
+                                                                        anf_639)
+                                                                        (let
+                                                                        anf_641
+                                                                        (paint_45
+                                                                        eye_l_90
+                                                                        black_10
+                                                                        anf_640)
+                                                                        (let
+                                                                        anf_642
+                                                                        (paint_45
+                                                                        eye_r_91
+                                                                        black_10
+                                                                        anf_641)
+                                                                        (let
+                                                                        anf_643
+                                                                        (paint_45
+                                                                        hi_l_92
+                                                                        wht_11
+                                                                        anf_642)
+                                                                        (let
+                                                                        anf_644
+                                                                        (paint_45
+                                                                        hi_r_93
+                                                                        wht_11
+                                                                        anf_643)
+                                                                        (let
+                                                                        anf_645
+                                                                        (paint_45
+                                                                        hi_l2_94
+                                                                        wht_11
+                                                                        anf_644)
+                                                                        (return
+                                                                        (paint_45
+                                                                        hi_r2_95
+                                                                        wht_11
+                                                                        anf_645))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3)))
+     ((Const pink_dk_9 (return (vec3 0.75 0.42 0.42))) : (vec 3))
+     ((Define Nonrec (name smax_40)
+       (args ((a_41 float) (b_42 float) (k_43 float)))
+       (body
+        (let anf_646 (- a_41 b_42)
+         (let anf_647 (abs anf_646)
+          (let anf_648 (- k_43 anf_647)
+           (let anf_649 (max anf_648 0)
+            (let h_44 (/ anf_649 k_43)
+             (let anf_650 (max a_41 b_42)
+              (let anf_651 (* h_44 h_44)
+               (let anf_652 (* anf_651 k_43)
+                (let anf_653 (* anf_652 0.25) (return (+ anf_650 anf_653)))))))))))))
+      : (float -> (float -> (float -> float)))))
+
+    === tail call (beaver.glml) ===
+    (Program
+     ((Define (name at_17) (args ((offset_18 (vec 2)) (p_19 (vec 2))))
+       (body (return (- p_19 offset_18))))
+      : ((vec 2) -> ((vec 2) -> (vec 2))))
+     ((Const bg_col_0 (return (vec3 0.13 0.48 0.3))) : (vec 3))
+     ((Const bg_dark_1 (return (vec3 0.09 0.36 0.22))) : (vec 3))
+     ((Const black_10 (return (vec3 0.06 0.04 0.03))) : (vec 3))
+     ((Define (name box_26) (args ((b_27 (vec 2)) (p_28 (vec 2))))
+       (body
+        (let anf_477 (abs p_28)
+         (let d_29 (- anf_477 b_27)
+          (let anf_478 (vec2 0 0)
+           (let anf_479 (max d_29 anf_478)
+            (let anf_480 (length anf_479)
+             (let anf_481 (index d_29 0)
+              (let anf_482 (index d_29 1)
+               (let anf_483 (max anf_481 anf_482)
+                (let anf_484 (min anf_483 0) (return (+ anf_480 anf_484)))))))))))))
+      : ((vec 2) -> ((vec 2) -> float)))
+     ((Const brown_2 (return (vec3 0.55 0.34 0.16))) : (vec 3))
+     ((Const brown_dk_4 (return (vec3 0.38 0.22 0.08))) : (vec 3))
+     ((Const brown_lt_3 (return (vec3 0.68 0.46 0.24))) : (vec 3))
+     ((Define (name circle_23) (args ((r_24 float) (p_25 (vec 2))))
+       (body (let anf_485 (length p_25) (return (- anf_485 r_24)))))
+      : (float -> ((vec 2) -> float)))
+     ((Const cream_6 (return (vec3 0.95 0.89 0.74))) : (vec 3))
+     ((Const cream_dk_7 (return (vec3 0.78 0.68 0.5))) : (vec 3))
+     ((Const drk_brown_5 (return (vec3 0.22 0.11 0.03))) : (vec 3))
+     ((Define (name ellipse_20) (args ((ab_21 (vec 2)) (p_22 (vec 2))))
+       (body
+        (let anf_486 (/ p_22 ab_21)
+         (let anf_487 (length anf_486) (return (- anf_487 1))))))
+      : ((vec 2) -> ((vec 2) -> float)))
+     ((Define (name paint_45)
+       (args ((d_46 float) (shape_col_47 (vec 3)) (bg_48 (vec 3))))
+       (body
+        (let anf_488 (smoothstep -0.005 0.005 d_46)
+         (return (mix shape_col_47 bg_48 anf_488)))))
+      : (float -> ((vec 3) -> ((vec 3) -> (vec 3)))))
+     ((Define (name paint_shaded_49)
+       (args
+        ((d_50 float) (shape_col_51 (vec 3)) (shadow_col_52 (vec 3))
+         (shadow_depth_53 float) (bg_54 (vec 3))))
+       (body
+        (let anf_489 (smoothstep -0.005 0.005 d_50)
+         (let base_55 (mix shape_col_51 bg_54 anf_489)
+          (let anf_490 (* -1 shadow_depth_53)
+           (let shade_56 (smoothstep anf_490 0 d_50)
+            (let anf_491 (* shade_56 0.55)
+             (let anf_492 (mix shape_col_51 shadow_col_52 anf_491)
+              (let anf_493 (smoothstep 0.005 -0.005 d_50)
+               (return (mix base_55 anf_492 anf_493)))))))))))
+      : (float -> ((vec 3) -> ((vec 3) -> (float -> ((vec 3) -> (vec 3)))))))
+     ((Const pink_8 (return (vec3 0.92 0.62 0.6))) : (vec 3))
+     ((Define (name rot_30) (args ((a_31 float) (p_32 (vec 2))))
+       (body
+        (let c_33 (cos a_31)
+         (let s_34 (sin a_31)
+          (let anf_494 (index p_32 0)
+           (let anf_495 (* c_33 anf_494)
+            (let anf_496 (index p_32 1)
+             (let anf_497 (* s_34 anf_496)
+              (let anf_498 (- anf_495 anf_497)
+               (let anf_499 (index p_32 0)
+                (let anf_500 (* s_34 anf_499)
+                 (let anf_501 (index p_32 1)
+                  (let anf_502 (* c_33 anf_501)
+                   (let anf_503 (+ anf_500 anf_502)
+                    (return (vec2 anf_498 anf_503))))))))))))))))
+      : (float -> ((vec 2) -> (vec 2))))
+     ((Define (name smin_35) (args ((a_36 float) (b_37 float) (k_38 float)))
+       (body
+        (let anf_504 (- a_36 b_37)
+         (let anf_505 (abs anf_504)
+          (let anf_506 (- k_38 anf_505)
+           (let anf_507 (max anf_506 0)
+            (let h_39 (/ anf_507 k_38)
+             (let anf_508 (min a_36 b_37)
+              (let anf_509 (* h_39 h_39)
+               (let anf_510 (* anf_509 k_38)
+                (let anf_511 (* anf_510 0.25) (return (- anf_508 anf_511)))))))))))))
+      : (float -> (float -> (float -> float))))
+     ((Const tooth_yel_12 (return (vec3 0.92 0.85 0.6))) : (vec 3))
+     ((Extern u_resolution) : (vec 2))
+     ((Define (name get_uv_13_vec2_to_vec2_476) (args ((coord_14 (vec 2))))
+       (body
+        (let anf_512 (* 2 coord_14)
+         (let top_15 (- anf_512 u_resolution)
+          (let anf_513 (index u_resolution 0)
+           (let anf_514 (index u_resolution 1)
+            (let bot_16 (min anf_513 anf_514) (return (/ top_15 bot_16)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Const wht_11 (return (vec3 1. 0.97 0.93))) : (vec 3))
+     ((Define (name main) (args ((coord_57 (vec 2))))
+       (body
+        (let anf_515 (get_uv_13_vec2_to_vec2_476 coord_57)
+         (let p_58 (/ anf_515 1.5)
+          (let anf_516 (vec2 0.28 -0.28)
+           (let anf_517 (at_17 anf_516 p_58)
+            (let tp_59 (rot_30 -0.35 anf_517)
+             (let anf_518 (vec2 0.22 0.085)
+              (let tail_60 (ellipse_20 anf_518 tp_59)
+               (let anf_519 (index tp_59 0)
+                (let anf_520 (index tp_59 1)
+                 (let anf_521 (+ anf_519 anf_520)
+                  (let anf_522 (* anf_521 38.)
+                   (let anf_523 (sin anf_522)
+                    (let anf_524 (abs anf_523)
+                     (let tsx_61 (- anf_524 0.55)
+                      (let anf_525 (index tp_59 0)
+                       (let anf_526 (index tp_59 1)
+                        (let anf_527 (- anf_525 anf_526)
+                         (let anf_528 (* anf_527 38.)
+                          (let anf_529 (sin anf_528)
+                           (let anf_530 (abs anf_529)
+                            (let tsy_62 (- anf_530 0.55)
+                             (let anf_531 (+ tail_60 0.01)
+                              (let anf_532 (min tsx_61 tsy_62)
+                               (let anf_533 (* anf_532 0.015)
+                                (let tail_scales_63 (max anf_531 anf_533)
+                                 (let anf_534 (+ tail_60 0.018)
+                                  (let anf_535 (* -1 anf_534)
+                                   (let tail_rim_64 (max tail_60 anf_535)
+                                    (let anf_536 (vec2 0.25 0.26)
+                                     (let anf_537 (vec2 0. -0.16)
+                                      (let anf_538 (at_17 anf_537 p_58)
+                                       (let body_65 (ellipse_20 anf_536 anf_538)
+                                        (let anf_539 (vec2 0.22 0.2)
+                                         (let anf_540 (vec2 0. 0.2)
+                                          (let anf_541 (at_17 anf_540 p_58)
+                                           (let head_66
+                                            (ellipse_20 anf_539 anf_541)
+                                            (let torso_67
+                                             (smin_35 body_65 head_66 0.1)
+                                             (let anf_542 (vec2 -0.14 0.11)
+                                              (let anf_543 (at_17 anf_542 p_58)
+                                               (let cheek_l_68
+                                                (circle_23 0.1 anf_543)
+                                                (let anf_544 (vec2 0.14 0.11)
+                                                 (let anf_545
+                                                  (at_17 anf_544 p_58)
+                                                  (let cheek_r_69
+                                                   (circle_23 0.1 anf_545)
+                                                   (let cheeks_70
+                                                    (min cheek_l_68 cheek_r_69)
+                                                    (let torso_with_cheeks_71
+                                                     (smin_35 torso_67 cheeks_70
+                                                      0.06)
+                                                     (let anf_546
+                                                      (vec2 0.13 0.095)
+                                                      (let anf_547 (vec2 0. 0.09)
+                                                       (let anf_548
+                                                        (at_17 anf_547 p_58)
+                                                        (let muzzle_72
+                                                         (ellipse_20 anf_546
+                                                          anf_548)
+                                                         (let anf_549
+                                                          (vec2 0.15 0.17)
+                                                          (let anf_550
+                                                           (vec2 0. -0.2)
+                                                           (let anf_551
+                                                            (at_17 anf_550 p_58)
+                                                            (let belly_73
+                                                             (ellipse_20 anf_549
+                                                              anf_551)
+                                                             (let anf_552
+                                                              (vec2 -0.175 0.355)
+                                                              (let anf_553
+                                                               (at_17 anf_552
+                                                                p_58)
+                                                               (let ear_l_74
+                                                                (circle_23 0.075
+                                                                 anf_553)
+                                                                (let anf_554
+                                                                 (vec2 0.175
+                                                                  0.355)
+                                                                 (let anf_555
+                                                                  (at_17 anf_554
+                                                                   p_58)
+                                                                  (let ear_r_75
+                                                                   (circle_23
+                                                                    0.075
+                                                                    anf_555)
+                                                                   (let anf_556
+                                                                    (vec2 0.035
+                                                                     0.042)
+                                                                    (let anf_557
+                                                                     (vec2 -0.175
+                                                                      0.345)
+                                                                     (let anf_558
+                                                                      (at_17
+                                                                       anf_557
+                                                                       p_58)
+                                                                      (let
+                                                                       ear_in_l_76
+                                                                       (ellipse_20
+                                                                        anf_556
+                                                                        anf_558)
+                                                                       (let
+                                                                        anf_559
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.042)
+                                                                        (let
+                                                                        anf_560
+                                                                        (vec2
+                                                                        0.175
+                                                                        0.345)
+                                                                        (let
+                                                                        anf_561
+                                                                        (at_17
+                                                                        anf_560
+                                                                        p_58)
+                                                                        (let
+                                                                        ear_in_r_77
+                                                                        (ellipse_20
+                                                                        anf_559
+                                                                        anf_561)
+                                                                        (let
+                                                                        anf_562
+                                                                        (vec2
+                                                                        0.065
+                                                                        0.09)
+                                                                        (let
+                                                                        anf_563
+                                                                        (vec2
+                                                                        -0.23
+                                                                        -0.09)
+                                                                        (let
+                                                                        anf_564
+                                                                        (at_17
+                                                                        anf_563
+                                                                        p_58)
+                                                                        (let
+                                                                        arm_l_78
+                                                                        (ellipse_20
+                                                                        anf_562
+                                                                        anf_564)
+                                                                        (let
+                                                                        anf_565
+                                                                        (vec2
+                                                                        0.065
+                                                                        0.09)
+                                                                        (let
+                                                                        anf_566
+                                                                        (vec2
+                                                                        0.23
+                                                                        -0.09)
+                                                                        (let
+                                                                        anf_567
+                                                                        (at_17
+                                                                        anf_566
+                                                                        p_58)
+                                                                        (let
+                                                                        arm_r_79
+                                                                        (ellipse_20
+                                                                        anf_565
+                                                                        anf_567)
+                                                                        (let
+                                                                        anf_568
+                                                                        (vec2
+                                                                        -0.28
+                                                                        -0.19)
+                                                                        (let
+                                                                        anf_569
+                                                                        (at_17
+                                                                        anf_568
+                                                                        p_58)
+                                                                        (let
+                                                                        paw_l_80
+                                                                        (circle_23
+                                                                        0.055
+                                                                        anf_569)
+                                                                        (let
+                                                                        anf_570
+                                                                        (vec2
+                                                                        0.28
+                                                                        -0.19)
+                                                                        (let
+                                                                        anf_571
+                                                                        (at_17
+                                                                        anf_570
+                                                                        p_58)
+                                                                        (let
+                                                                        paw_r_81
+                                                                        (circle_23
+                                                                        0.055
+                                                                        anf_571)
+                                                                        (let
+                                                                        anf_572
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.048)
+                                                                        (let
+                                                                        anf_573
+                                                                        (vec2
+                                                                        -0.13
+                                                                        -0.42)
+                                                                        (let
+                                                                        anf_574
+                                                                        (at_17
+                                                                        anf_573
+                                                                        p_58)
+                                                                        (let
+                                                                        foot_l_82
+                                                                        (ellipse_20
+                                                                        anf_572
+                                                                        anf_574)
+                                                                        (let
+                                                                        anf_575
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.048)
+                                                                        (let
+                                                                        anf_576
+                                                                        (vec2
+                                                                        0.13
+                                                                        -0.42)
+                                                                        (let
+                                                                        anf_577
+                                                                        (at_17
+                                                                        anf_576
+                                                                        p_58)
+                                                                        (let
+                                                                        foot_r_83
+                                                                        (ellipse_20
+                                                                        anf_575
+                                                                        anf_577)
+                                                                        (let
+                                                                        anf_578
+                                                                        (vec2
+                                                                        0.022
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_579
+                                                                        (vec2
+                                                                        -0.028
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_580
+                                                                        (at_17
+                                                                        anf_579
+                                                                        p_58)
+                                                                        (let
+                                                                        tooth_l_84
+                                                                        (box_26
+                                                                        anf_578
+                                                                        anf_580)
+                                                                        (let
+                                                                        anf_581
+                                                                        (vec2
+                                                                        0.022
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_582
+                                                                        (vec2
+                                                                        0.028
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_583
+                                                                        (at_17
+                                                                        anf_582
+                                                                        p_58)
+                                                                        (let
+                                                                        tooth_r_85
+                                                                        (box_26
+                                                                        anf_581
+                                                                        anf_583)
+                                                                        (let
+                                                                        teeth_86
+                                                                        (min
+                                                                        tooth_l_84
+                                                                        tooth_r_85)
+                                                                        (let
+                                                                        anf_584
+                                                                        (vec2
+                                                                        0.005
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_585
+                                                                        (vec2 0.
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_586
+                                                                        (at_17
+                                                                        anf_585
+                                                                        p_58)
+                                                                        (let
+                                                                        groove_87
+                                                                        (box_26
+                                                                        anf_584
+                                                                        anf_586)
+                                                                        (let
+                                                                        anf_587
+                                                                        (vec2
+                                                                        0.038
+                                                                        0.028)
+                                                                        (let
+                                                                        anf_588
+                                                                        (vec2 0.
+                                                                        0.135)
+                                                                        (let
+                                                                        anf_589
+                                                                        (at_17
+                                                                        anf_588
+                                                                        p_58)
+                                                                        (let
+                                                                        nose_88
+                                                                        (ellipse_20
+                                                                        anf_587
+                                                                        anf_589)
+                                                                        (let
+                                                                        anf_590
+                                                                        (vec2
+                                                                        0.012
+                                                                        0.008)
+                                                                        (let
+                                                                        anf_591
+                                                                        (vec2
+                                                                        -0.012
+                                                                        0.142)
+                                                                        (let
+                                                                        anf_592
+                                                                        (at_17
+                                                                        anf_591
+                                                                        p_58)
+                                                                        (let
+                                                                        nose_hi_89
+                                                                        (ellipse_20
+                                                                        anf_590
+                                                                        anf_592)
+                                                                        (let
+                                                                        anf_593
+                                                                        (vec2
+                                                                        -0.095
+                                                                        0.255)
+                                                                        (let
+                                                                        anf_594
+                                                                        (at_17
+                                                                        anf_593
+                                                                        p_58)
+                                                                        (let
+                                                                        eye_l_90
+                                                                        (circle_23
+                                                                        0.04
+                                                                        anf_594)
+                                                                        (let
+                                                                        anf_595
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.255)
+                                                                        (let
+                                                                        anf_596
+                                                                        (at_17
+                                                                        anf_595
+                                                                        p_58)
+                                                                        (let
+                                                                        eye_r_91
+                                                                        (circle_23
+                                                                        0.04
+                                                                        anf_596)
+                                                                        (let
+                                                                        anf_597
+                                                                        (vec2
+                                                                        -0.082
+                                                                        0.27)
+                                                                        (let
+                                                                        anf_598
+                                                                        (at_17
+                                                                        anf_597
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_l_92
+                                                                        (circle_23
+                                                                        0.014
+                                                                        anf_598)
+                                                                        (let
+                                                                        anf_599
+                                                                        (vec2
+                                                                        0.108
+                                                                        0.27)
+                                                                        (let
+                                                                        anf_600
+                                                                        (at_17
+                                                                        anf_599
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_r_93
+                                                                        (circle_23
+                                                                        0.014
+                                                                        anf_600)
+                                                                        (let
+                                                                        anf_601
+                                                                        (vec2
+                                                                        -0.105
+                                                                        0.245)
+                                                                        (let
+                                                                        anf_602
+                                                                        (at_17
+                                                                        anf_601
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_l2_94
+                                                                        (circle_23
+                                                                        0.006
+                                                                        anf_602)
+                                                                        (let
+                                                                        anf_603
+                                                                        (vec2
+                                                                        0.085
+                                                                        0.245)
+                                                                        (let
+                                                                        anf_604
+                                                                        (at_17
+                                                                        anf_603
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_r2_95
+                                                                        (circle_23
+                                                                        0.006
+                                                                        anf_604)
+                                                                        (let
+                                                                        anf_605
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.01)
+                                                                        (let
+                                                                        anf_606
+                                                                        (vec2
+                                                                        -0.095
+                                                                        0.315)
+                                                                        (let
+                                                                        anf_607
+                                                                        (at_17
+                                                                        anf_606
+                                                                        p_58)
+                                                                        (let
+                                                                        anf_608
+                                                                        (rot_30
+                                                                        0.15
+                                                                        anf_607)
+                                                                        (let
+                                                                        brow_l_96
+                                                                        (ellipse_20
+                                                                        anf_605
+                                                                        anf_608)
+                                                                        (let
+                                                                        anf_609
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.01)
+                                                                        (let
+                                                                        anf_610
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.315)
+                                                                        (let
+                                                                        anf_611
+                                                                        (at_17
+                                                                        anf_610
+                                                                        p_58)
+                                                                        (let
+                                                                        anf_612
+                                                                        (rot_30
+                                                                        -0.15
+                                                                        anf_611)
+                                                                        (let
+                                                                        brow_r_97
+                                                                        (ellipse_20
+                                                                        anf_609
+                                                                        anf_612)
+                                                                        (let
+                                                                        anf_613
+                                                                        (length
+                                                                        p_58)
+                                                                        (let
+                                                                        vig_98
+                                                                        (smoothstep
+                                                                        0.3 1.1
+                                                                        anf_613)
+                                                                        (let
+                                                                        col_99
+                                                                        (mix
+                                                                        bg_col_0
+                                                                        bg_dark_1
+                                                                        vig_98)
+                                                                        (let
+                                                                        anf_614
+                                                                        (vec2
+                                                                        0.38
+                                                                        0.055)
+                                                                        (let
+                                                                        anf_615
+                                                                        (vec2
+                                                                        0.02
+                                                                        -0.45)
+                                                                        (let
+                                                                        anf_616
+                                                                        (at_17
+                                                                        anf_615
+                                                                        p_58)
+                                                                        (let
+                                                                        shadow_d_100
+                                                                        (ellipse_20
+                                                                        anf_614
+                                                                        anf_616)
+                                                                        (let
+                                                                        shadow_falloff_101
+                                                                        (smoothstep
+                                                                        0.08
+                                                                        -0.02
+                                                                        shadow_d_100)
+                                                                        (let
+                                                                        anf_617
+                                                                        (vec3
+                                                                        0.06 0.28
+                                                                        0.16)
+                                                                        (let
+                                                                        anf_618
+                                                                        (*
+                                                                        shadow_falloff_101
+                                                                        0.55)
+                                                                        (let
+                                                                        col_102
+                                                                        (mix
+                                                                        col_99
+                                                                        anf_617
+                                                                        anf_618)
+                                                                        (let
+                                                                        anf_619
+                                                                        (paint_45
+                                                                        tail_60
+                                                                        brown_dk_4
+                                                                        col_102)
+                                                                        (let
+                                                                        anf_620
+                                                                        (paint_45
+                                                                        tail_rim_64
+                                                                        drk_brown_5
+                                                                        anf_619)
+                                                                        (let
+                                                                        anf_621
+                                                                        (paint_45
+                                                                        tail_scales_63
+                                                                        drk_brown_5
+                                                                        anf_620)
+                                                                        (let
+                                                                        anf_622
+                                                                        (paint_45
+                                                                        foot_l_82
+                                                                        drk_brown_5
+                                                                        anf_621)
+                                                                        (let
+                                                                        anf_623
+                                                                        (paint_45
+                                                                        foot_r_83
+                                                                        drk_brown_5
+                                                                        anf_622)
+                                                                        (let
+                                                                        anf_624
+                                                                        (paint_45
+                                                                        arm_l_78
+                                                                        brown_dk_4
+                                                                        anf_623)
+                                                                        (let
+                                                                        anf_625
+                                                                        (paint_45
+                                                                        arm_r_79
+                                                                        brown_dk_4
+                                                                        anf_624)
+                                                                        (let
+                                                                        anf_626
+                                                                        (paint_shaded_49
+                                                                        torso_with_cheeks_71
+                                                                        brown_2
+                                                                        brown_dk_4
+                                                                        0.08
+                                                                        anf_625)
+                                                                        (let
+                                                                        anf_627
+                                                                        (paint_shaded_49
+                                                                        belly_73
+                                                                        cream_6
+                                                                        cream_dk_7
+                                                                        0.05
+                                                                        anf_626)
+                                                                        (let
+                                                                        anf_628
+                                                                        (paint_45
+                                                                        paw_l_80
+                                                                        cream_6
+                                                                        anf_627)
+                                                                        (let
+                                                                        anf_629
+                                                                        (paint_45
+                                                                        paw_r_81
+                                                                        cream_6
+                                                                        anf_628)
+                                                                        (let
+                                                                        anf_630
+                                                                        (paint_45
+                                                                        ear_l_74
+                                                                        brown_2
+                                                                        anf_629)
+                                                                        (let
+                                                                        anf_631
+                                                                        (paint_45
+                                                                        ear_r_75
+                                                                        brown_2
+                                                                        anf_630)
+                                                                        (let
+                                                                        anf_632
+                                                                        (paint_45
+                                                                        ear_in_l_76
+                                                                        pink_8
+                                                                        anf_631)
+                                                                        (let
+                                                                        anf_633
+                                                                        (paint_45
+                                                                        ear_in_r_77
+                                                                        pink_8
+                                                                        anf_632)
+                                                                        (let
+                                                                        anf_634
+                                                                        (paint_45
+                                                                        muzzle_72
+                                                                        cream_6
+                                                                        anf_633)
+                                                                        (let
+                                                                        anf_635
+                                                                        (paint_45
+                                                                        brow_l_96
+                                                                        drk_brown_5
+                                                                        anf_634)
+                                                                        (let
+                                                                        anf_636
+                                                                        (paint_45
+                                                                        brow_r_97
+                                                                        drk_brown_5
+                                                                        anf_635)
+                                                                        (let
+                                                                        anf_637
+                                                                        (paint_45
+                                                                        teeth_86
+                                                                        tooth_yel_12
+                                                                        anf_636)
+                                                                        (let
+                                                                        anf_638
+                                                                        (paint_45
+                                                                        groove_87
+                                                                        brown_dk_4
+                                                                        anf_637)
+                                                                        (let
+                                                                        anf_639
+                                                                        (paint_45
+                                                                        nose_88
+                                                                        drk_brown_5
+                                                                        anf_638)
+                                                                        (let
+                                                                        anf_640
+                                                                        (paint_45
+                                                                        nose_hi_89
+                                                                        brown_lt_3
+                                                                        anf_639)
+                                                                        (let
+                                                                        anf_641
+                                                                        (paint_45
+                                                                        eye_l_90
+                                                                        black_10
+                                                                        anf_640)
+                                                                        (let
+                                                                        anf_642
+                                                                        (paint_45
+                                                                        eye_r_91
+                                                                        black_10
+                                                                        anf_641)
+                                                                        (let
+                                                                        anf_643
+                                                                        (paint_45
+                                                                        hi_l_92
+                                                                        wht_11
+                                                                        anf_642)
+                                                                        (let
+                                                                        anf_644
+                                                                        (paint_45
+                                                                        hi_r_93
+                                                                        wht_11
+                                                                        anf_643)
+                                                                        (let
+                                                                        anf_645
+                                                                        (paint_45
+                                                                        hi_l2_94
+                                                                        wht_11
+                                                                        anf_644)
+                                                                        (return
+                                                                        (paint_45
+                                                                        hi_r2_95
+                                                                        wht_11
+                                                                        anf_645))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3)))
+     ((Const pink_dk_9 (return (vec3 0.75 0.42 0.42))) : (vec 3))
+     ((Define (name smax_40) (args ((a_41 float) (b_42 float) (k_43 float)))
+       (body
+        (let anf_646 (- a_41 b_42)
+         (let anf_647 (abs anf_646)
+          (let anf_648 (- k_43 anf_647)
+           (let anf_649 (max anf_648 0)
+            (let h_44 (/ anf_649 k_43)
+             (let anf_650 (max a_41 b_42)
+              (let anf_651 (* h_44 h_44)
+               (let anf_652 (* anf_651 k_43)
+                (let anf_653 (* anf_652 0.25) (return (+ anf_650 anf_653)))))))))))))
+      : (float -> (float -> (float -> float)))))
+
+    === lower variants (beaver.glml) ===
+    (Program
+     ((Define (name at_17) (args ((offset_18 (vec 2)) (p_19 (vec 2))))
+       (body (return (- p_19 offset_18))))
+      : ((vec 2) -> ((vec 2) -> (vec 2))))
+     ((Const bg_col_0 (return (vec3 0.13 0.48 0.3))) : (vec 3))
+     ((Const bg_dark_1 (return (vec3 0.09 0.36 0.22))) : (vec 3))
+     ((Const black_10 (return (vec3 0.06 0.04 0.03))) : (vec 3))
+     ((Define (name box_26) (args ((b_27 (vec 2)) (p_28 (vec 2))))
+       (body
+        (let anf_477 (abs p_28)
+         (let d_29 (- anf_477 b_27)
+          (let anf_478 (vec2 0 0)
+           (let anf_479 (max d_29 anf_478)
+            (let anf_480 (length anf_479)
+             (let anf_481 (index d_29 0)
+              (let anf_482 (index d_29 1)
+               (let anf_483 (max anf_481 anf_482)
+                (let anf_484 (min anf_483 0) (return (+ anf_480 anf_484)))))))))))))
+      : ((vec 2) -> ((vec 2) -> float)))
+     ((Const brown_2 (return (vec3 0.55 0.34 0.16))) : (vec 3))
+     ((Const brown_dk_4 (return (vec3 0.38 0.22 0.08))) : (vec 3))
+     ((Const brown_lt_3 (return (vec3 0.68 0.46 0.24))) : (vec 3))
+     ((Define (name circle_23) (args ((r_24 float) (p_25 (vec 2))))
+       (body (let anf_485 (length p_25) (return (- anf_485 r_24)))))
+      : (float -> ((vec 2) -> float)))
+     ((Const cream_6 (return (vec3 0.95 0.89 0.74))) : (vec 3))
+     ((Const cream_dk_7 (return (vec3 0.78 0.68 0.5))) : (vec 3))
+     ((Const drk_brown_5 (return (vec3 0.22 0.11 0.03))) : (vec 3))
+     ((Define (name ellipse_20) (args ((ab_21 (vec 2)) (p_22 (vec 2))))
+       (body
+        (let anf_486 (/ p_22 ab_21)
+         (let anf_487 (length anf_486) (return (- anf_487 1))))))
+      : ((vec 2) -> ((vec 2) -> float)))
+     ((Define (name paint_45)
+       (args ((d_46 float) (shape_col_47 (vec 3)) (bg_48 (vec 3))))
+       (body
+        (let anf_488 (smoothstep -0.005 0.005 d_46)
+         (return (mix shape_col_47 bg_48 anf_488)))))
+      : (float -> ((vec 3) -> ((vec 3) -> (vec 3)))))
+     ((Define (name paint_shaded_49)
+       (args
+        ((d_50 float) (shape_col_51 (vec 3)) (shadow_col_52 (vec 3))
+         (shadow_depth_53 float) (bg_54 (vec 3))))
+       (body
+        (let anf_489 (smoothstep -0.005 0.005 d_50)
+         (let base_55 (mix shape_col_51 bg_54 anf_489)
+          (let anf_490 (* -1 shadow_depth_53)
+           (let shade_56 (smoothstep anf_490 0 d_50)
+            (let anf_491 (* shade_56 0.55)
+             (let anf_492 (mix shape_col_51 shadow_col_52 anf_491)
+              (let anf_493 (smoothstep 0.005 -0.005 d_50)
+               (return (mix base_55 anf_492 anf_493)))))))))))
+      : (float -> ((vec 3) -> ((vec 3) -> (float -> ((vec 3) -> (vec 3)))))))
+     ((Const pink_8 (return (vec3 0.92 0.62 0.6))) : (vec 3))
+     ((Define (name rot_30) (args ((a_31 float) (p_32 (vec 2))))
+       (body
+        (let c_33 (cos a_31)
+         (let s_34 (sin a_31)
+          (let anf_494 (index p_32 0)
+           (let anf_495 (* c_33 anf_494)
+            (let anf_496 (index p_32 1)
+             (let anf_497 (* s_34 anf_496)
+              (let anf_498 (- anf_495 anf_497)
+               (let anf_499 (index p_32 0)
+                (let anf_500 (* s_34 anf_499)
+                 (let anf_501 (index p_32 1)
+                  (let anf_502 (* c_33 anf_501)
+                   (let anf_503 (+ anf_500 anf_502)
+                    (return (vec2 anf_498 anf_503))))))))))))))))
+      : (float -> ((vec 2) -> (vec 2))))
+     ((Define (name smin_35) (args ((a_36 float) (b_37 float) (k_38 float)))
+       (body
+        (let anf_504 (- a_36 b_37)
+         (let anf_505 (abs anf_504)
+          (let anf_506 (- k_38 anf_505)
+           (let anf_507 (max anf_506 0)
+            (let h_39 (/ anf_507 k_38)
+             (let anf_508 (min a_36 b_37)
+              (let anf_509 (* h_39 h_39)
+               (let anf_510 (* anf_509 k_38)
+                (let anf_511 (* anf_510 0.25) (return (- anf_508 anf_511)))))))))))))
+      : (float -> (float -> (float -> float))))
+     ((Const tooth_yel_12 (return (vec3 0.92 0.85 0.6))) : (vec 3))
+     ((Extern u_resolution) : (vec 2))
+     ((Define (name get_uv_13_vec2_to_vec2_476) (args ((coord_14 (vec 2))))
+       (body
+        (let anf_512 (* 2 coord_14)
+         (let top_15 (- anf_512 u_resolution)
+          (let anf_513 (index u_resolution 0)
+           (let anf_514 (index u_resolution 1)
+            (let bot_16 (min anf_513 anf_514) (return (/ top_15 bot_16)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Const wht_11 (return (vec3 1. 0.97 0.93))) : (vec 3))
+     ((Define (name main) (args ((coord_57 (vec 2))))
+       (body
+        (let anf_515 (get_uv_13_vec2_to_vec2_476 coord_57)
+         (let p_58 (/ anf_515 1.5)
+          (let anf_516 (vec2 0.28 -0.28)
+           (let anf_517 (at_17 anf_516 p_58)
+            (let tp_59 (rot_30 -0.35 anf_517)
+             (let anf_518 (vec2 0.22 0.085)
+              (let tail_60 (ellipse_20 anf_518 tp_59)
+               (let anf_519 (index tp_59 0)
+                (let anf_520 (index tp_59 1)
+                 (let anf_521 (+ anf_519 anf_520)
+                  (let anf_522 (* anf_521 38.)
+                   (let anf_523 (sin anf_522)
+                    (let anf_524 (abs anf_523)
+                     (let tsx_61 (- anf_524 0.55)
+                      (let anf_525 (index tp_59 0)
+                       (let anf_526 (index tp_59 1)
+                        (let anf_527 (- anf_525 anf_526)
+                         (let anf_528 (* anf_527 38.)
+                          (let anf_529 (sin anf_528)
+                           (let anf_530 (abs anf_529)
+                            (let tsy_62 (- anf_530 0.55)
+                             (let anf_531 (+ tail_60 0.01)
+                              (let anf_532 (min tsx_61 tsy_62)
+                               (let anf_533 (* anf_532 0.015)
+                                (let tail_scales_63 (max anf_531 anf_533)
+                                 (let anf_534 (+ tail_60 0.018)
+                                  (let anf_535 (* -1 anf_534)
+                                   (let tail_rim_64 (max tail_60 anf_535)
+                                    (let anf_536 (vec2 0.25 0.26)
+                                     (let anf_537 (vec2 0. -0.16)
+                                      (let anf_538 (at_17 anf_537 p_58)
+                                       (let body_65 (ellipse_20 anf_536 anf_538)
+                                        (let anf_539 (vec2 0.22 0.2)
+                                         (let anf_540 (vec2 0. 0.2)
+                                          (let anf_541 (at_17 anf_540 p_58)
+                                           (let head_66
+                                            (ellipse_20 anf_539 anf_541)
+                                            (let torso_67
+                                             (smin_35 body_65 head_66 0.1)
+                                             (let anf_542 (vec2 -0.14 0.11)
+                                              (let anf_543 (at_17 anf_542 p_58)
+                                               (let cheek_l_68
+                                                (circle_23 0.1 anf_543)
+                                                (let anf_544 (vec2 0.14 0.11)
+                                                 (let anf_545
+                                                  (at_17 anf_544 p_58)
+                                                  (let cheek_r_69
+                                                   (circle_23 0.1 anf_545)
+                                                   (let cheeks_70
+                                                    (min cheek_l_68 cheek_r_69)
+                                                    (let torso_with_cheeks_71
+                                                     (smin_35 torso_67 cheeks_70
+                                                      0.06)
+                                                     (let anf_546
+                                                      (vec2 0.13 0.095)
+                                                      (let anf_547 (vec2 0. 0.09)
+                                                       (let anf_548
+                                                        (at_17 anf_547 p_58)
+                                                        (let muzzle_72
+                                                         (ellipse_20 anf_546
+                                                          anf_548)
+                                                         (let anf_549
+                                                          (vec2 0.15 0.17)
+                                                          (let anf_550
+                                                           (vec2 0. -0.2)
+                                                           (let anf_551
+                                                            (at_17 anf_550 p_58)
+                                                            (let belly_73
+                                                             (ellipse_20 anf_549
+                                                              anf_551)
+                                                             (let anf_552
+                                                              (vec2 -0.175 0.355)
+                                                              (let anf_553
+                                                               (at_17 anf_552
+                                                                p_58)
+                                                               (let ear_l_74
+                                                                (circle_23 0.075
+                                                                 anf_553)
+                                                                (let anf_554
+                                                                 (vec2 0.175
+                                                                  0.355)
+                                                                 (let anf_555
+                                                                  (at_17 anf_554
+                                                                   p_58)
+                                                                  (let ear_r_75
+                                                                   (circle_23
+                                                                    0.075
+                                                                    anf_555)
+                                                                   (let anf_556
+                                                                    (vec2 0.035
+                                                                     0.042)
+                                                                    (let anf_557
+                                                                     (vec2 -0.175
+                                                                      0.345)
+                                                                     (let anf_558
+                                                                      (at_17
+                                                                       anf_557
+                                                                       p_58)
+                                                                      (let
+                                                                       ear_in_l_76
+                                                                       (ellipse_20
+                                                                        anf_556
+                                                                        anf_558)
+                                                                       (let
+                                                                        anf_559
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.042)
+                                                                        (let
+                                                                        anf_560
+                                                                        (vec2
+                                                                        0.175
+                                                                        0.345)
+                                                                        (let
+                                                                        anf_561
+                                                                        (at_17
+                                                                        anf_560
+                                                                        p_58)
+                                                                        (let
+                                                                        ear_in_r_77
+                                                                        (ellipse_20
+                                                                        anf_559
+                                                                        anf_561)
+                                                                        (let
+                                                                        anf_562
+                                                                        (vec2
+                                                                        0.065
+                                                                        0.09)
+                                                                        (let
+                                                                        anf_563
+                                                                        (vec2
+                                                                        -0.23
+                                                                        -0.09)
+                                                                        (let
+                                                                        anf_564
+                                                                        (at_17
+                                                                        anf_563
+                                                                        p_58)
+                                                                        (let
+                                                                        arm_l_78
+                                                                        (ellipse_20
+                                                                        anf_562
+                                                                        anf_564)
+                                                                        (let
+                                                                        anf_565
+                                                                        (vec2
+                                                                        0.065
+                                                                        0.09)
+                                                                        (let
+                                                                        anf_566
+                                                                        (vec2
+                                                                        0.23
+                                                                        -0.09)
+                                                                        (let
+                                                                        anf_567
+                                                                        (at_17
+                                                                        anf_566
+                                                                        p_58)
+                                                                        (let
+                                                                        arm_r_79
+                                                                        (ellipse_20
+                                                                        anf_565
+                                                                        anf_567)
+                                                                        (let
+                                                                        anf_568
+                                                                        (vec2
+                                                                        -0.28
+                                                                        -0.19)
+                                                                        (let
+                                                                        anf_569
+                                                                        (at_17
+                                                                        anf_568
+                                                                        p_58)
+                                                                        (let
+                                                                        paw_l_80
+                                                                        (circle_23
+                                                                        0.055
+                                                                        anf_569)
+                                                                        (let
+                                                                        anf_570
+                                                                        (vec2
+                                                                        0.28
+                                                                        -0.19)
+                                                                        (let
+                                                                        anf_571
+                                                                        (at_17
+                                                                        anf_570
+                                                                        p_58)
+                                                                        (let
+                                                                        paw_r_81
+                                                                        (circle_23
+                                                                        0.055
+                                                                        anf_571)
+                                                                        (let
+                                                                        anf_572
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.048)
+                                                                        (let
+                                                                        anf_573
+                                                                        (vec2
+                                                                        -0.13
+                                                                        -0.42)
+                                                                        (let
+                                                                        anf_574
+                                                                        (at_17
+                                                                        anf_573
+                                                                        p_58)
+                                                                        (let
+                                                                        foot_l_82
+                                                                        (ellipse_20
+                                                                        anf_572
+                                                                        anf_574)
+                                                                        (let
+                                                                        anf_575
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.048)
+                                                                        (let
+                                                                        anf_576
+                                                                        (vec2
+                                                                        0.13
+                                                                        -0.42)
+                                                                        (let
+                                                                        anf_577
+                                                                        (at_17
+                                                                        anf_576
+                                                                        p_58)
+                                                                        (let
+                                                                        foot_r_83
+                                                                        (ellipse_20
+                                                                        anf_575
+                                                                        anf_577)
+                                                                        (let
+                                                                        anf_578
+                                                                        (vec2
+                                                                        0.022
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_579
+                                                                        (vec2
+                                                                        -0.028
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_580
+                                                                        (at_17
+                                                                        anf_579
+                                                                        p_58)
+                                                                        (let
+                                                                        tooth_l_84
+                                                                        (box_26
+                                                                        anf_578
+                                                                        anf_580)
+                                                                        (let
+                                                                        anf_581
+                                                                        (vec2
+                                                                        0.022
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_582
+                                                                        (vec2
+                                                                        0.028
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_583
+                                                                        (at_17
+                                                                        anf_582
+                                                                        p_58)
+                                                                        (let
+                                                                        tooth_r_85
+                                                                        (box_26
+                                                                        anf_581
+                                                                        anf_583)
+                                                                        (let
+                                                                        teeth_86
+                                                                        (min
+                                                                        tooth_l_84
+                                                                        tooth_r_85)
+                                                                        (let
+                                                                        anf_584
+                                                                        (vec2
+                                                                        0.005
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_585
+                                                                        (vec2 0.
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_586
+                                                                        (at_17
+                                                                        anf_585
+                                                                        p_58)
+                                                                        (let
+                                                                        groove_87
+                                                                        (box_26
+                                                                        anf_584
+                                                                        anf_586)
+                                                                        (let
+                                                                        anf_587
+                                                                        (vec2
+                                                                        0.038
+                                                                        0.028)
+                                                                        (let
+                                                                        anf_588
+                                                                        (vec2 0.
+                                                                        0.135)
+                                                                        (let
+                                                                        anf_589
+                                                                        (at_17
+                                                                        anf_588
+                                                                        p_58)
+                                                                        (let
+                                                                        nose_88
+                                                                        (ellipse_20
+                                                                        anf_587
+                                                                        anf_589)
+                                                                        (let
+                                                                        anf_590
+                                                                        (vec2
+                                                                        0.012
+                                                                        0.008)
+                                                                        (let
+                                                                        anf_591
+                                                                        (vec2
+                                                                        -0.012
+                                                                        0.142)
+                                                                        (let
+                                                                        anf_592
+                                                                        (at_17
+                                                                        anf_591
+                                                                        p_58)
+                                                                        (let
+                                                                        nose_hi_89
+                                                                        (ellipse_20
+                                                                        anf_590
+                                                                        anf_592)
+                                                                        (let
+                                                                        anf_593
+                                                                        (vec2
+                                                                        -0.095
+                                                                        0.255)
+                                                                        (let
+                                                                        anf_594
+                                                                        (at_17
+                                                                        anf_593
+                                                                        p_58)
+                                                                        (let
+                                                                        eye_l_90
+                                                                        (circle_23
+                                                                        0.04
+                                                                        anf_594)
+                                                                        (let
+                                                                        anf_595
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.255)
+                                                                        (let
+                                                                        anf_596
+                                                                        (at_17
+                                                                        anf_595
+                                                                        p_58)
+                                                                        (let
+                                                                        eye_r_91
+                                                                        (circle_23
+                                                                        0.04
+                                                                        anf_596)
+                                                                        (let
+                                                                        anf_597
+                                                                        (vec2
+                                                                        -0.082
+                                                                        0.27)
+                                                                        (let
+                                                                        anf_598
+                                                                        (at_17
+                                                                        anf_597
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_l_92
+                                                                        (circle_23
+                                                                        0.014
+                                                                        anf_598)
+                                                                        (let
+                                                                        anf_599
+                                                                        (vec2
+                                                                        0.108
+                                                                        0.27)
+                                                                        (let
+                                                                        anf_600
+                                                                        (at_17
+                                                                        anf_599
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_r_93
+                                                                        (circle_23
+                                                                        0.014
+                                                                        anf_600)
+                                                                        (let
+                                                                        anf_601
+                                                                        (vec2
+                                                                        -0.105
+                                                                        0.245)
+                                                                        (let
+                                                                        anf_602
+                                                                        (at_17
+                                                                        anf_601
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_l2_94
+                                                                        (circle_23
+                                                                        0.006
+                                                                        anf_602)
+                                                                        (let
+                                                                        anf_603
+                                                                        (vec2
+                                                                        0.085
+                                                                        0.245)
+                                                                        (let
+                                                                        anf_604
+                                                                        (at_17
+                                                                        anf_603
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_r2_95
+                                                                        (circle_23
+                                                                        0.006
+                                                                        anf_604)
+                                                                        (let
+                                                                        anf_605
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.01)
+                                                                        (let
+                                                                        anf_606
+                                                                        (vec2
+                                                                        -0.095
+                                                                        0.315)
+                                                                        (let
+                                                                        anf_607
+                                                                        (at_17
+                                                                        anf_606
+                                                                        p_58)
+                                                                        (let
+                                                                        anf_608
+                                                                        (rot_30
+                                                                        0.15
+                                                                        anf_607)
+                                                                        (let
+                                                                        brow_l_96
+                                                                        (ellipse_20
+                                                                        anf_605
+                                                                        anf_608)
+                                                                        (let
+                                                                        anf_609
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.01)
+                                                                        (let
+                                                                        anf_610
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.315)
+                                                                        (let
+                                                                        anf_611
+                                                                        (at_17
+                                                                        anf_610
+                                                                        p_58)
+                                                                        (let
+                                                                        anf_612
+                                                                        (rot_30
+                                                                        -0.15
+                                                                        anf_611)
+                                                                        (let
+                                                                        brow_r_97
+                                                                        (ellipse_20
+                                                                        anf_609
+                                                                        anf_612)
+                                                                        (let
+                                                                        anf_613
+                                                                        (length
+                                                                        p_58)
+                                                                        (let
+                                                                        vig_98
+                                                                        (smoothstep
+                                                                        0.3 1.1
+                                                                        anf_613)
+                                                                        (let
+                                                                        col_99
+                                                                        (mix
+                                                                        bg_col_0
+                                                                        bg_dark_1
+                                                                        vig_98)
+                                                                        (let
+                                                                        anf_614
+                                                                        (vec2
+                                                                        0.38
+                                                                        0.055)
+                                                                        (let
+                                                                        anf_615
+                                                                        (vec2
+                                                                        0.02
+                                                                        -0.45)
+                                                                        (let
+                                                                        anf_616
+                                                                        (at_17
+                                                                        anf_615
+                                                                        p_58)
+                                                                        (let
+                                                                        shadow_d_100
+                                                                        (ellipse_20
+                                                                        anf_614
+                                                                        anf_616)
+                                                                        (let
+                                                                        shadow_falloff_101
+                                                                        (smoothstep
+                                                                        0.08
+                                                                        -0.02
+                                                                        shadow_d_100)
+                                                                        (let
+                                                                        anf_617
+                                                                        (vec3
+                                                                        0.06 0.28
+                                                                        0.16)
+                                                                        (let
+                                                                        anf_618
+                                                                        (*
+                                                                        shadow_falloff_101
+                                                                        0.55)
+                                                                        (let
+                                                                        col_102
+                                                                        (mix
+                                                                        col_99
+                                                                        anf_617
+                                                                        anf_618)
+                                                                        (let
+                                                                        anf_619
+                                                                        (paint_45
+                                                                        tail_60
+                                                                        brown_dk_4
+                                                                        col_102)
+                                                                        (let
+                                                                        anf_620
+                                                                        (paint_45
+                                                                        tail_rim_64
+                                                                        drk_brown_5
+                                                                        anf_619)
+                                                                        (let
+                                                                        anf_621
+                                                                        (paint_45
+                                                                        tail_scales_63
+                                                                        drk_brown_5
+                                                                        anf_620)
+                                                                        (let
+                                                                        anf_622
+                                                                        (paint_45
+                                                                        foot_l_82
+                                                                        drk_brown_5
+                                                                        anf_621)
+                                                                        (let
+                                                                        anf_623
+                                                                        (paint_45
+                                                                        foot_r_83
+                                                                        drk_brown_5
+                                                                        anf_622)
+                                                                        (let
+                                                                        anf_624
+                                                                        (paint_45
+                                                                        arm_l_78
+                                                                        brown_dk_4
+                                                                        anf_623)
+                                                                        (let
+                                                                        anf_625
+                                                                        (paint_45
+                                                                        arm_r_79
+                                                                        brown_dk_4
+                                                                        anf_624)
+                                                                        (let
+                                                                        anf_626
+                                                                        (paint_shaded_49
+                                                                        torso_with_cheeks_71
+                                                                        brown_2
+                                                                        brown_dk_4
+                                                                        0.08
+                                                                        anf_625)
+                                                                        (let
+                                                                        anf_627
+                                                                        (paint_shaded_49
+                                                                        belly_73
+                                                                        cream_6
+                                                                        cream_dk_7
+                                                                        0.05
+                                                                        anf_626)
+                                                                        (let
+                                                                        anf_628
+                                                                        (paint_45
+                                                                        paw_l_80
+                                                                        cream_6
+                                                                        anf_627)
+                                                                        (let
+                                                                        anf_629
+                                                                        (paint_45
+                                                                        paw_r_81
+                                                                        cream_6
+                                                                        anf_628)
+                                                                        (let
+                                                                        anf_630
+                                                                        (paint_45
+                                                                        ear_l_74
+                                                                        brown_2
+                                                                        anf_629)
+                                                                        (let
+                                                                        anf_631
+                                                                        (paint_45
+                                                                        ear_r_75
+                                                                        brown_2
+                                                                        anf_630)
+                                                                        (let
+                                                                        anf_632
+                                                                        (paint_45
+                                                                        ear_in_l_76
+                                                                        pink_8
+                                                                        anf_631)
+                                                                        (let
+                                                                        anf_633
+                                                                        (paint_45
+                                                                        ear_in_r_77
+                                                                        pink_8
+                                                                        anf_632)
+                                                                        (let
+                                                                        anf_634
+                                                                        (paint_45
+                                                                        muzzle_72
+                                                                        cream_6
+                                                                        anf_633)
+                                                                        (let
+                                                                        anf_635
+                                                                        (paint_45
+                                                                        brow_l_96
+                                                                        drk_brown_5
+                                                                        anf_634)
+                                                                        (let
+                                                                        anf_636
+                                                                        (paint_45
+                                                                        brow_r_97
+                                                                        drk_brown_5
+                                                                        anf_635)
+                                                                        (let
+                                                                        anf_637
+                                                                        (paint_45
+                                                                        teeth_86
+                                                                        tooth_yel_12
+                                                                        anf_636)
+                                                                        (let
+                                                                        anf_638
+                                                                        (paint_45
+                                                                        groove_87
+                                                                        brown_dk_4
+                                                                        anf_637)
+                                                                        (let
+                                                                        anf_639
+                                                                        (paint_45
+                                                                        nose_88
+                                                                        drk_brown_5
+                                                                        anf_638)
+                                                                        (let
+                                                                        anf_640
+                                                                        (paint_45
+                                                                        nose_hi_89
+                                                                        brown_lt_3
+                                                                        anf_639)
+                                                                        (let
+                                                                        anf_641
+                                                                        (paint_45
+                                                                        eye_l_90
+                                                                        black_10
+                                                                        anf_640)
+                                                                        (let
+                                                                        anf_642
+                                                                        (paint_45
+                                                                        eye_r_91
+                                                                        black_10
+                                                                        anf_641)
+                                                                        (let
+                                                                        anf_643
+                                                                        (paint_45
+                                                                        hi_l_92
+                                                                        wht_11
+                                                                        anf_642)
+                                                                        (let
+                                                                        anf_644
+                                                                        (paint_45
+                                                                        hi_r_93
+                                                                        wht_11
+                                                                        anf_643)
+                                                                        (let
+                                                                        anf_645
+                                                                        (paint_45
+                                                                        hi_l2_94
+                                                                        wht_11
+                                                                        anf_644)
+                                                                        (return
+                                                                        (paint_45
+                                                                        hi_r2_95
+                                                                        wht_11
+                                                                        anf_645))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3)))
+     ((Const pink_dk_9 (return (vec3 0.75 0.42 0.42))) : (vec 3))
+     ((Define (name smax_40) (args ((a_41 float) (b_42 float) (k_43 float)))
+       (body
+        (let anf_646 (- a_41 b_42)
+         (let anf_647 (abs anf_646)
+          (let anf_648 (- k_43 anf_647)
+           (let anf_649 (max anf_648 0)
+            (let h_44 (/ anf_649 k_43)
+             (let anf_650 (max a_41 b_42)
+              (let anf_651 (* h_44 h_44)
+               (let anf_652 (* anf_651 k_43)
+                (let anf_653 (* anf_652 0.25) (return (+ anf_650 anf_653)))))))))))))
+      : (float -> (float -> (float -> float)))))
+
+    === promote ints (beaver.glml) ===
+    (Program
+     ((Define (name at_17) (args ((offset_18 (vec 2)) (p_19 (vec 2))))
+       (body (return (- p_19 offset_18))))
+      : ((vec 2) -> ((vec 2) -> (vec 2))))
+     ((Const bg_col_0 (return (vec3 0.13 0.48 0.3))) : (vec 3))
+     ((Const bg_dark_1 (return (vec3 0.09 0.36 0.22))) : (vec 3))
+     ((Const black_10 (return (vec3 0.06 0.04 0.03))) : (vec 3))
+     ((Define (name box_26) (args ((b_27 (vec 2)) (p_28 (vec 2))))
+       (body
+        (let anf_477 (abs p_28)
+         (let d_29 (- anf_477 b_27)
+          (let anf_478 (vec2 0. 0.)
+           (let anf_479 (max d_29 anf_478)
+            (let anf_480 (length anf_479)
+             (let anf_481 (index d_29 0)
+              (let anf_482 (index d_29 1)
+               (let anf_483 (max anf_481 anf_482)
+                (let anf_484 (min anf_483 0.) (return (+ anf_480 anf_484)))))))))))))
+      : ((vec 2) -> ((vec 2) -> float)))
+     ((Const brown_2 (return (vec3 0.55 0.34 0.16))) : (vec 3))
+     ((Const brown_dk_4 (return (vec3 0.38 0.22 0.08))) : (vec 3))
+     ((Const brown_lt_3 (return (vec3 0.68 0.46 0.24))) : (vec 3))
+     ((Define (name circle_23) (args ((r_24 float) (p_25 (vec 2))))
+       (body (let anf_485 (length p_25) (return (- anf_485 r_24)))))
+      : (float -> ((vec 2) -> float)))
+     ((Const cream_6 (return (vec3 0.95 0.89 0.74))) : (vec 3))
+     ((Const cream_dk_7 (return (vec3 0.78 0.68 0.5))) : (vec 3))
+     ((Const drk_brown_5 (return (vec3 0.22 0.11 0.03))) : (vec 3))
+     ((Define (name ellipse_20) (args ((ab_21 (vec 2)) (p_22 (vec 2))))
+       (body
+        (let anf_486 (/ p_22 ab_21)
+         (let anf_487 (length anf_486) (return (- anf_487 1.))))))
+      : ((vec 2) -> ((vec 2) -> float)))
+     ((Define (name paint_45)
+       (args ((d_46 float) (shape_col_47 (vec 3)) (bg_48 (vec 3))))
+       (body
+        (let anf_488 (smoothstep -0.005 0.005 d_46)
+         (return (mix shape_col_47 bg_48 anf_488)))))
+      : (float -> ((vec 3) -> ((vec 3) -> (vec 3)))))
+     ((Define (name paint_shaded_49)
+       (args
+        ((d_50 float) (shape_col_51 (vec 3)) (shadow_col_52 (vec 3))
+         (shadow_depth_53 float) (bg_54 (vec 3))))
+       (body
+        (let anf_489 (smoothstep -0.005 0.005 d_50)
+         (let base_55 (mix shape_col_51 bg_54 anf_489)
+          (let anf_490 (* -1. shadow_depth_53)
+           (let shade_56 (smoothstep anf_490 0. d_50)
+            (let anf_491 (* shade_56 0.55)
+             (let anf_492 (mix shape_col_51 shadow_col_52 anf_491)
+              (let anf_493 (smoothstep 0.005 -0.005 d_50)
+               (return (mix base_55 anf_492 anf_493)))))))))))
+      : (float -> ((vec 3) -> ((vec 3) -> (float -> ((vec 3) -> (vec 3)))))))
+     ((Const pink_8 (return (vec3 0.92 0.62 0.6))) : (vec 3))
+     ((Define (name rot_30) (args ((a_31 float) (p_32 (vec 2))))
+       (body
+        (let c_33 (cos a_31)
+         (let s_34 (sin a_31)
+          (let anf_494 (index p_32 0)
+           (let anf_495 (* c_33 anf_494)
+            (let anf_496 (index p_32 1)
+             (let anf_497 (* s_34 anf_496)
+              (let anf_498 (- anf_495 anf_497)
+               (let anf_499 (index p_32 0)
+                (let anf_500 (* s_34 anf_499)
+                 (let anf_501 (index p_32 1)
+                  (let anf_502 (* c_33 anf_501)
+                   (let anf_503 (+ anf_500 anf_502)
+                    (return (vec2 anf_498 anf_503))))))))))))))))
+      : (float -> ((vec 2) -> (vec 2))))
+     ((Define (name smin_35) (args ((a_36 float) (b_37 float) (k_38 float)))
+       (body
+        (let anf_504 (- a_36 b_37)
+         (let anf_505 (abs anf_504)
+          (let anf_506 (- k_38 anf_505)
+           (let anf_507 (max anf_506 0.)
+            (let h_39 (/ anf_507 k_38)
+             (let anf_508 (min a_36 b_37)
+              (let anf_509 (* h_39 h_39)
+               (let anf_510 (* anf_509 k_38)
+                (let anf_511 (* anf_510 0.25) (return (- anf_508 anf_511)))))))))))))
+      : (float -> (float -> (float -> float))))
+     ((Const tooth_yel_12 (return (vec3 0.92 0.85 0.6))) : (vec 3))
+     ((Extern u_resolution) : (vec 2))
+     ((Define (name get_uv_13_vec2_to_vec2_476) (args ((coord_14 (vec 2))))
+       (body
+        (let anf_512 (* 2. coord_14)
+         (let top_15 (- anf_512 u_resolution)
+          (let anf_513 (index u_resolution 0)
+           (let anf_514 (index u_resolution 1)
+            (let bot_16 (min anf_513 anf_514) (return (/ top_15 bot_16)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Const wht_11 (return (vec3 1. 0.97 0.93))) : (vec 3))
+     ((Define (name main) (args ((coord_57 (vec 2))))
+       (body
+        (let anf_515 (get_uv_13_vec2_to_vec2_476 coord_57)
+         (let p_58 (/ anf_515 1.5)
+          (let anf_516 (vec2 0.28 -0.28)
+           (let anf_517 (at_17 anf_516 p_58)
+            (let tp_59 (rot_30 -0.35 anf_517)
+             (let anf_518 (vec2 0.22 0.085)
+              (let tail_60 (ellipse_20 anf_518 tp_59)
+               (let anf_519 (index tp_59 0)
+                (let anf_520 (index tp_59 1)
+                 (let anf_521 (+ anf_519 anf_520)
+                  (let anf_522 (* anf_521 38.)
+                   (let anf_523 (sin anf_522)
+                    (let anf_524 (abs anf_523)
+                     (let tsx_61 (- anf_524 0.55)
+                      (let anf_525 (index tp_59 0)
+                       (let anf_526 (index tp_59 1)
+                        (let anf_527 (- anf_525 anf_526)
+                         (let anf_528 (* anf_527 38.)
+                          (let anf_529 (sin anf_528)
+                           (let anf_530 (abs anf_529)
+                            (let tsy_62 (- anf_530 0.55)
+                             (let anf_531 (+ tail_60 0.01)
+                              (let anf_532 (min tsx_61 tsy_62)
+                               (let anf_533 (* anf_532 0.015)
+                                (let tail_scales_63 (max anf_531 anf_533)
+                                 (let anf_534 (+ tail_60 0.018)
+                                  (let anf_535 (* -1. anf_534)
+                                   (let tail_rim_64 (max tail_60 anf_535)
+                                    (let anf_536 (vec2 0.25 0.26)
+                                     (let anf_537 (vec2 0. -0.16)
+                                      (let anf_538 (at_17 anf_537 p_58)
+                                       (let body_65 (ellipse_20 anf_536 anf_538)
+                                        (let anf_539 (vec2 0.22 0.2)
+                                         (let anf_540 (vec2 0. 0.2)
+                                          (let anf_541 (at_17 anf_540 p_58)
+                                           (let head_66
+                                            (ellipse_20 anf_539 anf_541)
+                                            (let torso_67
+                                             (smin_35 body_65 head_66 0.1)
+                                             (let anf_542 (vec2 -0.14 0.11)
+                                              (let anf_543 (at_17 anf_542 p_58)
+                                               (let cheek_l_68
+                                                (circle_23 0.1 anf_543)
+                                                (let anf_544 (vec2 0.14 0.11)
+                                                 (let anf_545
+                                                  (at_17 anf_544 p_58)
+                                                  (let cheek_r_69
+                                                   (circle_23 0.1 anf_545)
+                                                   (let cheeks_70
+                                                    (min cheek_l_68 cheek_r_69)
+                                                    (let torso_with_cheeks_71
+                                                     (smin_35 torso_67 cheeks_70
+                                                      0.06)
+                                                     (let anf_546
+                                                      (vec2 0.13 0.095)
+                                                      (let anf_547 (vec2 0. 0.09)
+                                                       (let anf_548
+                                                        (at_17 anf_547 p_58)
+                                                        (let muzzle_72
+                                                         (ellipse_20 anf_546
+                                                          anf_548)
+                                                         (let anf_549
+                                                          (vec2 0.15 0.17)
+                                                          (let anf_550
+                                                           (vec2 0. -0.2)
+                                                           (let anf_551
+                                                            (at_17 anf_550 p_58)
+                                                            (let belly_73
+                                                             (ellipse_20 anf_549
+                                                              anf_551)
+                                                             (let anf_552
+                                                              (vec2 -0.175 0.355)
+                                                              (let anf_553
+                                                               (at_17 anf_552
+                                                                p_58)
+                                                               (let ear_l_74
+                                                                (circle_23 0.075
+                                                                 anf_553)
+                                                                (let anf_554
+                                                                 (vec2 0.175
+                                                                  0.355)
+                                                                 (let anf_555
+                                                                  (at_17 anf_554
+                                                                   p_58)
+                                                                  (let ear_r_75
+                                                                   (circle_23
+                                                                    0.075
+                                                                    anf_555)
+                                                                   (let anf_556
+                                                                    (vec2 0.035
+                                                                     0.042)
+                                                                    (let anf_557
+                                                                     (vec2 -0.175
+                                                                      0.345)
+                                                                     (let anf_558
+                                                                      (at_17
+                                                                       anf_557
+                                                                       p_58)
+                                                                      (let
+                                                                       ear_in_l_76
+                                                                       (ellipse_20
+                                                                        anf_556
+                                                                        anf_558)
+                                                                       (let
+                                                                        anf_559
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.042)
+                                                                        (let
+                                                                        anf_560
+                                                                        (vec2
+                                                                        0.175
+                                                                        0.345)
+                                                                        (let
+                                                                        anf_561
+                                                                        (at_17
+                                                                        anf_560
+                                                                        p_58)
+                                                                        (let
+                                                                        ear_in_r_77
+                                                                        (ellipse_20
+                                                                        anf_559
+                                                                        anf_561)
+                                                                        (let
+                                                                        anf_562
+                                                                        (vec2
+                                                                        0.065
+                                                                        0.09)
+                                                                        (let
+                                                                        anf_563
+                                                                        (vec2
+                                                                        -0.23
+                                                                        -0.09)
+                                                                        (let
+                                                                        anf_564
+                                                                        (at_17
+                                                                        anf_563
+                                                                        p_58)
+                                                                        (let
+                                                                        arm_l_78
+                                                                        (ellipse_20
+                                                                        anf_562
+                                                                        anf_564)
+                                                                        (let
+                                                                        anf_565
+                                                                        (vec2
+                                                                        0.065
+                                                                        0.09)
+                                                                        (let
+                                                                        anf_566
+                                                                        (vec2
+                                                                        0.23
+                                                                        -0.09)
+                                                                        (let
+                                                                        anf_567
+                                                                        (at_17
+                                                                        anf_566
+                                                                        p_58)
+                                                                        (let
+                                                                        arm_r_79
+                                                                        (ellipse_20
+                                                                        anf_565
+                                                                        anf_567)
+                                                                        (let
+                                                                        anf_568
+                                                                        (vec2
+                                                                        -0.28
+                                                                        -0.19)
+                                                                        (let
+                                                                        anf_569
+                                                                        (at_17
+                                                                        anf_568
+                                                                        p_58)
+                                                                        (let
+                                                                        paw_l_80
+                                                                        (circle_23
+                                                                        0.055
+                                                                        anf_569)
+                                                                        (let
+                                                                        anf_570
+                                                                        (vec2
+                                                                        0.28
+                                                                        -0.19)
+                                                                        (let
+                                                                        anf_571
+                                                                        (at_17
+                                                                        anf_570
+                                                                        p_58)
+                                                                        (let
+                                                                        paw_r_81
+                                                                        (circle_23
+                                                                        0.055
+                                                                        anf_571)
+                                                                        (let
+                                                                        anf_572
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.048)
+                                                                        (let
+                                                                        anf_573
+                                                                        (vec2
+                                                                        -0.13
+                                                                        -0.42)
+                                                                        (let
+                                                                        anf_574
+                                                                        (at_17
+                                                                        anf_573
+                                                                        p_58)
+                                                                        (let
+                                                                        foot_l_82
+                                                                        (ellipse_20
+                                                                        anf_572
+                                                                        anf_574)
+                                                                        (let
+                                                                        anf_575
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.048)
+                                                                        (let
+                                                                        anf_576
+                                                                        (vec2
+                                                                        0.13
+                                                                        -0.42)
+                                                                        (let
+                                                                        anf_577
+                                                                        (at_17
+                                                                        anf_576
+                                                                        p_58)
+                                                                        (let
+                                                                        foot_r_83
+                                                                        (ellipse_20
+                                                                        anf_575
+                                                                        anf_577)
+                                                                        (let
+                                                                        anf_578
+                                                                        (vec2
+                                                                        0.022
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_579
+                                                                        (vec2
+                                                                        -0.028
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_580
+                                                                        (at_17
+                                                                        anf_579
+                                                                        p_58)
+                                                                        (let
+                                                                        tooth_l_84
+                                                                        (box_26
+                                                                        anf_578
+                                                                        anf_580)
+                                                                        (let
+                                                                        anf_581
+                                                                        (vec2
+                                                                        0.022
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_582
+                                                                        (vec2
+                                                                        0.028
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_583
+                                                                        (at_17
+                                                                        anf_582
+                                                                        p_58)
+                                                                        (let
+                                                                        tooth_r_85
+                                                                        (box_26
+                                                                        anf_581
+                                                                        anf_583)
+                                                                        (let
+                                                                        teeth_86
+                                                                        (min
+                                                                        tooth_l_84
+                                                                        tooth_r_85)
+                                                                        (let
+                                                                        anf_584
+                                                                        (vec2
+                                                                        0.005
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_585
+                                                                        (vec2 0.
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_586
+                                                                        (at_17
+                                                                        anf_585
+                                                                        p_58)
+                                                                        (let
+                                                                        groove_87
+                                                                        (box_26
+                                                                        anf_584
+                                                                        anf_586)
+                                                                        (let
+                                                                        anf_587
+                                                                        (vec2
+                                                                        0.038
+                                                                        0.028)
+                                                                        (let
+                                                                        anf_588
+                                                                        (vec2 0.
+                                                                        0.135)
+                                                                        (let
+                                                                        anf_589
+                                                                        (at_17
+                                                                        anf_588
+                                                                        p_58)
+                                                                        (let
+                                                                        nose_88
+                                                                        (ellipse_20
+                                                                        anf_587
+                                                                        anf_589)
+                                                                        (let
+                                                                        anf_590
+                                                                        (vec2
+                                                                        0.012
+                                                                        0.008)
+                                                                        (let
+                                                                        anf_591
+                                                                        (vec2
+                                                                        -0.012
+                                                                        0.142)
+                                                                        (let
+                                                                        anf_592
+                                                                        (at_17
+                                                                        anf_591
+                                                                        p_58)
+                                                                        (let
+                                                                        nose_hi_89
+                                                                        (ellipse_20
+                                                                        anf_590
+                                                                        anf_592)
+                                                                        (let
+                                                                        anf_593
+                                                                        (vec2
+                                                                        -0.095
+                                                                        0.255)
+                                                                        (let
+                                                                        anf_594
+                                                                        (at_17
+                                                                        anf_593
+                                                                        p_58)
+                                                                        (let
+                                                                        eye_l_90
+                                                                        (circle_23
+                                                                        0.04
+                                                                        anf_594)
+                                                                        (let
+                                                                        anf_595
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.255)
+                                                                        (let
+                                                                        anf_596
+                                                                        (at_17
+                                                                        anf_595
+                                                                        p_58)
+                                                                        (let
+                                                                        eye_r_91
+                                                                        (circle_23
+                                                                        0.04
+                                                                        anf_596)
+                                                                        (let
+                                                                        anf_597
+                                                                        (vec2
+                                                                        -0.082
+                                                                        0.27)
+                                                                        (let
+                                                                        anf_598
+                                                                        (at_17
+                                                                        anf_597
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_l_92
+                                                                        (circle_23
+                                                                        0.014
+                                                                        anf_598)
+                                                                        (let
+                                                                        anf_599
+                                                                        (vec2
+                                                                        0.108
+                                                                        0.27)
+                                                                        (let
+                                                                        anf_600
+                                                                        (at_17
+                                                                        anf_599
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_r_93
+                                                                        (circle_23
+                                                                        0.014
+                                                                        anf_600)
+                                                                        (let
+                                                                        anf_601
+                                                                        (vec2
+                                                                        -0.105
+                                                                        0.245)
+                                                                        (let
+                                                                        anf_602
+                                                                        (at_17
+                                                                        anf_601
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_l2_94
+                                                                        (circle_23
+                                                                        0.006
+                                                                        anf_602)
+                                                                        (let
+                                                                        anf_603
+                                                                        (vec2
+                                                                        0.085
+                                                                        0.245)
+                                                                        (let
+                                                                        anf_604
+                                                                        (at_17
+                                                                        anf_603
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_r2_95
+                                                                        (circle_23
+                                                                        0.006
+                                                                        anf_604)
+                                                                        (let
+                                                                        anf_605
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.01)
+                                                                        (let
+                                                                        anf_606
+                                                                        (vec2
+                                                                        -0.095
+                                                                        0.315)
+                                                                        (let
+                                                                        anf_607
+                                                                        (at_17
+                                                                        anf_606
+                                                                        p_58)
+                                                                        (let
+                                                                        anf_608
+                                                                        (rot_30
+                                                                        0.15
+                                                                        anf_607)
+                                                                        (let
+                                                                        brow_l_96
+                                                                        (ellipse_20
+                                                                        anf_605
+                                                                        anf_608)
+                                                                        (let
+                                                                        anf_609
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.01)
+                                                                        (let
+                                                                        anf_610
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.315)
+                                                                        (let
+                                                                        anf_611
+                                                                        (at_17
+                                                                        anf_610
+                                                                        p_58)
+                                                                        (let
+                                                                        anf_612
+                                                                        (rot_30
+                                                                        -0.15
+                                                                        anf_611)
+                                                                        (let
+                                                                        brow_r_97
+                                                                        (ellipse_20
+                                                                        anf_609
+                                                                        anf_612)
+                                                                        (let
+                                                                        anf_613
+                                                                        (length
+                                                                        p_58)
+                                                                        (let
+                                                                        vig_98
+                                                                        (smoothstep
+                                                                        0.3 1.1
+                                                                        anf_613)
+                                                                        (let
+                                                                        col_99
+                                                                        (mix
+                                                                        bg_col_0
+                                                                        bg_dark_1
+                                                                        vig_98)
+                                                                        (let
+                                                                        anf_614
+                                                                        (vec2
+                                                                        0.38
+                                                                        0.055)
+                                                                        (let
+                                                                        anf_615
+                                                                        (vec2
+                                                                        0.02
+                                                                        -0.45)
+                                                                        (let
+                                                                        anf_616
+                                                                        (at_17
+                                                                        anf_615
+                                                                        p_58)
+                                                                        (let
+                                                                        shadow_d_100
+                                                                        (ellipse_20
+                                                                        anf_614
+                                                                        anf_616)
+                                                                        (let
+                                                                        shadow_falloff_101
+                                                                        (smoothstep
+                                                                        0.08
+                                                                        -0.02
+                                                                        shadow_d_100)
+                                                                        (let
+                                                                        anf_617
+                                                                        (vec3
+                                                                        0.06 0.28
+                                                                        0.16)
+                                                                        (let
+                                                                        anf_618
+                                                                        (*
+                                                                        shadow_falloff_101
+                                                                        0.55)
+                                                                        (let
+                                                                        col_102
+                                                                        (mix
+                                                                        col_99
+                                                                        anf_617
+                                                                        anf_618)
+                                                                        (let
+                                                                        anf_619
+                                                                        (paint_45
+                                                                        tail_60
+                                                                        brown_dk_4
+                                                                        col_102)
+                                                                        (let
+                                                                        anf_620
+                                                                        (paint_45
+                                                                        tail_rim_64
+                                                                        drk_brown_5
+                                                                        anf_619)
+                                                                        (let
+                                                                        anf_621
+                                                                        (paint_45
+                                                                        tail_scales_63
+                                                                        drk_brown_5
+                                                                        anf_620)
+                                                                        (let
+                                                                        anf_622
+                                                                        (paint_45
+                                                                        foot_l_82
+                                                                        drk_brown_5
+                                                                        anf_621)
+                                                                        (let
+                                                                        anf_623
+                                                                        (paint_45
+                                                                        foot_r_83
+                                                                        drk_brown_5
+                                                                        anf_622)
+                                                                        (let
+                                                                        anf_624
+                                                                        (paint_45
+                                                                        arm_l_78
+                                                                        brown_dk_4
+                                                                        anf_623)
+                                                                        (let
+                                                                        anf_625
+                                                                        (paint_45
+                                                                        arm_r_79
+                                                                        brown_dk_4
+                                                                        anf_624)
+                                                                        (let
+                                                                        anf_626
+                                                                        (paint_shaded_49
+                                                                        torso_with_cheeks_71
+                                                                        brown_2
+                                                                        brown_dk_4
+                                                                        0.08
+                                                                        anf_625)
+                                                                        (let
+                                                                        anf_627
+                                                                        (paint_shaded_49
+                                                                        belly_73
+                                                                        cream_6
+                                                                        cream_dk_7
+                                                                        0.05
+                                                                        anf_626)
+                                                                        (let
+                                                                        anf_628
+                                                                        (paint_45
+                                                                        paw_l_80
+                                                                        cream_6
+                                                                        anf_627)
+                                                                        (let
+                                                                        anf_629
+                                                                        (paint_45
+                                                                        paw_r_81
+                                                                        cream_6
+                                                                        anf_628)
+                                                                        (let
+                                                                        anf_630
+                                                                        (paint_45
+                                                                        ear_l_74
+                                                                        brown_2
+                                                                        anf_629)
+                                                                        (let
+                                                                        anf_631
+                                                                        (paint_45
+                                                                        ear_r_75
+                                                                        brown_2
+                                                                        anf_630)
+                                                                        (let
+                                                                        anf_632
+                                                                        (paint_45
+                                                                        ear_in_l_76
+                                                                        pink_8
+                                                                        anf_631)
+                                                                        (let
+                                                                        anf_633
+                                                                        (paint_45
+                                                                        ear_in_r_77
+                                                                        pink_8
+                                                                        anf_632)
+                                                                        (let
+                                                                        anf_634
+                                                                        (paint_45
+                                                                        muzzle_72
+                                                                        cream_6
+                                                                        anf_633)
+                                                                        (let
+                                                                        anf_635
+                                                                        (paint_45
+                                                                        brow_l_96
+                                                                        drk_brown_5
+                                                                        anf_634)
+                                                                        (let
+                                                                        anf_636
+                                                                        (paint_45
+                                                                        brow_r_97
+                                                                        drk_brown_5
+                                                                        anf_635)
+                                                                        (let
+                                                                        anf_637
+                                                                        (paint_45
+                                                                        teeth_86
+                                                                        tooth_yel_12
+                                                                        anf_636)
+                                                                        (let
+                                                                        anf_638
+                                                                        (paint_45
+                                                                        groove_87
+                                                                        brown_dk_4
+                                                                        anf_637)
+                                                                        (let
+                                                                        anf_639
+                                                                        (paint_45
+                                                                        nose_88
+                                                                        drk_brown_5
+                                                                        anf_638)
+                                                                        (let
+                                                                        anf_640
+                                                                        (paint_45
+                                                                        nose_hi_89
+                                                                        brown_lt_3
+                                                                        anf_639)
+                                                                        (let
+                                                                        anf_641
+                                                                        (paint_45
+                                                                        eye_l_90
+                                                                        black_10
+                                                                        anf_640)
+                                                                        (let
+                                                                        anf_642
+                                                                        (paint_45
+                                                                        eye_r_91
+                                                                        black_10
+                                                                        anf_641)
+                                                                        (let
+                                                                        anf_643
+                                                                        (paint_45
+                                                                        hi_l_92
+                                                                        wht_11
+                                                                        anf_642)
+                                                                        (let
+                                                                        anf_644
+                                                                        (paint_45
+                                                                        hi_r_93
+                                                                        wht_11
+                                                                        anf_643)
+                                                                        (let
+                                                                        anf_645
+                                                                        (paint_45
+                                                                        hi_l2_94
+                                                                        wht_11
+                                                                        anf_644)
+                                                                        (return
+                                                                        (paint_45
+                                                                        hi_r2_95
+                                                                        wht_11
+                                                                        anf_645))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3)))
+     ((Const pink_dk_9 (return (vec3 0.75 0.42 0.42))) : (vec 3))
+     ((Define (name smax_40) (args ((a_41 float) (b_42 float) (k_43 float)))
+       (body
+        (let anf_646 (- a_41 b_42)
+         (let anf_647 (abs anf_646)
+          (let anf_648 (- k_43 anf_647)
+           (let anf_649 (max anf_648 0.)
+            (let h_44 (/ anf_649 k_43)
+             (let anf_650 (max a_41 b_42)
+              (let anf_651 (* h_44 h_44)
+               (let anf_652 (* anf_651 k_43)
+                (let anf_653 (* anf_652 0.25) (return (+ anf_650 anf_653)))))))))))))
+      : (float -> (float -> (float -> float)))))
+
+    === remove placeholder (beaver.glml) ===
+    (Program
+     ((Define (name at_17) (args ((offset_18 (vec 2)) (p_19 (vec 2))))
+       (body (return (- p_19 offset_18))))
+      : ((vec 2) -> ((vec 2) -> (vec 2))))
+     ((Const bg_col_0 (return (vec3 0.13 0.48 0.3))) : (vec 3))
+     ((Const bg_dark_1 (return (vec3 0.09 0.36 0.22))) : (vec 3))
+     ((Const black_10 (return (vec3 0.06 0.04 0.03))) : (vec 3))
+     ((Define (name box_26) (args ((b_27 (vec 2)) (p_28 (vec 2))))
+       (body
+        (let anf_477 (abs p_28)
+         (let d_29 (- anf_477 b_27)
+          (let anf_478 (vec2 0. 0.)
+           (let anf_479 (max d_29 anf_478)
+            (let anf_480 (length anf_479)
+             (let anf_481 (index d_29 0)
+              (let anf_482 (index d_29 1)
+               (let anf_483 (max anf_481 anf_482)
+                (let anf_484 (min anf_483 0.) (return (+ anf_480 anf_484)))))))))))))
+      : ((vec 2) -> ((vec 2) -> float)))
+     ((Const brown_2 (return (vec3 0.55 0.34 0.16))) : (vec 3))
+     ((Const brown_dk_4 (return (vec3 0.38 0.22 0.08))) : (vec 3))
+     ((Const brown_lt_3 (return (vec3 0.68 0.46 0.24))) : (vec 3))
+     ((Define (name circle_23) (args ((r_24 float) (p_25 (vec 2))))
+       (body (let anf_485 (length p_25) (return (- anf_485 r_24)))))
+      : (float -> ((vec 2) -> float)))
+     ((Const cream_6 (return (vec3 0.95 0.89 0.74))) : (vec 3))
+     ((Const cream_dk_7 (return (vec3 0.78 0.68 0.5))) : (vec 3))
+     ((Const drk_brown_5 (return (vec3 0.22 0.11 0.03))) : (vec 3))
+     ((Define (name ellipse_20) (args ((ab_21 (vec 2)) (p_22 (vec 2))))
+       (body
+        (let anf_486 (/ p_22 ab_21)
+         (let anf_487 (length anf_486) (return (- anf_487 1.))))))
+      : ((vec 2) -> ((vec 2) -> float)))
+     ((Define (name paint_45)
+       (args ((d_46 float) (shape_col_47 (vec 3)) (bg_48 (vec 3))))
+       (body
+        (let anf_488 (smoothstep -0.005 0.005 d_46)
+         (return (mix shape_col_47 bg_48 anf_488)))))
+      : (float -> ((vec 3) -> ((vec 3) -> (vec 3)))))
+     ((Define (name paint_shaded_49)
+       (args
+        ((d_50 float) (shape_col_51 (vec 3)) (shadow_col_52 (vec 3))
+         (shadow_depth_53 float) (bg_54 (vec 3))))
+       (body
+        (let anf_489 (smoothstep -0.005 0.005 d_50)
+         (let base_55 (mix shape_col_51 bg_54 anf_489)
+          (let anf_490 (* -1. shadow_depth_53)
+           (let shade_56 (smoothstep anf_490 0. d_50)
+            (let anf_491 (* shade_56 0.55)
+             (let anf_492 (mix shape_col_51 shadow_col_52 anf_491)
+              (let anf_493 (smoothstep 0.005 -0.005 d_50)
+               (return (mix base_55 anf_492 anf_493)))))))))))
+      : (float -> ((vec 3) -> ((vec 3) -> (float -> ((vec 3) -> (vec 3)))))))
+     ((Const pink_8 (return (vec3 0.92 0.62 0.6))) : (vec 3))
+     ((Define (name rot_30) (args ((a_31 float) (p_32 (vec 2))))
+       (body
+        (let c_33 (cos a_31)
+         (let s_34 (sin a_31)
+          (let anf_494 (index p_32 0)
+           (let anf_495 (* c_33 anf_494)
+            (let anf_496 (index p_32 1)
+             (let anf_497 (* s_34 anf_496)
+              (let anf_498 (- anf_495 anf_497)
+               (let anf_499 (index p_32 0)
+                (let anf_500 (* s_34 anf_499)
+                 (let anf_501 (index p_32 1)
+                  (let anf_502 (* c_33 anf_501)
+                   (let anf_503 (+ anf_500 anf_502)
+                    (return (vec2 anf_498 anf_503))))))))))))))))
+      : (float -> ((vec 2) -> (vec 2))))
+     ((Define (name smin_35) (args ((a_36 float) (b_37 float) (k_38 float)))
+       (body
+        (let anf_504 (- a_36 b_37)
+         (let anf_505 (abs anf_504)
+          (let anf_506 (- k_38 anf_505)
+           (let anf_507 (max anf_506 0.)
+            (let h_39 (/ anf_507 k_38)
+             (let anf_508 (min a_36 b_37)
+              (let anf_509 (* h_39 h_39)
+               (let anf_510 (* anf_509 k_38)
+                (let anf_511 (* anf_510 0.25) (return (- anf_508 anf_511)))))))))))))
+      : (float -> (float -> (float -> float))))
+     ((Const tooth_yel_12 (return (vec3 0.92 0.85 0.6))) : (vec 3))
+     ((Extern u_resolution) : (vec 2))
+     ((Define (name get_uv_13_vec2_to_vec2_476) (args ((coord_14 (vec 2))))
+       (body
+        (let anf_512 (* 2. coord_14)
+         (let top_15 (- anf_512 u_resolution)
+          (let anf_513 (index u_resolution 0)
+           (let anf_514 (index u_resolution 1)
+            (let bot_16 (min anf_513 anf_514) (return (/ top_15 bot_16)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Const wht_11 (return (vec3 1. 0.97 0.93))) : (vec 3))
+     ((Define (name main) (args ((coord_57 (vec 2))))
+       (body
+        (let anf_515 (get_uv_13_vec2_to_vec2_476 coord_57)
+         (let p_58 (/ anf_515 1.5)
+          (let anf_516 (vec2 0.28 -0.28)
+           (let anf_517 (at_17 anf_516 p_58)
+            (let tp_59 (rot_30 -0.35 anf_517)
+             (let anf_518 (vec2 0.22 0.085)
+              (let tail_60 (ellipse_20 anf_518 tp_59)
+               (let anf_519 (index tp_59 0)
+                (let anf_520 (index tp_59 1)
+                 (let anf_521 (+ anf_519 anf_520)
+                  (let anf_522 (* anf_521 38.)
+                   (let anf_523 (sin anf_522)
+                    (let anf_524 (abs anf_523)
+                     (let tsx_61 (- anf_524 0.55)
+                      (let anf_525 (index tp_59 0)
+                       (let anf_526 (index tp_59 1)
+                        (let anf_527 (- anf_525 anf_526)
+                         (let anf_528 (* anf_527 38.)
+                          (let anf_529 (sin anf_528)
+                           (let anf_530 (abs anf_529)
+                            (let tsy_62 (- anf_530 0.55)
+                             (let anf_531 (+ tail_60 0.01)
+                              (let anf_532 (min tsx_61 tsy_62)
+                               (let anf_533 (* anf_532 0.015)
+                                (let tail_scales_63 (max anf_531 anf_533)
+                                 (let anf_534 (+ tail_60 0.018)
+                                  (let anf_535 (* -1. anf_534)
+                                   (let tail_rim_64 (max tail_60 anf_535)
+                                    (let anf_536 (vec2 0.25 0.26)
+                                     (let anf_537 (vec2 0. -0.16)
+                                      (let anf_538 (at_17 anf_537 p_58)
+                                       (let body_65 (ellipse_20 anf_536 anf_538)
+                                        (let anf_539 (vec2 0.22 0.2)
+                                         (let anf_540 (vec2 0. 0.2)
+                                          (let anf_541 (at_17 anf_540 p_58)
+                                           (let head_66
+                                            (ellipse_20 anf_539 anf_541)
+                                            (let torso_67
+                                             (smin_35 body_65 head_66 0.1)
+                                             (let anf_542 (vec2 -0.14 0.11)
+                                              (let anf_543 (at_17 anf_542 p_58)
+                                               (let cheek_l_68
+                                                (circle_23 0.1 anf_543)
+                                                (let anf_544 (vec2 0.14 0.11)
+                                                 (let anf_545
+                                                  (at_17 anf_544 p_58)
+                                                  (let cheek_r_69
+                                                   (circle_23 0.1 anf_545)
+                                                   (let cheeks_70
+                                                    (min cheek_l_68 cheek_r_69)
+                                                    (let torso_with_cheeks_71
+                                                     (smin_35 torso_67 cheeks_70
+                                                      0.06)
+                                                     (let anf_546
+                                                      (vec2 0.13 0.095)
+                                                      (let anf_547 (vec2 0. 0.09)
+                                                       (let anf_548
+                                                        (at_17 anf_547 p_58)
+                                                        (let muzzle_72
+                                                         (ellipse_20 anf_546
+                                                          anf_548)
+                                                         (let anf_549
+                                                          (vec2 0.15 0.17)
+                                                          (let anf_550
+                                                           (vec2 0. -0.2)
+                                                           (let anf_551
+                                                            (at_17 anf_550 p_58)
+                                                            (let belly_73
+                                                             (ellipse_20 anf_549
+                                                              anf_551)
+                                                             (let anf_552
+                                                              (vec2 -0.175 0.355)
+                                                              (let anf_553
+                                                               (at_17 anf_552
+                                                                p_58)
+                                                               (let ear_l_74
+                                                                (circle_23 0.075
+                                                                 anf_553)
+                                                                (let anf_554
+                                                                 (vec2 0.175
+                                                                  0.355)
+                                                                 (let anf_555
+                                                                  (at_17 anf_554
+                                                                   p_58)
+                                                                  (let ear_r_75
+                                                                   (circle_23
+                                                                    0.075
+                                                                    anf_555)
+                                                                   (let anf_556
+                                                                    (vec2 0.035
+                                                                     0.042)
+                                                                    (let anf_557
+                                                                     (vec2 -0.175
+                                                                      0.345)
+                                                                     (let anf_558
+                                                                      (at_17
+                                                                       anf_557
+                                                                       p_58)
+                                                                      (let
+                                                                       ear_in_l_76
+                                                                       (ellipse_20
+                                                                        anf_556
+                                                                        anf_558)
+                                                                       (let
+                                                                        anf_559
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.042)
+                                                                        (let
+                                                                        anf_560
+                                                                        (vec2
+                                                                        0.175
+                                                                        0.345)
+                                                                        (let
+                                                                        anf_561
+                                                                        (at_17
+                                                                        anf_560
+                                                                        p_58)
+                                                                        (let
+                                                                        ear_in_r_77
+                                                                        (ellipse_20
+                                                                        anf_559
+                                                                        anf_561)
+                                                                        (let
+                                                                        anf_562
+                                                                        (vec2
+                                                                        0.065
+                                                                        0.09)
+                                                                        (let
+                                                                        anf_563
+                                                                        (vec2
+                                                                        -0.23
+                                                                        -0.09)
+                                                                        (let
+                                                                        anf_564
+                                                                        (at_17
+                                                                        anf_563
+                                                                        p_58)
+                                                                        (let
+                                                                        arm_l_78
+                                                                        (ellipse_20
+                                                                        anf_562
+                                                                        anf_564)
+                                                                        (let
+                                                                        anf_565
+                                                                        (vec2
+                                                                        0.065
+                                                                        0.09)
+                                                                        (let
+                                                                        anf_566
+                                                                        (vec2
+                                                                        0.23
+                                                                        -0.09)
+                                                                        (let
+                                                                        anf_567
+                                                                        (at_17
+                                                                        anf_566
+                                                                        p_58)
+                                                                        (let
+                                                                        arm_r_79
+                                                                        (ellipse_20
+                                                                        anf_565
+                                                                        anf_567)
+                                                                        (let
+                                                                        anf_568
+                                                                        (vec2
+                                                                        -0.28
+                                                                        -0.19)
+                                                                        (let
+                                                                        anf_569
+                                                                        (at_17
+                                                                        anf_568
+                                                                        p_58)
+                                                                        (let
+                                                                        paw_l_80
+                                                                        (circle_23
+                                                                        0.055
+                                                                        anf_569)
+                                                                        (let
+                                                                        anf_570
+                                                                        (vec2
+                                                                        0.28
+                                                                        -0.19)
+                                                                        (let
+                                                                        anf_571
+                                                                        (at_17
+                                                                        anf_570
+                                                                        p_58)
+                                                                        (let
+                                                                        paw_r_81
+                                                                        (circle_23
+                                                                        0.055
+                                                                        anf_571)
+                                                                        (let
+                                                                        anf_572
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.048)
+                                                                        (let
+                                                                        anf_573
+                                                                        (vec2
+                                                                        -0.13
+                                                                        -0.42)
+                                                                        (let
+                                                                        anf_574
+                                                                        (at_17
+                                                                        anf_573
+                                                                        p_58)
+                                                                        (let
+                                                                        foot_l_82
+                                                                        (ellipse_20
+                                                                        anf_572
+                                                                        anf_574)
+                                                                        (let
+                                                                        anf_575
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.048)
+                                                                        (let
+                                                                        anf_576
+                                                                        (vec2
+                                                                        0.13
+                                                                        -0.42)
+                                                                        (let
+                                                                        anf_577
+                                                                        (at_17
+                                                                        anf_576
+                                                                        p_58)
+                                                                        (let
+                                                                        foot_r_83
+                                                                        (ellipse_20
+                                                                        anf_575
+                                                                        anf_577)
+                                                                        (let
+                                                                        anf_578
+                                                                        (vec2
+                                                                        0.022
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_579
+                                                                        (vec2
+                                                                        -0.028
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_580
+                                                                        (at_17
+                                                                        anf_579
+                                                                        p_58)
+                                                                        (let
+                                                                        tooth_l_84
+                                                                        (box_26
+                                                                        anf_578
+                                                                        anf_580)
+                                                                        (let
+                                                                        anf_581
+                                                                        (vec2
+                                                                        0.022
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_582
+                                                                        (vec2
+                                                                        0.028
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_583
+                                                                        (at_17
+                                                                        anf_582
+                                                                        p_58)
+                                                                        (let
+                                                                        tooth_r_85
+                                                                        (box_26
+                                                                        anf_581
+                                                                        anf_583)
+                                                                        (let
+                                                                        teeth_86
+                                                                        (min
+                                                                        tooth_l_84
+                                                                        tooth_r_85)
+                                                                        (let
+                                                                        anf_584
+                                                                        (vec2
+                                                                        0.005
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_585
+                                                                        (vec2 0.
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_586
+                                                                        (at_17
+                                                                        anf_585
+                                                                        p_58)
+                                                                        (let
+                                                                        groove_87
+                                                                        (box_26
+                                                                        anf_584
+                                                                        anf_586)
+                                                                        (let
+                                                                        anf_587
+                                                                        (vec2
+                                                                        0.038
+                                                                        0.028)
+                                                                        (let
+                                                                        anf_588
+                                                                        (vec2 0.
+                                                                        0.135)
+                                                                        (let
+                                                                        anf_589
+                                                                        (at_17
+                                                                        anf_588
+                                                                        p_58)
+                                                                        (let
+                                                                        nose_88
+                                                                        (ellipse_20
+                                                                        anf_587
+                                                                        anf_589)
+                                                                        (let
+                                                                        anf_590
+                                                                        (vec2
+                                                                        0.012
+                                                                        0.008)
+                                                                        (let
+                                                                        anf_591
+                                                                        (vec2
+                                                                        -0.012
+                                                                        0.142)
+                                                                        (let
+                                                                        anf_592
+                                                                        (at_17
+                                                                        anf_591
+                                                                        p_58)
+                                                                        (let
+                                                                        nose_hi_89
+                                                                        (ellipse_20
+                                                                        anf_590
+                                                                        anf_592)
+                                                                        (let
+                                                                        anf_593
+                                                                        (vec2
+                                                                        -0.095
+                                                                        0.255)
+                                                                        (let
+                                                                        anf_594
+                                                                        (at_17
+                                                                        anf_593
+                                                                        p_58)
+                                                                        (let
+                                                                        eye_l_90
+                                                                        (circle_23
+                                                                        0.04
+                                                                        anf_594)
+                                                                        (let
+                                                                        anf_595
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.255)
+                                                                        (let
+                                                                        anf_596
+                                                                        (at_17
+                                                                        anf_595
+                                                                        p_58)
+                                                                        (let
+                                                                        eye_r_91
+                                                                        (circle_23
+                                                                        0.04
+                                                                        anf_596)
+                                                                        (let
+                                                                        anf_597
+                                                                        (vec2
+                                                                        -0.082
+                                                                        0.27)
+                                                                        (let
+                                                                        anf_598
+                                                                        (at_17
+                                                                        anf_597
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_l_92
+                                                                        (circle_23
+                                                                        0.014
+                                                                        anf_598)
+                                                                        (let
+                                                                        anf_599
+                                                                        (vec2
+                                                                        0.108
+                                                                        0.27)
+                                                                        (let
+                                                                        anf_600
+                                                                        (at_17
+                                                                        anf_599
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_r_93
+                                                                        (circle_23
+                                                                        0.014
+                                                                        anf_600)
+                                                                        (let
+                                                                        anf_601
+                                                                        (vec2
+                                                                        -0.105
+                                                                        0.245)
+                                                                        (let
+                                                                        anf_602
+                                                                        (at_17
+                                                                        anf_601
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_l2_94
+                                                                        (circle_23
+                                                                        0.006
+                                                                        anf_602)
+                                                                        (let
+                                                                        anf_603
+                                                                        (vec2
+                                                                        0.085
+                                                                        0.245)
+                                                                        (let
+                                                                        anf_604
+                                                                        (at_17
+                                                                        anf_603
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_r2_95
+                                                                        (circle_23
+                                                                        0.006
+                                                                        anf_604)
+                                                                        (let
+                                                                        anf_605
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.01)
+                                                                        (let
+                                                                        anf_606
+                                                                        (vec2
+                                                                        -0.095
+                                                                        0.315)
+                                                                        (let
+                                                                        anf_607
+                                                                        (at_17
+                                                                        anf_606
+                                                                        p_58)
+                                                                        (let
+                                                                        anf_608
+                                                                        (rot_30
+                                                                        0.15
+                                                                        anf_607)
+                                                                        (let
+                                                                        brow_l_96
+                                                                        (ellipse_20
+                                                                        anf_605
+                                                                        anf_608)
+                                                                        (let
+                                                                        anf_609
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.01)
+                                                                        (let
+                                                                        anf_610
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.315)
+                                                                        (let
+                                                                        anf_611
+                                                                        (at_17
+                                                                        anf_610
+                                                                        p_58)
+                                                                        (let
+                                                                        anf_612
+                                                                        (rot_30
+                                                                        -0.15
+                                                                        anf_611)
+                                                                        (let
+                                                                        brow_r_97
+                                                                        (ellipse_20
+                                                                        anf_609
+                                                                        anf_612)
+                                                                        (let
+                                                                        anf_613
+                                                                        (length
+                                                                        p_58)
+                                                                        (let
+                                                                        vig_98
+                                                                        (smoothstep
+                                                                        0.3 1.1
+                                                                        anf_613)
+                                                                        (let
+                                                                        col_99
+                                                                        (mix
+                                                                        bg_col_0
+                                                                        bg_dark_1
+                                                                        vig_98)
+                                                                        (let
+                                                                        anf_614
+                                                                        (vec2
+                                                                        0.38
+                                                                        0.055)
+                                                                        (let
+                                                                        anf_615
+                                                                        (vec2
+                                                                        0.02
+                                                                        -0.45)
+                                                                        (let
+                                                                        anf_616
+                                                                        (at_17
+                                                                        anf_615
+                                                                        p_58)
+                                                                        (let
+                                                                        shadow_d_100
+                                                                        (ellipse_20
+                                                                        anf_614
+                                                                        anf_616)
+                                                                        (let
+                                                                        shadow_falloff_101
+                                                                        (smoothstep
+                                                                        0.08
+                                                                        -0.02
+                                                                        shadow_d_100)
+                                                                        (let
+                                                                        anf_617
+                                                                        (vec3
+                                                                        0.06 0.28
+                                                                        0.16)
+                                                                        (let
+                                                                        anf_618
+                                                                        (*
+                                                                        shadow_falloff_101
+                                                                        0.55)
+                                                                        (let
+                                                                        col_102
+                                                                        (mix
+                                                                        col_99
+                                                                        anf_617
+                                                                        anf_618)
+                                                                        (let
+                                                                        anf_619
+                                                                        (paint_45
+                                                                        tail_60
+                                                                        brown_dk_4
+                                                                        col_102)
+                                                                        (let
+                                                                        anf_620
+                                                                        (paint_45
+                                                                        tail_rim_64
+                                                                        drk_brown_5
+                                                                        anf_619)
+                                                                        (let
+                                                                        anf_621
+                                                                        (paint_45
+                                                                        tail_scales_63
+                                                                        drk_brown_5
+                                                                        anf_620)
+                                                                        (let
+                                                                        anf_622
+                                                                        (paint_45
+                                                                        foot_l_82
+                                                                        drk_brown_5
+                                                                        anf_621)
+                                                                        (let
+                                                                        anf_623
+                                                                        (paint_45
+                                                                        foot_r_83
+                                                                        drk_brown_5
+                                                                        anf_622)
+                                                                        (let
+                                                                        anf_624
+                                                                        (paint_45
+                                                                        arm_l_78
+                                                                        brown_dk_4
+                                                                        anf_623)
+                                                                        (let
+                                                                        anf_625
+                                                                        (paint_45
+                                                                        arm_r_79
+                                                                        brown_dk_4
+                                                                        anf_624)
+                                                                        (let
+                                                                        anf_626
+                                                                        (paint_shaded_49
+                                                                        torso_with_cheeks_71
+                                                                        brown_2
+                                                                        brown_dk_4
+                                                                        0.08
+                                                                        anf_625)
+                                                                        (let
+                                                                        anf_627
+                                                                        (paint_shaded_49
+                                                                        belly_73
+                                                                        cream_6
+                                                                        cream_dk_7
+                                                                        0.05
+                                                                        anf_626)
+                                                                        (let
+                                                                        anf_628
+                                                                        (paint_45
+                                                                        paw_l_80
+                                                                        cream_6
+                                                                        anf_627)
+                                                                        (let
+                                                                        anf_629
+                                                                        (paint_45
+                                                                        paw_r_81
+                                                                        cream_6
+                                                                        anf_628)
+                                                                        (let
+                                                                        anf_630
+                                                                        (paint_45
+                                                                        ear_l_74
+                                                                        brown_2
+                                                                        anf_629)
+                                                                        (let
+                                                                        anf_631
+                                                                        (paint_45
+                                                                        ear_r_75
+                                                                        brown_2
+                                                                        anf_630)
+                                                                        (let
+                                                                        anf_632
+                                                                        (paint_45
+                                                                        ear_in_l_76
+                                                                        pink_8
+                                                                        anf_631)
+                                                                        (let
+                                                                        anf_633
+                                                                        (paint_45
+                                                                        ear_in_r_77
+                                                                        pink_8
+                                                                        anf_632)
+                                                                        (let
+                                                                        anf_634
+                                                                        (paint_45
+                                                                        muzzle_72
+                                                                        cream_6
+                                                                        anf_633)
+                                                                        (let
+                                                                        anf_635
+                                                                        (paint_45
+                                                                        brow_l_96
+                                                                        drk_brown_5
+                                                                        anf_634)
+                                                                        (let
+                                                                        anf_636
+                                                                        (paint_45
+                                                                        brow_r_97
+                                                                        drk_brown_5
+                                                                        anf_635)
+                                                                        (let
+                                                                        anf_637
+                                                                        (paint_45
+                                                                        teeth_86
+                                                                        tooth_yel_12
+                                                                        anf_636)
+                                                                        (let
+                                                                        anf_638
+                                                                        (paint_45
+                                                                        groove_87
+                                                                        brown_dk_4
+                                                                        anf_637)
+                                                                        (let
+                                                                        anf_639
+                                                                        (paint_45
+                                                                        nose_88
+                                                                        drk_brown_5
+                                                                        anf_638)
+                                                                        (let
+                                                                        anf_640
+                                                                        (paint_45
+                                                                        nose_hi_89
+                                                                        brown_lt_3
+                                                                        anf_639)
+                                                                        (let
+                                                                        anf_641
+                                                                        (paint_45
+                                                                        eye_l_90
+                                                                        black_10
+                                                                        anf_640)
+                                                                        (let
+                                                                        anf_642
+                                                                        (paint_45
+                                                                        eye_r_91
+                                                                        black_10
+                                                                        anf_641)
+                                                                        (let
+                                                                        anf_643
+                                                                        (paint_45
+                                                                        hi_l_92
+                                                                        wht_11
+                                                                        anf_642)
+                                                                        (let
+                                                                        anf_644
+                                                                        (paint_45
+                                                                        hi_r_93
+                                                                        wht_11
+                                                                        anf_643)
+                                                                        (let
+                                                                        anf_645
+                                                                        (paint_45
+                                                                        hi_l2_94
+                                                                        wht_11
+                                                                        anf_644)
+                                                                        (return
+                                                                        (paint_45
+                                                                        hi_r2_95
+                                                                        wht_11
+                                                                        anf_645))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3)))
+     ((Const pink_dk_9 (return (vec3 0.75 0.42 0.42))) : (vec 3))
+     ((Define (name smax_40) (args ((a_41 float) (b_42 float) (k_43 float)))
+       (body
+        (let anf_646 (- a_41 b_42)
+         (let anf_647 (abs anf_646)
+          (let anf_648 (- k_43 anf_647)
+           (let anf_649 (max anf_648 0.)
+            (let h_44 (/ anf_649 k_43)
+             (let anf_650 (max a_41 b_42)
+              (let anf_651 (* h_44 h_44)
+               (let anf_652 (* anf_651 k_43)
+                (let anf_653 (* anf_652 0.25) (return (+ anf_650 anf_653)))))))))))))
+      : (float -> (float -> (float -> float)))))
+
+    === lift consts (beaver.glml) ===
+    (Program
+     ((Define (name at_17) (args ((offset_18 (vec 2)) (p_19 (vec 2))))
+       (body (return (- p_19 offset_18))))
+      : ((vec 2) -> ((vec 2) -> (vec 2))))
+     ((Const bg_col_0 (return (vec3 0.13 0.48 0.3))) : (vec 3))
+     ((Const bg_dark_1 (return (vec3 0.09 0.36 0.22))) : (vec 3))
+     ((Const black_10 (return (vec3 0.06 0.04 0.03))) : (vec 3))
+     ((Define (name box_26) (args ((b_27 (vec 2)) (p_28 (vec 2))))
+       (body
+        (let anf_477 (abs p_28)
+         (let d_29 (- anf_477 b_27)
+          (let anf_478 (vec2 0. 0.)
+           (let anf_479 (max d_29 anf_478)
+            (let anf_480 (length anf_479)
+             (let anf_481 (index d_29 0)
+              (let anf_482 (index d_29 1)
+               (let anf_483 (max anf_481 anf_482)
+                (let anf_484 (min anf_483 0.) (return (+ anf_480 anf_484)))))))))))))
+      : ((vec 2) -> ((vec 2) -> float)))
+     ((Const brown_2 (return (vec3 0.55 0.34 0.16))) : (vec 3))
+     ((Const brown_dk_4 (return (vec3 0.38 0.22 0.08))) : (vec 3))
+     ((Const brown_lt_3 (return (vec3 0.68 0.46 0.24))) : (vec 3))
+     ((Define (name circle_23) (args ((r_24 float) (p_25 (vec 2))))
+       (body (let anf_485 (length p_25) (return (- anf_485 r_24)))))
+      : (float -> ((vec 2) -> float)))
+     ((Const cream_6 (return (vec3 0.95 0.89 0.74))) : (vec 3))
+     ((Const cream_dk_7 (return (vec3 0.78 0.68 0.5))) : (vec 3))
+     ((Const drk_brown_5 (return (vec3 0.22 0.11 0.03))) : (vec 3))
+     ((Define (name ellipse_20) (args ((ab_21 (vec 2)) (p_22 (vec 2))))
+       (body
+        (let anf_486 (/ p_22 ab_21)
+         (let anf_487 (length anf_486) (return (- anf_487 1.))))))
+      : ((vec 2) -> ((vec 2) -> float)))
+     ((Define (name paint_45)
+       (args ((d_46 float) (shape_col_47 (vec 3)) (bg_48 (vec 3))))
+       (body
+        (let anf_488 (smoothstep -0.005 0.005 d_46)
+         (return (mix shape_col_47 bg_48 anf_488)))))
+      : (float -> ((vec 3) -> ((vec 3) -> (vec 3)))))
+     ((Define (name paint_shaded_49)
+       (args
+        ((d_50 float) (shape_col_51 (vec 3)) (shadow_col_52 (vec 3))
+         (shadow_depth_53 float) (bg_54 (vec 3))))
+       (body
+        (let anf_489 (smoothstep -0.005 0.005 d_50)
+         (let base_55 (mix shape_col_51 bg_54 anf_489)
+          (let anf_490 (* -1. shadow_depth_53)
+           (let shade_56 (smoothstep anf_490 0. d_50)
+            (let anf_491 (* shade_56 0.55)
+             (let anf_492 (mix shape_col_51 shadow_col_52 anf_491)
+              (let anf_493 (smoothstep 0.005 -0.005 d_50)
+               (return (mix base_55 anf_492 anf_493)))))))))))
+      : (float -> ((vec 3) -> ((vec 3) -> (float -> ((vec 3) -> (vec 3)))))))
+     ((Const pink_8 (return (vec3 0.92 0.62 0.6))) : (vec 3))
+     ((Define (name rot_30) (args ((a_31 float) (p_32 (vec 2))))
+       (body
+        (let c_33 (cos a_31)
+         (let s_34 (sin a_31)
+          (let anf_494 (index p_32 0)
+           (let anf_495 (* c_33 anf_494)
+            (let anf_496 (index p_32 1)
+             (let anf_497 (* s_34 anf_496)
+              (let anf_498 (- anf_495 anf_497)
+               (let anf_499 (index p_32 0)
+                (let anf_500 (* s_34 anf_499)
+                 (let anf_501 (index p_32 1)
+                  (let anf_502 (* c_33 anf_501)
+                   (let anf_503 (+ anf_500 anf_502)
+                    (return (vec2 anf_498 anf_503))))))))))))))))
+      : (float -> ((vec 2) -> (vec 2))))
+     ((Define (name smin_35) (args ((a_36 float) (b_37 float) (k_38 float)))
+       (body
+        (let anf_504 (- a_36 b_37)
+         (let anf_505 (abs anf_504)
+          (let anf_506 (- k_38 anf_505)
+           (let anf_507 (max anf_506 0.)
+            (let h_39 (/ anf_507 k_38)
+             (let anf_508 (min a_36 b_37)
+              (let anf_509 (* h_39 h_39)
+               (let anf_510 (* anf_509 k_38)
+                (let anf_511 (* anf_510 0.25) (return (- anf_508 anf_511)))))))))))))
+      : (float -> (float -> (float -> float))))
+     ((Const tooth_yel_12 (return (vec3 0.92 0.85 0.6))) : (vec 3))
+     ((Extern u_resolution) : (vec 2))
+     ((Define (name get_uv_13_vec2_to_vec2_476) (args ((coord_14 (vec 2))))
+       (body
+        (let anf_512 (* 2. coord_14)
+         (let top_15 (- anf_512 u_resolution)
+          (let anf_513 (index u_resolution 0)
+           (let anf_514 (index u_resolution 1)
+            (let bot_16 (min anf_513 anf_514) (return (/ top_15 bot_16)))))))))
+      : ((vec 2) -> (vec 2)))
+     ((Const wht_11 (return (vec3 1. 0.97 0.93))) : (vec 3))
+     ((Define (name main) (args ((coord_57 (vec 2))))
+       (body
+        (let anf_515 (get_uv_13_vec2_to_vec2_476 coord_57)
+         (let p_58 (/ anf_515 1.5)
+          (let anf_516 (vec2 0.28 -0.28)
+           (let anf_517 (at_17 anf_516 p_58)
+            (let tp_59 (rot_30 -0.35 anf_517)
+             (let anf_518 (vec2 0.22 0.085)
+              (let tail_60 (ellipse_20 anf_518 tp_59)
+               (let anf_519 (index tp_59 0)
+                (let anf_520 (index tp_59 1)
+                 (let anf_521 (+ anf_519 anf_520)
+                  (let anf_522 (* anf_521 38.)
+                   (let anf_523 (sin anf_522)
+                    (let anf_524 (abs anf_523)
+                     (let tsx_61 (- anf_524 0.55)
+                      (let anf_525 (index tp_59 0)
+                       (let anf_526 (index tp_59 1)
+                        (let anf_527 (- anf_525 anf_526)
+                         (let anf_528 (* anf_527 38.)
+                          (let anf_529 (sin anf_528)
+                           (let anf_530 (abs anf_529)
+                            (let tsy_62 (- anf_530 0.55)
+                             (let anf_531 (+ tail_60 0.01)
+                              (let anf_532 (min tsx_61 tsy_62)
+                               (let anf_533 (* anf_532 0.015)
+                                (let tail_scales_63 (max anf_531 anf_533)
+                                 (let anf_534 (+ tail_60 0.018)
+                                  (let anf_535 (* -1. anf_534)
+                                   (let tail_rim_64 (max tail_60 anf_535)
+                                    (let anf_536 (vec2 0.25 0.26)
+                                     (let anf_537 (vec2 0. -0.16)
+                                      (let anf_538 (at_17 anf_537 p_58)
+                                       (let body_65 (ellipse_20 anf_536 anf_538)
+                                        (let anf_539 (vec2 0.22 0.2)
+                                         (let anf_540 (vec2 0. 0.2)
+                                          (let anf_541 (at_17 anf_540 p_58)
+                                           (let head_66
+                                            (ellipse_20 anf_539 anf_541)
+                                            (let torso_67
+                                             (smin_35 body_65 head_66 0.1)
+                                             (let anf_542 (vec2 -0.14 0.11)
+                                              (let anf_543 (at_17 anf_542 p_58)
+                                               (let cheek_l_68
+                                                (circle_23 0.1 anf_543)
+                                                (let anf_544 (vec2 0.14 0.11)
+                                                 (let anf_545
+                                                  (at_17 anf_544 p_58)
+                                                  (let cheek_r_69
+                                                   (circle_23 0.1 anf_545)
+                                                   (let cheeks_70
+                                                    (min cheek_l_68 cheek_r_69)
+                                                    (let torso_with_cheeks_71
+                                                     (smin_35 torso_67 cheeks_70
+                                                      0.06)
+                                                     (let anf_546
+                                                      (vec2 0.13 0.095)
+                                                      (let anf_547 (vec2 0. 0.09)
+                                                       (let anf_548
+                                                        (at_17 anf_547 p_58)
+                                                        (let muzzle_72
+                                                         (ellipse_20 anf_546
+                                                          anf_548)
+                                                         (let anf_549
+                                                          (vec2 0.15 0.17)
+                                                          (let anf_550
+                                                           (vec2 0. -0.2)
+                                                           (let anf_551
+                                                            (at_17 anf_550 p_58)
+                                                            (let belly_73
+                                                             (ellipse_20 anf_549
+                                                              anf_551)
+                                                             (let anf_552
+                                                              (vec2 -0.175 0.355)
+                                                              (let anf_553
+                                                               (at_17 anf_552
+                                                                p_58)
+                                                               (let ear_l_74
+                                                                (circle_23 0.075
+                                                                 anf_553)
+                                                                (let anf_554
+                                                                 (vec2 0.175
+                                                                  0.355)
+                                                                 (let anf_555
+                                                                  (at_17 anf_554
+                                                                   p_58)
+                                                                  (let ear_r_75
+                                                                   (circle_23
+                                                                    0.075
+                                                                    anf_555)
+                                                                   (let anf_556
+                                                                    (vec2 0.035
+                                                                     0.042)
+                                                                    (let anf_557
+                                                                     (vec2 -0.175
+                                                                      0.345)
+                                                                     (let anf_558
+                                                                      (at_17
+                                                                       anf_557
+                                                                       p_58)
+                                                                      (let
+                                                                       ear_in_l_76
+                                                                       (ellipse_20
+                                                                        anf_556
+                                                                        anf_558)
+                                                                       (let
+                                                                        anf_559
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.042)
+                                                                        (let
+                                                                        anf_560
+                                                                        (vec2
+                                                                        0.175
+                                                                        0.345)
+                                                                        (let
+                                                                        anf_561
+                                                                        (at_17
+                                                                        anf_560
+                                                                        p_58)
+                                                                        (let
+                                                                        ear_in_r_77
+                                                                        (ellipse_20
+                                                                        anf_559
+                                                                        anf_561)
+                                                                        (let
+                                                                        anf_562
+                                                                        (vec2
+                                                                        0.065
+                                                                        0.09)
+                                                                        (let
+                                                                        anf_563
+                                                                        (vec2
+                                                                        -0.23
+                                                                        -0.09)
+                                                                        (let
+                                                                        anf_564
+                                                                        (at_17
+                                                                        anf_563
+                                                                        p_58)
+                                                                        (let
+                                                                        arm_l_78
+                                                                        (ellipse_20
+                                                                        anf_562
+                                                                        anf_564)
+                                                                        (let
+                                                                        anf_565
+                                                                        (vec2
+                                                                        0.065
+                                                                        0.09)
+                                                                        (let
+                                                                        anf_566
+                                                                        (vec2
+                                                                        0.23
+                                                                        -0.09)
+                                                                        (let
+                                                                        anf_567
+                                                                        (at_17
+                                                                        anf_566
+                                                                        p_58)
+                                                                        (let
+                                                                        arm_r_79
+                                                                        (ellipse_20
+                                                                        anf_565
+                                                                        anf_567)
+                                                                        (let
+                                                                        anf_568
+                                                                        (vec2
+                                                                        -0.28
+                                                                        -0.19)
+                                                                        (let
+                                                                        anf_569
+                                                                        (at_17
+                                                                        anf_568
+                                                                        p_58)
+                                                                        (let
+                                                                        paw_l_80
+                                                                        (circle_23
+                                                                        0.055
+                                                                        anf_569)
+                                                                        (let
+                                                                        anf_570
+                                                                        (vec2
+                                                                        0.28
+                                                                        -0.19)
+                                                                        (let
+                                                                        anf_571
+                                                                        (at_17
+                                                                        anf_570
+                                                                        p_58)
+                                                                        (let
+                                                                        paw_r_81
+                                                                        (circle_23
+                                                                        0.055
+                                                                        anf_571)
+                                                                        (let
+                                                                        anf_572
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.048)
+                                                                        (let
+                                                                        anf_573
+                                                                        (vec2
+                                                                        -0.13
+                                                                        -0.42)
+                                                                        (let
+                                                                        anf_574
+                                                                        (at_17
+                                                                        anf_573
+                                                                        p_58)
+                                                                        (let
+                                                                        foot_l_82
+                                                                        (ellipse_20
+                                                                        anf_572
+                                                                        anf_574)
+                                                                        (let
+                                                                        anf_575
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.048)
+                                                                        (let
+                                                                        anf_576
+                                                                        (vec2
+                                                                        0.13
+                                                                        -0.42)
+                                                                        (let
+                                                                        anf_577
+                                                                        (at_17
+                                                                        anf_576
+                                                                        p_58)
+                                                                        (let
+                                                                        foot_r_83
+                                                                        (ellipse_20
+                                                                        anf_575
+                                                                        anf_577)
+                                                                        (let
+                                                                        anf_578
+                                                                        (vec2
+                                                                        0.022
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_579
+                                                                        (vec2
+                                                                        -0.028
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_580
+                                                                        (at_17
+                                                                        anf_579
+                                                                        p_58)
+                                                                        (let
+                                                                        tooth_l_84
+                                                                        (box_26
+                                                                        anf_578
+                                                                        anf_580)
+                                                                        (let
+                                                                        anf_581
+                                                                        (vec2
+                                                                        0.022
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_582
+                                                                        (vec2
+                                                                        0.028
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_583
+                                                                        (at_17
+                                                                        anf_582
+                                                                        p_58)
+                                                                        (let
+                                                                        tooth_r_85
+                                                                        (box_26
+                                                                        anf_581
+                                                                        anf_583)
+                                                                        (let
+                                                                        teeth_86
+                                                                        (min
+                                                                        tooth_l_84
+                                                                        tooth_r_85)
+                                                                        (let
+                                                                        anf_584
+                                                                        (vec2
+                                                                        0.005
+                                                                        0.05)
+                                                                        (let
+                                                                        anf_585
+                                                                        (vec2 0.
+                                                                        0.035)
+                                                                        (let
+                                                                        anf_586
+                                                                        (at_17
+                                                                        anf_585
+                                                                        p_58)
+                                                                        (let
+                                                                        groove_87
+                                                                        (box_26
+                                                                        anf_584
+                                                                        anf_586)
+                                                                        (let
+                                                                        anf_587
+                                                                        (vec2
+                                                                        0.038
+                                                                        0.028)
+                                                                        (let
+                                                                        anf_588
+                                                                        (vec2 0.
+                                                                        0.135)
+                                                                        (let
+                                                                        anf_589
+                                                                        (at_17
+                                                                        anf_588
+                                                                        p_58)
+                                                                        (let
+                                                                        nose_88
+                                                                        (ellipse_20
+                                                                        anf_587
+                                                                        anf_589)
+                                                                        (let
+                                                                        anf_590
+                                                                        (vec2
+                                                                        0.012
+                                                                        0.008)
+                                                                        (let
+                                                                        anf_591
+                                                                        (vec2
+                                                                        -0.012
+                                                                        0.142)
+                                                                        (let
+                                                                        anf_592
+                                                                        (at_17
+                                                                        anf_591
+                                                                        p_58)
+                                                                        (let
+                                                                        nose_hi_89
+                                                                        (ellipse_20
+                                                                        anf_590
+                                                                        anf_592)
+                                                                        (let
+                                                                        anf_593
+                                                                        (vec2
+                                                                        -0.095
+                                                                        0.255)
+                                                                        (let
+                                                                        anf_594
+                                                                        (at_17
+                                                                        anf_593
+                                                                        p_58)
+                                                                        (let
+                                                                        eye_l_90
+                                                                        (circle_23
+                                                                        0.04
+                                                                        anf_594)
+                                                                        (let
+                                                                        anf_595
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.255)
+                                                                        (let
+                                                                        anf_596
+                                                                        (at_17
+                                                                        anf_595
+                                                                        p_58)
+                                                                        (let
+                                                                        eye_r_91
+                                                                        (circle_23
+                                                                        0.04
+                                                                        anf_596)
+                                                                        (let
+                                                                        anf_597
+                                                                        (vec2
+                                                                        -0.082
+                                                                        0.27)
+                                                                        (let
+                                                                        anf_598
+                                                                        (at_17
+                                                                        anf_597
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_l_92
+                                                                        (circle_23
+                                                                        0.014
+                                                                        anf_598)
+                                                                        (let
+                                                                        anf_599
+                                                                        (vec2
+                                                                        0.108
+                                                                        0.27)
+                                                                        (let
+                                                                        anf_600
+                                                                        (at_17
+                                                                        anf_599
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_r_93
+                                                                        (circle_23
+                                                                        0.014
+                                                                        anf_600)
+                                                                        (let
+                                                                        anf_601
+                                                                        (vec2
+                                                                        -0.105
+                                                                        0.245)
+                                                                        (let
+                                                                        anf_602
+                                                                        (at_17
+                                                                        anf_601
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_l2_94
+                                                                        (circle_23
+                                                                        0.006
+                                                                        anf_602)
+                                                                        (let
+                                                                        anf_603
+                                                                        (vec2
+                                                                        0.085
+                                                                        0.245)
+                                                                        (let
+                                                                        anf_604
+                                                                        (at_17
+                                                                        anf_603
+                                                                        p_58)
+                                                                        (let
+                                                                        hi_r2_95
+                                                                        (circle_23
+                                                                        0.006
+                                                                        anf_604)
+                                                                        (let
+                                                                        anf_605
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.01)
+                                                                        (let
+                                                                        anf_606
+                                                                        (vec2
+                                                                        -0.095
+                                                                        0.315)
+                                                                        (let
+                                                                        anf_607
+                                                                        (at_17
+                                                                        anf_606
+                                                                        p_58)
+                                                                        (let
+                                                                        anf_608
+                                                                        (rot_30
+                                                                        0.15
+                                                                        anf_607)
+                                                                        (let
+                                                                        brow_l_96
+                                                                        (ellipse_20
+                                                                        anf_605
+                                                                        anf_608)
+                                                                        (let
+                                                                        anf_609
+                                                                        (vec2
+                                                                        0.035
+                                                                        0.01)
+                                                                        (let
+                                                                        anf_610
+                                                                        (vec2
+                                                                        0.095
+                                                                        0.315)
+                                                                        (let
+                                                                        anf_611
+                                                                        (at_17
+                                                                        anf_610
+                                                                        p_58)
+                                                                        (let
+                                                                        anf_612
+                                                                        (rot_30
+                                                                        -0.15
+                                                                        anf_611)
+                                                                        (let
+                                                                        brow_r_97
+                                                                        (ellipse_20
+                                                                        anf_609
+                                                                        anf_612)
+                                                                        (let
+                                                                        anf_613
+                                                                        (length
+                                                                        p_58)
+                                                                        (let
+                                                                        vig_98
+                                                                        (smoothstep
+                                                                        0.3 1.1
+                                                                        anf_613)
+                                                                        (let
+                                                                        col_99
+                                                                        (mix
+                                                                        bg_col_0
+                                                                        bg_dark_1
+                                                                        vig_98)
+                                                                        (let
+                                                                        anf_614
+                                                                        (vec2
+                                                                        0.38
+                                                                        0.055)
+                                                                        (let
+                                                                        anf_615
+                                                                        (vec2
+                                                                        0.02
+                                                                        -0.45)
+                                                                        (let
+                                                                        anf_616
+                                                                        (at_17
+                                                                        anf_615
+                                                                        p_58)
+                                                                        (let
+                                                                        shadow_d_100
+                                                                        (ellipse_20
+                                                                        anf_614
+                                                                        anf_616)
+                                                                        (let
+                                                                        shadow_falloff_101
+                                                                        (smoothstep
+                                                                        0.08
+                                                                        -0.02
+                                                                        shadow_d_100)
+                                                                        (let
+                                                                        anf_617
+                                                                        (vec3
+                                                                        0.06 0.28
+                                                                        0.16)
+                                                                        (let
+                                                                        anf_618
+                                                                        (*
+                                                                        shadow_falloff_101
+                                                                        0.55)
+                                                                        (let
+                                                                        col_102
+                                                                        (mix
+                                                                        col_99
+                                                                        anf_617
+                                                                        anf_618)
+                                                                        (let
+                                                                        anf_619
+                                                                        (paint_45
+                                                                        tail_60
+                                                                        brown_dk_4
+                                                                        col_102)
+                                                                        (let
+                                                                        anf_620
+                                                                        (paint_45
+                                                                        tail_rim_64
+                                                                        drk_brown_5
+                                                                        anf_619)
+                                                                        (let
+                                                                        anf_621
+                                                                        (paint_45
+                                                                        tail_scales_63
+                                                                        drk_brown_5
+                                                                        anf_620)
+                                                                        (let
+                                                                        anf_622
+                                                                        (paint_45
+                                                                        foot_l_82
+                                                                        drk_brown_5
+                                                                        anf_621)
+                                                                        (let
+                                                                        anf_623
+                                                                        (paint_45
+                                                                        foot_r_83
+                                                                        drk_brown_5
+                                                                        anf_622)
+                                                                        (let
+                                                                        anf_624
+                                                                        (paint_45
+                                                                        arm_l_78
+                                                                        brown_dk_4
+                                                                        anf_623)
+                                                                        (let
+                                                                        anf_625
+                                                                        (paint_45
+                                                                        arm_r_79
+                                                                        brown_dk_4
+                                                                        anf_624)
+                                                                        (let
+                                                                        anf_626
+                                                                        (paint_shaded_49
+                                                                        torso_with_cheeks_71
+                                                                        brown_2
+                                                                        brown_dk_4
+                                                                        0.08
+                                                                        anf_625)
+                                                                        (let
+                                                                        anf_627
+                                                                        (paint_shaded_49
+                                                                        belly_73
+                                                                        cream_6
+                                                                        cream_dk_7
+                                                                        0.05
+                                                                        anf_626)
+                                                                        (let
+                                                                        anf_628
+                                                                        (paint_45
+                                                                        paw_l_80
+                                                                        cream_6
+                                                                        anf_627)
+                                                                        (let
+                                                                        anf_629
+                                                                        (paint_45
+                                                                        paw_r_81
+                                                                        cream_6
+                                                                        anf_628)
+                                                                        (let
+                                                                        anf_630
+                                                                        (paint_45
+                                                                        ear_l_74
+                                                                        brown_2
+                                                                        anf_629)
+                                                                        (let
+                                                                        anf_631
+                                                                        (paint_45
+                                                                        ear_r_75
+                                                                        brown_2
+                                                                        anf_630)
+                                                                        (let
+                                                                        anf_632
+                                                                        (paint_45
+                                                                        ear_in_l_76
+                                                                        pink_8
+                                                                        anf_631)
+                                                                        (let
+                                                                        anf_633
+                                                                        (paint_45
+                                                                        ear_in_r_77
+                                                                        pink_8
+                                                                        anf_632)
+                                                                        (let
+                                                                        anf_634
+                                                                        (paint_45
+                                                                        muzzle_72
+                                                                        cream_6
+                                                                        anf_633)
+                                                                        (let
+                                                                        anf_635
+                                                                        (paint_45
+                                                                        brow_l_96
+                                                                        drk_brown_5
+                                                                        anf_634)
+                                                                        (let
+                                                                        anf_636
+                                                                        (paint_45
+                                                                        brow_r_97
+                                                                        drk_brown_5
+                                                                        anf_635)
+                                                                        (let
+                                                                        anf_637
+                                                                        (paint_45
+                                                                        teeth_86
+                                                                        tooth_yel_12
+                                                                        anf_636)
+                                                                        (let
+                                                                        anf_638
+                                                                        (paint_45
+                                                                        groove_87
+                                                                        brown_dk_4
+                                                                        anf_637)
+                                                                        (let
+                                                                        anf_639
+                                                                        (paint_45
+                                                                        nose_88
+                                                                        drk_brown_5
+                                                                        anf_638)
+                                                                        (let
+                                                                        anf_640
+                                                                        (paint_45
+                                                                        nose_hi_89
+                                                                        brown_lt_3
+                                                                        anf_639)
+                                                                        (let
+                                                                        anf_641
+                                                                        (paint_45
+                                                                        eye_l_90
+                                                                        black_10
+                                                                        anf_640)
+                                                                        (let
+                                                                        anf_642
+                                                                        (paint_45
+                                                                        eye_r_91
+                                                                        black_10
+                                                                        anf_641)
+                                                                        (let
+                                                                        anf_643
+                                                                        (paint_45
+                                                                        hi_l_92
+                                                                        wht_11
+                                                                        anf_642)
+                                                                        (let
+                                                                        anf_644
+                                                                        (paint_45
+                                                                        hi_r_93
+                                                                        wht_11
+                                                                        anf_643)
+                                                                        (let
+                                                                        anf_645
+                                                                        (paint_45
+                                                                        hi_l2_94
+                                                                        wht_11
+                                                                        anf_644)
+                                                                        (return
+                                                                        (paint_45
+                                                                        hi_r2_95
+                                                                        wht_11
+                                                                        anf_645))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+      : ((vec 2) -> (vec 3)))
+     ((Const pink_dk_9 (return (vec3 0.75 0.42 0.42))) : (vec 3))
+     ((Define (name smax_40) (args ((a_41 float) (b_42 float) (k_43 float)))
+       (body
+        (let anf_646 (- a_41 b_42)
+         (let anf_647 (abs anf_646)
+          (let anf_648 (- k_43 anf_647)
+           (let anf_649 (max anf_648 0.)
+            (let h_44 (/ anf_649 k_43)
+             (let anf_650 (max a_41 b_42)
+              (let anf_651 (* h_44 h_44)
+               (let anf_652 (* anf_651 k_43)
+                (let anf_653 (* anf_652 0.25) (return (+ anf_650 anf_653)))))))))))))
+      : (float -> (float -> (float -> float)))))
+
+    === translate (beaver.glml) ===
+    (Program
+     ((Function (name at_17) (desc ())
+       (params (((TyVec 2) offset_18) ((TyVec 2) p_19))) (ret_type (TyVec 2))
+       (body ((return (- p_19 offset_18)))))
+      (Global Const (TyVec 3) bg_col_0 ((vec3 0.13 0.48 0.3)))
+      (Global Const (TyVec 3) bg_dark_1 ((vec3 0.09 0.36 0.22)))
+      (Global Const (TyVec 3) black_10 ((vec3 0.06 0.04 0.03)))
+      (Function (name box_26) (desc ())
+       (params (((TyVec 2) b_27) ((TyVec 2) p_28))) (ret_type TyFloat)
+       (body
+        ((set () vec2 anf_477 ((abs p_28))) (set () vec2 d_29 ((- anf_477 b_27)))
+         (set () vec2 anf_478 ((vec2 0. 0.)))
+         (set () vec2 anf_479 ((max d_29 anf_478)))
+         (set () float anf_480 ((length anf_479)))
+         (set () float anf_481 ((index d_29 0)))
+         (set () float anf_482 ((index d_29 1)))
+         (set () float anf_483 ((max anf_481 anf_482)))
+         (set () float anf_484 ((min anf_483 0.))) (return (+ anf_480 anf_484)))))
+      (Global Const (TyVec 3) brown_2 ((vec3 0.55 0.34 0.16)))
+      (Global Const (TyVec 3) brown_dk_4 ((vec3 0.38 0.22 0.08)))
+      (Global Const (TyVec 3) brown_lt_3 ((vec3 0.68 0.46 0.24)))
+      (Function (name circle_23) (desc ())
+       (params ((TyFloat r_24) ((TyVec 2) p_25))) (ret_type TyFloat)
+       (body ((set () float anf_485 ((length p_25))) (return (- anf_485 r_24)))))
+      (Global Const (TyVec 3) cream_6 ((vec3 0.95 0.89 0.74)))
+      (Global Const (TyVec 3) cream_dk_7 ((vec3 0.78 0.68 0.5)))
+      (Global Const (TyVec 3) drk_brown_5 ((vec3 0.22 0.11 0.03)))
+      (Function (name ellipse_20) (desc ())
+       (params (((TyVec 2) ab_21) ((TyVec 2) p_22))) (ret_type TyFloat)
+       (body
+        ((set () vec2 anf_486 ((/ p_22 ab_21)))
+         (set () float anf_487 ((length anf_486))) (return (- anf_487 1.)))))
+      (Function (name paint_45) (desc ())
+       (params ((TyFloat d_46) ((TyVec 3) shape_col_47) ((TyVec 3) bg_48)))
+       (ret_type (TyVec 3))
+       (body
+        ((set () float anf_488 ((smoothstep -0.005 0.005 d_46)))
+         (return (mix shape_col_47 bg_48 anf_488)))))
+      (Function (name paint_shaded_49) (desc ())
+       (params
+        ((TyFloat d_50) ((TyVec 3) shape_col_51) ((TyVec 3) shadow_col_52)
+         (TyFloat shadow_depth_53) ((TyVec 3) bg_54)))
+       (ret_type (TyVec 3))
+       (body
+        ((set () float anf_489 ((smoothstep -0.005 0.005 d_50)))
+         (set () vec3 base_55 ((mix shape_col_51 bg_54 anf_489)))
+         (set () float anf_490 ((* -1. shadow_depth_53)))
+         (set () float shade_56 ((smoothstep anf_490 0. d_50)))
+         (set () float anf_491 ((* shade_56 0.55)))
+         (set () vec3 anf_492 ((mix shape_col_51 shadow_col_52 anf_491)))
+         (set () float anf_493 ((smoothstep 0.005 -0.005 d_50)))
+         (return (mix base_55 anf_492 anf_493)))))
+      (Global Const (TyVec 3) pink_8 ((vec3 0.92 0.62 0.6)))
+      (Function (name rot_30) (desc ())
+       (params ((TyFloat a_31) ((TyVec 2) p_32))) (ret_type (TyVec 2))
+       (body
+        ((set () float c_33 ((cos a_31))) (set () float s_34 ((sin a_31)))
+         (set () float anf_494 ((index p_32 0)))
+         (set () float anf_495 ((* c_33 anf_494)))
+         (set () float anf_496 ((index p_32 1)))
+         (set () float anf_497 ((* s_34 anf_496)))
+         (set () float anf_498 ((- anf_495 anf_497)))
+         (set () float anf_499 ((index p_32 0)))
+         (set () float anf_500 ((* s_34 anf_499)))
+         (set () float anf_501 ((index p_32 1)))
+         (set () float anf_502 ((* c_33 anf_501)))
+         (set () float anf_503 ((+ anf_500 anf_502)))
+         (return (vec2 anf_498 anf_503)))))
+      (Function (name smin_35) (desc ())
+       (params ((TyFloat a_36) (TyFloat b_37) (TyFloat k_38))) (ret_type TyFloat)
+       (body
+        ((set () float anf_504 ((- a_36 b_37)))
+         (set () float anf_505 ((abs anf_504)))
+         (set () float anf_506 ((- k_38 anf_505)))
+         (set () float anf_507 ((max anf_506 0.)))
+         (set () float h_39 ((/ anf_507 k_38)))
+         (set () float anf_508 ((min a_36 b_37)))
+         (set () float anf_509 ((* h_39 h_39)))
+         (set () float anf_510 ((* anf_509 k_38)))
+         (set () float anf_511 ((* anf_510 0.25))) (return (- anf_508 anf_511)))))
+      (Global Const (TyVec 3) tooth_yel_12 ((vec3 0.92 0.85 0.6)))
+      (Global Uniform (TyVec 2) u_resolution ())
+      (Function (name get_uv_13_vec2_to_vec2_476) (desc ())
+       (params (((TyVec 2) coord_14))) (ret_type (TyVec 2))
+       (body
+        ((set () vec2 anf_512 ((* 2. coord_14)))
+         (set () vec2 top_15 ((- anf_512 u_resolution)))
+         (set () float anf_513 ((index u_resolution 0)))
+         (set () float anf_514 ((index u_resolution 1)))
+         (set () float bot_16 ((min anf_513 anf_514)))
+         (return (/ top_15 bot_16)))))
+      (Global Const (TyVec 3) wht_11 ((vec3 1. 0.97 0.93)))
+      (Function (name main) (desc ()) (params (((TyVec 2) coord_57)))
+       (ret_type (TyVec 3))
+       (body
+        ((set () vec2 anf_515 ((get_uv_13_vec2_to_vec2_476 coord_57)))
+         (set () vec2 p_58 ((/ anf_515 1.5)))
+         (set () vec2 anf_516 ((vec2 0.28 -0.28)))
+         (set () vec2 anf_517 ((at_17 anf_516 p_58)))
+         (set () vec2 tp_59 ((rot_30 -0.35 anf_517)))
+         (set () vec2 anf_518 ((vec2 0.22 0.085)))
+         (set () float tail_60 ((ellipse_20 anf_518 tp_59)))
+         (set () float anf_519 ((index tp_59 0)))
+         (set () float anf_520 ((index tp_59 1)))
+         (set () float anf_521 ((+ anf_519 anf_520)))
+         (set () float anf_522 ((* anf_521 38.)))
+         (set () float anf_523 ((sin anf_522)))
+         (set () float anf_524 ((abs anf_523)))
+         (set () float tsx_61 ((- anf_524 0.55)))
+         (set () float anf_525 ((index tp_59 0)))
+         (set () float anf_526 ((index tp_59 1)))
+         (set () float anf_527 ((- anf_525 anf_526)))
+         (set () float anf_528 ((* anf_527 38.)))
+         (set () float anf_529 ((sin anf_528)))
+         (set () float anf_530 ((abs anf_529)))
+         (set () float tsy_62 ((- anf_530 0.55)))
+         (set () float anf_531 ((+ tail_60 0.01)))
+         (set () float anf_532 ((min tsx_61 tsy_62)))
+         (set () float anf_533 ((* anf_532 0.015)))
+         (set () float tail_scales_63 ((max anf_531 anf_533)))
+         (set () float anf_534 ((+ tail_60 0.018)))
+         (set () float anf_535 ((* -1. anf_534)))
+         (set () float tail_rim_64 ((max tail_60 anf_535)))
+         (set () vec2 anf_536 ((vec2 0.25 0.26)))
+         (set () vec2 anf_537 ((vec2 0. -0.16)))
+         (set () vec2 anf_538 ((at_17 anf_537 p_58)))
+         (set () float body_65 ((ellipse_20 anf_536 anf_538)))
+         (set () vec2 anf_539 ((vec2 0.22 0.2)))
+         (set () vec2 anf_540 ((vec2 0. 0.2)))
+         (set () vec2 anf_541 ((at_17 anf_540 p_58)))
+         (set () float head_66 ((ellipse_20 anf_539 anf_541)))
+         (set () float torso_67 ((smin_35 body_65 head_66 0.1)))
+         (set () vec2 anf_542 ((vec2 -0.14 0.11)))
+         (set () vec2 anf_543 ((at_17 anf_542 p_58)))
+         (set () float cheek_l_68 ((circle_23 0.1 anf_543)))
+         (set () vec2 anf_544 ((vec2 0.14 0.11)))
+         (set () vec2 anf_545 ((at_17 anf_544 p_58)))
+         (set () float cheek_r_69 ((circle_23 0.1 anf_545)))
+         (set () float cheeks_70 ((min cheek_l_68 cheek_r_69)))
+         (set () float torso_with_cheeks_71 ((smin_35 torso_67 cheeks_70 0.06)))
+         (set () vec2 anf_546 ((vec2 0.13 0.095)))
+         (set () vec2 anf_547 ((vec2 0. 0.09)))
+         (set () vec2 anf_548 ((at_17 anf_547 p_58)))
+         (set () float muzzle_72 ((ellipse_20 anf_546 anf_548)))
+         (set () vec2 anf_549 ((vec2 0.15 0.17)))
+         (set () vec2 anf_550 ((vec2 0. -0.2)))
+         (set () vec2 anf_551 ((at_17 anf_550 p_58)))
+         (set () float belly_73 ((ellipse_20 anf_549 anf_551)))
+         (set () vec2 anf_552 ((vec2 -0.175 0.355)))
+         (set () vec2 anf_553 ((at_17 anf_552 p_58)))
+         (set () float ear_l_74 ((circle_23 0.075 anf_553)))
+         (set () vec2 anf_554 ((vec2 0.175 0.355)))
+         (set () vec2 anf_555 ((at_17 anf_554 p_58)))
+         (set () float ear_r_75 ((circle_23 0.075 anf_555)))
+         (set () vec2 anf_556 ((vec2 0.035 0.042)))
+         (set () vec2 anf_557 ((vec2 -0.175 0.345)))
+         (set () vec2 anf_558 ((at_17 anf_557 p_58)))
+         (set () float ear_in_l_76 ((ellipse_20 anf_556 anf_558)))
+         (set () vec2 anf_559 ((vec2 0.035 0.042)))
+         (set () vec2 anf_560 ((vec2 0.175 0.345)))
+         (set () vec2 anf_561 ((at_17 anf_560 p_58)))
+         (set () float ear_in_r_77 ((ellipse_20 anf_559 anf_561)))
+         (set () vec2 anf_562 ((vec2 0.065 0.09)))
+         (set () vec2 anf_563 ((vec2 -0.23 -0.09)))
+         (set () vec2 anf_564 ((at_17 anf_563 p_58)))
+         (set () float arm_l_78 ((ellipse_20 anf_562 anf_564)))
+         (set () vec2 anf_565 ((vec2 0.065 0.09)))
+         (set () vec2 anf_566 ((vec2 0.23 -0.09)))
+         (set () vec2 anf_567 ((at_17 anf_566 p_58)))
+         (set () float arm_r_79 ((ellipse_20 anf_565 anf_567)))
+         (set () vec2 anf_568 ((vec2 -0.28 -0.19)))
+         (set () vec2 anf_569 ((at_17 anf_568 p_58)))
+         (set () float paw_l_80 ((circle_23 0.055 anf_569)))
+         (set () vec2 anf_570 ((vec2 0.28 -0.19)))
+         (set () vec2 anf_571 ((at_17 anf_570 p_58)))
+         (set () float paw_r_81 ((circle_23 0.055 anf_571)))
+         (set () vec2 anf_572 ((vec2 0.095 0.048)))
+         (set () vec2 anf_573 ((vec2 -0.13 -0.42)))
+         (set () vec2 anf_574 ((at_17 anf_573 p_58)))
+         (set () float foot_l_82 ((ellipse_20 anf_572 anf_574)))
+         (set () vec2 anf_575 ((vec2 0.095 0.048)))
+         (set () vec2 anf_576 ((vec2 0.13 -0.42)))
+         (set () vec2 anf_577 ((at_17 anf_576 p_58)))
+         (set () float foot_r_83 ((ellipse_20 anf_575 anf_577)))
+         (set () vec2 anf_578 ((vec2 0.022 0.05)))
+         (set () vec2 anf_579 ((vec2 -0.028 0.035)))
+         (set () vec2 anf_580 ((at_17 anf_579 p_58)))
+         (set () float tooth_l_84 ((box_26 anf_578 anf_580)))
+         (set () vec2 anf_581 ((vec2 0.022 0.05)))
+         (set () vec2 anf_582 ((vec2 0.028 0.035)))
+         (set () vec2 anf_583 ((at_17 anf_582 p_58)))
+         (set () float tooth_r_85 ((box_26 anf_581 anf_583)))
+         (set () float teeth_86 ((min tooth_l_84 tooth_r_85)))
+         (set () vec2 anf_584 ((vec2 0.005 0.05)))
+         (set () vec2 anf_585 ((vec2 0. 0.035)))
+         (set () vec2 anf_586 ((at_17 anf_585 p_58)))
+         (set () float groove_87 ((box_26 anf_584 anf_586)))
+         (set () vec2 anf_587 ((vec2 0.038 0.028)))
+         (set () vec2 anf_588 ((vec2 0. 0.135)))
+         (set () vec2 anf_589 ((at_17 anf_588 p_58)))
+         (set () float nose_88 ((ellipse_20 anf_587 anf_589)))
+         (set () vec2 anf_590 ((vec2 0.012 0.008)))
+         (set () vec2 anf_591 ((vec2 -0.012 0.142)))
+         (set () vec2 anf_592 ((at_17 anf_591 p_58)))
+         (set () float nose_hi_89 ((ellipse_20 anf_590 anf_592)))
+         (set () vec2 anf_593 ((vec2 -0.095 0.255)))
+         (set () vec2 anf_594 ((at_17 anf_593 p_58)))
+         (set () float eye_l_90 ((circle_23 0.04 anf_594)))
+         (set () vec2 anf_595 ((vec2 0.095 0.255)))
+         (set () vec2 anf_596 ((at_17 anf_595 p_58)))
+         (set () float eye_r_91 ((circle_23 0.04 anf_596)))
+         (set () vec2 anf_597 ((vec2 -0.082 0.27)))
+         (set () vec2 anf_598 ((at_17 anf_597 p_58)))
+         (set () float hi_l_92 ((circle_23 0.014 anf_598)))
+         (set () vec2 anf_599 ((vec2 0.108 0.27)))
+         (set () vec2 anf_600 ((at_17 anf_599 p_58)))
+         (set () float hi_r_93 ((circle_23 0.014 anf_600)))
+         (set () vec2 anf_601 ((vec2 -0.105 0.245)))
+         (set () vec2 anf_602 ((at_17 anf_601 p_58)))
+         (set () float hi_l2_94 ((circle_23 0.006 anf_602)))
+         (set () vec2 anf_603 ((vec2 0.085 0.245)))
+         (set () vec2 anf_604 ((at_17 anf_603 p_58)))
+         (set () float hi_r2_95 ((circle_23 0.006 anf_604)))
+         (set () vec2 anf_605 ((vec2 0.035 0.01)))
+         (set () vec2 anf_606 ((vec2 -0.095 0.315)))
+         (set () vec2 anf_607 ((at_17 anf_606 p_58)))
+         (set () vec2 anf_608 ((rot_30 0.15 anf_607)))
+         (set () float brow_l_96 ((ellipse_20 anf_605 anf_608)))
+         (set () vec2 anf_609 ((vec2 0.035 0.01)))
+         (set () vec2 anf_610 ((vec2 0.095 0.315)))
+         (set () vec2 anf_611 ((at_17 anf_610 p_58)))
+         (set () vec2 anf_612 ((rot_30 -0.15 anf_611)))
+         (set () float brow_r_97 ((ellipse_20 anf_609 anf_612)))
+         (set () float anf_613 ((length p_58)))
+         (set () float vig_98 ((smoothstep 0.3 1.1 anf_613)))
+         (set () vec3 col_99 ((mix bg_col_0 bg_dark_1 vig_98)))
+         (set () vec2 anf_614 ((vec2 0.38 0.055)))
+         (set () vec2 anf_615 ((vec2 0.02 -0.45)))
+         (set () vec2 anf_616 ((at_17 anf_615 p_58)))
+         (set () float shadow_d_100 ((ellipse_20 anf_614 anf_616)))
+         (set () float shadow_falloff_101 ((smoothstep 0.08 -0.02 shadow_d_100)))
+         (set () vec3 anf_617 ((vec3 0.06 0.28 0.16)))
+         (set () float anf_618 ((* shadow_falloff_101 0.55)))
+         (set () vec3 col_102 ((mix col_99 anf_617 anf_618)))
+         (set () vec3 anf_619 ((paint_45 tail_60 brown_dk_4 col_102)))
+         (set () vec3 anf_620 ((paint_45 tail_rim_64 drk_brown_5 anf_619)))
+         (set () vec3 anf_621 ((paint_45 tail_scales_63 drk_brown_5 anf_620)))
+         (set () vec3 anf_622 ((paint_45 foot_l_82 drk_brown_5 anf_621)))
+         (set () vec3 anf_623 ((paint_45 foot_r_83 drk_brown_5 anf_622)))
+         (set () vec3 anf_624 ((paint_45 arm_l_78 brown_dk_4 anf_623)))
+         (set () vec3 anf_625 ((paint_45 arm_r_79 brown_dk_4 anf_624)))
+         (set () vec3 anf_626
+          ((paint_shaded_49 torso_with_cheeks_71 brown_2 brown_dk_4 0.08 anf_625)))
+         (set () vec3 anf_627
+          ((paint_shaded_49 belly_73 cream_6 cream_dk_7 0.05 anf_626)))
+         (set () vec3 anf_628 ((paint_45 paw_l_80 cream_6 anf_627)))
+         (set () vec3 anf_629 ((paint_45 paw_r_81 cream_6 anf_628)))
+         (set () vec3 anf_630 ((paint_45 ear_l_74 brown_2 anf_629)))
+         (set () vec3 anf_631 ((paint_45 ear_r_75 brown_2 anf_630)))
+         (set () vec3 anf_632 ((paint_45 ear_in_l_76 pink_8 anf_631)))
+         (set () vec3 anf_633 ((paint_45 ear_in_r_77 pink_8 anf_632)))
+         (set () vec3 anf_634 ((paint_45 muzzle_72 cream_6 anf_633)))
+         (set () vec3 anf_635 ((paint_45 brow_l_96 drk_brown_5 anf_634)))
+         (set () vec3 anf_636 ((paint_45 brow_r_97 drk_brown_5 anf_635)))
+         (set () vec3 anf_637 ((paint_45 teeth_86 tooth_yel_12 anf_636)))
+         (set () vec3 anf_638 ((paint_45 groove_87 brown_dk_4 anf_637)))
+         (set () vec3 anf_639 ((paint_45 nose_88 drk_brown_5 anf_638)))
+         (set () vec3 anf_640 ((paint_45 nose_hi_89 brown_lt_3 anf_639)))
+         (set () vec3 anf_641 ((paint_45 eye_l_90 black_10 anf_640)))
+         (set () vec3 anf_642 ((paint_45 eye_r_91 black_10 anf_641)))
+         (set () vec3 anf_643 ((paint_45 hi_l_92 wht_11 anf_642)))
+         (set () vec3 anf_644 ((paint_45 hi_r_93 wht_11 anf_643)))
+         (set () vec3 anf_645 ((paint_45 hi_l2_94 wht_11 anf_644)))
+         (return (paint_45 hi_r2_95 wht_11 anf_645)))))
+      (Global Const (TyVec 3) pink_dk_9 ((vec3 0.75 0.42 0.42)))
+      (Function (name smax_40) (desc ())
+       (params ((TyFloat a_41) (TyFloat b_42) (TyFloat k_43))) (ret_type TyFloat)
+       (body
+        ((set () float anf_646 ((- a_41 b_42)))
+         (set () float anf_647 ((abs anf_646)))
+         (set () float anf_648 ((- k_43 anf_647)))
+         (set () float anf_649 ((max anf_648 0.)))
+         (set () float h_44 ((/ anf_649 k_43)))
+         (set () float anf_650 ((max a_41 b_42)))
+         (set () float anf_651 ((* h_44 h_44)))
+         (set () float anf_652 ((* anf_651 k_43)))
+         (set () float anf_653 ((* anf_652 0.25))) (return (+ anf_650 anf_653)))))))
+
+    === patch main (beaver.glml) ===
+    (Program
+     ((Global Out (TyVec 4) fragColor ())
+      (Function (name at_17) (desc ())
+       (params (((TyVec 2) offset_18) ((TyVec 2) p_19))) (ret_type (TyVec 2))
+       (body ((return (- p_19 offset_18)))))
+      (Global Const (TyVec 3) bg_col_0 ((vec3 0.13 0.48 0.3)))
+      (Global Const (TyVec 3) bg_dark_1 ((vec3 0.09 0.36 0.22)))
+      (Global Const (TyVec 3) black_10 ((vec3 0.06 0.04 0.03)))
+      (Function (name box_26) (desc ())
+       (params (((TyVec 2) b_27) ((TyVec 2) p_28))) (ret_type TyFloat)
+       (body
+        ((set () vec2 anf_477 ((abs p_28))) (set () vec2 d_29 ((- anf_477 b_27)))
+         (set () vec2 anf_478 ((vec2 0. 0.)))
+         (set () vec2 anf_479 ((max d_29 anf_478)))
+         (set () float anf_480 ((length anf_479)))
+         (set () float anf_481 ((index d_29 0)))
+         (set () float anf_482 ((index d_29 1)))
+         (set () float anf_483 ((max anf_481 anf_482)))
+         (set () float anf_484 ((min anf_483 0.))) (return (+ anf_480 anf_484)))))
+      (Global Const (TyVec 3) brown_2 ((vec3 0.55 0.34 0.16)))
+      (Global Const (TyVec 3) brown_dk_4 ((vec3 0.38 0.22 0.08)))
+      (Global Const (TyVec 3) brown_lt_3 ((vec3 0.68 0.46 0.24)))
+      (Function (name circle_23) (desc ())
+       (params ((TyFloat r_24) ((TyVec 2) p_25))) (ret_type TyFloat)
+       (body ((set () float anf_485 ((length p_25))) (return (- anf_485 r_24)))))
+      (Global Const (TyVec 3) cream_6 ((vec3 0.95 0.89 0.74)))
+      (Global Const (TyVec 3) cream_dk_7 ((vec3 0.78 0.68 0.5)))
+      (Global Const (TyVec 3) drk_brown_5 ((vec3 0.22 0.11 0.03)))
+      (Function (name ellipse_20) (desc ())
+       (params (((TyVec 2) ab_21) ((TyVec 2) p_22))) (ret_type TyFloat)
+       (body
+        ((set () vec2 anf_486 ((/ p_22 ab_21)))
+         (set () float anf_487 ((length anf_486))) (return (- anf_487 1.)))))
+      (Function (name paint_45) (desc ())
+       (params ((TyFloat d_46) ((TyVec 3) shape_col_47) ((TyVec 3) bg_48)))
+       (ret_type (TyVec 3))
+       (body
+        ((set () float anf_488 ((smoothstep -0.005 0.005 d_46)))
+         (return (mix shape_col_47 bg_48 anf_488)))))
+      (Function (name paint_shaded_49) (desc ())
+       (params
+        ((TyFloat d_50) ((TyVec 3) shape_col_51) ((TyVec 3) shadow_col_52)
+         (TyFloat shadow_depth_53) ((TyVec 3) bg_54)))
+       (ret_type (TyVec 3))
+       (body
+        ((set () float anf_489 ((smoothstep -0.005 0.005 d_50)))
+         (set () vec3 base_55 ((mix shape_col_51 bg_54 anf_489)))
+         (set () float anf_490 ((* -1. shadow_depth_53)))
+         (set () float shade_56 ((smoothstep anf_490 0. d_50)))
+         (set () float anf_491 ((* shade_56 0.55)))
+         (set () vec3 anf_492 ((mix shape_col_51 shadow_col_52 anf_491)))
+         (set () float anf_493 ((smoothstep 0.005 -0.005 d_50)))
+         (return (mix base_55 anf_492 anf_493)))))
+      (Global Const (TyVec 3) pink_8 ((vec3 0.92 0.62 0.6)))
+      (Function (name rot_30) (desc ())
+       (params ((TyFloat a_31) ((TyVec 2) p_32))) (ret_type (TyVec 2))
+       (body
+        ((set () float c_33 ((cos a_31))) (set () float s_34 ((sin a_31)))
+         (set () float anf_494 ((index p_32 0)))
+         (set () float anf_495 ((* c_33 anf_494)))
+         (set () float anf_496 ((index p_32 1)))
+         (set () float anf_497 ((* s_34 anf_496)))
+         (set () float anf_498 ((- anf_495 anf_497)))
+         (set () float anf_499 ((index p_32 0)))
+         (set () float anf_500 ((* s_34 anf_499)))
+         (set () float anf_501 ((index p_32 1)))
+         (set () float anf_502 ((* c_33 anf_501)))
+         (set () float anf_503 ((+ anf_500 anf_502)))
+         (return (vec2 anf_498 anf_503)))))
+      (Function (name smin_35) (desc ())
+       (params ((TyFloat a_36) (TyFloat b_37) (TyFloat k_38))) (ret_type TyFloat)
+       (body
+        ((set () float anf_504 ((- a_36 b_37)))
+         (set () float anf_505 ((abs anf_504)))
+         (set () float anf_506 ((- k_38 anf_505)))
+         (set () float anf_507 ((max anf_506 0.)))
+         (set () float h_39 ((/ anf_507 k_38)))
+         (set () float anf_508 ((min a_36 b_37)))
+         (set () float anf_509 ((* h_39 h_39)))
+         (set () float anf_510 ((* anf_509 k_38)))
+         (set () float anf_511 ((* anf_510 0.25))) (return (- anf_508 anf_511)))))
+      (Global Const (TyVec 3) tooth_yel_12 ((vec3 0.92 0.85 0.6)))
+      (Global Uniform (TyVec 2) u_resolution ())
+      (Function (name get_uv_13_vec2_to_vec2_476) (desc ())
+       (params (((TyVec 2) coord_14))) (ret_type (TyVec 2))
+       (body
+        ((set () vec2 anf_512 ((* 2. coord_14)))
+         (set () vec2 top_15 ((- anf_512 u_resolution)))
+         (set () float anf_513 ((index u_resolution 0)))
+         (set () float anf_514 ((index u_resolution 1)))
+         (set () float bot_16 ((min anf_513 anf_514)))
+         (return (/ top_15 bot_16)))))
+      (Global Const (TyVec 3) wht_11 ((vec3 1. 0.97 0.93)))
+      (Function (name main_pure) (desc ()) (params (((TyVec 2) coord_57)))
+       (ret_type (TyVec 3))
+       (body
+        ((set () vec2 anf_515 ((get_uv_13_vec2_to_vec2_476 coord_57)))
+         (set () vec2 p_58 ((/ anf_515 1.5)))
+         (set () vec2 anf_516 ((vec2 0.28 -0.28)))
+         (set () vec2 anf_517 ((at_17 anf_516 p_58)))
+         (set () vec2 tp_59 ((rot_30 -0.35 anf_517)))
+         (set () vec2 anf_518 ((vec2 0.22 0.085)))
+         (set () float tail_60 ((ellipse_20 anf_518 tp_59)))
+         (set () float anf_519 ((index tp_59 0)))
+         (set () float anf_520 ((index tp_59 1)))
+         (set () float anf_521 ((+ anf_519 anf_520)))
+         (set () float anf_522 ((* anf_521 38.)))
+         (set () float anf_523 ((sin anf_522)))
+         (set () float anf_524 ((abs anf_523)))
+         (set () float tsx_61 ((- anf_524 0.55)))
+         (set () float anf_525 ((index tp_59 0)))
+         (set () float anf_526 ((index tp_59 1)))
+         (set () float anf_527 ((- anf_525 anf_526)))
+         (set () float anf_528 ((* anf_527 38.)))
+         (set () float anf_529 ((sin anf_528)))
+         (set () float anf_530 ((abs anf_529)))
+         (set () float tsy_62 ((- anf_530 0.55)))
+         (set () float anf_531 ((+ tail_60 0.01)))
+         (set () float anf_532 ((min tsx_61 tsy_62)))
+         (set () float anf_533 ((* anf_532 0.015)))
+         (set () float tail_scales_63 ((max anf_531 anf_533)))
+         (set () float anf_534 ((+ tail_60 0.018)))
+         (set () float anf_535 ((* -1. anf_534)))
+         (set () float tail_rim_64 ((max tail_60 anf_535)))
+         (set () vec2 anf_536 ((vec2 0.25 0.26)))
+         (set () vec2 anf_537 ((vec2 0. -0.16)))
+         (set () vec2 anf_538 ((at_17 anf_537 p_58)))
+         (set () float body_65 ((ellipse_20 anf_536 anf_538)))
+         (set () vec2 anf_539 ((vec2 0.22 0.2)))
+         (set () vec2 anf_540 ((vec2 0. 0.2)))
+         (set () vec2 anf_541 ((at_17 anf_540 p_58)))
+         (set () float head_66 ((ellipse_20 anf_539 anf_541)))
+         (set () float torso_67 ((smin_35 body_65 head_66 0.1)))
+         (set () vec2 anf_542 ((vec2 -0.14 0.11)))
+         (set () vec2 anf_543 ((at_17 anf_542 p_58)))
+         (set () float cheek_l_68 ((circle_23 0.1 anf_543)))
+         (set () vec2 anf_544 ((vec2 0.14 0.11)))
+         (set () vec2 anf_545 ((at_17 anf_544 p_58)))
+         (set () float cheek_r_69 ((circle_23 0.1 anf_545)))
+         (set () float cheeks_70 ((min cheek_l_68 cheek_r_69)))
+         (set () float torso_with_cheeks_71 ((smin_35 torso_67 cheeks_70 0.06)))
+         (set () vec2 anf_546 ((vec2 0.13 0.095)))
+         (set () vec2 anf_547 ((vec2 0. 0.09)))
+         (set () vec2 anf_548 ((at_17 anf_547 p_58)))
+         (set () float muzzle_72 ((ellipse_20 anf_546 anf_548)))
+         (set () vec2 anf_549 ((vec2 0.15 0.17)))
+         (set () vec2 anf_550 ((vec2 0. -0.2)))
+         (set () vec2 anf_551 ((at_17 anf_550 p_58)))
+         (set () float belly_73 ((ellipse_20 anf_549 anf_551)))
+         (set () vec2 anf_552 ((vec2 -0.175 0.355)))
+         (set () vec2 anf_553 ((at_17 anf_552 p_58)))
+         (set () float ear_l_74 ((circle_23 0.075 anf_553)))
+         (set () vec2 anf_554 ((vec2 0.175 0.355)))
+         (set () vec2 anf_555 ((at_17 anf_554 p_58)))
+         (set () float ear_r_75 ((circle_23 0.075 anf_555)))
+         (set () vec2 anf_556 ((vec2 0.035 0.042)))
+         (set () vec2 anf_557 ((vec2 -0.175 0.345)))
+         (set () vec2 anf_558 ((at_17 anf_557 p_58)))
+         (set () float ear_in_l_76 ((ellipse_20 anf_556 anf_558)))
+         (set () vec2 anf_559 ((vec2 0.035 0.042)))
+         (set () vec2 anf_560 ((vec2 0.175 0.345)))
+         (set () vec2 anf_561 ((at_17 anf_560 p_58)))
+         (set () float ear_in_r_77 ((ellipse_20 anf_559 anf_561)))
+         (set () vec2 anf_562 ((vec2 0.065 0.09)))
+         (set () vec2 anf_563 ((vec2 -0.23 -0.09)))
+         (set () vec2 anf_564 ((at_17 anf_563 p_58)))
+         (set () float arm_l_78 ((ellipse_20 anf_562 anf_564)))
+         (set () vec2 anf_565 ((vec2 0.065 0.09)))
+         (set () vec2 anf_566 ((vec2 0.23 -0.09)))
+         (set () vec2 anf_567 ((at_17 anf_566 p_58)))
+         (set () float arm_r_79 ((ellipse_20 anf_565 anf_567)))
+         (set () vec2 anf_568 ((vec2 -0.28 -0.19)))
+         (set () vec2 anf_569 ((at_17 anf_568 p_58)))
+         (set () float paw_l_80 ((circle_23 0.055 anf_569)))
+         (set () vec2 anf_570 ((vec2 0.28 -0.19)))
+         (set () vec2 anf_571 ((at_17 anf_570 p_58)))
+         (set () float paw_r_81 ((circle_23 0.055 anf_571)))
+         (set () vec2 anf_572 ((vec2 0.095 0.048)))
+         (set () vec2 anf_573 ((vec2 -0.13 -0.42)))
+         (set () vec2 anf_574 ((at_17 anf_573 p_58)))
+         (set () float foot_l_82 ((ellipse_20 anf_572 anf_574)))
+         (set () vec2 anf_575 ((vec2 0.095 0.048)))
+         (set () vec2 anf_576 ((vec2 0.13 -0.42)))
+         (set () vec2 anf_577 ((at_17 anf_576 p_58)))
+         (set () float foot_r_83 ((ellipse_20 anf_575 anf_577)))
+         (set () vec2 anf_578 ((vec2 0.022 0.05)))
+         (set () vec2 anf_579 ((vec2 -0.028 0.035)))
+         (set () vec2 anf_580 ((at_17 anf_579 p_58)))
+         (set () float tooth_l_84 ((box_26 anf_578 anf_580)))
+         (set () vec2 anf_581 ((vec2 0.022 0.05)))
+         (set () vec2 anf_582 ((vec2 0.028 0.035)))
+         (set () vec2 anf_583 ((at_17 anf_582 p_58)))
+         (set () float tooth_r_85 ((box_26 anf_581 anf_583)))
+         (set () float teeth_86 ((min tooth_l_84 tooth_r_85)))
+         (set () vec2 anf_584 ((vec2 0.005 0.05)))
+         (set () vec2 anf_585 ((vec2 0. 0.035)))
+         (set () vec2 anf_586 ((at_17 anf_585 p_58)))
+         (set () float groove_87 ((box_26 anf_584 anf_586)))
+         (set () vec2 anf_587 ((vec2 0.038 0.028)))
+         (set () vec2 anf_588 ((vec2 0. 0.135)))
+         (set () vec2 anf_589 ((at_17 anf_588 p_58)))
+         (set () float nose_88 ((ellipse_20 anf_587 anf_589)))
+         (set () vec2 anf_590 ((vec2 0.012 0.008)))
+         (set () vec2 anf_591 ((vec2 -0.012 0.142)))
+         (set () vec2 anf_592 ((at_17 anf_591 p_58)))
+         (set () float nose_hi_89 ((ellipse_20 anf_590 anf_592)))
+         (set () vec2 anf_593 ((vec2 -0.095 0.255)))
+         (set () vec2 anf_594 ((at_17 anf_593 p_58)))
+         (set () float eye_l_90 ((circle_23 0.04 anf_594)))
+         (set () vec2 anf_595 ((vec2 0.095 0.255)))
+         (set () vec2 anf_596 ((at_17 anf_595 p_58)))
+         (set () float eye_r_91 ((circle_23 0.04 anf_596)))
+         (set () vec2 anf_597 ((vec2 -0.082 0.27)))
+         (set () vec2 anf_598 ((at_17 anf_597 p_58)))
+         (set () float hi_l_92 ((circle_23 0.014 anf_598)))
+         (set () vec2 anf_599 ((vec2 0.108 0.27)))
+         (set () vec2 anf_600 ((at_17 anf_599 p_58)))
+         (set () float hi_r_93 ((circle_23 0.014 anf_600)))
+         (set () vec2 anf_601 ((vec2 -0.105 0.245)))
+         (set () vec2 anf_602 ((at_17 anf_601 p_58)))
+         (set () float hi_l2_94 ((circle_23 0.006 anf_602)))
+         (set () vec2 anf_603 ((vec2 0.085 0.245)))
+         (set () vec2 anf_604 ((at_17 anf_603 p_58)))
+         (set () float hi_r2_95 ((circle_23 0.006 anf_604)))
+         (set () vec2 anf_605 ((vec2 0.035 0.01)))
+         (set () vec2 anf_606 ((vec2 -0.095 0.315)))
+         (set () vec2 anf_607 ((at_17 anf_606 p_58)))
+         (set () vec2 anf_608 ((rot_30 0.15 anf_607)))
+         (set () float brow_l_96 ((ellipse_20 anf_605 anf_608)))
+         (set () vec2 anf_609 ((vec2 0.035 0.01)))
+         (set () vec2 anf_610 ((vec2 0.095 0.315)))
+         (set () vec2 anf_611 ((at_17 anf_610 p_58)))
+         (set () vec2 anf_612 ((rot_30 -0.15 anf_611)))
+         (set () float brow_r_97 ((ellipse_20 anf_609 anf_612)))
+         (set () float anf_613 ((length p_58)))
+         (set () float vig_98 ((smoothstep 0.3 1.1 anf_613)))
+         (set () vec3 col_99 ((mix bg_col_0 bg_dark_1 vig_98)))
+         (set () vec2 anf_614 ((vec2 0.38 0.055)))
+         (set () vec2 anf_615 ((vec2 0.02 -0.45)))
+         (set () vec2 anf_616 ((at_17 anf_615 p_58)))
+         (set () float shadow_d_100 ((ellipse_20 anf_614 anf_616)))
+         (set () float shadow_falloff_101 ((smoothstep 0.08 -0.02 shadow_d_100)))
+         (set () vec3 anf_617 ((vec3 0.06 0.28 0.16)))
+         (set () float anf_618 ((* shadow_falloff_101 0.55)))
+         (set () vec3 col_102 ((mix col_99 anf_617 anf_618)))
+         (set () vec3 anf_619 ((paint_45 tail_60 brown_dk_4 col_102)))
+         (set () vec3 anf_620 ((paint_45 tail_rim_64 drk_brown_5 anf_619)))
+         (set () vec3 anf_621 ((paint_45 tail_scales_63 drk_brown_5 anf_620)))
+         (set () vec3 anf_622 ((paint_45 foot_l_82 drk_brown_5 anf_621)))
+         (set () vec3 anf_623 ((paint_45 foot_r_83 drk_brown_5 anf_622)))
+         (set () vec3 anf_624 ((paint_45 arm_l_78 brown_dk_4 anf_623)))
+         (set () vec3 anf_625 ((paint_45 arm_r_79 brown_dk_4 anf_624)))
+         (set () vec3 anf_626
+          ((paint_shaded_49 torso_with_cheeks_71 brown_2 brown_dk_4 0.08 anf_625)))
+         (set () vec3 anf_627
+          ((paint_shaded_49 belly_73 cream_6 cream_dk_7 0.05 anf_626)))
+         (set () vec3 anf_628 ((paint_45 paw_l_80 cream_6 anf_627)))
+         (set () vec3 anf_629 ((paint_45 paw_r_81 cream_6 anf_628)))
+         (set () vec3 anf_630 ((paint_45 ear_l_74 brown_2 anf_629)))
+         (set () vec3 anf_631 ((paint_45 ear_r_75 brown_2 anf_630)))
+         (set () vec3 anf_632 ((paint_45 ear_in_l_76 pink_8 anf_631)))
+         (set () vec3 anf_633 ((paint_45 ear_in_r_77 pink_8 anf_632)))
+         (set () vec3 anf_634 ((paint_45 muzzle_72 cream_6 anf_633)))
+         (set () vec3 anf_635 ((paint_45 brow_l_96 drk_brown_5 anf_634)))
+         (set () vec3 anf_636 ((paint_45 brow_r_97 drk_brown_5 anf_635)))
+         (set () vec3 anf_637 ((paint_45 teeth_86 tooth_yel_12 anf_636)))
+         (set () vec3 anf_638 ((paint_45 groove_87 brown_dk_4 anf_637)))
+         (set () vec3 anf_639 ((paint_45 nose_88 drk_brown_5 anf_638)))
+         (set () vec3 anf_640 ((paint_45 nose_hi_89 brown_lt_3 anf_639)))
+         (set () vec3 anf_641 ((paint_45 eye_l_90 black_10 anf_640)))
+         (set () vec3 anf_642 ((paint_45 eye_r_91 black_10 anf_641)))
+         (set () vec3 anf_643 ((paint_45 hi_l_92 wht_11 anf_642)))
+         (set () vec3 anf_644 ((paint_45 hi_r_93 wht_11 anf_643)))
+         (set () vec3 anf_645 ((paint_45 hi_l2_94 wht_11 anf_644)))
+         (return (paint_45 hi_r2_95 wht_11 anf_645)))))
+      (Global Const (TyVec 3) pink_dk_9 ((vec3 0.75 0.42 0.42)))
+      (Function (name smax_40) (desc ())
+       (params ((TyFloat a_41) (TyFloat b_42) (TyFloat k_43))) (ret_type TyFloat)
+       (body
+        ((set () float anf_646 ((- a_41 b_42)))
+         (set () float anf_647 ((abs anf_646)))
+         (set () float anf_648 ((- k_43 anf_647)))
+         (set () float anf_649 ((max anf_648 0.)))
+         (set () float h_44 ((/ anf_649 k_43)))
+         (set () float anf_650 ((max a_41 b_42)))
+         (set () float anf_651 ((* h_44 h_44)))
+         (set () float anf_652 ((* anf_651 k_43)))
+         (set () float anf_653 ((* anf_652 0.25))) (return (+ anf_650 anf_653)))))
+      (Function (name main) (desc ()) (params ()) (ret_type TyVoid)
+       (body
+        ((set () vec3 color ((main_pure (. gl_FragCoord xy))))
+         (set fragColor (clamp (vec4 (. color xyz) 1.) 0. 1.)))))))
+
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec2 at_17(vec2 offset_18, vec2 p_19) {
+        return (p_19 - offset_18);
+    }
+    const vec3 bg_col_0 = vec3(0.13, 0.48, 0.3);
+    const vec3 bg_dark_1 = vec3(0.09, 0.36, 0.22);
+    const vec3 black_10 = vec3(0.06, 0.04, 0.03);
+    float box_26(vec2 b_27, vec2 p_28) {
+        vec2 anf_477 = abs(p_28);
+        vec2 d_29 = (anf_477 - b_27);
+        vec2 anf_478 = vec2(0., 0.);
+        vec2 anf_479 = max(d_29, anf_478);
+        float anf_480 = length(anf_479);
+        float anf_481 = d_29[0];
+        float anf_482 = d_29[1];
+        float anf_483 = max(anf_481, anf_482);
+        float anf_484 = min(anf_483, 0.);
+        return (anf_480 + anf_484);
+    }
+    const vec3 brown_2 = vec3(0.55, 0.34, 0.16);
+    const vec3 brown_dk_4 = vec3(0.38, 0.22, 0.08);
+    const vec3 brown_lt_3 = vec3(0.68, 0.46, 0.24);
+    float circle_23(float r_24, vec2 p_25) {
+        float anf_485 = length(p_25);
+        return (anf_485 - r_24);
+    }
+    const vec3 cream_6 = vec3(0.95, 0.89, 0.74);
+    const vec3 cream_dk_7 = vec3(0.78, 0.68, 0.5);
+    const vec3 drk_brown_5 = vec3(0.22, 0.11, 0.03);
+    float ellipse_20(vec2 ab_21, vec2 p_22) {
+        vec2 anf_486 = (p_22 / ab_21);
+        float anf_487 = length(anf_486);
+        return (anf_487 - 1.);
+    }
+    vec3 paint_45(float d_46, vec3 shape_col_47, vec3 bg_48) {
+        float anf_488 = smoothstep(-0.005, 0.005, d_46);
+        return mix(shape_col_47, bg_48, anf_488);
+    }
+    vec3 paint_shaded_49(float d_50, vec3 shape_col_51, vec3 shadow_col_52, float shadow_depth_53, vec3 bg_54) {
+        float anf_489 = smoothstep(-0.005, 0.005, d_50);
+        vec3 base_55 = mix(shape_col_51, bg_54, anf_489);
+        float anf_490 = (-1. * shadow_depth_53);
+        float shade_56 = smoothstep(anf_490, 0., d_50);
+        float anf_491 = (shade_56 * 0.55);
+        vec3 anf_492 = mix(shape_col_51, shadow_col_52, anf_491);
+        float anf_493 = smoothstep(0.005, -0.005, d_50);
+        return mix(base_55, anf_492, anf_493);
+    }
+    const vec3 pink_8 = vec3(0.92, 0.62, 0.6);
+    vec2 rot_30(float a_31, vec2 p_32) {
+        float c_33 = cos(a_31);
+        float s_34 = sin(a_31);
+        float anf_494 = p_32[0];
+        float anf_495 = (c_33 * anf_494);
+        float anf_496 = p_32[1];
+        float anf_497 = (s_34 * anf_496);
+        float anf_498 = (anf_495 - anf_497);
+        float anf_499 = p_32[0];
+        float anf_500 = (s_34 * anf_499);
+        float anf_501 = p_32[1];
+        float anf_502 = (c_33 * anf_501);
+        float anf_503 = (anf_500 + anf_502);
+        return vec2(anf_498, anf_503);
+    }
+    float smin_35(float a_36, float b_37, float k_38) {
+        float anf_504 = (a_36 - b_37);
+        float anf_505 = abs(anf_504);
+        float anf_506 = (k_38 - anf_505);
+        float anf_507 = max(anf_506, 0.);
+        float h_39 = (anf_507 / k_38);
+        float anf_508 = min(a_36, b_37);
+        float anf_509 = (h_39 * h_39);
+        float anf_510 = (anf_509 * k_38);
+        float anf_511 = (anf_510 * 0.25);
+        return (anf_508 - anf_511);
+    }
+    const vec3 tooth_yel_12 = vec3(0.92, 0.85, 0.6);
+    uniform vec2 u_resolution;
+    vec2 get_uv_13_vec2_to_vec2_476(vec2 coord_14) {
+        vec2 anf_512 = (2. * coord_14);
+        vec2 top_15 = (anf_512 - u_resolution);
+        float anf_513 = u_resolution[0];
+        float anf_514 = u_resolution[1];
+        float bot_16 = min(anf_513, anf_514);
+        return (top_15 / bot_16);
+    }
+    const vec3 wht_11 = vec3(1., 0.97, 0.93);
+    vec3 main_pure(vec2 coord_57) {
+        vec2 anf_515 = get_uv_13_vec2_to_vec2_476(coord_57);
+        vec2 p_58 = (anf_515 / 1.5);
+        vec2 anf_516 = vec2(0.28, -0.28);
+        vec2 anf_517 = at_17(anf_516, p_58);
+        vec2 tp_59 = rot_30(-0.35, anf_517);
+        vec2 anf_518 = vec2(0.22, 0.085);
+        float tail_60 = ellipse_20(anf_518, tp_59);
+        float anf_519 = tp_59[0];
+        float anf_520 = tp_59[1];
+        float anf_521 = (anf_519 + anf_520);
+        float anf_522 = (anf_521 * 38.);
+        float anf_523 = sin(anf_522);
+        float anf_524 = abs(anf_523);
+        float tsx_61 = (anf_524 - 0.55);
+        float anf_525 = tp_59[0];
+        float anf_526 = tp_59[1];
+        float anf_527 = (anf_525 - anf_526);
+        float anf_528 = (anf_527 * 38.);
+        float anf_529 = sin(anf_528);
+        float anf_530 = abs(anf_529);
+        float tsy_62 = (anf_530 - 0.55);
+        float anf_531 = (tail_60 + 0.01);
+        float anf_532 = min(tsx_61, tsy_62);
+        float anf_533 = (anf_532 * 0.015);
+        float tail_scales_63 = max(anf_531, anf_533);
+        float anf_534 = (tail_60 + 0.018);
+        float anf_535 = (-1. * anf_534);
+        float tail_rim_64 = max(tail_60, anf_535);
+        vec2 anf_536 = vec2(0.25, 0.26);
+        vec2 anf_537 = vec2(0., -0.16);
+        vec2 anf_538 = at_17(anf_537, p_58);
+        float body_65 = ellipse_20(anf_536, anf_538);
+        vec2 anf_539 = vec2(0.22, 0.2);
+        vec2 anf_540 = vec2(0., 0.2);
+        vec2 anf_541 = at_17(anf_540, p_58);
+        float head_66 = ellipse_20(anf_539, anf_541);
+        float torso_67 = smin_35(body_65, head_66, 0.1);
+        vec2 anf_542 = vec2(-0.14, 0.11);
+        vec2 anf_543 = at_17(anf_542, p_58);
+        float cheek_l_68 = circle_23(0.1, anf_543);
+        vec2 anf_544 = vec2(0.14, 0.11);
+        vec2 anf_545 = at_17(anf_544, p_58);
+        float cheek_r_69 = circle_23(0.1, anf_545);
+        float cheeks_70 = min(cheek_l_68, cheek_r_69);
+        float torso_with_cheeks_71 = smin_35(torso_67, cheeks_70, 0.06);
+        vec2 anf_546 = vec2(0.13, 0.095);
+        vec2 anf_547 = vec2(0., 0.09);
+        vec2 anf_548 = at_17(anf_547, p_58);
+        float muzzle_72 = ellipse_20(anf_546, anf_548);
+        vec2 anf_549 = vec2(0.15, 0.17);
+        vec2 anf_550 = vec2(0., -0.2);
+        vec2 anf_551 = at_17(anf_550, p_58);
+        float belly_73 = ellipse_20(anf_549, anf_551);
+        vec2 anf_552 = vec2(-0.175, 0.355);
+        vec2 anf_553 = at_17(anf_552, p_58);
+        float ear_l_74 = circle_23(0.075, anf_553);
+        vec2 anf_554 = vec2(0.175, 0.355);
+        vec2 anf_555 = at_17(anf_554, p_58);
+        float ear_r_75 = circle_23(0.075, anf_555);
+        vec2 anf_556 = vec2(0.035, 0.042);
+        vec2 anf_557 = vec2(-0.175, 0.345);
+        vec2 anf_558 = at_17(anf_557, p_58);
+        float ear_in_l_76 = ellipse_20(anf_556, anf_558);
+        vec2 anf_559 = vec2(0.035, 0.042);
+        vec2 anf_560 = vec2(0.175, 0.345);
+        vec2 anf_561 = at_17(anf_560, p_58);
+        float ear_in_r_77 = ellipse_20(anf_559, anf_561);
+        vec2 anf_562 = vec2(0.065, 0.09);
+        vec2 anf_563 = vec2(-0.23, -0.09);
+        vec2 anf_564 = at_17(anf_563, p_58);
+        float arm_l_78 = ellipse_20(anf_562, anf_564);
+        vec2 anf_565 = vec2(0.065, 0.09);
+        vec2 anf_566 = vec2(0.23, -0.09);
+        vec2 anf_567 = at_17(anf_566, p_58);
+        float arm_r_79 = ellipse_20(anf_565, anf_567);
+        vec2 anf_568 = vec2(-0.28, -0.19);
+        vec2 anf_569 = at_17(anf_568, p_58);
+        float paw_l_80 = circle_23(0.055, anf_569);
+        vec2 anf_570 = vec2(0.28, -0.19);
+        vec2 anf_571 = at_17(anf_570, p_58);
+        float paw_r_81 = circle_23(0.055, anf_571);
+        vec2 anf_572 = vec2(0.095, 0.048);
+        vec2 anf_573 = vec2(-0.13, -0.42);
+        vec2 anf_574 = at_17(anf_573, p_58);
+        float foot_l_82 = ellipse_20(anf_572, anf_574);
+        vec2 anf_575 = vec2(0.095, 0.048);
+        vec2 anf_576 = vec2(0.13, -0.42);
+        vec2 anf_577 = at_17(anf_576, p_58);
+        float foot_r_83 = ellipse_20(anf_575, anf_577);
+        vec2 anf_578 = vec2(0.022, 0.05);
+        vec2 anf_579 = vec2(-0.028, 0.035);
+        vec2 anf_580 = at_17(anf_579, p_58);
+        float tooth_l_84 = box_26(anf_578, anf_580);
+        vec2 anf_581 = vec2(0.022, 0.05);
+        vec2 anf_582 = vec2(0.028, 0.035);
+        vec2 anf_583 = at_17(anf_582, p_58);
+        float tooth_r_85 = box_26(anf_581, anf_583);
+        float teeth_86 = min(tooth_l_84, tooth_r_85);
+        vec2 anf_584 = vec2(0.005, 0.05);
+        vec2 anf_585 = vec2(0., 0.035);
+        vec2 anf_586 = at_17(anf_585, p_58);
+        float groove_87 = box_26(anf_584, anf_586);
+        vec2 anf_587 = vec2(0.038, 0.028);
+        vec2 anf_588 = vec2(0., 0.135);
+        vec2 anf_589 = at_17(anf_588, p_58);
+        float nose_88 = ellipse_20(anf_587, anf_589);
+        vec2 anf_590 = vec2(0.012, 0.008);
+        vec2 anf_591 = vec2(-0.012, 0.142);
+        vec2 anf_592 = at_17(anf_591, p_58);
+        float nose_hi_89 = ellipse_20(anf_590, anf_592);
+        vec2 anf_593 = vec2(-0.095, 0.255);
+        vec2 anf_594 = at_17(anf_593, p_58);
+        float eye_l_90 = circle_23(0.04, anf_594);
+        vec2 anf_595 = vec2(0.095, 0.255);
+        vec2 anf_596 = at_17(anf_595, p_58);
+        float eye_r_91 = circle_23(0.04, anf_596);
+        vec2 anf_597 = vec2(-0.082, 0.27);
+        vec2 anf_598 = at_17(anf_597, p_58);
+        float hi_l_92 = circle_23(0.014, anf_598);
+        vec2 anf_599 = vec2(0.108, 0.27);
+        vec2 anf_600 = at_17(anf_599, p_58);
+        float hi_r_93 = circle_23(0.014, anf_600);
+        vec2 anf_601 = vec2(-0.105, 0.245);
+        vec2 anf_602 = at_17(anf_601, p_58);
+        float hi_l2_94 = circle_23(0.006, anf_602);
+        vec2 anf_603 = vec2(0.085, 0.245);
+        vec2 anf_604 = at_17(anf_603, p_58);
+        float hi_r2_95 = circle_23(0.006, anf_604);
+        vec2 anf_605 = vec2(0.035, 0.01);
+        vec2 anf_606 = vec2(-0.095, 0.315);
+        vec2 anf_607 = at_17(anf_606, p_58);
+        vec2 anf_608 = rot_30(0.15, anf_607);
+        float brow_l_96 = ellipse_20(anf_605, anf_608);
+        vec2 anf_609 = vec2(0.035, 0.01);
+        vec2 anf_610 = vec2(0.095, 0.315);
+        vec2 anf_611 = at_17(anf_610, p_58);
+        vec2 anf_612 = rot_30(-0.15, anf_611);
+        float brow_r_97 = ellipse_20(anf_609, anf_612);
+        float anf_613 = length(p_58);
+        float vig_98 = smoothstep(0.3, 1.1, anf_613);
+        vec3 col_99 = mix(bg_col_0, bg_dark_1, vig_98);
+        vec2 anf_614 = vec2(0.38, 0.055);
+        vec2 anf_615 = vec2(0.02, -0.45);
+        vec2 anf_616 = at_17(anf_615, p_58);
+        float shadow_d_100 = ellipse_20(anf_614, anf_616);
+        float shadow_falloff_101 = smoothstep(0.08, -0.02, shadow_d_100);
+        vec3 anf_617 = vec3(0.06, 0.28, 0.16);
+        float anf_618 = (shadow_falloff_101 * 0.55);
+        vec3 col_102 = mix(col_99, anf_617, anf_618);
+        vec3 anf_619 = paint_45(tail_60, brown_dk_4, col_102);
+        vec3 anf_620 = paint_45(tail_rim_64, drk_brown_5, anf_619);
+        vec3 anf_621 = paint_45(tail_scales_63, drk_brown_5, anf_620);
+        vec3 anf_622 = paint_45(foot_l_82, drk_brown_5, anf_621);
+        vec3 anf_623 = paint_45(foot_r_83, drk_brown_5, anf_622);
+        vec3 anf_624 = paint_45(arm_l_78, brown_dk_4, anf_623);
+        vec3 anf_625 = paint_45(arm_r_79, brown_dk_4, anf_624);
+        vec3 anf_626 = paint_shaded_49(torso_with_cheeks_71, brown_2, brown_dk_4, 0.08, anf_625);
+        vec3 anf_627 = paint_shaded_49(belly_73, cream_6, cream_dk_7, 0.05, anf_626);
+        vec3 anf_628 = paint_45(paw_l_80, cream_6, anf_627);
+        vec3 anf_629 = paint_45(paw_r_81, cream_6, anf_628);
+        vec3 anf_630 = paint_45(ear_l_74, brown_2, anf_629);
+        vec3 anf_631 = paint_45(ear_r_75, brown_2, anf_630);
+        vec3 anf_632 = paint_45(ear_in_l_76, pink_8, anf_631);
+        vec3 anf_633 = paint_45(ear_in_r_77, pink_8, anf_632);
+        vec3 anf_634 = paint_45(muzzle_72, cream_6, anf_633);
+        vec3 anf_635 = paint_45(brow_l_96, drk_brown_5, anf_634);
+        vec3 anf_636 = paint_45(brow_r_97, drk_brown_5, anf_635);
+        vec3 anf_637 = paint_45(teeth_86, tooth_yel_12, anf_636);
+        vec3 anf_638 = paint_45(groove_87, brown_dk_4, anf_637);
+        vec3 anf_639 = paint_45(nose_88, drk_brown_5, anf_638);
+        vec3 anf_640 = paint_45(nose_hi_89, brown_lt_3, anf_639);
+        vec3 anf_641 = paint_45(eye_l_90, black_10, anf_640);
+        vec3 anf_642 = paint_45(eye_r_91, black_10, anf_641);
+        vec3 anf_643 = paint_45(hi_l_92, wht_11, anf_642);
+        vec3 anf_644 = paint_45(hi_r_93, wht_11, anf_643);
+        vec3 anf_645 = paint_45(hi_l2_94, wht_11, anf_644);
+        return paint_45(hi_r2_95, wht_11, anf_645);
+    }
+    const vec3 pink_dk_9 = vec3(0.75, 0.42, 0.42);
+    float smax_40(float a_41, float b_42, float k_43) {
+        float anf_646 = (a_41 - b_42);
+        float anf_647 = abs(anf_646);
+        float anf_648 = (k_43 - anf_647);
+        float anf_649 = max(anf_648, 0.);
+        float h_44 = (anf_649 / k_43);
+        float anf_650 = max(a_41, b_42);
+        float anf_651 = (h_44 * h_44);
+        float anf_652 = (anf_651 * k_43);
+        float anf_653 = (anf_652 * 0.25);
+        return (anf_650 + anf_653);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+
+
     ====== COMPILING EXAMPLE checkerboard.glml ======
 
     === frontend (checkerboard.glml) ===
