@@ -2640,7 +2640,8 @@ let%expect_test "toplevel complex consts / promotion to zero-arg functions" =
 let%expect_test "ints in float contexts" =
   (* int literal passed directly as float argument *)
   test_term "let f (x : float) = x * 2.0 in [f 3, 0.0, 0.0]";
-  [%expect {|
+  [%expect
+    {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
@@ -2658,7 +2659,8 @@ let%expect_test "ints in float contexts" =
     |}];
   (* int literal in arithmetic with float — promotes left operand *)
   test_term "let x = 1 + 2.0 in [x, x, x]";
-  [%expect {|
+  [%expect
+    {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
@@ -2673,7 +2675,8 @@ let%expect_test "ints in float contexts" =
     |}];
   (* int variable passed to annotated float param *)
   test_term "let n = 4 in let f (x : float) = x + 1.0 in [f n, 0.0, 0.0]";
-  [%expect {|
+  [%expect
+    {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
@@ -2693,7 +2696,8 @@ let%expect_test "ints in float contexts" =
     |}];
   (* int literals in vec3 literal *)
   test_term "[1, 2, 3]";
-  [%expect {|
+  [%expect
+    {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
@@ -2707,7 +2711,8 @@ let%expect_test "ints in float contexts" =
     |}];
   (* int literal broadcast-multiplied with float *)
   test_term "let v = [1.0, 2.0, 3.0] in [2 * v.0, 0.0, 0.0]";
-  [%expect {|
+  [%expect
+    {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
@@ -2728,7 +2733,8 @@ let%expect_test "ints in float contexts" =
     #extern int n
     let main (u : vec2) = [n + 1.0, 0.0, 0.0]
     |};
-  [%expect {|
+  [%expect
+    {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
@@ -2745,7 +2751,8 @@ let%expect_test "ints in float contexts" =
     |}];
   (* int from if-expression used in float context *)
   test_term "let r = if true then 1 else 2 in [r, 0.0, 0.0]";
-  [%expect {|
+  [%expect
+    {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
@@ -2766,7 +2773,8 @@ let%expect_test "ints in float contexts" =
     |}];
   (* int literal passed to builtin expecting float *)
   test_term "let s = #sin(0) in [s, 0.0, 0.0]";
-  [%expect {|
+  [%expect
+    {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
@@ -2781,7 +2789,8 @@ let%expect_test "ints in float contexts" =
     |}];
   (* two int literals passed to two float params *)
   test_term "let f (x : float) (y : float) = x + y in [f 1 2, 0.0, 0.0]";
-  [%expect {|
+  [%expect
+    {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
@@ -2791,6 +2800,91 @@ let%expect_test "ints in float contexts" =
     vec3 main_pure(vec2 coord_0) {
         float anf_8 = f_1_7(1., 2.);
         return vec3(anf_8, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "function keyword desugaring" =
+  test
+    {|
+    type option['a] = Some of 'a | None
+
+    let f = function
+      | Some x -> x + 1.0
+      | None -> 0.0
+
+    let g = function | true -> 1.0 | false -> 0.0
+
+    let apply_fn (f : 'a -> 'b) (x : 'a) : 'b = f x
+
+    let main (u : vec2) = 
+      let h = apply_fn (function | true -> 1 | false -> 0) in
+      [f (Some 5.0), g true, h true]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_31 {
+        int tag;
+    };
+    struct DFn_36 {
+        int tag;
+        DFn_31 lctor_37_0;
+    };
+    int dapply_30(DFn_31 dfn_38, bool da_39) {
+        if (da_39) {
+            return 1;
+        } else {
+            return 0;
+        }
+    }
+    int apply_fn_5_bool_to_int_to_bool_to_int_29(DFn_31 f_6, bool x_7) {
+        return dapply_30(f_6, x_7);
+    }
+    int dapply_35(DFn_36 dfn_40, bool da_41) {
+        DFn_31 ca_34 = dfn_40.lctor_37_0;
+        return apply_fn_5_bool_to_int_to_bool_to_int_29(ca_34, da_41);
+    }
+    float g_3(bool _fn_arg_4) {
+        if (_fn_arg_4) {
+            return 1.;
+        } else {
+            return 0.;
+        }
+    }
+    struct v_option_float {
+        int tag;
+        float Some_0;
+    };
+    float f_0_v_option_float_to_float_28(v_option_float _fn_arg_1) {
+        int _lv_tag_47 = _fn_arg_1.tag;
+        switch (_lv_tag_47) {
+            case 0: {
+                float x_2 = _fn_arg_1.Some_0;
+                return (x_2 + 1.);
+                break;
+            }
+            default: {
+                return 0.;
+                break;
+            }
+        }
+    }
+    vec3 main_pure(vec2 u_8) {
+        DFn_31 anf_42 = DFn_31(0);
+        DFn_36 h_9 = DFn_36(0, anf_42);
+        v_option_float anf_43 = v_option_float(0, 5.);
+        float anf_44 = f_0_v_option_float_to_float_28(anf_43);
+        float anf_45 = g_3(true);
+        int anf_46 = dapply_35(h_9, true);
+        float pf_48 = float(anf_46);
+        return vec3(anf_44, anf_45, pf_48);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

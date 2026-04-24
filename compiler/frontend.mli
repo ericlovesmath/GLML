@@ -50,6 +50,7 @@ type term_desc =
   | Field of term * string
   | Variant of string * term list
   | Match of term * (pat * term) list
+  | Function of (pat * term) list
 [@@deriving sexp_of]
 
 and term =

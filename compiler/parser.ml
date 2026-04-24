@@ -292,6 +292,15 @@ and term_lam_p =
             return (make_lambdas params t))))
     st
 
+and case_p =
+  fun st ->
+  (let%bind _ = tok BAR in
+   let%bind pat = pat_p in
+   let%bind _ = tok ARROW in
+   let%bind body = term_p in
+   return (pat, body) <??> "case")
+    st
+
 and term_match_p =
   fun st ->
   (with_term_loc
@@ -299,16 +308,19 @@ and term_match_p =
       *> commit
            (let%bind scrutinee = term_p in
             let%bind _ = tok WITH in
-            let%bind cases =
-              many1
-                (let%bind _ = tok BAR in
-                 let%bind pat = pat_p in
-                 let%bind _ = tok ARROW in
-                 let%bind body = term_p in
-                 return (pat, body))
-            in
+            let%bind cases = many1 case_p in
             return (Match (scrutinee, cases))))
    <??> "term_match")
+    st
+
+and term_function_p =
+  fun st ->
+  (with_term_loc
+     (tok FUNCTION
+      *> commit
+           (let%map cases = many1 case_p in
+            Function cases))
+   <??> "term_function")
     st
 
 and term_mat_p =
@@ -452,6 +464,7 @@ and term_p =
   (term_let_p
    <|> term_if_p
    <|> term_lam_p
+   <|> term_function_p
    <|> term_match_p
    <|> List.fold_left bop_levels ~init:term_postfix_p ~f:chainl1
    <??> "term")
@@ -482,6 +495,9 @@ let%expect_test "term parse tests" =
   test "match x with | true -> a | _ -> b";
   test "match x with | -1 -> a | 23 -> b | var -> c";
   test "match x with | -1. -> a | 0. -> b | 2.4 -> c | _ -> d";
+  test "function | Constr x -> a | Alt b -> b";
+  test "function | true -> a | _ -> b";
+  test "function | -1 -> a | 23 -> b | var -> c";
   [%expect
     {|
     variable_name
@@ -506,6 +522,9 @@ let%expect_test "term parse tests" =
     (match x (true a) (_ b))
     (match x (-1 a) (23 b) (var c))
     (match x (-1. a) (0. b) (2.4 c) (_ d))
+    (function ((Constr x) a) ((Alt b) b))
+    (function (true a) (_ b))
+    (function (-1 a) (23 b) (var c))
     |}];
   test "-113.0";
   test "-113.";
