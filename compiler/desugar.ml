@@ -158,10 +158,16 @@ let rec desugar_term_desc (td : Frontend.term_desc) : term_desc Compiler_error.t
     let%bind l = desugar_term l in
     let%bind r = desugar_term r in
     return (App (r, l))
-  | Let (r, v, ty_opt, bind, body) ->
+  | Let (r, PatVar v, ty_opt, bind, body) ->
     let%bind bind = desugar_term bind in
     let%bind body = desugar_term body in
     return (Let (r, v, ty_opt, bind, body))
+  | Let (Rec _, _, _, _, _) ->
+    Err.fail "recursive let binding requires a variable pattern"
+  | Let (Nonrec, pat, _, bind, body) ->
+    let%bind bind = desugar_term bind in
+    let%bind body = desugar_term body in
+    return (Match (bind, [ pat, body ]))
   | If (c, t, e) ->
     let%bind c = desugar_term c in
     let%bind t = desugar_term t in
