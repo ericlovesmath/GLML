@@ -21,11 +21,7 @@ let rec gcd a b =
   else gcd a (b - a)
 
 let main (coord : vec2) =
-  let uv = get_uv coord in
-  let uv = rotate u_time * uv in
-
-  let x = #abs(uv.0 * #sin(u_time * 2) * 2) in
-  let y = #abs(uv.1 * #sin(u_time * 2) * 2) in
-
+  let uv = rotate u_time * get_uv coord in
+  let [x, y] = #abs(uv * #sin(u_time * 2) * 2) in
   let res = gcd x y in
   [ res, res * 0.5, 1 - res ]
