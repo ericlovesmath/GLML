@@ -13,42 +13,28 @@ let dup f g x = f (g x) (g x)
 let scene : sdf = dup union constant 0.3
 let main (coord : vec2) = [0, 0, 0]
 ```
-```glml
-let add (x : float) (y : float) = x + y
 
-let addn (n : float) = fun (x : float) -> add n x
-
-let main (coord : vec2) =
-  // The below fails to typecheck when [0.] and [1.] are ints
-  let f = addn 0. in
-  let r = f 1. in
-  [r, 0, 0]
-```
 - main is mangled so make sure that doesn't happen, must be fixed to coord vec2
 
 ## Todo Tasks
 
-- `function` keyword, shorthand for matching
 - More Demos: New examples with HOFs, IQ Palette, Beaver Logo
-- Type annotations for arbitrary terms and let bindings
+- Type annotations for arbitrary terms
 - Functions in structs and variants
 - Promotion with ints/floats (true coercion enforced rather than constraint)
 - Type aliases with parameters
 - Curried builtin functions for partial application
 - Auto lift `f : float -> float` to work over vecs?
 - Update GLML screenshot
-- Pipe as syntactic sugar for application
 - Button to show GLSL output on mobile
-- Allow clicking through all passes in GLSL output window
 - Add builtin GLSL function callers or GLSL extern libraries
 - Add user definable constrained functions?
 - `uintBitsToFloat` instead of fat structs to represent variants, instead storing as uvec4 in raw bits
 - Reuse fields with same type for structs / defunctionalization
 - Tuples and static arrays
 - `when` clause for match statements
-- matching on `vec`s, `mat`s and `struct`s
+- matching on `struct`s
 - Nested destructing
-- Destructing in `let` bindings
 - `mat` should be exactly a `vec` of `vec`s, not a new form which makes it ambiguous and prevents non-float vecs
 - add types to new passes like `specialize_params`, also do some general refactoring?
 - Pathtracing example
@@ -87,7 +73,6 @@ let main (coord : vec2) =
 ## Potentially Interesting Thoughts
 
 - `wasm_of_ocaml` build? `Core` seems to cause `Error: Base_am_testing not implemented`
-- Local renderer without web / tests with [glslViewer](https://github.com/patriciogonzalezvivo/glslViewer)
 - Do I separate camera and make it specific like a 3D ShaderToy for Raymarching in the web playground?
 - Write Nix derivation for Javascript and OCaml bindings
 - Emit on compilation what data needs to be passed from host
