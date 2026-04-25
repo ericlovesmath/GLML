@@ -634,8 +634,16 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
   | App (f, x) ->
     let%bind f, constrs_f = gen_term env f in
     let%bind x, constrs_x = gen_term env x in
+    let arg_ty = fresh_tyvar () in
     let ret_ty = fresh_tyvar () in
-    let constrs = constr (Eq (f.ty, TyArrow (x.ty, ret_ty))) :: (constrs_f @ constrs_x) in
+    (* NOTE: We put [Eq(arg_ty, x.ty)] after [constrs_f] so the function's arg type
+       is resolved first, so [int-in-float] contexts label arg as [float] not [int] *)
+    let constrs =
+      (constr (Eq (f.ty, TyArrow (arg_ty, ret_ty))) :: constrs_f)
+      @ constrs_x
+      @ [ constr (Eq (arg_ty, x.ty)) ]
+    in
+    let x = { x with ty = arg_ty } in
     make (App (f, x)) ret_ty constrs
   | Let (Nonrec, v, return_ty, bind, body) ->
     let%bind bind, _, env, scheme_constrs, remaining =

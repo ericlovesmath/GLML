@@ -671,7 +671,11 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
     reg, { t with desc = Record (s, ts) }
   | Field (tt, f) ->
     let reg, tt = rw reg tt in
-    reg, { t with desc = Field (tt, f) }
+    if (not call_head) && is_fn_ty t.ty
+    then (
+      let reg, info = get_or_create_info reg t.ty in
+      reg, { t with desc = Field (tt, f); ty = TyVariant info.variant_name })
+    else reg, { t with desc = Field (tt, f) }
   | Variant (tn, c, args) ->
     let reg, args = rw_list reg args in
     reg, { t with desc = Variant (tn, c, args) }
