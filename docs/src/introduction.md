@@ -9,7 +9,7 @@ GLML (OpenGL Meta Language) is a functional DSL that compiles to GLSL fragment s
 ## What GLML Gives You
 
 - **Type inference**: No need to annotate every variable.
-- **First-class functions**: Pass functions as values, build helpers that compose.
+- **First-class functions**: Pass functions as values, store them in records and variants, build higher-order helpers that compose.
 - **Algebraic data types**: Define `type shape = | Circle of float | Rect of float * float` and `match` on it.
 - **Purity**: Every GLML program is a pure function from `vec2` (screen coordinate) to `vec3` (RGB color). No side effects, no mutation.
 - **Recursion**: Write recursive shaders; the compiler compiles them to bounded while loops (capped at 1000 iterations, since GLSL doesn't support recursion).

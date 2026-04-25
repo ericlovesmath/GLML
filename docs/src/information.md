@@ -20,7 +20,6 @@ let main (coord : vec2) = [0, 0, 0]
 
 - More Demos: New examples with HOFs, IQ Palette, Beaver Logo
 - Type annotations for arbitrary terms
-- Functions in structs and variants
 - Promotion with ints/floats (true coercion enforced rather than constraint)
 - Type aliases with parameters
 - Curried builtin functions for partial application
