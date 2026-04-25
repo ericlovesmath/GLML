@@ -255,20 +255,41 @@ let function_annotation params return_ty =
     go params
 ;;
 
+let let_lhs_p =
+  let annotated_pat_p =
+    (* (pat : ty) form *)
+    let%bind _ = tok LPAREN in
+    let%bind p = pat_p in
+    let%bind _ = tok COLON in
+    let%bind ty = ty_p in
+    let%bind _ = tok RPAREN in
+    return (p, [], Some ty)
+  in
+  let function_p =
+    (* ident [params] [: ret_ty] form*)
+    let%bind id = ident_p in
+    let%bind params = many param_p in
+    let%bind ret_ty = optional (tok COLON *> ty_p) in
+    return (PatVar id, params, function_annotation params ret_ty)
+  in
+  let pat_p =
+    let%map pat = pat_p in
+    pat, [], None
+  in
+  annotated_pat_p <|> function_p <|> between `Paren pat_p <|> pat_p
+;;
+
 let rec term_let_p =
   fun st ->
   (with_term_loc
      (tok LET
       *> commit
            (let%bind recur = recur_p in
-            let%bind id = ident_p in
-            let%bind params = many param_p in
-            let%bind return_ty = optional (tok COLON *> ty_p) in
+            let%bind pat, params, ann = let_lhs_p in
             let%bind rhs = tok EQ *> term_p in
             let rhs_desc = make_lambdas params rhs in
             let%bind body = tok IN *> term_p in
-            let ann = function_annotation params return_ty in
-            return (Let (recur, id, ann, { desc = rhs_desc; loc = rhs.loc }, body))))
+            return (Let (recur, pat, ann, { desc = rhs_desc; loc = rhs.loc }, body))))
    <??> "term_let")
     st
 
@@ -578,6 +599,9 @@ let%expect_test "term parse tests" =
   test "let rec f x = f x in f";
   test "let rec f (x : 'b) : 'a = f x in f";
   test "let f (x : float) : float = x in f";
+  test "let (x : float) = 1.0 in x";
+  test "let Foo v = e in v";
+  test "let [a, b, c] = arr in a";
   [%expect
     {|
     (let f (lambda (x (bool)) (lambda (y (bool)) (&& x y))) f)
@@ -586,6 +610,9 @@ let%expect_test "term parse tests" =
     (let (rec 1000) f (lambda (x ()) (app f x)) f)
     (let (rec 1000) f (: ('b -> 'a)) (lambda (x ('b)) (app f x)) f)
     (let f (: (float -> float)) (lambda (x (float)) x) f)
+    (let x (: float) 1. x)
+    (let (Foo v) e v)
+    (let (bracket a b c) arr a)
     |}]
 ;;
 

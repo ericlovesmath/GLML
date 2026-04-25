@@ -71,7 +71,7 @@ type term_desc =
   | Lam of string * ty option * term
   | App of term * term
   | Pipe of term * term
-  | Let of recur * string * ty option * term * term
+  | Let of recur * pat * ty option * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -104,23 +104,23 @@ let rec sexp_of_term_desc = function
   | Pipe (l, r) -> List [ sexp_of_term l; Atom "|>"; sexp_of_term r ]
   | Let (Rec n, v, None, bind, body) ->
     let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
-    List [ Atom "let"; rec_tag; Atom v; sexp_of_term bind; sexp_of_term body ]
+    List [ Atom "let"; rec_tag; sexp_of_pat v; sexp_of_term bind; sexp_of_term body ]
   | Let (Rec n, v, Some ret_ty, bind, body) ->
     let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
     List
       [ Atom "let"
       ; rec_tag
-      ; Atom v
+      ; sexp_of_pat v
       ; List [ Atom ":"; sexp_of_ty ret_ty ]
       ; sexp_of_term bind
       ; sexp_of_term body
       ]
   | Let (Nonrec, v, None, bind, body) ->
-    List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
+    List [ Atom "let"; sexp_of_pat v; sexp_of_term bind; sexp_of_term body ]
   | Let (Nonrec, v, Some ret_ty, bind, body) ->
     List
       [ Atom "let"
-      ; Atom v
+      ; sexp_of_pat v
       ; List [ Atom ":"; sexp_of_ty ret_ty ]
       ; sexp_of_term bind
       ; sexp_of_term body

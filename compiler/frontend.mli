@@ -43,7 +43,7 @@ type term_desc =
   | Lam of string * ty option * term
   | App of term * term
   | Pipe of term * term
-  | Let of recur * string * ty option * term * term
+  | Let of recur * pat * ty option * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int

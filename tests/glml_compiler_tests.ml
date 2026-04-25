@@ -2993,3 +2993,48 @@ let%expect_test "bracket pattern matching" =
     }
     |}]
 ;;
+
+let%expect_test "let pattern binding" =
+  test
+    {|
+    type wrapper = Wrap of float
+
+    let f w =
+      let Wrap v = w in
+      let (Wrap v') = w in
+      v + v'
+
+    let main (uv : vec2) =
+      let (x : float) = 2.0 in
+      let [u, v] = uv in
+      [x, f (Wrap 1.0), u + v]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct wrapper {
+        int tag;
+        float Wrap_0;
+    };
+    float f_0(wrapper w_1) {
+        float v_2 = w_1.Wrap_0;
+        float v_prime_3 = w_1.Wrap_0;
+        return (v_2 + v_prime_3);
+    }
+    vec3 main_pure(vec2 uv_4) {
+        float x_5 = 2.;
+        float u_6 = uv_4[0];
+        float v_7 = uv_4[1];
+        wrapper anf_16 = wrapper(0, 1.);
+        float anf_17 = f_0(anf_16);
+        float anf_18 = (u_6 + v_7);
+        return vec3(x_5, anf_17, anf_18);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
