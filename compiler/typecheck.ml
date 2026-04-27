@@ -968,13 +968,21 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
           then Ok ()
           else Err.fail "mixed pattern kinds in match" ~loc)
     in
+    let bind_var ctx v ty =
+      if String.equal v "_" then ctx else Map.set ctx ~key:v ~data:([], [], ty)
+    in
     let typecheck_cases ~scrutinee_ty ~ctx_for_pat =
+      let ctx_for_pat' pat =
+        match pat with
+        | Frontend.PatVar v -> Ok (bind_var env.ctx v scrutinee_ty)
+        | _ -> ctx_for_pat pat
+      in
       let%bind cases, constrs_cases =
         List.fold_result
           cases
           ~init:([], [])
           ~f:(fun (acc_cases, acc_constrs) (pat, body) ->
-            let%bind ctx = ctx_for_pat pat in
+            let%bind ctx = ctx_for_pat' pat in
             let env_pat = { env with ctx } in
             let%bind body, constrs_body = gen_term env_pat body in
             return
@@ -987,11 +995,6 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
         ret_ty
         (scrutinee_constr :: (constrs_s @ constrs_cases))
     in
-    let prim_ctx_for_pat ty pat =
-      match pat with
-      | Frontend.PatVar v -> Ok (Map.set env.ctx ~key:v ~data:([], [], ty))
-      | _ -> Ok env.ctx
-    in
     let require_catchall msg = if has_catchall then Ok () else Err.fail msg ~loc in
     let check_dup_pats ~extract ~equal ~err_msg ~sexp_of_dup =
       let pats = List.filter_map cases ~f:(fun (p, _) -> extract p) in
@@ -1001,24 +1004,42 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
         else Ok (k :: seen))
       |> Result.ignore_m
     in
+    let infer_nominal_type ~get_name ~env ~extract_keys =
+      match get_name scrutinee.ty with
+      | Some (name, params, decl) -> Ok (name, params, decl)
+      | None ->
+        let keys =
+          List.filter_map cases ~f:(fun (pat, _) -> extract_keys pat)
+          |> List.concat
+          |> List.dedup_and_sort ~compare:String.compare
+        in
+        let candidates =
+          Map.filter env ~f:(fun (_, decl) ->
+            List.for_all keys ~f:(fun k ->
+              List.exists decl ~f:(fun (f, _) -> String.equal f k)))
+        in
+        (match Map.to_alist candidates with
+         | [ (name, (params, decl)) ] -> Ok (name, params, decl)
+         | [] -> Err.fail "pattern does not match with any known type" ~loc
+         | _ -> Err.fail "pattern match is ambigious" ~loc)
+    in
     (match first_kind with
      | None ->
        (* All vars: scrutinee can be any type *)
-       typecheck_cases
-         ~scrutinee_ty:scrutinee.ty
-         ~ctx_for_pat:(prim_ctx_for_pat scrutinee.ty)
+       typecheck_cases ~scrutinee_ty:scrutinee.ty ~ctx_for_pat:(fun _ -> Ok env.ctx)
      | Some `MatchBool ->
        let%bind () =
          if has_catchall
          then Ok ()
          else (
-           let has_true =
-             List.exists cases ~f:(fun (p, _) -> Frontend.equal_pat p (PatLitBool true))
+           let covered =
+             List.filter_map cases ~f:(fun (p, _) ->
+               match p with
+               | PatLitBool b -> Some b
+               | _ -> None)
+             |> Bool.Set.of_list
            in
-           let has_false =
-             List.exists cases ~f:(fun (p, _) -> Frontend.equal_pat p (PatLitBool false))
-           in
-           if has_true && has_false
+           if Set.equal covered (Bool.Set.of_list [ true; false ])
            then Ok ()
            else Err.fail "non-exhaustive bool match (missing true or false)" ~loc)
        in
@@ -1031,7 +1052,7 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
            ~err_msg:"duplicate bool pattern"
            ~sexp_of_dup:(fun b -> [%message (b : bool)])
        in
-       typecheck_cases ~scrutinee_ty:TyBool ~ctx_for_pat:(prim_ctx_for_pat TyBool)
+       typecheck_cases ~scrutinee_ty:TyBool ~ctx_for_pat:(fun _ -> Ok env.ctx)
      | Some `MatchInt ->
        let%bind () = require_catchall "int match must have a catch-all" in
        let%bind () =
@@ -1043,7 +1064,7 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
            ~err_msg:"duplicate int pattern"
            ~sexp_of_dup:(fun n -> [%message (n : int)])
        in
-       typecheck_cases ~scrutinee_ty:TyInt ~ctx_for_pat:(prim_ctx_for_pat TyInt)
+       typecheck_cases ~scrutinee_ty:TyInt ~ctx_for_pat:(fun _ -> Ok env.ctx)
      | Some `MatchFloat ->
        let%bind () = require_catchall "float match must have a catch-all" in
        let%bind () =
@@ -1055,7 +1076,7 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
            ~err_msg:"duplicate float pattern"
            ~sexp_of_dup:(fun f -> [%message (f : float)])
        in
-       typecheck_cases ~scrutinee_ty:TyFloat ~ctx_for_pat:(prim_ctx_for_pat TyFloat)
+       typecheck_cases ~scrutinee_ty:TyFloat ~ctx_for_pat:(fun _ -> Ok env.ctx)
      | Some `MatchBracket ->
        let infer_scrutinee_ty () =
          List.find_map cases ~f:(fun (pat, _) ->
@@ -1076,12 +1097,8 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
          | TyVar _ -> infer_scrutinee_ty ()
          | _ -> Err.fail "bracket pattern requires vec or mat scrutinee" ~loc
        in
-       let bind_var ctx v ty =
-         if String.equal v "_" then ctx else Map.set ctx ~key:v ~data:([], [], ty)
-       in
        let ctx_for_pat pat =
          match pat, scrutinee_ty with
-         | Frontend.PatVar v, ty -> Ok (bind_var env.ctx v ty)
          | Frontend.PatBracket pats, TyVec n ->
            if List.length pats <> n
            then Err.fail "vec pattern has wrong number of elements" ~loc
@@ -1110,33 +1127,15 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
        typecheck_cases ~scrutinee_ty ~ctx_for_pat
      | Some `MatchVariant ->
        let%bind variant_name, variant_params, variant_ctors =
-         let find_from_ty ty =
-           match ty with
-           | TyVariant (name, _) ->
-             (match Map.find env.variants name with
-              | Some (params, ctors) -> Some (name, params, ctors)
-              | None -> None)
-           | _ -> None
-         in
-         match find_from_ty scrutinee.ty with
-         | Some x -> Ok x
-         | None ->
-           let case_ctors =
-             List.filter_map cases ~f:(fun (pat, _) ->
-               match pat with
-               | PatCtor (c, _) -> Some c
-               | _ -> None)
-           in
-           let candidates =
-             Map.filter env.variants ~f:(fun (_, ctors) ->
-               let ctor_names = List.map ctors ~f:fst in
-               List.for_all case_ctors ~f:(fun c ->
-                 List.mem ctor_names c ~equal:String.equal))
-           in
-           (match Map.to_alist candidates with
-            | [ (name, (params, ctors)) ] -> Ok (name, params, ctors)
-            | [] -> Err.fail "match cases don't match any variant type" ~loc
-            | _ -> Err.fail "ambiguous match variant type" ~loc)
+         infer_nominal_type
+           ~get_name:(function
+             | TyVariant (name, _) ->
+               Option.map (Map.find env.variants name) ~f:(fun (p, c) -> name, p, c)
+             | _ -> None)
+           ~env:env.variants
+           ~extract_keys:(function
+             | PatCtor (c, _) -> Some [ c ]
+             | _ -> None)
        in
        let param_sub = List.map variant_params ~f:(fun p -> p, fresh_tyvar ()) in
        let type_args = List.map param_sub ~f:snd in
@@ -1190,40 +1189,18 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
              Ok
                (List.fold2_exn vars expected_arg_tys ~init:env.ctx ~f:(fun ctx v ty ->
                   Map.set ctx ~key:v ~data:([], [], ty)))
-         | PatVar v -> Ok (Map.set env.ctx ~key:v ~data:([], [], scrutinee_ty))
-         | PatLitBool _ | PatLitInt _ | PatLitFloat _ | PatBracket _ | PatRecord _ ->
-           Ok env.ctx)
+         | _ -> Ok env.ctx)
      | Some `MatchRecord ->
        let%bind struct_name, struct_params, struct_fields =
-         let find_from_ty ty =
-           match ty with
-           | TyRecord (name, _) ->
-             (match Map.find env.structs name with
-              | Some (params, fields) -> Some (name, params, fields)
-              | None -> None)
-           | _ -> None
-         in
-         match find_from_ty scrutinee.ty with
-         | Some x -> Ok x
-         | None ->
-           let case_fields =
-             cases
-             |> List.filter_map ~f:(fun (pat, _) ->
-               match pat with
-               | PatRecord (fields, _) -> Some (List.map fields ~f:fst)
-               | _ -> None)
-             |> List.concat
-             |> List.dedup_and_sort ~compare:String.compare
-           in
-           let candidates =
-             Map.filter env.structs ~f:(fun (_, fields) ->
-               let field_names = List.map fields ~f:fst in
-               List.for_all case_fields ~f:(List.mem field_names ~equal:String.equal))
-           in
-           (match Map.to_alist candidates with
-            | [ (name, (params, fields)) ] -> Ok (name, params, fields)
-            | [] -> Err.fail "record pat fields don't match any struct type" ~loc
-            | _ -> Err.fail "ambiguous record pat (add a type annotation)" ~loc)
+         infer_nominal_type
+           ~get_name:(function
+             | TyRecord (name, _) ->
+               Option.map (Map.find env.structs name) ~f:(fun (p, f) -> name, p, f)
+             | _ -> None)
+           ~env:env.structs
+           ~extract_keys:(function
+             | PatRecord (fs, _) -> Some (List.map fs ~f:fst)
+             | _ -> None)
        in
        let param_sub = List.map struct_params ~f:(fun p -> p, fresh_tyvar ()) in
        let scrutinee_ty = TyRecord (struct_name, List.map param_sub ~f:snd) in
@@ -1244,10 +1221,7 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
                      let field_ty = subst_ty param_sub ty in
                      let%map ctx =
                        match fpat with
-                       (* TODO: Not a fan of this "when not _" everywhere *)
-                       | PatVar v when not (String.equal v "_") ->
-                         Ok (Map.set ctx ~key:v ~data:([], [], field_ty))
-                       | PatVar _ -> Ok ctx
+                       | PatVar v -> Ok (bind_var ctx v field_ty)
                        | _ -> Err.fail "record field pattern must be a variable" ~loc
                      in
                      ctx, Set.add seen fname))
@@ -1255,7 +1229,6 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
            if is_partial || Set.is_empty (Set.diff all_field_names seen)
            then Ok ctx
            else Err.fail "non-exhaustive record pat (use _ to ignore fields)" ~loc
-         | PatVar v -> Ok (Map.set env.ctx ~key:v ~data:([], [], scrutinee_ty))
          | _ -> Err.fail "invalid pattern in record match" ~loc))
 ;;
 
