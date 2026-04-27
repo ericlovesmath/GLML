@@ -1195,13 +1195,35 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
            Ok env.ctx)
      | Some `MatchRecord ->
        let%bind struct_name, struct_params, struct_fields =
-         match scrutinee.ty with
-         | TyRecord (name, _) ->
-           (match Map.find env.structs name with
-            | Some (params, fields) -> Ok (name, params, fields)
-            | None -> Err.fail "unknown struct type" ~loc)
-         | _ ->
-           Err.fail "record pat requires a struct scrutinee (add a type annotation)" ~loc
+         let find_from_ty ty =
+           match ty with
+           | TyRecord (name, _) ->
+             (match Map.find env.structs name with
+              | Some (params, fields) -> Some (name, params, fields)
+              | None -> None)
+           | _ -> None
+         in
+         match find_from_ty scrutinee.ty with
+         | Some x -> Ok x
+         | None ->
+           let case_fields =
+             cases
+             |> List.filter_map ~f:(fun (pat, _) ->
+               match pat with
+               | PatRecord (fields, _) -> Some (List.map fields ~f:fst)
+               | _ -> None)
+             |> List.concat
+             |> List.dedup_and_sort ~compare:String.compare
+           in
+           let candidates =
+             Map.filter env.structs ~f:(fun (_, fields) ->
+               let field_names = List.map fields ~f:fst in
+               List.for_all case_fields ~f:(List.mem field_names ~equal:String.equal))
+           in
+           (match Map.to_alist candidates with
+            | [ (name, (params, fields)) ] -> Ok (name, params, fields)
+            | [] -> Err.fail "record pat fields don't match any struct type" ~loc
+            | _ -> Err.fail "ambiguous record pat (add a type annotation)" ~loc)
        in
        let param_sub = List.map struct_params ~f:(fun p -> p, fresh_tyvar ()) in
        let scrutinee_ty = TyRecord (struct_name, List.map param_sub ~f:snd) in
