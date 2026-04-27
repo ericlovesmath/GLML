@@ -5,6 +5,8 @@ type pat =
   | PatLitFloat of float
   | PatVar of string
   | PatBracket of pat list
+  (** PatRecord of [(binging * pattern) list * is_partial] *)
+  | PatRecord of (string * pat) list * bool
 [@@deriving sexp_of, equal]
 
 val pat_bound_vars : pat -> string list

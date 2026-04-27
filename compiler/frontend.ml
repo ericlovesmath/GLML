@@ -8,6 +8,7 @@ type pat =
   | PatLitFloat of float
   | PatVar of string
   | PatBracket of pat list
+  | PatRecord of (string * pat) list * bool
 [@@deriving equal]
 
 let rec sexp_of_pat = function
@@ -17,6 +18,9 @@ let rec sexp_of_pat = function
   | PatLitFloat f -> Atom (Float.to_string f)
   | PatVar v -> Atom v
   | PatBracket pats -> List (Atom "bracket" :: List.map pats ~f:sexp_of_pat)
+  | PatRecord (fields, _) ->
+    List
+      (Atom "record" :: List.map fields ~f:(fun (f, p) -> List [ Atom f; sexp_of_pat p ]))
 ;;
 
 let rec pat_bound_vars = function
@@ -24,6 +28,7 @@ let rec pat_bound_vars = function
   | PatLitBool _ | PatLitInt _ | PatLitFloat _ -> []
   | PatVar v -> [ v ]
   | PatBracket pats -> List.concat_map pats ~f:pat_bound_vars
+  | PatRecord (fields, _) -> List.concat_map fields ~f:(fun (_, p) -> pat_bound_vars p)
 ;;
 
 type ty =

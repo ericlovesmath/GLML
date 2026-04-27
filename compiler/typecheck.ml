@@ -955,6 +955,7 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
       | PatLitFloat _ -> Some `MatchFloat
       | PatVar _ -> None
       | PatBracket _ -> Some `MatchBracket
+      | PatRecord _ -> Some `MatchRecord
     in
     let first_kind = List.find_map cases ~f:(fun (p, _) -> kind_of_pat p) in
     (* Validate no mixing of pattern kinds *)
@@ -1190,7 +1191,50 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
                (List.fold2_exn vars expected_arg_tys ~init:env.ctx ~f:(fun ctx v ty ->
                   Map.set ctx ~key:v ~data:([], [], ty)))
          | PatVar v -> Ok (Map.set env.ctx ~key:v ~data:([], [], scrutinee_ty))
-         | PatLitBool _ | PatLitInt _ | PatLitFloat _ | PatBracket _ -> Ok env.ctx))
+         | PatLitBool _ | PatLitInt _ | PatLitFloat _ | PatBracket _ | PatRecord _ ->
+           Ok env.ctx)
+     | Some `MatchRecord ->
+       let%bind struct_name, struct_params, struct_fields =
+         match scrutinee.ty with
+         | TyRecord (name, _) ->
+           (match Map.find env.structs name with
+            | Some (params, fields) -> Ok (name, params, fields)
+            | None -> Err.fail "unknown struct type" ~loc)
+         | _ ->
+           Err.fail "record pat requires a struct scrutinee (add a type annotation)" ~loc
+       in
+       let param_sub = List.map struct_params ~f:(fun p -> p, fresh_tyvar ()) in
+       let scrutinee_ty = TyRecord (struct_name, List.map param_sub ~f:snd) in
+       let all_field_names = List.map struct_fields ~f:fst |> String.Set.of_list in
+       typecheck_cases ~scrutinee_ty ~ctx_for_pat:(function
+         | PatRecord (fields, is_partial) ->
+           let%bind ctx, seen =
+             List.fold_result
+               fields
+               ~init:(env.ctx, String.Set.empty)
+               ~f:(fun (ctx, seen) (fname, fpat) ->
+                 if Set.mem seen fname
+                 then Err.fail "duplicate field" ~loc ~d:[%message (fname : string)]
+                 else (
+                   match List.Assoc.find struct_fields ~equal:String.equal fname with
+                   | None -> Err.fail "unknown field" ~loc ~d:[%message (fname : string)]
+                   | Some ty ->
+                     let field_ty = subst_ty param_sub ty in
+                     let%map ctx =
+                       match fpat with
+                       (* TODO: Not a fan of this "when not _" everywhere *)
+                       | PatVar v when not (String.equal v "_") ->
+                         Ok (Map.set ctx ~key:v ~data:([], [], field_ty))
+                       | PatVar _ -> Ok ctx
+                       | _ -> Err.fail "record field pattern must be a variable" ~loc
+                     in
+                     ctx, Set.add seen fname))
+           in
+           if is_partial || Set.is_empty (Set.diff all_field_names seen)
+           then Ok ctx
+           else Err.fail "non-exhaustive record pat (use _ to ignore fields)" ~loc
+         | PatVar v -> Ok (Map.set env.ctx ~key:v ~data:([], [], scrutinee_ty))
+         | _ -> Err.fail "invalid pattern in record match" ~loc))
 ;;
 
 let typecheck (Program terms : Desugar.t) : t Compiler_error.t =

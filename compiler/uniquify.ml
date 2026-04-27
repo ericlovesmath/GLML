@@ -117,6 +117,16 @@ let rec uniquify_term (ctx : env) (t : term) : term Compiler_error.t =
                 | _ -> ctx, p)
             in
             Frontend.PatBracket pats, ctx
+          | PatRecord (fields, partial) ->
+            let ctx, fields =
+              List.fold_map fields ~init:ctx ~f:(fun ctx (fname, fpat) ->
+                match fpat with
+                | PatVar v when not (String.equal v "_") ->
+                  let v, ctx = fresh v ctx in
+                  ctx, (fname, Frontend.PatVar v)
+                | _ -> ctx, (fname, fpat))
+            in
+            Frontend.PatRecord (fields, partial), ctx
         in
         let%map body = uniquify_term ctx body in
         pat, body)

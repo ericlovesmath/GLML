@@ -534,6 +534,52 @@ and lower_mat_match
     in
     Ok (map_last_return k with_bindings)
 
+and lower_record_match
+      (tenv : type_env)
+      (scrut : Anf.atom)
+      (cases : (Frontend.pat * Tail_call.anf) list)
+      (result_ty : ty)
+      (loc : Lexer.loc)
+      (k : term -> anf)
+  : anf Compiler_error.t
+  =
+  let result_ty_lowered = lower_ty result_ty in
+  match
+    List.find_map cases ~f:(fun (pat, body) ->
+      match pat with
+      | PatRecord (fs, _) -> Some (fs, body)
+      | _ -> None)
+  with
+  | None ->
+    (match find_catchall cases with
+     | None -> Err.fail "record match: no pattern" ~loc
+     | Some (v, body) ->
+       let%map lowered = lower_anf tenv body in
+       map_last_return k (bind_opt_var ~loc ~scrut ~ty:scrut.ty (Some v) lowered))
+  | Some (fields, body) ->
+    let%bind lowered_body = lower_anf tenv body in
+    let%bind struct_fields =
+      match scrut.ty with
+      | TyRecord name ->
+        (match Map.find tenv name with
+         | Some (RecordDecl fs) -> Ok fs
+         | _ -> Err.fail "record match: unknown struct" ~loc)
+      | _ -> Err.fail "record match: scrut is not TyRecord" ~loc
+    in
+    let%map with_bindings =
+      List.fold_right fields ~init:(Ok lowered_body) ~f:(fun (fname, fpat) acc ->
+        let%map acc = acc in
+        match fpat with
+        | PatVar v ->
+          let ty =
+            lower_ty (List.Assoc.find_exn struct_fields ~equal:String.equal fname)
+          in
+          let bind : term = { desc = Field (scrut, fname); ty; loc } in
+          ({ desc = Let (v, bind, acc); ty = result_ty_lowered; loc } : anf)
+        | _ -> acc)
+    in
+    map_last_return k with_bindings
+
 and lower_match
       (tenv : type_env)
       (scrut : Anf.atom)
@@ -574,6 +620,7 @@ and lower_match
      | TyVec _ -> lower_vec_match tenv scrut cases result_ty loc k
      | TyMat _ -> lower_mat_match tenv scrut cases result_ty loc k
      | _ -> Err.fail "bracket pattern on non-vec/mat scrutinee" ~loc)
+  | Some (PatRecord _) -> lower_record_match tenv scrut cases result_ty loc k
 ;;
 
 let lower_top (tenv : type_env) (top : Tail_call.top) : top Compiler_error.t =
