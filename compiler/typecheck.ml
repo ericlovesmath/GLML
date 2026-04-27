@@ -642,15 +642,7 @@ let resolve_match_scrutinee_ty
       (env : env)
       loc
       (inferred_ty : ty)
-      (first_kind :
-        [ `MatchBool
-        | `MatchInt
-        | `MatchFloat
-        | `MatchBracket
-        | `MatchVariant
-        | `MatchRecord
-        ]
-          option)
+      (first_pat : Frontend.pat option)
       (cases : (Frontend.pat * _) list)
   : ty Compiler_error.t
   =
@@ -673,12 +665,12 @@ let resolve_match_scrutinee_ty
        | [] -> Err.fail "pattern does not match with any known type" ~loc
        | _ -> Err.fail "pattern match is ambiguous" ~loc)
   in
-  match first_kind with
+  match first_pat with
   | None -> Ok inferred_ty
-  | Some `MatchBool -> Ok TyBool
-  | Some `MatchInt -> Ok TyInt
-  | Some `MatchFloat -> Ok TyFloat
-  | Some `MatchBracket ->
+  | Some (Frontend.PatLitBool _) -> Ok TyBool
+  | Some (PatLitInt _) -> Ok TyInt
+  | Some (PatLitFloat _) -> Ok TyFloat
+  | Some (PatBracket _) ->
     (match inferred_ty with
      | (TyVec _ | TyMat _) as ty -> Ok ty
      | TyVar _ ->
@@ -694,7 +686,7 @@ let resolve_match_scrutinee_ty
        |> Err.of_option "MatchBracket with no bracket pattern" ~loc
        |> Compiler_error.join
      | _ -> Err.fail "bracket pattern requires vec or mat scrutinee" ~loc)
-  | Some `MatchVariant ->
+  | Some (PatCtor _) ->
     let%bind variant_name, variant_params, _ =
       infer_nominal_type
         ~get_name:(function
@@ -709,7 +701,7 @@ let resolve_match_scrutinee_ty
     let param_sub = List.map variant_params ~f:(fun p -> p, fresh_tyvar ()) in
     let type_args = List.map param_sub ~f:snd in
     Ok (TyVariant (variant_name, type_args))
-  | Some `MatchRecord ->
+  | Some (PatRecord _) ->
     let%bind struct_name, struct_params, _ =
       infer_nominal_type
         ~get_name:(function
@@ -724,29 +716,22 @@ let resolve_match_scrutinee_ty
     let param_sub = List.map struct_params ~f:(fun p -> p, fresh_tyvar ()) in
     let type_args = List.map param_sub ~f:snd in
     Ok (TyRecord (struct_name, type_args))
+  | Some (PatVar _) -> Ok inferred_ty
 ;;
 
 let check_match_exhaustiveness
       (env : env)
       loc
       ~(has_catchall : bool)
-      (first_kind :
-        [ `MatchBool
-        | `MatchInt
-        | `MatchFloat
-        | `MatchBracket
-        | `MatchVariant
-        | `MatchRecord
-        ]
-          option)
+      (first_pat : Frontend.pat option)
       (scrutinee_ty : ty)
       (cases : (Frontend.pat * _) list)
   : unit Compiler_error.t
   =
   let require_catchall msg = if has_catchall then Ok () else Err.fail msg ~loc in
-  match first_kind with
-  | None | Some `MatchBracket | Some `MatchRecord -> Ok ()
-  | Some `MatchBool ->
+  match first_pat with
+  | None | Some (Frontend.PatBracket _) | Some (PatRecord _) | Some (PatVar _) -> Ok ()
+  | Some (PatLitBool _) ->
     if has_catchall
     then Ok ()
     else (
@@ -760,9 +745,9 @@ let check_match_exhaustiveness
       if Set.equal covered (Bool.Set.of_list [ true; false ])
       then Ok ()
       else Err.fail "non-exhaustive bool match (missing true or false)" ~loc)
-  | Some `MatchInt -> require_catchall "int match must have a catch-all"
-  | Some `MatchFloat -> require_catchall "float match must have a catch-all"
-  | Some `MatchVariant ->
+  | Some (PatLitInt _) -> require_catchall "int match must have a catch-all"
+  | Some (PatLitFloat _) -> require_catchall "float match must have a catch-all"
+  | Some (PatCtor _) ->
     if has_catchall
     then Ok ()
     else (
@@ -1186,30 +1171,34 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
         | Frontend.PatVar _ -> true
         | _ -> false)
     in
-    let kind_of_pat = function
-      | Frontend.PatCtor _ -> Some `MatchVariant
-      | PatLitBool _ -> Some `MatchBool
-      | PatLitInt _ -> Some `MatchInt
-      | PatLitFloat _ -> Some `MatchFloat
-      | PatVar _ -> None
-      | PatBracket _ -> Some `MatchBracket
-      | PatRecord _ -> Some `MatchRecord
+    let is_catchall = function
+      | Frontend.PatVar _ -> true
+      | _ -> false
     in
-    let first_kind = List.find_map cases ~f:(fun (p, _) -> kind_of_pat p) in
+    let same_family p q =
+      match p, q with
+      | Frontend.PatCtor _, Frontend.PatCtor _
+      | PatLitBool _, PatLitBool _
+      | PatLitInt _, PatLitInt _
+      | PatLitFloat _, PatLitFloat _
+      | PatBracket _, PatBracket _
+      | PatRecord _, PatRecord _ -> true
+      | _ -> false
+    in
+    let first_pat =
+      List.find_map cases ~f:(fun (p, _) -> if is_catchall p then None else Some p)
+    in
     let%bind () =
       List.fold_result cases ~init:() ~f:(fun () (pat, _) ->
-        match kind_of_pat pat with
-        | None -> Ok ()
-        | Some k ->
-          if Option.exists first_kind ~f:(Poly.equal k)
-          then Ok ()
-          else Err.fail "mixed pattern kinds in match" ~loc)
+        if is_catchall pat || Option.exists first_pat ~f:(same_family pat)
+        then Ok ()
+        else Err.fail "mixed pattern kinds in match" ~loc)
     in
     let%bind scrutinee_ty =
-      resolve_match_scrutinee_ty env loc scrutinee.ty first_kind cases
+      resolve_match_scrutinee_ty env loc scrutinee.ty first_pat cases
     in
     let%bind () =
-      check_match_exhaustiveness env loc ~has_catchall first_kind scrutinee_ty cases
+      check_match_exhaustiveness env loc ~has_catchall first_pat scrutinee_ty cases
     in
     let check_dup_pats ~extract ~equal ~err_msg ~sexp_of_dup =
       let pats = List.filter_map cases ~f:(fun (p, _) -> extract p) in
@@ -1220,8 +1209,8 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
       |> Result.ignore_m
     in
     let%bind () =
-      match first_kind with
-      | Some `MatchBool ->
+      match first_pat with
+      | Some (Frontend.PatLitBool _) ->
         check_dup_pats
           ~extract:(function
             | Frontend.PatLitBool b -> Some b
@@ -1229,7 +1218,7 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
           ~equal:Bool.equal
           ~err_msg:"duplicate bool pattern"
           ~sexp_of_dup:(fun b -> [%message (b : bool)])
-      | Some `MatchInt ->
+      | Some (PatLitInt _) ->
         check_dup_pats
           ~extract:(function
             | Frontend.PatLitInt n -> Some n
@@ -1237,7 +1226,7 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
           ~equal:Int.equal
           ~err_msg:"duplicate int pattern"
           ~sexp_of_dup:(fun n -> [%message (n : int)])
-      | Some `MatchFloat ->
+      | Some (PatLitFloat _) ->
         check_dup_pats
           ~extract:(function
             | Frontend.PatLitFloat f -> Some f
@@ -1245,7 +1234,7 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
           ~equal:Float.equal
           ~err_msg:"duplicate float pattern"
           ~sexp_of_dup:(fun f -> [%message (f : float)])
-      | Some `MatchVariant ->
+      | Some (PatCtor _) ->
         check_dup_pats
           ~extract:(function
             | Frontend.PatCtor (c, _) -> Some c
