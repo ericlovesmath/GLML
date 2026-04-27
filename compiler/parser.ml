@@ -66,6 +66,21 @@ let rec pat_p st =
              >>| (fun f -> PatLitFloat (-.f))
              <|> (num_p >>| fun n -> PatLitInt (-n)))
    <|> (between `Bracket (commas pat_p) >>| fun pats -> PatBracket pats)
+   <|> between
+         `Curly
+         (tok (ID "_") *> return (PatRecord ([], true))
+          <|>
+          let field_p =
+            let%bind id = ident_p in
+            let%bind _ = tok EQ in
+            let%bind p = pat_p in
+            return (id, p)
+          in
+          let%bind fields = commas field_p in
+          let%bind has_wildcard =
+            tok COMMA *> tok (ID "_") *> return true <|> return false
+          in
+          return (PatRecord (fields, has_wildcard)))
    <|> (ident_p >>| fun v -> PatVar v)
    <??> "pat")
     st

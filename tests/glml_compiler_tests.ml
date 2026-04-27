@@ -3171,3 +3171,147 @@ let%expect_test "functions in records / structs" =
     }
     |}]
 ;;
+
+let%expect_test "struct pattern matching" =
+  test
+    {|
+    type point = { x : float, y : float }
+
+    let main (uv : vec2) : vec3 =
+      match { x = 1.0, y = 2.0 } with
+      | { x = a, y = b } -> [a, b, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct point {
+        float x;
+        float y;
+    };
+    vec3 main_pure(vec2 uv_0) {
+        point anf_6 = point(1., 2.);
+        float a_1 = anf_6.x;
+        float b_2 = anf_6.y;
+        return vec3(a_1, b_2, 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* Partial: bind one field, ignore rest with _ *)
+  test
+    {|
+    type rgb = { r : float, g : float, b : float }
+
+    let main (uv : vec2) : vec3 =
+      let c : rgb = { r = 1.0, g = 0.5, b = 0.0 } in
+      match c with
+      | { r = red, _ } -> [red, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct rgb {
+        float r;
+        float g;
+        float b;
+    };
+    vec3 main_pure(vec2 uv_0) {
+        rgb c_1 = rgb(1., 0.5, 0.);
+        float red_2 = c_1.r;
+        return vec3(red_2, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    type box['a] = { value : 'a }
+
+    let main (uv : vec2) : vec3 =
+      let b = { value = 1.5 } in
+      match b with
+      | { value = v, _ } -> [v, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct r_box_float {
+        float value;
+    };
+    vec3 main_pure(vec2 uv_0) {
+        r_box_float b_1 = r_box_float(1.5);
+        float v_2 = b_1.value;
+        return vec3(v_2, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  (* Error non-exhaustive *)
+  test
+    {|
+    type point = { x : float, y : float }
+
+    let main (uv : vec2) : vec3 =
+      let p : point = { x = 1.0, y = 2.0 } in
+      match p with
+      | { x = a } -> [a, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    [typecheck] at 6:7-7:35: non-exhaustive record pat (use _ to ignore fields)
+      |
+    6 |       match p with
+    7 |       | { x = a } -> [a, 0.0, 0.0]
+      |
+    |}];
+  (* Error unknown field *)
+  test
+    {|
+    type point = { x : float, y : float }
+
+    let main (uv : vec2) : vec3 =
+      let p : point = { x = 1.0, y = 2.0 } in
+      match p with
+      | { x = a, z = b } -> [a, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    [typecheck] at 6:7-7:42: unknown field
+      fname: z
+      |
+    6 |       match p with
+    7 |       | { x = a, z = b } -> [a, 0.0, 0.0]
+      |
+    |}];
+  (* Error:duplicate field *)
+  test
+    {|
+    type point = { x : float, y : float }
+
+    let main (uv : vec2) : vec3 =
+      let p : point = { x = 1.0, y = 2.0 } in
+      match p with
+      | { x = a, x = b } -> [a, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    [typecheck] at 6:7-7:42: duplicate field
+      fname: x
+      |
+    6 |       match p with
+    7 |       | { x = a, x = b } -> [a, 0.0, 0.0]
+      |
+    |}]
+;;
