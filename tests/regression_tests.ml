@@ -1181,3 +1181,39 @@ let%expect_test "function in variant, match-bound var used with int arg" =
     }
     |}]
 ;;
+
+let%expect_test "struct pattern matching on non-concrete types" =
+  test
+    {|
+    type box['a] = { value : 'a }
+
+    let unbox = function
+      | { value = v } -> v
+
+    let main (uv : vec2) : vec3 =
+      let n = unbox { value = 1.5 } in
+      [n, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct r_box_float {
+        float value;
+    };
+    float unbox_0_r_box_float_to_float_12(r_box_float _fn_arg_1) {
+        float v_2 = _fn_arg_1.value;
+        return v_2;
+    }
+    vec3 main_pure(vec2 uv_3) {
+        r_box_float anf_13 = r_box_float(1.5);
+        float n_4 = unbox_0_r_box_float_to_float_12(anf_13);
+        return vec3(n_4, 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
