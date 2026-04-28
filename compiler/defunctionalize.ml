@@ -67,13 +67,15 @@ type registry =
 
 let empty_registry = { by_arrow = String.Map.empty; by_variant = String.Map.empty }
 
+type global_kind =
+  | GlobalFn of { arity : int } (** top-level Define with a direct Lam *)
+  | ClosureVal (** top-level Define with fn type but not a direct Lam *)
+  | GlobalNonFn (** extern or non-fn define *)
+
 type ctx =
-  { globals : String.Set.t
-  ; global_arities : int String.Map.t
-  ; closure_globals : String.Set.t
-  ; closure_global_types : ty String.Map.t
+  { globals : global_kind String.Map.t
+  ; closure_tys : ty String.Map.t
   ; lift_only : String.Set.t
-  ; lift_only_bodies : ((string * ty) list * Uncurry.term) String.Map.t
   ; env : ty String.Map.t
   }
 
@@ -85,10 +87,13 @@ let entry_loc = function
 let collect_globals tops =
   List.filter_map tops ~f:(fun (top : Uncurry.top) ->
     match top.desc with
-    | Define (_, v, _) -> Some v
-    | Extern v -> Some v
+    | Define (_, name, { desc = Lam (params, _); _ }) ->
+      Some (name, GlobalFn { arity = List.length params })
+    | Define (_, name, term) when is_fn_ty term.ty -> Some (name, ClosureVal)
+    | Define (_, name, _) -> Some (name, GlobalNonFn)
+    | Extern name -> Some (name, GlobalNonFn)
     | TypeDef _ -> None)
-  |> String.Set.of_list
+  |> String.Map.of_alist_exn
 ;;
 
 (* TODO: So ugly and so sad *)
@@ -171,41 +176,6 @@ let rec subst_vars (subs : (string * string) list) (t : Uncurry.term) : Uncurry.
       Match (rw scrut, List.map cases ~f:rw_case)
   in
   { t with desc }
-;;
-
-(* TODO: SO sad *)
-let rec is_used_as_value (var_name : string) (t : Uncurry.term) : bool =
-  let is_used = is_used_as_value var_name in
-  match t.desc with
-  | Var v -> String.equal v var_name
-  | Float _ | Int _ | Bool _ -> false
-  | App (f, args) ->
-    let f_used =
-      match f.desc with
-      (* direct call head = not value position *)
-      | Var v when String.equal v var_name -> false
-      | _ -> is_used f
-    in
-    f_used || List.exists args ~f:is_used
-  | Vec (_, ts) | Builtin (_, ts) -> List.exists ts ~f:is_used
-  | Mat (_, _, ts) -> List.exists ts ~f:is_used
-  | Lam (params, body) ->
-    if List.exists params ~f:(fun (v, _) -> String.equal v var_name)
-    then false
-    else is_used body
-  | Let (_, v, bind, body) ->
-    is_used bind || if String.equal v var_name then false else is_used body
-  | If (c, t, e) -> is_used c || is_used t || is_used e
-  | Bop (_, l, r) -> is_used l || is_used r
-  | Index (t, _) -> is_used t
-  | Record (_, ts) -> List.exists ts ~f:is_used
-  | Field (t, _) -> is_used t
-  | Variant (_, _, args) -> List.exists args ~f:is_used
-  | Match (scrut, cases) ->
-    is_used scrut
-    || List.exists cases ~f:(fun (pat, body) ->
-      (not (List.mem (Frontend.pat_bound_vars pat) var_name ~equal:String.equal))
-      && is_used body)
 ;;
 
 let get_or_create_info (reg : registry) (ty : ty) : registry * fn_type_info =
@@ -386,7 +356,6 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
   : registry * Uncurry.term
   =
   let rw reg t = rewrite_term ctx false reg t in
-  let rw_call reg t = rewrite_term ctx true reg t in
   let rw_list reg ts = List.fold_map ts ~init:reg ~f:rw in
   match t.desc with
   | Var v ->
@@ -394,7 +363,7 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
     then (
       match Map.find ctx.env v with
       | Some new_ty -> reg, { t with ty = new_ty }
-      | None when Set.mem ctx.globals v ->
+      | None when Map.mem ctx.globals v ->
         let reg, info, ctor_name = add_global_entry reg t.ty v t.loc in
         ( reg
         , ({ desc = Variant (info.variant_name, ctor_name, [])
@@ -407,106 +376,65 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
   | App (f, args) ->
     let reg, args = rw_list reg args in
     (match f.desc with
-     | Var v when Set.mem ctx.globals v ->
-       (* Global function: call by name, globals retain their name through lambda_lift *)
-       if Set.mem ctx.closure_globals v
-       then (
-         (* Evaluates to a closure value, so we route through [dapply] instead of calling by name *)
-         let reg, info = get_or_create_info reg f.ty in
-         (* Use the actual post-defunctionalization DFn type if known *)
-         let actual_info =
-           match Map.find ctx.closure_global_types v with
-           | Some (TyVariant vname) ->
-             Map.find reg.by_variant vname |> Option.value ~default:info
-           | _ -> info
-         in
-         let apply_ty =
-           build_arrow_ty
-             (TyVariant actual_info.variant_name :: actual_info.arg_tys)
-             actual_info.ret_ty
-         in
-         let apply_var : term =
-           { desc = Var actual_info.apply_name; ty = apply_ty; loc = f.loc }
-         in
-         let f = { f with ty = TyVariant actual_info.variant_name } in
-         reg, { t with desc = App (apply_var, f :: args); ty = actual_info.ret_ty })
-       else if is_fn_ty t.ty
-       then (
-         let f_arity =
-           Map.find ctx.global_arities v
-           |> Option.value ~default:(List.length (fst (flatten_arrow f.ty)))
-         in
-         let n_provided = List.length args in
-         if n_provided < f_arity
-         then (
-           (* True partial application: create a closure that calls f with all args *)
-           let remaining_arg_tys, final_ret_ty = flatten_arrow t.ty in
-           let remaining_arg_vars =
-             List.map remaining_arg_tys ~f:(fun _ -> Utils.fresh "ra")
-           in
-           let remaining_params = List.zip_exn remaining_arg_vars remaining_arg_tys in
-           let captured_arg_vars =
-             List.map args ~f:(fun arg -> Utils.fresh "ca", arg.ty)
-           in
-           let all_call_args =
-             List.map captured_arg_vars ~f:(fun (name, ty) ->
-               ({ desc = Var name; ty; loc = t.loc } : Uncurry.term))
-             @ List.map remaining_params ~f:(fun (name, ty) ->
-               ({ desc = Var name; ty; loc = t.loc } : Uncurry.term))
-           in
-           let body : Uncurry.term =
-             { desc = App (f, all_call_args); ty = final_ret_ty; loc = t.loc }
-           in
-           let reg, info, ctor_name =
-             add_lambda_entry reg t.ty remaining_params body captured_arg_vars t.loc
-           in
-           ( reg
-           , { desc = Variant (info.variant_name, ctor_name, args)
-             ; ty = TyVariant info.variant_name
-             ; loc = t.loc
-             } ))
-         else (
-           (* Full application of a HOF: the result is a function value,
-              Call the global directly, ensure the result type reflects the DFn variant. *)
-           let reg, info = get_or_create_info reg t.ty in
-           reg, { t with desc = App (f, args); ty = TyVariant info.variant_name }))
-       else reg, { t with desc = App (f, args) }
+     | Var v when Map.mem ctx.globals v ->
+       (match Map.find ctx.globals v with
+        | Some ClosureVal ->
+          (* Evaluates to a closure value, route through dapply instead of calling by name *)
+          let reg, info = get_or_create_info reg f.ty in
+          let actual_info =
+            match Map.find ctx.closure_tys v with
+            | Some (TyVariant vname) ->
+              Map.find reg.by_variant vname |> Option.value ~default:info
+            | _ -> info
+          in
+          let apply_ty =
+            build_arrow_ty
+              (TyVariant actual_info.variant_name :: actual_info.arg_tys)
+              actual_info.ret_ty
+          in
+          let apply_var : term =
+            { desc = Var actual_info.apply_name; ty = apply_ty; loc = f.loc }
+          in
+          let f = { f with ty = TyVariant actual_info.variant_name } in
+          reg, { t with desc = App (apply_var, f :: args); ty = actual_info.ret_ty }
+        | Some (GlobalFn { arity = f_arity }) when is_fn_ty t.ty ->
+          let n_provided = List.length args in
+          if n_provided < f_arity
+          then (
+            (* True partial application: create a closure that calls f with all args *)
+            let remaining_arg_tys, final_ret_ty = flatten_arrow t.ty in
+            let remaining_arg_vars =
+              List.map remaining_arg_tys ~f:(fun _ -> Utils.fresh "ra")
+            in
+            let remaining_params = List.zip_exn remaining_arg_vars remaining_arg_tys in
+            let captured_arg_vars =
+              List.map args ~f:(fun arg -> Utils.fresh "ca", arg.ty)
+            in
+            let all_call_args =
+              List.map captured_arg_vars ~f:(fun (name, ty) ->
+                ({ desc = Var name; ty; loc = t.loc } : Uncurry.term))
+              @ List.map remaining_params ~f:(fun (name, ty) ->
+                ({ desc = Var name; ty; loc = t.loc } : Uncurry.term))
+            in
+            let body : Uncurry.term =
+              { desc = App (f, all_call_args); ty = final_ret_ty; loc = t.loc }
+            in
+            let reg, info, ctor_name =
+              add_lambda_entry reg t.ty remaining_params body captured_arg_vars t.loc
+            in
+            ( reg
+            , { desc = Variant (info.variant_name, ctor_name, args)
+              ; ty = TyVariant info.variant_name
+              ; loc = t.loc
+              } ))
+          else (
+            (* Full application of a HOF: result is a function value *)
+            let reg, info = get_or_create_info reg t.ty in
+            reg, { t with desc = App (f, args); ty = TyVariant info.variant_name })
+        | _ -> reg, { t with desc = App (f, args) })
      | Var v when Set.mem ctx.lift_only v ->
-       (* lift_only function: lambda_lift will rename it, so inline the body instead of
-          calling by name. We stored the params/body when we processed the let-binding. *)
-       if is_fn_ty t.ty
-       then (
-         match Map.find ctx.lift_only_bodies v with
-         | Some (fn_params, fn_body) ->
-           let n_applied = List.length args in
-           let applied_params = List.take fn_params n_applied in
-           let remaining_params_orig = List.drop fn_params n_applied in
-           let captured_arg_vars =
-             List.map args ~f:(fun arg -> Utils.fresh "ca", arg.ty)
-           in
-           let remaining_arg_vars =
-             List.map remaining_params_orig ~f:(fun _ -> Utils.fresh "ra")
-           in
-           let remaining_params =
-             List.zip_exn remaining_arg_vars (List.map remaining_params_orig ~f:snd)
-           in
-           let subs =
-             List.zip_exn
-               (List.map applied_params ~f:fst)
-               (List.map captured_arg_vars ~f:fst)
-             @ List.zip_exn (List.map remaining_params_orig ~f:fst) remaining_arg_vars
-           in
-           let body = subst_vars subs fn_body in
-           let reg, info, ctor_name =
-             add_lambda_entry reg t.ty remaining_params body captured_arg_vars t.loc
-           in
-           ( reg
-           , { desc = Variant (info.variant_name, ctor_name, args)
-             ; ty = TyVariant info.variant_name
-             ; loc = t.loc
-             } )
-         | None -> reg, { t with desc = App (f, args) })
-       else reg, { t with desc = App (f, args) }
+       (* Rec local function: direct call, lambda_lift will globalize it *)
+       reg, { t with desc = App (f, args) }
      | _ when is_fn_ty f.ty ->
        let reg, info = get_or_create_info reg f.ty in
        let reg, f = rw reg f in
@@ -563,25 +491,38 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
          in
          reg, { t with desc = App (apply_var, f :: args) })
      | _ ->
-       let reg, f = rw_call reg f in
+       let reg, f = rewrite_term ctx true reg f in
        reg, { t with desc = App (f, args) })
   | Lam (params, body) ->
     (* Lam in value position (defunctionalize) *)
     let param_names = List.map params ~f:fst in
-    let excluded = Set.union ctx.globals (String.Set.of_list param_names) in
-    let captured_raw = free_vars_of ctx.globals excluded body in
+    let globals_set = Map.key_set ctx.globals in
+    let excluded = Set.union globals_set (String.Set.of_list param_names) in
+    let captured_raw = free_vars_of globals_set excluded body in
     let captured =
       List.map captured_raw ~f:(fun (name, ty) ->
         name, Map.find ctx.env name |> Option.value ~default:ty)
     in
+    (* Retype function-typed params to their DFn variant,
+       prevents arrow types in [gen_apply_fn]. *)
+    let reg, params, param_env = retype_params reg params in
     let ctx_for_body =
       { ctx with
-        env = List.fold param_names ~init:ctx.env ~f:Map.remove
+        env =
+          Map.merge_skewed
+            param_env
+            (List.fold param_names ~init:ctx.env ~f:Map.remove)
+            ~combine:(fun ~key:_ v _ -> v)
       ; lift_only = Set.diff ctx.lift_only (String.Set.of_list param_names)
       }
     in
     let reg, body = rewrite_term ctx_for_body false reg body in
-    let reg, info, ctor_name = add_lambda_entry reg t.ty params body captured t.loc in
+    (* Use [normalized_ty] (retyped args + actual body return type) so [info.arg_tys]
+       has no arrow types for [gen_apply_fn] to use as Lam parameter types. *)
+    let normalized_ty = build_arrow_ty (List.map params ~f:snd) body.ty in
+    let reg, info, ctor_name =
+      add_lambda_entry reg normalized_ty params body captured t.loc
+    in
     let payload =
       List.map captured ~f:(fun (name, ty) ->
         ({ desc = Var name; ty; loc = t.loc } : term))
@@ -593,48 +534,34 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
        }
        : term) )
   | Let (recur, v, ({ desc = Lam (lparams, lbody); _ } as lam_term), rest) ->
-    let is_value =
-      match recur with
-      | Rec _ -> false
-      | Nonrec -> is_used_as_value v rest
-    in
-    if is_value
-    then (
-      (* Lambda used as a value (defunctionalize) *)
-      let reg, variant_term = rewrite_term ctx false reg lam_term in
-      let ctx = { ctx with env = Map.set ctx.env ~key:v ~data:variant_term.ty } in
-      let reg, rest = rewrite_term ctx false reg rest in
-      reg, { t with desc = Let (recur, v, variant_term, rest); ty = rest.ty })
-    else (
-      (* Lambda only directly called (rewrite params/body, leave for Lambda_lift) *)
-      let reg, params, param_env = retype_params reg lparams in
-      let env_for_body =
-        Map.merge_skewed
-          param_env
-          (List.fold (List.map lparams ~f:fst) ~init:ctx.env ~f:Map.remove)
-          ~combine:(fun ~key:_ v1 _ -> v1)
-      in
-      let lift_only_for_body =
-        let lo = Set.diff ctx.lift_only (String.Set.of_list (List.map lparams ~f:fst)) in
-        (* Recursive bindings can call themselves (treat as direct call) *)
-        match recur with
-        | Rec _ -> Set.add lo v
-        | Nonrec -> lo
-      in
-      let ctx_for_body =
-        { ctx with env = env_for_body; lift_only = lift_only_for_body }
-      in
-      let reg, lbody' = rewrite_term ctx_for_body false reg lbody in
-      let lam_ty = build_arrow_ty (List.map params ~f:snd) lbody'.ty in
-      let lam_term = { lam_term with desc = Lam (params, lbody'); ty = lam_ty } in
-      let ctx =
-        { ctx with
-          lift_only = Set.add ctx.lift_only v
-        ; lift_only_bodies = Map.set ctx.lift_only_bodies ~key:v ~data:(params, lbody')
-        }
-      in
-      let reg, rest = rewrite_term ctx false reg rest in
-      reg, { t with desc = Let (recur, v, lam_term, rest); ty = rest.ty })
+    (match recur with
+     | Nonrec ->
+       (* Always defunctionalize non-rec local lambdas *)
+       let reg, variant_term = rewrite_term ctx false reg lam_term in
+       let ctx = { ctx with env = Map.set ctx.env ~key:v ~data:variant_term.ty } in
+       let reg, rest = rewrite_term ctx false reg rest in
+       reg, { t with desc = Let (Nonrec, v, variant_term, rest); ty = rest.ty }
+     | Rec _ ->
+       (* Leave for lambda_lift, just retype params and rewrite body *)
+       let reg, params, param_env = retype_params reg lparams in
+       let env_for_body =
+         Map.merge_skewed
+           param_env
+           (List.fold (List.map lparams ~f:fst) ~init:ctx.env ~f:Map.remove)
+           ~combine:(fun ~key:_ v1 _ -> v1)
+       in
+       let lift_only_for_body =
+         Set.add (Set.diff ctx.lift_only (String.Set.of_list (List.map lparams ~f:fst))) v
+       in
+       let ctx_for_body =
+         { ctx with env = env_for_body; lift_only = lift_only_for_body }
+       in
+       let reg, lbody' = rewrite_term ctx_for_body false reg lbody in
+       let lam_ty = build_arrow_ty (List.map params ~f:snd) lbody'.ty in
+       let lam_term = { lam_term with desc = Lam (params, lbody'); ty = lam_ty } in
+       let ctx = { ctx with lift_only = Set.add ctx.lift_only v } in
+       let reg, rest = rewrite_term ctx false reg rest in
+       reg, { t with desc = Let (recur, v, lam_term, rest); ty = rest.ty })
   | Let (recur, v, bind, body) ->
     let orig_bind_ty = bind.ty in
     let reg, bind = rw reg bind in
@@ -697,36 +624,18 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
   | Float _ | Int _ | Bool _ -> reg, t
 ;;
 
-let rewrite_top
-      (globals : String.Set.t)
-      (global_arities : int String.Map.t)
-      (closure_globals : String.Set.t)
-      (closure_global_types : ty String.Map.t)
-      (reg : registry)
-      (top : Uncurry.top)
-  : registry * Uncurry.top
-  =
-  let ctx_base =
-    { globals
-    ; global_arities
-    ; closure_globals
-    ; closure_global_types
-    ; lift_only = String.Set.empty
-    ; lift_only_bodies = String.Map.empty
-    ; env = String.Map.empty
-    }
-  in
+let rewrite_top (ctx : ctx) (reg : registry) (top : Uncurry.top) : registry * Uncurry.top =
   match top.desc with
   | Define (recur, name, ({ desc = Lam (params, body); _ } as lam)) ->
     let reg, params, env = retype_params reg params in
-    let ctx = { ctx_base with env } in
+    let ctx = { ctx with env } in
     let reg, body = rewrite_term ctx false reg body in
     let lam_ty = build_arrow_ty (List.map params ~f:snd) body.ty in
     let lam = { lam with desc = Lam (params, body); ty = lam_ty } in
     let top = { top with desc = Define (recur, name, lam); ty = lam_ty } in
     reg, top
   | Define (recur, name, term) ->
-    let reg, term = rewrite_term ctx_base false reg term in
+    let reg, term = rewrite_term ctx false reg term in
     reg, { top with desc = Define (recur, name, term); ty = term.ty }
   | TypeDef (name, RecordDecl fields) ->
     let reg, fields =
@@ -852,36 +761,24 @@ let topo_sort (all_tops : top list) : t Compiler_error.t =
 
 let defunctionalize (Program tops : Uncurry.t) : Uncurry.t Compiler_error.t =
   let globals = collect_globals tops in
-  (* Arity of each global function at the GLSL level, needed to distinguish partial
-     application from a full call to a function that returns a function value. *)
-  let global_arities =
-    List.filter_map tops ~f:(fun (top : Uncurry.top) ->
-      match top.desc with
-      | Define (_, name, { desc = Lam (params, _); _ }) -> Some (name, List.length params)
-      | Define (_, name, _) -> Some (name, 0)
-      | _ -> None)
-    |> String.Map.of_alist_exn
-  in
-  (* Globals whose RHS is not a direct lambda but evaluates to a function value.
-     These are now closure values. *)
-  let closure_globals =
-    List.filter_map tops ~f:(fun (top : Uncurry.top) ->
-      match top.desc with
-      | Define (_, _, { desc = Lam _; _ }) -> None
-      | Define (_, name, term) when is_fn_ty term.ty -> Some name
-      | _ -> None)
-    |> String.Set.of_list
-  in
   let (reg, _), rewritten_tops =
-    List.fold_map tops ~init:(empty_registry, String.Map.empty) ~f:(fun (reg, cgt) top ->
-      let reg, top = rewrite_top globals global_arities closure_globals cgt reg top in
-      let cgt =
-        match top.desc with
-        | Define (_, name, term) when Set.mem closure_globals name ->
-          Map.set cgt ~key:name ~data:term.ty
-        | _ -> cgt
-      in
-      (reg, cgt), top)
+    List.fold_map
+      tops
+      ~init:(empty_registry, String.Map.empty)
+      ~f:(fun (reg, closure_tys) top ->
+        let ctx =
+          { globals; closure_tys; lift_only = String.Set.empty; env = String.Map.empty }
+        in
+        let reg, top = rewrite_top ctx reg top in
+        let closure_tys =
+          match top.desc with
+          | Define (_, name, term) ->
+            (match Map.find globals name with
+             | Some ClosureVal -> Map.set closure_tys ~key:name ~data:term.ty
+             | _ -> closure_tys)
+          | _ -> closure_tys
+        in
+        (reg, closure_tys), top)
   in
   let all_tops =
     let dfn_infos =

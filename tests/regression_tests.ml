@@ -1023,18 +1023,24 @@ let%expect_test "regression - inferred type in higher-order local function" =
     struct DFn_24 {
         int tag;
     };
-    int dapply_23(DFn_24 dfn_26, int da_27) {
-        return (da_27 + 1);
+    struct DFn_26 {
+        int tag;
+        int lctor_27_0;
+    };
+    int dapply_23(DFn_24 dfn_31, int da_32) {
+        return (da_32 + 1);
     }
-    int app_t_2_28(int t_1, DFn_24 f_3) {
-        return dapply_23(f_3, t_1);
+    int dapply_25(DFn_26 dfn_33, DFn_24 da_34) {
+        int t_1 = dfn_33.lctor_27_0;
+        return dapply_23(da_34, t_1);
     }
     vec2 func_0_int_to_vec2_22(int t_1) {
-        DFn_24 anf_29 = DFn_24(0);
-        int x_4 = app_t_2_28(t_1, anf_29);
-        float pf_30 = float(x_4);
-        float pf_31 = float(x_4);
-        return vec2(pf_30, pf_31);
+        DFn_26 app_t_2 = DFn_26(0, t_1);
+        DFn_24 anf_35 = DFn_24(0);
+        int x_4 = dapply_25(app_t_2, anf_35);
+        float pf_36 = float(x_4);
+        float pf_37 = float(x_4);
+        return vec2(pf_36, pf_37);
     }
     vec3 main_pure(vec2 uv_6) {
         vec2 result_7 = func_0_int_to_vec2_22(0);
@@ -1062,15 +1068,21 @@ let%expect_test "regression - inferred type in higher-order local function" =
     struct DFn_23 {
         int tag;
     };
-    float dapply_22(DFn_23 dfn_25, float da_26) {
-        return (da_26 + 1.);
+    struct DFn_25 {
+        int tag;
+        float lctor_26_0;
+    };
+    float dapply_22(DFn_23 dfn_30, float da_31) {
+        return (da_31 + 1.);
     }
-    float app_t_2_27(float t_1, DFn_23 f_3) {
-        return dapply_22(f_3, t_1);
+    float dapply_24(DFn_25 dfn_32, DFn_23 da_33) {
+        float t_1 = dfn_32.lctor_26_0;
+        return dapply_22(da_33, t_1);
     }
     vec3 func_0_float_to_vec3_21(float t_1) {
-        DFn_23 anf_28 = DFn_23(0);
-        float x_4 = app_t_2_27(t_1, anf_28);
+        DFn_25 app_t_2 = DFn_25(0, t_1);
+        DFn_23 anf_34 = DFn_23(0);
+        float x_4 = dapply_24(app_t_2, anf_34);
         return vec3(x_4, x_4, x_4);
     }
     vec3 main_pure(vec2 uv_6) {
