@@ -1,6 +1,6 @@
 open Core
 open Monomorphize
-open Uncurry
+open Lambda_lift
 
 module Err = Compiler_error.Pass (struct
     let name = "defunctionalize"
@@ -38,7 +38,7 @@ type fn_entry =
   | LambdaEntry of
       { ctor_name : string
       ; params : (string * ty) list
-      ; body : Uncurry.term
+      ; body : Lambda_lift.term
       ; captured : (string * ty) list
       ; loc : Lexer.loc
       }
@@ -75,7 +75,6 @@ type global_kind =
 type ctx =
   { globals : global_kind String.Map.t
   ; closure_tys : ty String.Map.t
-  ; lift_only : String.Set.t
   ; env : ty String.Map.t
   }
 
@@ -85,61 +84,21 @@ let entry_loc = function
 ;;
 
 let collect_globals tops =
-  List.filter_map tops ~f:(fun (top : Uncurry.top) ->
+  List.filter_map tops ~f:(fun (top : Lambda_lift.top) ->
     match top.desc with
-    | Define (_, name, { desc = Lam (params, _); _ }) ->
-      Some (name, GlobalFn { arity = List.length params })
-    | Define (_, name, term) when is_fn_ty term.ty -> Some (name, ClosureVal)
-    | Define (_, name, _) -> Some (name, GlobalNonFn)
+    | Define { name; args; _ } -> Some (name, GlobalFn { arity = List.length args })
+    | Const (name, term) when is_fn_ty term.ty -> Some (name, ClosureVal)
+    | Const (name, _) -> Some (name, GlobalNonFn)
     | Extern name -> Some (name, GlobalNonFn)
     | TypeDef _ -> None)
   |> String.Map.of_alist_exn
 ;;
 
-(* TODO: So ugly and so sad *)
-let free_vars_of (globals : String.Set.t) (excluded : String.Set.t) (t : Uncurry.term)
-  : (string * ty) list
+let rec subst_vars (subs : (string * string) list) (t : Lambda_lift.term)
+  : Lambda_lift.term
   =
-  let union m1 m2 =
-    Map.merge m1 m2 ~f:(fun ~key:_ -> function
-      | `Left v | `Right v | `Both (v, _) -> Some v)
-  in
-  let union_list ms = List.fold ms ~init:String.Map.empty ~f:union in
-  let rec fv (bound : String.Set.t) (t : Uncurry.term) : ty String.Map.t =
-    match t.desc with
-    | Var v ->
-      if Set.mem globals v || Set.mem bound v
-      then String.Map.empty
-      else String.Map.singleton v t.ty
-    | Float _ | Int _ | Bool _ -> String.Map.empty
-    | Vec (_, ts) | Builtin (_, ts) -> union_list (List.map ts ~f:(fv bound))
-    | Mat (_, _, ts) -> union_list (List.map ts ~f:(fv bound))
-    | Lam (args, body) ->
-      let bound = List.fold args ~init:bound ~f:(fun acc (v, _) -> Set.add acc v) in
-      fv bound body
-    | App (f, args) -> union_list (fv bound f :: List.map args ~f:(fv bound))
-    | Let (_, v, bind, body) -> union (fv bound bind) (fv (Set.add bound v) body)
-    | If (c, t, e) -> union_list [ fv bound c; fv bound t; fv bound e ]
-    | Bop (_, l, r) -> union (fv bound l) (fv bound r)
-    | Index (t, _) -> fv bound t
-    | Record (_, ts) -> union_list (List.map ts ~f:(fv bound))
-    | Field (t, _) -> fv bound t
-    | Variant (_, _, args) -> union_list (List.map args ~f:(fv bound))
-    | Match (scrut, cases) ->
-      let fv_cases =
-        List.map cases ~f:(fun (pat, body) ->
-          let vars = Frontend.pat_bound_vars pat in
-          let bound = List.fold vars ~init:bound ~f:Set.add in
-          fv bound body)
-      in
-      union_list (fv bound scrut :: fv_cases)
-  in
-  fv excluded t |> Map.to_alist
-;;
-
-let rec subst_vars (subs : (string * string) list) (t : Uncurry.term) : Uncurry.term =
   let rw = subst_vars subs in
-  let desc : Uncurry.term_desc =
+  let desc : Lambda_lift.term_desc =
     match t.desc with
     | Var v ->
       (match List.Assoc.find subs v ~equal:String.equal with
@@ -148,16 +107,10 @@ let rec subst_vars (subs : (string * string) list) (t : Uncurry.term) : Uncurry.
     | Float _ | Int _ | Bool _ -> t.desc
     | Vec (n, ts) -> Vec (n, List.map ts ~f:rw)
     | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:rw)
-    | Lam (params, body) ->
-      let shadowed = List.map params ~f:fst in
-      let subs =
-        List.filter subs ~f:(fun (v, _) -> not (List.mem shadowed v ~equal:String.equal))
-      in
-      Lam (params, subst_vars subs body)
     | App (f, args) -> App (rw f, List.map args ~f:rw)
-    | Let (recur, v, bind, body) ->
+    | Let (v, bind, body) ->
       let subs = List.filter subs ~f:(fun (k, _) -> not (String.equal k v)) in
-      Let (recur, v, rw bind, subst_vars subs body)
+      Let (v, rw bind, subst_vars subs body)
     | If (c, t, e) -> If (rw c, rw t, rw e)
     | Bop (op, l, r) -> Bop (op, rw l, rw r)
     | Index (t, i) -> Index (rw t, i)
@@ -290,7 +243,7 @@ let add_global_entry (reg : registry) (ty : ty) (fn_name : string) (loc : Lexer.
     , ctor_name )
 ;;
 
-let gen_typedef info : Uncurry.top =
+let gen_typedef info : Lambda_lift.top =
   let loc = entry_loc (List.hd_exn info.entries) in
   let ctors =
     List.map info.entries ~f:(function
@@ -303,7 +256,7 @@ let gen_typedef info : Uncurry.top =
   }
 ;;
 
-let gen_apply_fn info : Uncurry.top =
+let gen_apply_fn info : Lambda_lift.top =
   let first_loc = entry_loc (List.hd_exn info.entries) in
   let fn_var = Utils.fresh "dfn" in
   let arg_vars = List.map info.arg_tys ~f:(fun _ -> Utils.fresh "da") in
@@ -325,9 +278,9 @@ let gen_apply_fn info : Uncurry.top =
         let pat = Frontend.PatCtor (e.ctor_name, []) in
         let arg_terms =
           List.map2_exn arg_vars info.arg_tys ~f:(fun v ty ->
-            ({ desc = Var v; ty; loc = e.loc } : Uncurry.term))
+            ({ desc = Var v; ty; loc = e.loc } : Lambda_lift.term))
         in
-        let body : Uncurry.term =
+        let body : Lambda_lift.term =
           { desc =
               App ({ desc = Var e.fn_name; ty = info.arrow_ty; loc = e.loc }, arg_terms)
           ; ty = info.ret_ty
@@ -336,7 +289,7 @@ let gen_apply_fn info : Uncurry.top =
         in
         Some (pat, body))
   in
-  let match_term : Uncurry.term =
+  let match_term : Lambda_lift.term =
     { desc =
         Match
           ( { desc = Var fn_var; ty = TyVariant info.variant_name; loc = first_loc }
@@ -346,14 +299,25 @@ let gen_apply_fn info : Uncurry.top =
     }
   in
   let apply_ty = build_arrow_ty (List.map apply_params ~f:snd) info.ret_ty in
-  let fn_body : Uncurry.term =
-    { desc = Lam (apply_params, match_term); ty = apply_ty; loc = first_loc }
-  in
-  { desc = Define (Nonrec, info.apply_name, fn_body); ty = apply_ty; loc = first_loc }
+  { desc =
+      Define
+        { name = info.apply_name
+        ; recur = Nonrec
+        ; args = apply_params
+        ; body = match_term
+        ; ret_ty = info.ret_ty
+        }
+  ; ty = apply_ty
+  ; loc = first_loc
+  }
 ;;
 
-let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurry.term)
-  : registry * Uncurry.term
+let rec rewrite_term
+          (ctx : ctx)
+          (call_head : bool)
+          (reg : registry)
+          (t : Lambda_lift.term)
+  : registry * Lambda_lift.term
   =
   let rw reg t = rewrite_term ctx false reg t in
   let rw_list reg ts = List.fold_map ts ~init:reg ~f:rw in
@@ -370,7 +334,7 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
            ; ty = TyVariant info.variant_name
            ; loc = t.loc
            }
-           : term) )
+           : Lambda_lift.term) )
       | None -> reg, t)
     else reg, t
   | App (f, args) ->
@@ -392,7 +356,7 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
               (TyVariant actual_info.variant_name :: actual_info.arg_tys)
               actual_info.ret_ty
           in
-          let apply_var : term =
+          let apply_var : Lambda_lift.term =
             { desc = Var actual_info.apply_name; ty = apply_ty; loc = f.loc }
           in
           let f = { f with ty = TyVariant actual_info.variant_name } in
@@ -412,11 +376,11 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
             in
             let all_call_args =
               List.map captured_arg_vars ~f:(fun (name, ty) ->
-                ({ desc = Var name; ty; loc = t.loc } : Uncurry.term))
+                ({ desc = Var name; ty; loc = t.loc } : Lambda_lift.term))
               @ List.map remaining_params ~f:(fun (name, ty) ->
-                ({ desc = Var name; ty; loc = t.loc } : Uncurry.term))
+                ({ desc = Var name; ty; loc = t.loc } : Lambda_lift.term))
             in
-            let body : Uncurry.term =
+            let body : Lambda_lift.term =
               { desc = App (f, all_call_args); ty = final_ret_ty; loc = t.loc }
             in
             let reg, info, ctor_name =
@@ -432,9 +396,6 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
             let reg, info = get_or_create_info reg t.ty in
             reg, { t with desc = App (f, args); ty = TyVariant info.variant_name })
         | _ -> reg, { t with desc = App (f, args) })
-     | Var v when Set.mem ctx.lift_only v ->
-       (* Rec local function: direct call, lambda_lift will globalize it *)
-       reg, { t with desc = App (f, args) }
      | _ when is_fn_ty f.ty ->
        let reg, info = get_or_create_info reg f.ty in
        let reg, f = rw reg f in
@@ -447,7 +408,6 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
        if is_fn_ty t.ty
        then (
          (* Partial application of a first-class function value, create a new closure *)
-         (* TODO: Clean up this arity analysis logic in a different pass? *)
          let n_provided = List.length args in
          let remaining_arg_tys = List.drop info.arg_tys n_provided in
          let cap_fn_var = Utils.fresh "ca" in
@@ -456,19 +416,21 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
          let rem_arg_vars = List.map remaining_arg_tys ~f:(fun _ -> Utils.fresh "ra") in
          let rem_params = List.zip_exn rem_arg_vars remaining_arg_tys in
          let apply_ty = build_arrow_ty (f.ty :: info.arg_tys) info.ret_ty in
-         let apply_var : term =
+         let apply_var : Lambda_lift.term =
            { desc = Var actual_info.apply_name; ty = apply_ty; loc = f.loc }
          in
-         let cap_fn_term : term = { desc = Var cap_fn_var; ty = f.ty; loc = t.loc } in
-         let cap_arg_terms : term list =
+         let cap_fn_term : Lambda_lift.term =
+           { desc = Var cap_fn_var; ty = f.ty; loc = t.loc }
+         in
+         let cap_arg_terms : Lambda_lift.term list =
            List.map cap_arg_vars ~f:(fun (name, ty) ->
-             ({ desc = Var name; ty; loc = t.loc } : term))
+             ({ desc = Var name; ty; loc = t.loc } : Lambda_lift.term))
          in
-         let rem_arg_terms : term list =
+         let rem_arg_terms : Lambda_lift.term list =
            List.map rem_params ~f:(fun (name, ty) ->
-             ({ desc = Var name; ty; loc = t.loc } : term))
+             ({ desc = Var name; ty; loc = t.loc } : Lambda_lift.term))
          in
-         let body : term =
+         let body : Lambda_lift.term =
            { desc = App (apply_var, (cap_fn_term :: cap_arg_terms) @ rem_arg_terms)
            ; ty = info.ret_ty
            ; loc = t.loc
@@ -486,83 +448,14 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
            } ))
        else (
          let apply_ty = build_arrow_ty (f.ty :: info.arg_tys) info.ret_ty in
-         let apply_var : Uncurry.term =
+         let apply_var : term =
            { desc = Var actual_info.apply_name; ty = apply_ty; loc = f.loc }
          in
          reg, { t with desc = App (apply_var, f :: args) })
      | _ ->
        let reg, f = rewrite_term ctx true reg f in
        reg, { t with desc = App (f, args) })
-  | Lam (params, body) ->
-    (* Lam in value position (defunctionalize) *)
-    let param_names = List.map params ~f:fst in
-    let globals_set = Map.key_set ctx.globals in
-    let excluded = Set.union globals_set (String.Set.of_list param_names) in
-    let captured_raw = free_vars_of globals_set excluded body in
-    let captured =
-      List.map captured_raw ~f:(fun (name, ty) ->
-        name, Map.find ctx.env name |> Option.value ~default:ty)
-    in
-    (* Retype function-typed params to their DFn variant,
-       prevents arrow types in [gen_apply_fn]. *)
-    let reg, params, param_env = retype_params reg params in
-    let ctx_for_body =
-      { ctx with
-        env =
-          Map.merge_skewed
-            param_env
-            (List.fold param_names ~init:ctx.env ~f:Map.remove)
-            ~combine:(fun ~key:_ v _ -> v)
-      ; lift_only = Set.diff ctx.lift_only (String.Set.of_list param_names)
-      }
-    in
-    let reg, body = rewrite_term ctx_for_body false reg body in
-    (* Use [normalized_ty] (retyped args + actual body return type) so [info.arg_tys]
-       has no arrow types for [gen_apply_fn] to use as Lam parameter types. *)
-    let normalized_ty = build_arrow_ty (List.map params ~f:snd) body.ty in
-    let reg, info, ctor_name =
-      add_lambda_entry reg normalized_ty params body captured t.loc
-    in
-    let payload =
-      List.map captured ~f:(fun (name, ty) ->
-        ({ desc = Var name; ty; loc = t.loc } : term))
-    in
-    ( reg
-    , ({ desc = Variant (info.variant_name, ctor_name, payload)
-       ; ty = TyVariant info.variant_name
-       ; loc = t.loc
-       }
-       : term) )
-  | Let (recur, v, ({ desc = Lam (lparams, lbody); _ } as lam_term), rest) ->
-    (match recur with
-     | Nonrec ->
-       (* Always defunctionalize non-rec local lambdas *)
-       let reg, variant_term = rewrite_term ctx false reg lam_term in
-       let ctx = { ctx with env = Map.set ctx.env ~key:v ~data:variant_term.ty } in
-       let reg, rest = rewrite_term ctx false reg rest in
-       reg, { t with desc = Let (Nonrec, v, variant_term, rest); ty = rest.ty }
-     | Rec _ ->
-       (* Leave for lambda_lift, just retype params and rewrite body *)
-       let reg, params, param_env = retype_params reg lparams in
-       let env_for_body =
-         Map.merge_skewed
-           param_env
-           (List.fold (List.map lparams ~f:fst) ~init:ctx.env ~f:Map.remove)
-           ~combine:(fun ~key:_ v1 _ -> v1)
-       in
-       let lift_only_for_body =
-         Set.add (Set.diff ctx.lift_only (String.Set.of_list (List.map lparams ~f:fst))) v
-       in
-       let ctx_for_body =
-         { ctx with env = env_for_body; lift_only = lift_only_for_body }
-       in
-       let reg, lbody' = rewrite_term ctx_for_body false reg lbody in
-       let lam_ty = build_arrow_ty (List.map params ~f:snd) lbody'.ty in
-       let lam_term = { lam_term with desc = Lam (params, lbody'); ty = lam_ty } in
-       let ctx = { ctx with lift_only = Set.add ctx.lift_only v } in
-       let reg, rest = rewrite_term ctx false reg rest in
-       reg, { t with desc = Let (recur, v, lam_term, rest); ty = rest.ty })
-  | Let (recur, v, bind, body) ->
+  | Let (v, bind, body) ->
     let orig_bind_ty = bind.ty in
     let reg, bind = rw reg bind in
     let ctx =
@@ -571,12 +464,12 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
       else ctx
     in
     let reg, body = rewrite_term ctx false reg body in
-    reg, { t with desc = Let (recur, v, bind, body); ty = body.ty }
-  | If (c, t, e) ->
+    reg, { t with desc = Let (v, bind, body); ty = body.ty }
+  | If (c, tt, e) ->
     let reg, c = rw reg c in
-    let reg, t = rw reg t in
+    let reg, tt = rw reg tt in
     let reg, e = rw reg e in
-    reg, { t with desc = If (c, t, e) }
+    reg, { t with desc = If (c, tt, e) }
   | Bop (op, l, r) ->
     let reg, l = rw reg l in
     let reg, r = rw reg r in
@@ -611,12 +504,7 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
     let reg, cases =
       List.fold_map cases ~init:reg ~f:(fun reg (pat, body) ->
         let bound = Frontend.pat_bound_vars pat in
-        let case_ctx =
-          { ctx with
-            env = List.fold bound ~init:ctx.env ~f:Map.remove
-          ; lift_only = Set.diff ctx.lift_only (String.Set.of_list bound)
-          }
-        in
+        let case_ctx = { ctx with env = List.fold bound ~init:ctx.env ~f:Map.remove } in
         let reg, body = rewrite_term case_ctx false reg body in
         reg, (pat, body))
     in
@@ -624,19 +512,21 @@ let rec rewrite_term (ctx : ctx) (call_head : bool) (reg : registry) (t : Uncurr
   | Float _ | Int _ | Bool _ -> reg, t
 ;;
 
-let rewrite_top (ctx : ctx) (reg : registry) (top : Uncurry.top) : registry * Uncurry.top =
+let rewrite_top (ctx : ctx) (reg : registry) (top : top) : registry * top =
   match top.desc with
-  | Define (recur, name, ({ desc = Lam (params, body); _ } as lam)) ->
-    let reg, params, env = retype_params reg params in
+  | Define { name; recur; args; body; ret_ty = _ } ->
+    let reg, args, env = retype_params reg args in
     let ctx = { ctx with env } in
     let reg, body = rewrite_term ctx false reg body in
-    let lam_ty = build_arrow_ty (List.map params ~f:snd) body.ty in
-    let lam = { lam with desc = Lam (params, body); ty = lam_ty } in
-    let top = { top with desc = Define (recur, name, lam); ty = lam_ty } in
-    reg, top
-  | Define (recur, name, term) ->
+    let lam_ty = build_arrow_ty (List.map args ~f:snd) body.ty in
+    ( reg
+    , { top with
+        desc = Define { name; recur; args; body; ret_ty = body.ty }
+      ; ty = lam_ty
+      } )
+  | Const (name, term) ->
     let reg, term = rewrite_term ctx false reg term in
-    reg, { top with desc = Define (recur, name, term); ty = term.ty }
+    reg, { top with desc = Const (name, term); ty = term.ty }
   | TypeDef (name, RecordDecl fields) ->
     let reg, fields =
       List.fold_map fields ~init:reg ~f:(fun reg (field_name, ty) ->
@@ -668,15 +558,15 @@ let rewrite_top (ctx : ctx) (reg : registry) (top : Uncurry.top) : registry * Un
 (* Topological Sort Logic for Generated Types/Functions                       *)
 (******************************************************************************)
 
-let rec global_refs_of (globals : String.Set.t) (term : Uncurry.term) : String.Set.t =
+let rec global_refs_of (globals : String.Set.t) (term : Lambda_lift.term) : String.Set.t =
   let go = global_refs_of globals in
   let union_many ts = List.fold ts ~init:String.Set.empty ~f:Set.union in
   match term.desc with
   | Var v -> if Set.mem globals v then String.Set.singleton v else String.Set.empty
   | Float _ | Int _ | Bool _ -> String.Set.empty
   | App (f, args) -> union_many (go f :: List.map args ~f:go)
-  | Lam (_, t) | Index (t, _) | Field (t, _) -> go t
-  | Let (_, _, bind, body) -> Set.union (go bind) (go body)
+  | Index (t, _) | Field (t, _) -> go t
+  | Let (_, bind, body) -> Set.union (go bind) (go body)
   | If (c, t, e) -> union_many [ go c; go t; go e ]
   | Bop (_, l, r) -> Set.union (go l) (go r)
   | Vec (_, ts) | Builtin (_, ts) | Record (_, ts) | Variant (_, _, ts) | Mat (_, _, ts)
@@ -692,16 +582,13 @@ let rec ty_struct_deps (ty : ty) : String.Set.t =
   | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ -> String.Set.empty
 ;;
 
-let rec term_ty_deps (t : term) : String.Set.t =
+let rec term_ty_deps (t : Lambda_lift.term) : String.Set.t =
   let self = ty_struct_deps t.ty in
   let from_desc =
     match t.desc with
-    | Lam (params, body) ->
-      List.fold params ~init:(term_ty_deps body) ~f:(fun acc (_, ty) ->
-        Set.union acc (ty_struct_deps ty))
     | Var _ | Float _ | Int _ | Bool _ -> String.Set.empty
     | App (f, args) -> String.Set.union_list (List.map ~f:term_ty_deps (f :: args))
-    | Let (_, _, b, e) -> Set.union (term_ty_deps b) (term_ty_deps e)
+    | Let (_, b, e) -> Set.union (term_ty_deps b) (term_ty_deps e)
     | If (c, t, e) ->
       Set.union (Set.union (term_ty_deps c) (term_ty_deps t)) (term_ty_deps e)
     | Bop (_, t, t') -> Set.union (term_ty_deps t) (term_ty_deps t')
@@ -724,19 +611,26 @@ let typedef_decl_deps = function
       List.fold tys ~init:acc ~f:(fun acc ty -> Set.union acc (ty_struct_deps ty)))
 ;;
 
-let topo_sort (all_tops : top list) : t Compiler_error.t =
+let topo_sort (all_tops : Lambda_lift.top list) : Lambda_lift.t Compiler_error.t =
   let open Compiler_error.Let_syntax in
-  let key_of (top : top) =
+  let key_of (top : Lambda_lift.top) =
     match top.desc with
-    | Define (_, name, _) | Extern name | TypeDef (name, _) -> name
+    | Define { name; _ } | Const (name, _) | Extern name | TypeDef (name, _) -> name
   in
   let nodes = List.map all_tops ~f:key_of in
   let globals = String.Set.of_list nodes in
-  let deps_of (top : top) =
+  let deps_of (top : Lambda_lift.top) =
     match top.desc with
     | Extern _ -> String.Set.empty
     | TypeDef (_, decl) -> typedef_decl_deps decl
-    | Define (_, _, body) -> Set.union (global_refs_of globals body) (term_ty_deps body)
+    | Define { body; args; _ } ->
+      let body_refs = Set.union (global_refs_of globals body) (term_ty_deps body) in
+      let arg_deps =
+        List.fold args ~init:String.Set.empty ~f:(fun acc (_, ty) ->
+          Set.union acc (ty_struct_deps ty))
+      in
+      Set.union body_refs arg_deps
+    | Const (_, term) -> Set.union (global_refs_of globals term) (term_ty_deps term)
   in
   let edges =
     List.concat_map all_tops ~f:(fun top ->
@@ -755,24 +649,21 @@ let topo_sort (all_tops : top list) : t Compiler_error.t =
   let%bind labels =
     Topological_sort.sort (module String) ~what:Nodes ~nodes ~edges |> Err.of_or_error
   in
-  (* TODO: Make sure I'm not accidentally filtering something out *)
   Ok (Program (List.filter_map ~f:(Map.find by_key) labels))
 ;;
 
-let defunctionalize (Program tops : Uncurry.t) : Uncurry.t Compiler_error.t =
+let defunctionalize (Program tops : Lambda_lift.t) : Lambda_lift.t Compiler_error.t =
   let globals = collect_globals tops in
   let (reg, _), rewritten_tops =
     List.fold_map
       tops
       ~init:(empty_registry, String.Map.empty)
       ~f:(fun (reg, closure_tys) top ->
-        let ctx =
-          { globals; closure_tys; lift_only = String.Set.empty; env = String.Map.empty }
-        in
+        let ctx = { globals; closure_tys; env = String.Map.empty } in
         let reg, top = rewrite_top ctx reg top in
         let closure_tys =
           match top.desc with
-          | Define (_, name, term) ->
+          | Const (name, term) ->
             (match Map.find globals name with
              | Some ClosureVal -> Map.set closure_tys ~key:name ~data:term.ty
              | _ -> closure_tys)

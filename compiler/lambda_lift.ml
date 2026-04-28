@@ -165,10 +165,14 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
   | Var v ->
     (match Map.find env v with
      | None -> make (Var v) []
-     | Some _ ->
-       Err.fail
-         "function-valued var in non-call position, should have defunctionalized"
-         ~loc:t.loc)
+     | Some (lifted_name, []) -> make (Var lifted_name) []
+     | Some (lifted_name, captured) ->
+       let extra =
+         List.map captured ~f:(fun (name, ty) ->
+           ({ desc = Var name; ty; loc = t.loc } : term))
+       in
+       let term_desc = App ({ desc = Var lifted_name; ty = t.ty; loc = t.loc }, extra) in
+       make term_desc [])
   | Float f -> make (Float f) []
   | Int i -> make (Int i) []
   | Bool b -> make (Bool b) []
@@ -249,7 +253,30 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
         (pat, body) :: acc_cases, acc_tops @ body_tops)
     in
     make (Match (scrutinee, List.rev cases)) (s_tops @ c_tops)
-  | Lam _ -> Err.fail "Anonymous functions should have been defunctionalized" ~loc:t.loc
+  | Lam (args, body) ->
+    (* Inline lambda in value position: lift it to a global, return Var/App referencing it *)
+    let captured =
+      let excluded = Set.union globals (String.Set.of_list (List.map args ~f:fst)) in
+      free_vars env body |> Map.filter_keys ~f:(Fn.non (Set.mem excluded)) |> Map.to_alist
+    in
+    let name = Utils.fresh "lam" in
+    let env = Map.set env ~key:name ~data:(name, captured) in
+    let%map body, body_tops = lift_term globals env body in
+    let lifted_fn =
+      let args = captured @ args in
+      let ret_ty = unroll_arrow t.ty in
+      let desc = Define { name; recur = Nonrec; args; body; ret_ty } in
+      { desc; ty = t.ty; loc = t.loc }
+    in
+    let name = ({ desc = Var name; ty = t.ty; loc = t.loc } : term) in
+    let body = body_tops @ [ lifted_fn ] in
+    if List.is_empty captured
+    then name, body
+    else (
+      let extra =
+        List.map captured ~f:(fun (n, ty) -> ({ desc = Var n; ty; loc = t.loc } : term))
+      in
+      ({ desc = App (name, extra); ty = t.ty; loc = t.loc } : term), body)
 ;;
 
 let lift_top (globals : String.Set.t) (top : Uncurry.top) : top list Compiler_error.t =

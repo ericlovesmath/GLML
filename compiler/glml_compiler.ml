@@ -11,8 +11,8 @@ module Passes = struct
       | Typecheck
       | Monomorphize
       | Uncurry
-      | Defunctionalize
       | Lambda_lift
+      | Defunctionalize
       | Anf
       | Tail_call
       | Lower_variants
@@ -47,10 +47,10 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   trace Monomorphize (Monomorphize.sexp_of_t t);
   let t = Uncurry.uncurry t in
   trace Uncurry (Uncurry.sexp_of_t t);
-  let%bind t = Defunctionalize.defunctionalize t in
-  trace Defunctionalize (Uncurry.sexp_of_t t);
   let%bind t = Lambda_lift.lift t in
   trace Lambda_lift (Lambda_lift.sexp_of_t t);
+  let%bind t = Defunctionalize.defunctionalize t in
+  trace Defunctionalize (Lambda_lift.sexp_of_t t);
   let t = Anf.to_anf t in
   trace Anf (Anf.sexp_of_t t);
   let%bind t = Tail_call.remove_rec t in

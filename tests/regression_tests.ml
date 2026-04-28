@@ -539,26 +539,29 @@ let%expect_test "regression - no recursive DFn structs from partial application"
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_15 {
+    struct DFn_16 {
         int tag;
     };
-    struct DFn_20 {
+    struct DFn_21 {
         int tag;
-        DFn_15 lctor_21_0;
+        DFn_16 lctor_22_0;
     };
-    vec3 dapply_14(DFn_15 dfn_22, float da_23) {
-        return vec3(da_23, da_23, da_23);
+    vec3 f_4_float_to_vec3_13_14(float x_5) {
+        return vec3(x_5, x_5, x_5);
     }
-    vec3 blend_0(DFn_15 f_1, float w_2) {
-        return dapply_14(f_1, w_2);
+    vec3 dapply_15(DFn_16 dfn_23, float da_24) {
+        return f_4_float_to_vec3_13_14(da_24);
     }
-    vec3 dapply_19(DFn_20 dfn_24, float da_25) {
-        DFn_15 ca_18 = dfn_24.lctor_21_0;
-        return blend_0(ca_18, da_25);
+    vec3 blend_0(DFn_16 f_1, float w_2) {
+        return dapply_15(f_1, w_2);
+    }
+    vec3 dapply_20(DFn_21 dfn_25, float da_26) {
+        DFn_16 ca_19 = dfn_25.lctor_22_0;
+        return blend_0(ca_19, da_26);
     }
     vec3 main_pure(vec2 coord_3) {
-        DFn_15 f_4_float_to_vec3_13 = DFn_15(0);
-        DFn_20 a_6 = DFn_20(0, f_4_float_to_vec3_13);
+        DFn_16 anf_27 = DFn_16(0);
+        DFn_21 a_6 = DFn_21(0, anf_27);
         return vec3(0., 0., 0.);
     }
     void main() {
@@ -708,19 +711,22 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_12 {
+    struct DFn_15 {
         int tag;
-        int lctor_13_0;
+        int lctor_16_0;
     };
-    int dapply_11(DFn_12 dfn_14, int da_15) {
-        int x_1 = dfn_14.lctor_13_0;
-        return (x_1 + da_15);
+    const DFn_15 inc_0_int_to_int_10 = DFn_15(0, 1);
+    int lam_11(int x_1, int y_2) {
+        return (x_1 + y_2);
     }
-    const DFn_12 inc_0_int_to_int_10 = DFn_12(0, 1);
+    int dapply_14(DFn_15 dfn_17, int da_18) {
+        int ca_13 = dfn_17.lctor_16_0;
+        return lam_11(ca_13, da_18);
+    }
     vec3 main_pure(vec2 uv_3) {
-        int anf_16 = dapply_11(inc_0_int_to_int_10, 1);
-        float pf_17 = float(anf_16);
-        return vec3(pf_17, 1., 1.);
+        int anf_19 = dapply_14(inc_0_int_to_int_10, 1);
+        float pf_20 = float(anf_19);
+        return vec3(pf_20, 1., 1.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -741,19 +747,22 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_12 {
+    struct DFn_15 {
         int tag;
-        int lctor_13_0;
+        int lctor_16_0;
     };
-    float dapply_11(DFn_12 dfn_14, float da_15) {
-        int x_1 = dfn_14.lctor_13_0;
-        float pf_17 = float(x_1);
-        return (pf_17 + da_15);
+    const DFn_15 inc_0_float_to_float_10 = DFn_15(0, 1);
+    float lam_11(int x_1, float y_2) {
+        float pf_20 = float(x_1);
+        return (pf_20 + y_2);
     }
-    const DFn_12 inc_0_float_to_float_10 = DFn_12(0, 1);
+    float dapply_14(DFn_15 dfn_17, float da_18) {
+        int ca_13 = dfn_17.lctor_16_0;
+        return lam_11(ca_13, da_18);
+    }
     vec3 main_pure(vec2 uv_3) {
-        float anf_16 = dapply_11(inc_0_float_to_float_10, 1.);
-        return vec3(anf_16, 0., 0.);
+        float anf_19 = dapply_14(inc_0_float_to_float_10, 1.);
+        return vec3(anf_19, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -777,33 +786,39 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_22 {
+    struct DFn_26 {
         int tag;
-        int lctor_23_0;
-        float lctor_24_0;
+        int lctor_27_0;
+        float lctor_30_0;
     };
-    const DFn_22 add_one_0_float_to_float_19 = DFn_22(0, 1, 0.);
-    float dapply_21(DFn_22 dfn_25, float da_26) {
-        int _lv_tag_29 = dfn_25.tag;
-        switch (_lv_tag_29) {
+    const DFn_26 add_one_0_float_to_float_19 = DFn_26(0, 1, 0.);
+    float lam_21(int k_1, float x_2) {
+        float pf_36 = float(k_1);
+        return (x_2 + pf_36);
+    }
+    float lam_22(float s_4, float x_5) {
+        return (x_5 * s_4);
+    }
+    float dapply_25(DFn_26 dfn_31, float da_32) {
+        int _lv_tag_35 = dfn_31.tag;
+        switch (_lv_tag_35) {
             case 0: {
-                int k_1 = dfn_25.lctor_23_0;
-                float pf_30 = float(k_1);
-                return (da_26 + pf_30);
+                int ca_24 = dfn_31.lctor_27_0;
+                return lam_21(ca_24, da_32);
                 break;
             }
             default: {
-                float s_4 = dfn_25.lctor_24_0;
-                return (da_26 * s_4);
+                float ca_29 = dfn_31.lctor_30_0;
+                return lam_22(ca_29, da_32);
                 break;
             }
         }
     }
-    const DFn_22 scale_3_float_to_float_20 = DFn_22(1, 0, 2.);
+    const DFn_26 scale_3_float_to_float_20 = DFn_26(1, 0, 2.);
     vec3 main_pure(vec2 uv_6) {
-        float anf_27 = dapply_21(add_one_0_float_to_float_19, 3.);
-        float anf_28 = dapply_21(scale_3_float_to_float_20, anf_27);
-        return vec3(anf_28, 0., 0.);
+        float anf_33 = dapply_25(add_one_0_float_to_float_19, 3.);
+        float anf_34 = dapply_25(scale_3_float_to_float_20, anf_33);
+        return vec3(anf_34, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1020,27 +1035,24 @@ let%expect_test "regression - inferred type in higher-order local function" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_24 {
-        int tag;
-    };
     struct DFn_26 {
         int tag;
-        int lctor_27_0;
     };
-    int dapply_23(DFn_24 dfn_31, int da_32) {
-        return (da_32 + 1);
+    int lam_24(int t_5) {
+        return (t_5 + 1);
     }
-    int dapply_25(DFn_26 dfn_33, DFn_24 da_34) {
-        int t_1 = dfn_33.lctor_27_0;
-        return dapply_23(da_34, t_1);
+    int dapply_25(DFn_26 dfn_28, int da_29) {
+        return lam_24(da_29);
+    }
+    int app_t_2_23(int t_1, DFn_26 f_3) {
+        return dapply_25(f_3, t_1);
     }
     vec2 func_0_int_to_vec2_22(int t_1) {
-        DFn_26 app_t_2 = DFn_26(0, t_1);
-        DFn_24 anf_35 = DFn_24(0);
-        int x_4 = dapply_25(app_t_2, anf_35);
-        float pf_36 = float(x_4);
-        float pf_37 = float(x_4);
-        return vec2(pf_36, pf_37);
+        DFn_26 anf_30 = DFn_26(0);
+        int x_4 = app_t_2_23(t_1, anf_30);
+        float pf_31 = float(x_4);
+        float pf_32 = float(x_4);
+        return vec2(pf_31, pf_32);
     }
     vec3 main_pure(vec2 uv_6) {
         vec2 result_7 = func_0_int_to_vec2_22(0);
@@ -1065,24 +1077,21 @@ let%expect_test "regression - inferred type in higher-order local function" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_23 {
-        int tag;
-    };
     struct DFn_25 {
         int tag;
-        float lctor_26_0;
     };
-    float dapply_22(DFn_23 dfn_30, float da_31) {
-        return (da_31 + 1.);
+    float lam_23(float t_5) {
+        return (t_5 + 1.);
     }
-    float dapply_24(DFn_25 dfn_32, DFn_23 da_33) {
-        float t_1 = dfn_32.lctor_26_0;
-        return dapply_22(da_33, t_1);
+    float dapply_24(DFn_25 dfn_27, float da_28) {
+        return lam_23(da_28);
+    }
+    float app_t_2_22(float t_1, DFn_25 f_3) {
+        return dapply_24(f_3, t_1);
     }
     vec3 func_0_float_to_vec3_21(float t_1) {
-        DFn_25 app_t_2 = DFn_25(0, t_1);
-        DFn_23 anf_34 = DFn_23(0);
-        float x_4 = dapply_24(app_t_2, anf_34);
+        DFn_25 anf_29 = DFn_25(0);
+        float x_4 = app_t_2_22(t_1, anf_29);
         return vec3(x_4, x_4, x_4);
     }
     vec3 main_pure(vec2 uv_6) {

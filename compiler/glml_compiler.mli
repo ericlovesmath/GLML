@@ -10,8 +10,8 @@ module Passes : sig
     | Typecheck
     | Monomorphize
     | Uncurry
-    | Defunctionalize
     | Lambda_lift
+    | Defunctionalize
     | Anf
     | Tail_call
     | Lower_variants
