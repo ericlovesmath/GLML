@@ -52,6 +52,16 @@ const darkTheme = EditorView.theme(
       backgroundColor: "#585b70 !important",
     },
     ".cm-cursor": { borderLeftColor: "#f5c2e7" },
+    ".cm-panels": {
+      backgroundColor: "#1e1e2e",
+      color: "#cdd6f4",
+    },
+    ".cm-panels input": {
+      backgroundColor: "transparent",
+      color: "#cdd6f4",
+      outline: "none",
+      border: "none",
+    },
   },
   { dark: true },
 );
