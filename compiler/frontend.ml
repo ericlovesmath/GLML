@@ -35,8 +35,7 @@ type ty =
   | TyFloat
   | TyInt
   | TyBool
-  | TyVec of int
-  | TyMat of int * int
+  | TyVec of int * ty
   | TyArrow of ty * ty
   | TyName of string
   | TyVar of string
@@ -47,8 +46,7 @@ let rec sexp_of_ty = function
   | TyFloat -> Atom "float"
   | TyInt -> Atom "int"
   | TyBool -> Atom "bool"
-  | TyVec i -> List [ Atom "vec"; Atom (Int.to_string i) ]
-  | TyMat (x, y) -> List [ Atom "mat"; Atom (Int.to_string x); Atom (Int.to_string y) ]
+  | TyVec (i, t) -> List [ Atom "vec"; Atom (Int.to_string i); sexp_of_ty t ]
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
   | TyName s -> Atom s
   | TyVar v -> Atom ("'" ^ v)
@@ -72,7 +70,6 @@ type term_desc =
   | Int of int
   | Bool of bool
   | Vec of int * term list
-  | Mat of int * int * term list
   | Lam of string * ty option * term
   | App of term * term
   | Pipe of term * term
@@ -98,10 +95,6 @@ let rec sexp_of_term_desc = function
   | Int i -> Atom (Int.to_string i)
   | Bool b -> Atom (Bool.to_string b)
   | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_term)
-  | Mat (x, y, ts) ->
-    List
-      (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
-       :: List.map ts ~f:sexp_of_term)
   | Lam (v, ty_opt, body) ->
     let ty = Option.sexp_of_t sexp_of_ty ty_opt in
     List [ Atom "lambda"; List [ Atom v; ty ]; sexp_of_term body ]

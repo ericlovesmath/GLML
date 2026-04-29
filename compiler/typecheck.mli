@@ -4,8 +4,7 @@ type ty =
   | TyFloat
   | TyInt
   | TyBool
-  | TyVec of int
-  | TyMat of int * int
+  | TyVec of int * ty
   | TyArrow of ty * ty
   | TyRecord of string * ty list
   | TyVariant of string * ty list
@@ -49,7 +48,6 @@ type term_desc =
   | Int of int
   | Bool of bool
   | Vec of int * term list
-  | Mat of int * int * term list
   | Lam of string * term
   | App of term * term
   | Let of Frontend.recur * string * constr list * term * term

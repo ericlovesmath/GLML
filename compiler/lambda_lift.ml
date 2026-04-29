@@ -12,7 +12,6 @@ type term_desc =
   | Int of int
   | Bool of bool
   | Vec of int * term list
-  | Mat of int * int * term list
   | App of term * term list
   | Let of string * term * term
   | If of term * term * term
@@ -36,10 +35,6 @@ let rec sexp_of_term_desc = function
   | Int i -> Atom (Int.to_string i)
   | Bool b -> Atom (Bool.to_string b)
   | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_term)
-  | Mat (x, y, ts) ->
-    List
-      (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
-       :: List.map ts ~f:sexp_of_term)
   | App (f, args) -> List (Atom "app" :: sexp_of_term f :: List.map args ~f:sexp_of_term)
   | Let (v, bind, body) ->
     List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
@@ -120,7 +115,6 @@ let free_vars (env : env) (t : Uncurry.term) : Monomorphize.ty String.Map.t =
        | None -> String.Map.singleton v t.ty)
     | Float _ | Int _ | Bool _ -> String.Map.empty
     | Vec (_, ts) | Builtin (_, ts) -> union_list (List.map ts ~f:fv)
-    | Mat (_, _, ts) -> union_list (List.map ts ~f:fv)
     | Lam (args, body) ->
       List.fold args ~init:(fv body) ~f:(fun acc (arg, _) -> Map.remove acc arg)
     | App (fn, args) -> union_list (fv fn :: List.map args ~f:fv)
@@ -179,9 +173,6 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
   | Vec (n, ts) ->
     let%bind ts, tops = lift_list ts in
     make (Vec (n, ts)) tops
-  | Mat (n, m, ts) ->
-    let%bind ts, tops = lift_list ts in
-    make (Mat (n, m, ts)) tops
   | App (f, args) ->
     let%bind args, args_tops = lift_list args in
     (match f.desc with

@@ -21,7 +21,6 @@ type term_desc =
   | Int of int
   | Bool of bool
   | Vec of int * term list
-  | Mat of int * int * term list
   | Lam of string * ty option * term
   | App of term * term
   | Let of Frontend.recur * string * ty option * term * term
@@ -45,10 +44,6 @@ let rec sexp_of_term_desc = function
   | Int i -> Atom (Int.to_string i)
   | Bool b -> Atom (Bool.to_string b)
   | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_term)
-  | Mat (x, y, ts) ->
-    List
-      (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
-       :: List.map ts ~f:sexp_of_term)
   | Lam (v, ty_opt, body) ->
     let ty = Option.sexp_of_t sexp_of_ty ty_opt in
     List [ Atom "lambda"; List [ Atom v; ty ]; sexp_of_term body ]
@@ -143,9 +138,6 @@ let rec desugar_term_desc (td : Frontend.term_desc) : term_desc Compiler_error.t
   | Vec (n, ts) ->
     let%map ts = Compiler_error.all (List.map ~f:desugar_term ts) in
     Vec (n, ts)
-  | Mat (x, y, ts) ->
-    let%map ts = Compiler_error.all (List.map ~f:desugar_term ts) in
-    Mat (x, y, ts)
   | Lam (v, ty_opt, body) ->
     let%map body = desugar_term body in
     Lam (v, ty_opt, body)

@@ -15,8 +15,7 @@ type ty =
   | TyFloat
   | TyInt
   | TyBool
-  | TyVec of int
-  | TyMat of int * int
+  | TyVec of int * ty
   | TyArrow of ty * ty
   | TyName of string
   | TyVar of string
@@ -41,7 +40,6 @@ type term_desc =
   | Int of int
   | Bool of bool
   | Vec of int * term list
-  | Mat of int * int * term list
   | Lam of string * ty option * term
   | App of term * term
   | Pipe of term * term

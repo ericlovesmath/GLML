@@ -29,7 +29,6 @@ type term_desc =
   | Atom of atom
   | Bop of Glsl.binary_op * atom * atom
   | Vec of int * atom list
-  | Mat of int * int * atom list
   | Index of atom * int
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list
@@ -63,10 +62,6 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | Bop (op, l, r) ->
     List [ Atom (Glsl.string_of_binary_op op); sexp_of_atom l; sexp_of_atom r ]
   | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_atom)
-  | Mat (x, y, ts) ->
-    List
-      (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
-       :: List.map ts ~f:sexp_of_atom)
   | Index (t, i) -> List [ Atom "index"; sexp_of_atom t; Atom (Int.to_string i) ]
   | Builtin (b, ts) ->
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_atom)
@@ -155,7 +150,7 @@ let remove_atom (atom : Anf.atom) : atom * bindings =
      | TyFloat -> pure (Float 0.0), []
      | TyInt -> pure (Int 0), []
      | TyBool -> pure (Bool false), []
-     | TyVec _ | TyMat _ | TyRecord _ | TyVariant _ ->
+     | TyVec _ | TyRecord _ | TyVariant _ ->
        let name = Utils.fresh "_tmp" in
        pure (Var name), [ name, atom.ty ]
      | TyArrow _ -> failwith "no placeholders for arrow types")
@@ -206,9 +201,6 @@ and remove_term (term : Lower_variants.term) : term * bindings =
   | Vec (i, atoms) ->
     let atoms, binds = remove_atoms atoms in
     pure (Vec (i, atoms)) binds
-  | Mat (n, m, atoms) ->
-    let atoms, binds = remove_atoms atoms in
-    pure (Mat (n, m, atoms)) binds
   | Index (a, i) ->
     let a, binds = remove_atom a in
     pure (Index (a, i)) binds

@@ -51,9 +51,6 @@ let rec uniquify_term (ctx : env) (t : term) : term Compiler_error.t =
   | Vec (n, ts) ->
     let%bind ts = aux_list ts in
     pure (Vec (n, ts))
-  | Mat (x, y, ts) ->
-    let%bind ts = aux_list ts in
-    pure (Mat (x, y, ts))
   | Bop (op, t, t') ->
     let%bind t = aux t in
     let%bind t' = aux t' in

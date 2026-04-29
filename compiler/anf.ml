@@ -28,7 +28,6 @@ type term_desc =
   | Atom of atom
   | Bop of Glsl.binary_op * atom * atom
   | Vec of int * atom list
-  | Mat of int * int * atom list
   | Index of atom * int
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list
@@ -59,10 +58,6 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | Bop (op, l, r) ->
     List [ Atom (Glsl.string_of_binary_op op); sexp_of_atom l; sexp_of_atom r ]
   | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_atom)
-  | Mat (x, y, ts) ->
-    List
-      (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
-       :: List.map ts ~f:sexp_of_atom)
   | Index (t, i) -> List [ Atom "index"; sexp_of_atom t; Atom (Int.to_string i) ]
   | Builtin (b, ts) ->
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_atom)
@@ -157,7 +152,6 @@ let rec normalize (expr : Lambda_lift.term) : anf =
   | Bop (op, l, r) ->
     atomize l (fun l_atom -> atomize r (fun r_atom -> pure (Bop (op, l_atom, r_atom))))
   | Vec (n, ts) -> atomize_list ts (fun ts_atoms -> pure (Vec (n, ts_atoms)))
-  | Mat (x, y, ts) -> atomize_list ts (fun ts_atoms -> pure (Mat (x, y, ts_atoms)))
   | Index (t, i) -> atomize t (fun t_atom -> pure (Index (t_atom, i)))
   | Builtin (b, args) ->
     atomize_list args (fun args_atoms -> pure (Builtin (b, args_atoms)))

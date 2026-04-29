@@ -15,8 +15,10 @@ let rec mangle_ty : ty -> string = function
   | TyFloat -> "float"
   | TyInt -> "int"
   | TyBool -> "bool"
-  | TyVec n -> Printf.sprintf "vec%d" n
-  | TyMat (m, n) -> Printf.sprintf "mat%dx%d" m n
+  | TyVec (n, TyFloat) -> Printf.sprintf "vec%d" n
+  | TyVec (n, TyVec (m, TyFloat)) ->
+    if n = m then Printf.sprintf "mat%d" n else Printf.sprintf "mat%dx%d" n m
+  | TyVec (n, t) -> Printf.sprintf "vec%d_%s" n (mangle_ty t)
   | TyRecord s | TyVariant s -> s
   | TyArrow (a, b) -> mangle_ty a ^ "_" ^ mangle_ty b
 ;;
@@ -106,7 +108,6 @@ let rec subst_vars (subs : (string * string) list) (t : Lambda_lift.term)
        | None -> Var v)
     | Float _ | Int _ | Bool _ -> t.desc
     | Vec (n, ts) -> Vec (n, List.map ts ~f:rw)
-    | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:rw)
     | App (f, args) -> App (rw f, List.map args ~f:rw)
     | Let (v, bind, body) ->
       let subs = List.filter subs ~f:(fun (k, _) -> not (String.equal k v)) in
@@ -477,9 +478,6 @@ let rec rewrite_term
   | Vec (n, ts) ->
     let reg, ts = rw_list reg ts in
     reg, { t with desc = Vec (n, ts) }
-  | Mat (n, m, ts) ->
-    let reg, ts = rw_list reg ts in
-    reg, { t with desc = Mat (n, m, ts) }
   | Index (tt, i) ->
     let reg, tt = rw reg tt in
     reg, { t with desc = Index (tt, i) }
@@ -569,7 +567,7 @@ let rec global_refs_of (globals : String.Set.t) (term : Lambda_lift.term) : Stri
   | Let (_, bind, body) -> Set.union (go bind) (go body)
   | If (c, t, e) -> union_many [ go c; go t; go e ]
   | Bop (_, l, r) -> Set.union (go l) (go r)
-  | Vec (_, ts) | Builtin (_, ts) | Record (_, ts) | Variant (_, _, ts) | Mat (_, _, ts)
+  | Vec (_, ts) | Builtin (_, ts) | Record (_, ts) | Variant (_, _, ts)
     -> union_many (List.map ts ~f:go)
   | Match (scrut, cases) ->
     union_many (go scrut :: List.map cases ~f:(fun (_, body) -> go body))
@@ -579,7 +577,8 @@ let rec ty_struct_deps (ty : ty) : String.Set.t =
   match ty with
   | TyRecord s | TyVariant s -> String.Set.singleton s
   | TyArrow (a, b) -> Set.union (ty_struct_deps a) (ty_struct_deps b)
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ -> String.Set.empty
+  | TyFloat | TyInt | TyBool -> String.Set.empty
+  | TyVec (_, t) -> ty_struct_deps t
 ;;
 
 let rec term_ty_deps (t : Lambda_lift.term) : String.Set.t =
@@ -592,7 +591,7 @@ let rec term_ty_deps (t : Lambda_lift.term) : String.Set.t =
     | If (c, t, e) ->
       Set.union (Set.union (term_ty_deps c) (term_ty_deps t)) (term_ty_deps e)
     | Bop (_, t, t') -> Set.union (term_ty_deps t) (term_ty_deps t')
-    | Vec (_, ts) | Mat (_, _, ts) | Builtin (_, ts) | Record (_, ts) | Variant (_, _, ts)
+    | Vec (_, ts) | Builtin (_, ts) | Record (_, ts) | Variant (_, _, ts)
       -> String.Set.union_list (List.map ~f:term_ty_deps ts)
     | Index (t, _) | Field (t, _) -> term_ty_deps t
     | Match (scrut, cases) ->

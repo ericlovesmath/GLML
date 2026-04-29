@@ -7,7 +7,6 @@ type term_desc =
   | Int of int
   | Bool of bool
   | Vec of int * term list
-  | Mat of int * int * term list
   | Lam of (string * Monomorphize.ty) list * term
   | App of term * term list
   | Let of Frontend.recur * string * term * term
@@ -32,10 +31,6 @@ let rec sexp_of_term_desc = function
   | Int i -> Atom (Int.to_string i)
   | Bool b -> Atom (Bool.to_string b)
   | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_term)
-  | Mat (x, y, ts) ->
-    List
-      (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
-       :: List.map ts ~f:sexp_of_term)
   | Lam (args, body) ->
     let args =
       List.map args ~f:(fun (v, ty) -> List [ Atom v; Monomorphize.sexp_of_ty ty ])
@@ -102,7 +97,6 @@ and uncurry_term (t : Monomorphize.term) : term =
     | Int i -> Int i
     | Bool b -> Bool b
     | Vec (n, ts) -> Vec (n, List.map ts ~f:uncurry_term)
-    | Mat (x, y, ts) -> Mat (x, y, List.map ts ~f:uncurry_term)
     | Lam (v, body) ->
       let args, body = collect_lams body in
       Lam ((v, arg_ty t) :: args, body)

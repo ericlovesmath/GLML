@@ -12,7 +12,6 @@ type term_desc =
   | Int of int
   | Bool of bool
   | Vec of int * term list
-  | Mat of int * int * term list
   | Lam of string * ty option * term
   | App of term * term
   | Let of recur * string * ty option * term * term

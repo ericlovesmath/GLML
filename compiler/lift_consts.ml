@@ -19,7 +19,7 @@ let is_constable_atom (externs : String.Set.t) (a : atom) =
 let is_constable_term (externs : String.Set.t) (t : term) =
   match t.desc with
   | Bop (_, a, a') -> is_constable_atom externs a && is_constable_atom externs a'
-  | Vec (_, atoms) | Mat (_, _, atoms) | Builtin (_, atoms) | Record (_, atoms) ->
+  | Vec (_, atoms) | Builtin (_, atoms) | Record (_, atoms) ->
     List.for_all ~f:(is_constable_atom externs) atoms
   | Index (a, _) | Field (a, _) -> is_constable_atom externs a
   | App _ | If _ | Switch _ -> false
@@ -44,7 +44,7 @@ let find_promoted (externs : String.Set.t) (tops : top list) : String.Set.t =
 let atoms_of_term_desc = function
   | Atom a -> [ a ]
   | Bop (_, l, r) -> [ l; r ]
-  | Vec (_, ts) | Mat (_, _, ts) | Builtin (_, ts) | App (_, ts) | Record (_, ts) -> ts
+  | Vec (_, ts) | Builtin (_, ts) | App (_, ts) | Record (_, ts) -> ts
   | Index (a, _) | Field (a, _) -> [ a ]
   | If _ | Switch _ -> []
 ;;
@@ -88,7 +88,6 @@ let lift_atoms (promoted : String.Set.t) (t : term) : binds * term =
     | Atom a -> Atom (rewrite_atom a)
     | Bop (op, l, r) -> Bop (op, rewrite_atom l, rewrite_atom r)
     | Vec (n, ts) -> Vec (n, List.map ts ~f:rewrite_atom)
-    | Mat (x, y, ts) -> Mat (x, y, List.map ts ~f:rewrite_atom)
     | Index (a, i) -> Index (rewrite_atom a, i)
     | Builtin (b, ts) -> Builtin (b, List.map ts ~f:rewrite_atom)
     | App (f, ts) -> App (f, List.map ts ~f:rewrite_atom)

@@ -17,7 +17,6 @@ type term_desc =
   | Atom of atom
   | Bop of Glsl.binary_op * atom * atom
   | Vec of int * atom list
-  | Mat of int * int * atom list
   | Index of atom * int
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list

@@ -4,7 +4,6 @@ type term_desc =
   | Int of int
   | Bool of bool
   | Vec of int * term list
-  | Mat of int * int * term list
   | Lam of (string * Monomorphize.ty) list * term
   | App of term * term list
   | Let of Frontend.recur * string * term * term
