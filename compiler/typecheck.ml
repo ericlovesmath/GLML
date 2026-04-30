@@ -221,6 +221,12 @@ let subst_context (sub : substitution) (ctx : context) : type_scheme String.Map.
     vars, subst_constraints sub constrs, subst_ty sub ty)
 ;;
 
+let compose_sub (s : substitution) (s' : substitution) : substitution =
+  List.map s' ~f:(fun (v, ty) -> v, subst_ty s ty)
+  @ List.filter s ~f:(fun (v, _) ->
+    not (List.exists s' ~f:(fun (v', _) -> String.equal v v')))
+;;
+
 (** Apply substitution to term *)
 let rec subst_term (sub : substitution) (t : term) : term =
   let subst = subst_term sub in
@@ -839,7 +845,7 @@ let rec infer_binding
           (recur : Frontend.recur)
           (v : string)
           (return_ty : Frontend.ty option)
-  : (term * ty * env * constr list * constr list) Compiler_error.t
+  : (term * ty * env * constr list * constr list * substitution) Compiler_error.t
   =
   let%bind return_ty =
     match return_ty with
@@ -858,7 +864,7 @@ let rec infer_binding
     | None -> env
     | Some ty_v -> { env with ctx = Map.set env.ctx ~key:v ~data:([], [], ty_v) }
   in
-  let%bind bind, constrs_bind = gen_term env_gen bind_stlc in
+  let%bind bind, constrs_bind, term_sub = gen_term env_gen bind_stlc in
   let constr desc = { desc; loc } in
   let constrs =
     let rec_constrs =
@@ -873,7 +879,7 @@ let rec infer_binding
   let%bind sub_bind, deferred = solve env.structs constrs in
   let ty_bind = subst_ty sub_bind bind.ty in
   let bind = subst_term sub_bind bind in
-  let ctx = subst_context sub_bind env.ctx in
+  let ctx = subst_context sub_bind (subst_context term_sub env.ctx) in
   let deferred = subst_constraints sub_bind deferred in
   let returns_fn =
     match ty_bind with
@@ -888,11 +894,13 @@ let rec infer_binding
   let _, scheme_constrs, _ = scheme in
   let ctx = Map.set ctx ~key:v ~data:scheme in
   let env = { env with ctx } in
-  Ok (bind, ty_bind, env, scheme_constrs, remaining)
+  Ok (bind, ty_bind, env, scheme_constrs, remaining, sub_bind)
 
-and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_error.t =
+and gen_term (env : env) (t : Desugar.term)
+  : (term * constr list * substitution) Compiler_error.t
+  =
   let loc = t.loc in
-  let make desc ty constrs = Ok (({ desc; ty; loc } : term), constrs) in
+  let make desc ty constrs = Ok (({ desc; ty; loc } : term), constrs, []) in
   let constr desc = { desc; loc } in
   match t.desc with
   | Float f -> make (Float f) TyFloat []
@@ -906,18 +914,19 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
     in
     let sub = List.map vs ~f:(fun v -> v, fresh_tyvar ()) in
     make (Var v) (subst_ty sub ty_scheme) (subst_constraints sub scheme_constrs)
-  | Lam (v, ty_ann, body) ->
+  | Lam (v, ty_ann, body_stlc) ->
     let%bind ty_v =
       match ty_ann with
       | Some t -> resolve_stlc_ty env t
       | None -> Ok (fresh_tyvar ())
     in
     let env = { env with ctx = Map.set env.ctx ~key:v ~data:([], [], ty_v) } in
-    let%bind body, constrs = gen_term env body in
-    make (Lam (v, body)) (TyArrow (ty_v, body.ty)) constrs
+    let%bind body, constrs, body_sub = gen_term env body_stlc in
+    let ty_v = subst_ty body_sub ty_v in
+    Ok ({ desc = Lam (v, body); ty = TyArrow (ty_v, body.ty); loc }, constrs, body_sub)
   | App (f, x) ->
-    let%bind f, constrs_f = gen_term env f in
-    let%bind x, constrs_x = gen_term env x in
+    let%bind f, constrs_f, sub_f = gen_term env f in
+    let%bind x, constrs_x, sub_x = gen_term env x in
     let arg_ty = fresh_tyvar () in
     let ret_ty = fresh_tyvar () in
     (* NOTE: We put [Eq(arg_ty, x.ty)] after [constrs_f] so the function's arg type
@@ -928,32 +937,48 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
       @ [ constr (Eq (arg_ty, x.ty)) ]
     in
     let x = { x with ty = arg_ty } in
-    make (App (f, x)) ret_ty constrs
-  | Let (Nonrec, v, return_ty, bind, body) ->
-    let%bind bind, _, env, scheme_constrs, remaining =
-      infer_binding env loc bind Nonrec v return_ty
+    let composed = compose_sub sub_x sub_f in
+    Ok ({ desc = App (f, x); ty = ret_ty; loc }, constrs, composed)
+  | Let (Nonrec, v, return_ty, bind_stlc, body_stlc) ->
+    let%bind bind, _, env, scheme_constrs, remaining, sub_bind =
+      infer_binding env loc bind_stlc Nonrec v return_ty
     in
-    let%bind body, constrs_body = gen_term env body in
-    make (Let (Nonrec, v, scheme_constrs, bind, body)) body.ty (remaining @ constrs_body)
-  | Let (Rec n, v, return_ty, bind, body) ->
-    let%bind bind, _, env, scheme_constrs, remaining =
-      infer_binding env loc bind (Rec n) v return_ty
+    let%bind body, constrs_body, body_sub = gen_term env body_stlc in
+    let bind = subst_term body_sub bind in
+    let remaining = subst_constraints body_sub remaining in
+    let scheme_constrs = subst_constraints body_sub scheme_constrs in
+    let composed = compose_sub body_sub sub_bind in
+    Ok
+      ( { desc = Let (Nonrec, v, scheme_constrs, bind, body); ty = body.ty; loc }
+      , remaining @ constrs_body
+      , composed )
+  | Let (Rec n, v, return_ty, bind_stlc, body_stlc) ->
+    let%bind bind, _, env, scheme_constrs, remaining, sub_bind =
+      infer_binding env loc bind_stlc (Rec n) v return_ty
     in
-    let%bind body, constrs_body = gen_term env body in
-    make (Let (Rec n, v, scheme_constrs, bind, body)) body.ty (remaining @ constrs_body)
+    let%bind body, constrs_body, body_sub = gen_term env body_stlc in
+    let bind = subst_term body_sub bind in
+    let remaining = subst_constraints body_sub remaining in
+    let scheme_constrs = subst_constraints body_sub scheme_constrs in
+    let composed = compose_sub body_sub sub_bind in
+    Ok
+      ( { desc = Let (Rec n, v, scheme_constrs, bind, body); ty = body.ty; loc }
+      , remaining @ constrs_body
+      , composed )
   | If (c, t, e) ->
-    let%bind c, constrs_c = gen_term env c in
-    let%bind t, constrs_t = gen_term env t in
-    let%bind e, constrs_e = gen_term env e in
+    let%bind c, constrs_c, sub_c = gen_term env c in
+    let%bind t, constrs_t, sub_t = gen_term env t in
+    let%bind e, constrs_e, sub_e = gen_term env e in
     let constrs =
       constr (Eq (c.ty, TyBool))
       :: constr (Eq (t.ty, e.ty))
       :: (constrs_c @ constrs_t @ constrs_e)
     in
-    make (If (c, t, e)) t.ty constrs
+    let composed = compose_sub sub_e (compose_sub sub_t sub_c) in
+    Ok ({ desc = If (c, t, e); ty = t.ty; loc }, constrs, composed)
   | Bop (op, l, r) ->
-    let%bind l, constrs_l = gen_term env l in
-    let%bind r, constrs_r = gen_term env r in
+    let%bind l, constrs_l, sub_l = gen_term env l in
+    let%bind r, constrs_r, sub_r = gen_term env r in
     let ret_ty = fresh_tyvar () in
     let op_constrs =
       match op with
@@ -982,16 +1007,26 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
         ; constr (Eq (ret_ty, TyBool))
         ]
     in
-    make (Bop (op, l, r)) ret_ty (op_constrs @ constrs_l @ constrs_r)
+    let composed = compose_sub sub_r sub_l in
+    Ok
+      ( { desc = Bop (op, l, r); ty = ret_ty; loc }
+      , op_constrs @ constrs_l @ constrs_r
+      , composed )
   | Index (t, i) ->
-    let%bind t, constrs_t = gen_term env t in
+    let%bind t, constrs_t, sub_t = gen_term env t in
     let ret_ty = fresh_tyvar () in
-    make (Index (t, i)) ret_ty (constr (IndexAccess (t.ty, i, ret_ty)) :: constrs_t)
+    Ok
+      ( { desc = Index (t, i); ty = ret_ty; loc }
+      , constr (IndexAccess (t.ty, i, ret_ty)) :: constrs_t
+      , sub_t )
   | Builtin (b, args) ->
-    let%bind args, constrs_args =
-      List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
-        let%bind arg', constrs = gen_term env arg in
-        return (arg' :: acc_args, constrs @ acc_constrs))
+    let%bind args, constrs_args, sub_args =
+      List.fold_result
+        args
+        ~init:([], [], [])
+        ~f:(fun (acc_args, acc_constrs, acc_sub) arg ->
+          let%bind arg', constrs, sub = gen_term env arg in
+          return (arg' :: acc_args, constrs @ acc_constrs, compose_sub sub acc_sub))
     in
     let args = List.rev args in
     let ty = fresh_tyvar () in
@@ -1100,17 +1135,24 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
           ]
       | _ -> Err.fail "invalid builtin arguments" ~loc ~d:[%message (b : Glsl.builtin)]
     in
-    make (Builtin (b, args)) ty (builtin_constrs @ constrs_args)
+    Ok ({ desc = Builtin (b, args); ty; loc }, builtin_constrs @ constrs_args, sub_args)
   | Vec (n, args) ->
     let elem_ty = fresh_tyvar () in
-    let%bind args, constrs_args =
-      List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
-        let%bind arg, constrs = gen_term env arg in
-        return (arg :: acc_args, (constr (Eq (arg.ty, elem_ty)) :: constrs) @ acc_constrs))
+    let%bind args, constrs_args, sub_args =
+      List.fold_result
+        args
+        ~init:([], [], [])
+        ~f:(fun (acc_args, acc_constrs, acc_sub) arg ->
+          let%bind arg, constrs, sub = gen_term env arg in
+          return
+            ( arg :: acc_args
+            , (constr (Eq (arg.ty, elem_ty)) :: constrs) @ acc_constrs
+            , compose_sub sub acc_sub ))
     in
     let args = List.rev args in
     if List.length args = n
-    then make (Vec (n, args)) (TyVec (n, elem_ty)) constrs_args
+    then
+      Ok ({ desc = Vec (n, args); ty = TyVec (n, elem_ty); loc }, constrs_args, sub_args)
     else Err.fail "vec size mismatch" ~loc ~d:[%message (n : int)]
   | Record fields ->
     let provided_fields = String.Set.of_list (List.map fields ~f:fst) in
@@ -1136,14 +1178,14 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
        let sub = List.map params ~f:(fun p -> p, fresh_tyvar ()) in
        let inst_fields = List.map struct_fields ~f:(fun (n, ty) -> n, subst_ty sub ty) in
        let type_args = List.map sub ~f:snd in
-       let%bind args, constrs_args =
+       let%bind args, constrs_args, sub_rec =
          List.fold_result
            inst_fields
-           ~init:([], [])
-           ~f:(fun (acc, acc_constrs) (name, ty) ->
+           ~init:([], [], [])
+           ~f:(fun (acc, acc_constrs, acc_sub) (name, ty) ->
              match List.Assoc.find fields ~equal:String.equal name with
              | Some arg ->
-               let%bind arg, constrs = gen_term env arg in
+               let%bind arg, constrs, sub = gen_term env arg in
                let arg, field_constrs =
                  match ty with
                  | TyFloat ->
@@ -1154,18 +1196,27 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
                      ] )
                  | _ -> arg, [ constr (Eq (arg.ty, ty)) ]
                in
-               return (arg :: acc, field_constrs @ constrs @ acc_constrs)
+               return
+                 ( arg :: acc
+                 , field_constrs @ constrs @ acc_constrs
+                 , compose_sub sub acc_sub )
              | None ->
                Err.fail "(unreachable) missing field" ~loc ~d:[%message (name : string)])
        in
-       make
-         (Record (struct_name, List.rev args))
-         (TyRecord (struct_name, type_args))
-         constrs_args)
+       Ok
+         ( { desc = Record (struct_name, List.rev args)
+           ; ty = TyRecord (struct_name, type_args)
+           ; loc
+           }
+         , constrs_args
+         , sub_rec ))
   | Field (t, f) ->
-    let%bind t, constrs_t = gen_term env t in
+    let%bind t, constrs_t, sub_t = gen_term env t in
     let ret_ty = fresh_tyvar () in
-    make (Field (t, f)) ret_ty (constr (FieldAccess (t.ty, f, ret_ty)) :: constrs_t)
+    Ok
+      ( { desc = Field (t, f); ty = ret_ty; loc }
+      , constr (FieldAccess (t.ty, f, ret_ty)) :: constrs_t
+      , sub_t )
   | Variant (ctor, args) ->
     let%bind variant_name, params, ctor_arg_tys =
       let found =
@@ -1185,14 +1236,14 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
     if List.length args <> List.length expected_arg_tys
     then Err.fail "wrong number of args to constructor" ~loc ~d:[%message (ctor : string)]
     else (
-      let%bind args, constrs_args =
+      let%bind args, constrs_args, sub_var =
         List.fold2_exn
           args
           expected_arg_tys
-          ~init:(Ok ([], []))
+          ~init:(Ok ([], [], []))
           ~f:(fun acc arg expected_ty ->
-            let%bind acc_args, acc_constrs = acc in
-            let%bind arg, constrs = gen_term env arg in
+            let%bind acc_args, acc_constrs, acc_sub = acc in
+            let%bind arg, constrs, sub = gen_term env arg in
             let arg, arg_constrs =
               match expected_ty with
               | TyFloat ->
@@ -1203,14 +1254,20 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
                   ] )
               | _ -> arg, [ constr (Eq (arg.ty, expected_ty)) ]
             in
-            return (arg :: acc_args, arg_constrs @ constrs @ acc_constrs))
+            return
+              ( arg :: acc_args
+              , arg_constrs @ constrs @ acc_constrs
+              , compose_sub sub acc_sub ))
       in
-      make
-        (Variant (variant_name, ctor, List.rev args))
-        (TyVariant (variant_name, type_args))
-        constrs_args)
+      Ok
+        ( { desc = Variant (variant_name, ctor, List.rev args)
+          ; ty = TyVariant (variant_name, type_args)
+          ; loc
+          }
+        , constrs_args
+        , sub_var ))
   | Match (scrutinee, cases) ->
-    let%bind scrutinee, constrs_s = gen_term env scrutinee in
+    let%bind scrutinee, constrs_s, sub_s = gen_term env scrutinee in
     let ret_ty = fresh_tyvar () in
     let has_catchall =
       List.exists cases ~f:(fun (pat, _) ->
@@ -1291,21 +1348,23 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
           ~sexp_of_dup:(fun ctor -> [%message (ctor : string)])
       | _ -> Ok ()
     in
-    let%bind cases, constrs_cases =
+    let%bind cases, constrs_cases, sub_cases =
       List.fold_result
         cases
-        ~init:([], [])
-        ~f:(fun (acc_cases, acc_constrs) (pat, body) ->
+        ~init:([], [], [])
+        ~f:(fun (acc_cases, acc_constrs, acc_sub) (pat, body) ->
           let%bind ctx = check_pat env loc scrutinee_ty pat in
-          let%bind body, constrs_body = gen_term { env with ctx } body in
+          let%bind body, constrs_body, body_sub = gen_term { env with ctx } body in
           return
             ( (pat, body) :: acc_cases
-            , (constr (Eq (body.ty, ret_ty)) :: constrs_body) @ acc_constrs ))
+            , (constr (Eq (body.ty, ret_ty)) :: constrs_body) @ acc_constrs
+            , compose_sub body_sub acc_sub ))
     in
-    make
-      (Match (scrutinee, List.rev cases))
-      ret_ty
-      ((constr (Eq (scrutinee.ty, scrutinee_ty)) :: constrs_s) @ constrs_cases)
+    let composed = compose_sub sub_cases sub_s in
+    Ok
+      ( { desc = Match (scrutinee, List.rev cases); ty = ret_ty; loc }
+      , (constr (Eq (scrutinee.ty, scrutinee_ty)) :: constrs_s) @ constrs_cases
+      , composed )
 ;;
 
 let typecheck (Program terms : Desugar.t) : t Compiler_error.t =
@@ -1322,7 +1381,7 @@ let typecheck (Program terms : Desugar.t) : t Compiler_error.t =
       ~f:(fun (env, acc) top ->
         match top.desc with
         | Define (Rec n, v, return_ty, bind) ->
-          let%bind bind, ty, env, scheme_constrs, remaining =
+          let%bind bind, ty, env, scheme_constrs, remaining, _sub_bind =
             infer_binding env top.loc bind (Rec n) v return_ty
           in
           if not (List.is_empty remaining)
@@ -1337,7 +1396,7 @@ let typecheck (Program terms : Desugar.t) : t Compiler_error.t =
             in
             Ok (env, top :: acc))
         | Define (Nonrec, v, return_ty, bind) ->
-          let%bind bind, ty, env, scheme_constrs, remaining =
+          let%bind bind, ty, env, scheme_constrs, remaining, _sub_bind =
             infer_binding env top.loc bind Nonrec v return_ty
           in
           if not (List.is_empty remaining)
