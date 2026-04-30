@@ -13,11 +13,11 @@ let to_glsl_ty (loc : Lexer.loc) (ty : Monomorphize.ty) : ty Compiler_error.t =
   | TyFloat -> Ok TyFloat
   | TyInt -> Ok TyInt
   | TyBool -> Ok TyBool
-  | TyVec n -> Ok (TyVec n)
-  | TyMat (x, y) -> Ok (TyMat (x, y))
+  | TyVec (n, TyFloat) -> Ok (TyVec n)
+  | TyVec (n, TyVec (m, TyFloat)) -> Ok (TyMat (n, m))
   | TyRecord s | TyVariant s -> Ok (TyStruct s)
-  | TyArrow _ ->
-    Err.fail "unexpected arrow type" ~loc ~d:[%message (ty : Monomorphize.ty)]
+  | TyArrow _ | TyVec _ ->
+    Err.fail "unexpected type" ~loc ~d:[%message (ty : Monomorphize.ty)]
 ;;
 
 let to_glsl_atom (a : Remove_placeholder.atom) : term =
@@ -33,14 +33,13 @@ let to_glsl_term (t : Remove_placeholder.term) : term Compiler_error.t =
   | Atom a -> Ok (to_glsl_atom a)
   | Bop (op, l, r) -> Ok (Bop (op, to_glsl_atom l, to_glsl_atom r))
   | Vec (n, ts) ->
-    let args = List.map ts ~f:to_glsl_atom in
-    Ok (App ([%string "vec%{n#Int}"], args))
-  | Mat (x, y, ts) ->
-    let args = List.map ts ~f:to_glsl_atom in
-    let ty =
-      if x = y then [%string "mat%{x#Int}"] else [%string "mat%{x#Int}x%{y#Int}"]
+    let ctor =
+      match t.ty with
+      | TyVec (_, TyVec (m, _)) when n = m -> [%string "mat%{n#Int}"]
+      | TyVec (_, TyVec (m, _)) -> [%string "mat%{n#Int}x%{m#Int}"]
+      | _ -> [%string "vec%{n#Int}"]
     in
-    Ok (App (ty, args))
+    Ok (App (ctor, List.map ~f:to_glsl_atom ts))
   | Index (t, i) -> Ok (Index (to_glsl_atom t, i))
   | Builtin (f, args) -> Ok (Builtin (f, List.map args ~f:to_glsl_atom))
   | Record (s, args) -> Ok (App (s, List.map args ~f:to_glsl_atom))
@@ -178,12 +177,14 @@ let build_const_term body =
     match t.desc with
     | Atom a -> Some (sa a)
     | Bop (op, l, r) -> Some (Bop (op, sa l, sa r))
-    | Vec (n, ts) -> Some (App ([%string "vec%{n#Int}"], List.map ts ~f:sa))
-    | Mat (x, y, ts) ->
-      let tname =
-        if x = y then [%string "mat%{x#Int}"] else [%string "mat%{x#Int}x%{y#Int}"]
+    | Vec (n, ts) ->
+      let ctor =
+        match t.ty with
+        | TyVec (_, TyVec (m, _)) when n = m -> [%string "mat%{n#Int}"]
+        | TyVec (_, TyVec (m, _)) -> [%string "mat%{n#Int}x%{m#Int}"]
+        | _ -> [%string "vec%{n#Int}"]
       in
-      Some (App (tname, List.map ts ~f:sa))
+      Some (App (ctor, List.map ~f:sa ts))
     | Builtin (f, ts) -> Some (Builtin (f, List.map ts ~f:sa))
     | Record (s, ts) -> Some (App (s, List.map ts ~f:sa))
     | Index (a, i) -> Some (Index (sa a, i))

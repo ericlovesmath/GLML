@@ -11,7 +11,6 @@ type term_desc =
   | Atom of atom
   | Bop of Glsl.binary_op * atom * atom
   | Vec of int * atom list
-  | Mat of int * int * atom list
   | Index of atom * int
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list
@@ -45,10 +44,6 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | Bop (op, l, r) ->
     List [ Atom (Glsl.string_of_binary_op op); sexp_of_atom l; sexp_of_atom r ]
   | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_atom)
-  | Mat (x, y, ts) ->
-    List
-      (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
-       :: List.map ts ~f:sexp_of_atom)
   | Index (t, i) -> List [ Atom "index"; sexp_of_atom t; Atom (Int.to_string i) ]
   | Builtin (b, ts) ->
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_atom)
@@ -124,7 +119,6 @@ let rec of_term (t : Anf.term) : term =
   | Atom a -> pure (Atom a)
   | Bop (bop, a, a') -> pure (Bop (bop, a, a'))
   | Vec (n, ts) -> pure (Vec (n, ts))
-  | Mat (n, m, ts) -> pure (Mat (n, m, ts))
   | Index (a, n) -> pure (Index (a, n))
   | Builtin (b, ts) -> pure (Builtin (b, ts))
   | Record (s, ts) -> pure (Record (s, ts))
@@ -188,7 +182,8 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : strin
       let tmp = Utils.fresh "_iter_inc" in
       let inc_iter_continue =
         let iter_inc : term =
-          { desc = Bop (Add, atom (Var iter), atom (Int 1)); ty = TyInt; loc }
+          let int_atom desc : atom = { desc; ty = TyInt; loc } in
+          { desc = Bop (Add, int_atom (Var iter), int_atom (Int 1)); ty = TyInt; loc }
         in
         let%bind continue = pure Continue in
         let%bind set_iter_to_tmp = pure (Set (iter, atom (Var tmp), continue)) in
@@ -221,7 +216,8 @@ let remove_rec_top (top : Anf.top) : top Compiler_error.t =
     let loc = body.loc in
     let iter = Utils.fresh "_iter" in
     let while_cond : term =
-      { desc = Bop (Lt, atom (Var iter), atom (Int limit)); ty = top.ty; loc }
+      let int_atom desc : atom = { desc; ty = TyInt; loc } in
+      { desc = Bop (Lt, int_atom (Var iter), int_atom (Int limit)); ty = TyBool; loc }
     in
     let%bind while_body = patch_tail_anf body name iter (List.map ~f:fst args) in
     let while_after =

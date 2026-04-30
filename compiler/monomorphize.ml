@@ -40,8 +40,7 @@ type ty =
   | TyFloat
   | TyInt
   | TyBool
-  | TyVec of int
-  | TyMat of int * int
+  | TyVec of int * ty
   | TyArrow of ty * ty
   | TyRecord of string
   | TyVariant of string
@@ -51,8 +50,7 @@ let rec sexp_of_ty = function
   | TyFloat -> Atom "float"
   | TyInt -> Atom "int"
   | TyBool -> Atom "bool"
-  | TyVec i -> List [ Atom "vec"; Atom (Int.to_string i) ]
-  | TyMat (x, y) -> List [ Atom "mat"; Atom (Int.to_string x); Atom (Int.to_string y) ]
+  | TyVec (i, t) -> List [ Atom "vec"; Atom (Int.to_string i); sexp_of_ty t ]
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
   | TyRecord s -> Atom s
   | TyVariant s -> Atom s
@@ -69,7 +67,6 @@ type term_desc =
   | Int of int
   | Bool of bool
   | Vec of int * term list
-  | Mat of int * int * term list
   | Lam of string * term
   | App of term * term
   | Let of Frontend.recur * string * term * term
@@ -94,10 +91,6 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | Int i -> Atom (Int.to_string i)
   | Bool b -> Atom (Bool.to_string b)
   | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_term)
-  | Mat (x, y, ts) ->
-    List
-      (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
-       :: List.map ts ~f:sexp_of_term)
   | Lam (v, body) -> List [ Atom "lambda"; Atom v; sexp_of_term body ]
   | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
   | Let (Rec n, v, bind, body) ->
@@ -144,8 +137,7 @@ let rec fold_term ~(f : 'a -> Typecheck.term -> 'a) (acc : 'a) (t : Typecheck.te
   let acc = f acc t in
   match t.desc with
   | Var _ | Float _ | Int _ | Bool _ -> acc
-  | Vec (_, ts) | Mat (_, _, ts) | Builtin (_, ts) | Record (_, ts) ->
-    List.fold ts ~init:acc ~f:fold
+  | Vec (_, ts) | Builtin (_, ts) | Record (_, ts) -> List.fold ts ~init:acc ~f:fold
   | Lam (_, body) -> fold acc body
   | App (fn, x) -> fold (fold acc fn) x
   | Let (_, _, _, bind, body) -> fold (fold acc bind) body
@@ -163,8 +155,12 @@ let rec mangle_ty (ty : Typecheck.ty) : string =
   | TyFloat -> "float"
   | TyInt -> "int"
   | TyBool -> "bool"
-  | TyVec n -> "vec" ^ Int.to_string n
-  | TyMat (x, y) -> "mat" ^ Int.to_string x ^ "x" ^ Int.to_string y
+  | TyVec (n, TyFloat) -> "vec" ^ Int.to_string n
+  | TyVec (n, TyVec (m, TyFloat)) ->
+    if n = m
+    then "mat" ^ Int.to_string n
+    else "mat" ^ Int.to_string n ^ "x" ^ Int.to_string m
+  | TyVec (n, t) -> "vec" ^ Int.to_string n ^ "_" ^ mangle_ty t
   | TyRecord (s, []) -> s
   | TyRecord (s, args) -> "r_" ^ String.concat ~sep:"_" (s :: List.map args ~f:mangle_ty)
   | TyVariant (s, []) -> s
@@ -176,7 +172,8 @@ let rec mangle_ty (ty : Typecheck.ty) : string =
 let rec is_concrete (ty : Typecheck.ty) : bool =
   match ty with
   | TyVar _ -> false
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ -> true
+  | TyFloat | TyInt | TyBool -> true
+  | TyVec (_, t) -> is_concrete t
   | TyVariant (_, args) -> List.for_all args ~f:is_concrete
   | TyRecord (_, args) -> List.for_all args ~f:is_concrete
   | TyArrow (a, b) -> is_concrete a && is_concrete b
@@ -191,7 +188,8 @@ let rec collect_from_ty
   : param list
   =
   match ty with
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVar _ -> []
+  | TyFloat | TyInt | TyBool | TyVar _ -> []
+  | TyVec (_, t) -> collect_from_ty ~type_poly_env t
   | TyArrow (a, b) -> collect_from_ty ~type_poly_env a @ collect_from_ty ~type_poly_env b
   | TyRecord (_, []) | TyVariant (_, []) -> []
   | TyRecord (name, args) when not (is_concrete (TyRecord (name, args))) -> []
@@ -299,7 +297,8 @@ let rec rewrite_ty ~(type_poly_env : Typecheck.type_decl String.Map.t) (ty : Typ
   : Typecheck.ty
   =
   match ty with
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVar _ -> ty
+  | TyFloat | TyInt | TyBool | TyVar _ -> ty
+  | TyVec (n, t) -> TyVec (n, rewrite_ty ~type_poly_env t)
   | TyArrow (a, b) -> TyArrow (rewrite_ty ~type_poly_env a, rewrite_ty ~type_poly_env b)
   | TyRecord (_, []) -> ty
   | TyRecord (name, args)
@@ -360,7 +359,6 @@ let rec rewrite_term
     match t.desc with
     | Var _ | Float _ | Int _ | Bool _ -> t.desc
     | Vec (n, ts) -> Vec (n, List.map ts ~f:rewrite)
-    | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:rewrite)
     | Lam (v, body) -> Lam (v, rewrite body)
     | App (f, x) -> App (rewrite f, rewrite x)
     | Let (recur, v, constrs, bind, body) ->
@@ -399,6 +397,7 @@ let rec subst ~(poly : Typecheck.ty) ~(concrete : Typecheck.ty)
     when String.equal n n' && List.length args = List.length args' ->
     List.concat_map (List.zip_exn args args') ~f:(fun (a, a') ->
       subst ~poly:a ~concrete:a')
+  | TyVec (n, t), TyVec (n', t') when n = n' -> subst ~poly:t ~concrete:t'
   | _, _ -> []
 ;;
 
@@ -464,7 +463,6 @@ let rec subst_var
     | Var v when String.equal v name && pred t -> Var new_name
     | Var _ | Float _ | Int _ | Bool _ -> t.desc
     | Vec (n, ts) -> Vec (n, List.map ts ~f:subst)
-    | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:subst)
     | Lam (v, body) -> if String.equal v name then t.desc else Lam (v, subst body)
     | App (f, x) -> App (subst f, subst x)
     | Let (recur, v, constrs, bind, body) ->
@@ -598,9 +596,6 @@ and rewrite_refs (env : env) (acc : acc) (t : Typecheck.term)
     | Vec (n, ts) ->
       let%map acc, ts = rewrite_list env acc ts in
       acc, Vec (n, ts)
-    | Mat (n, m, ts) ->
-      let%map acc, ts = rewrite_list env acc ts in
-      acc, Mat (n, m, ts)
     | Lam (v, body) ->
       let%map acc, body = rewrite_refs env acc body in
       acc, Lam (v, body)
@@ -721,8 +716,9 @@ let rec ty_of (t : Typecheck.ty) : ty Compiler_error.t =
   | TyFloat -> Ok TyFloat
   | TyInt -> Ok TyInt
   | TyBool -> Ok TyBool
-  | TyVec n -> Ok (TyVec n)
-  | TyMat (x, y) -> Ok (TyMat (x, y))
+  | TyVec (n, t) ->
+    let%map t = ty_of t in
+    TyVec (n, t)
   | TyRecord (s, []) -> Ok (TyRecord s)
   | TyRecord (_, _ :: _) ->
     Err.fail "unexpected parametrized TyRecord after [specialize_structs]"
@@ -749,9 +745,6 @@ and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Compiler_error.t =
   | Vec (n, ts) ->
     let%map ts = Compiler_error.all (List.map ts ~f:term_of_tc) in
     Vec (n, ts)
-  | Mat (n, m, ts) ->
-    let%map ts = Compiler_error.all (List.map ts ~f:term_of_tc) in
-    Mat (n, m, ts)
   | Lam (v, body) ->
     let%map body = term_of_tc body in
     Lam (v, body)

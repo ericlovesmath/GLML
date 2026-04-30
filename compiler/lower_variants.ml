@@ -15,7 +15,6 @@ type term_desc =
   | Atom of atom
   | Bop of Glsl.binary_op * atom * atom
   | Vec of int * atom list
-  | Mat of int * int * atom list
   | Index of atom * int
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list
@@ -50,10 +49,6 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | Bop (op, l, r) ->
     List [ Atom (Glsl.string_of_binary_op op); sexp_of_atom l; sexp_of_atom r ]
   | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_atom)
-  | Mat (x, y, ts) ->
-    List
-      (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
-       :: List.map ts ~f:sexp_of_atom)
   | Index (t, i) -> List [ Atom "index"; sexp_of_atom t; Atom (Int.to_string i) ]
   | Builtin (b, ts) ->
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_atom)
@@ -131,7 +126,8 @@ let rec lower_ty (ty : ty) : ty =
   match ty with
   | TyVariant s -> TyRecord s
   | TyArrow (a, b) -> TyArrow (lower_ty a, lower_ty b)
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyRecord _ -> ty
+  | TyVec (n, t) -> TyVec (n, lower_ty t)
+  | TyFloat | TyInt | TyBool | TyRecord _ -> ty
 ;;
 
 let find_tag (ctors : (string * ty list) list) (ctor : string) : int Compiler_error.t =
@@ -198,7 +194,6 @@ let rec lower_term (tenv : type_env) (term : Tail_call.term) : term Compiler_err
   | Atom a -> pure (Atom a)
   | Bop (op, l, r) -> pure (Bop (op, l, r))
   | Vec (n, ts) -> pure (Vec (n, ts))
-  | Mat (x, y, ts) -> pure (Mat (x, y, ts))
   | Index (t, i) -> pure (Index (t, i))
   | Builtin (b, ts) -> pure (Builtin (b, ts))
   | App (f, args) -> pure (App (f, args))
@@ -453,6 +448,11 @@ and lower_vec_match
   : anf Compiler_error.t
   =
   let result_ty_lowered = lower_ty result_ty in
+  let elem_ty =
+    match scrut.ty with
+    | TyVec (_, t) -> lower_ty t
+    | _ -> TyFloat
+  in
   let bracket_case =
     List.find_map cases ~f:(fun (pat, body) ->
       match pat with
@@ -474,65 +474,35 @@ and lower_vec_match
         match p with
         | PatVar v when String.equal v "_" -> acc
         | PatVar v ->
-          let elem_bind : term = { desc = Index (scrut, i); ty = TyFloat; loc } in
+          let elem_bind : term = { desc = Index (scrut, i); ty = elem_ty; loc } in
           ({ desc = Let (v, elem_bind, acc); ty = result_ty_lowered; loc } : anf)
+        | PatBracket inner_pats ->
+          (* Nested bracket pattern *)
+          let col_temp = Utils.fresh "_lv_col" in
+          let col_atom : Anf.atom = { desc = Var col_temp; ty = elem_ty; loc } in
+          let col_bind : term = { desc = Index (scrut, i); ty = elem_ty; loc } in
+          let inner_elem_ty =
+            match elem_ty with
+            | TyVec (_, t) -> t
+            | _ -> TyFloat
+          in
+          let inner_indexed = List.mapi inner_pats ~f:(fun j p -> j, p) in
+          let inner_with_bindings =
+            List.fold_right inner_indexed ~init:acc ~f:(fun (j, p) inner_acc ->
+              match p with
+              | PatVar v when String.equal v "_" -> inner_acc
+              | PatVar v ->
+                let e : term = { desc = Index (col_atom, j); ty = inner_elem_ty; loc } in
+                ({ desc = Let (v, e, inner_acc); ty = result_ty_lowered; loc } : anf)
+              | _ -> inner_acc)
+          in
+          { desc = Let (col_temp, col_bind, inner_with_bindings)
+          ; ty = result_ty_lowered
+          ; loc
+          }
         | _ -> acc)
     in
     map_last_return k with_bindings
-
-and lower_mat_match
-      (tenv : type_env)
-      (scrut : Anf.atom)
-      (cases : (Frontend.pat * Tail_call.anf) list)
-      (result_ty : ty)
-      (loc : Lexer.loc)
-      (k : term -> anf)
-  : anf Compiler_error.t
-  =
-  let result_ty_lowered = lower_ty result_ty in
-  let%bind r =
-    match scrut.ty with
-    | TyMat (r, _) -> Ok r
-    | _ -> Err.fail "mat match: scrut is not TyMat" ~loc
-  in
-  let bracket_case =
-    List.find_map cases ~f:(fun (pat, body) ->
-      match pat with
-      | PatBracket pats -> Some (pats, body)
-      | _ -> None)
-  in
-  match bracket_case with
-  | None ->
-    (match find_catchall cases with
-     | None -> Err.fail "mat match: no bracket pattern and no catch-all" ~loc
-     | Some (v, body) ->
-       let%map lowered = lower_anf tenv body in
-       map_last_return k (bind_opt_var ~loc ~scrut ~ty:scrut.ty (Some v) lowered))
-  | Some (col_pats, body) ->
-    let%bind lowered_body = lower_anf tenv body in
-    let flat_vars : (int * int * string) list =
-      List.concat_mapi col_pats ~f:(fun col col_pat ->
-        match col_pat with
-        | PatBracket row_pats ->
-          List.filter_mapi row_pats ~f:(fun row p ->
-            match p with
-            | PatVar v when not (String.equal v "_") -> Some (col, row, v)
-            | _ -> None)
-        | _ -> [])
-    in
-    let%bind with_bindings =
-      List.fold_right flat_vars ~init:(Ok lowered_body) ~f:(fun (col, row, v) acc ->
-        let%map acc = acc in
-        let col_temp = Utils.fresh "_lv_col" in
-        let col_atom : Anf.atom = { desc = Var col_temp; ty = TyVec r; loc } in
-        let col_bind : term = { desc = Index (scrut, col); ty = TyVec r; loc } in
-        let elem_bind : term = { desc = Index (col_atom, row); ty = TyFloat; loc } in
-        let inner =
-          ({ desc = Let (v, elem_bind, acc); ty = result_ty_lowered; loc } : anf)
-        in
-        ({ desc = Let (col_temp, col_bind, inner); ty = result_ty_lowered; loc } : anf))
-    in
-    Ok (map_last_return k with_bindings)
 
 and lower_record_match
       (tenv : type_env)
@@ -618,8 +588,7 @@ and lower_match
   | Some (PatBracket _) ->
     (match scrut.ty with
      | TyVec _ -> lower_vec_match tenv scrut cases result_ty loc k
-     | TyMat _ -> lower_mat_match tenv scrut cases result_ty loc k
-     | _ -> Err.fail "bracket pattern on non-vec/mat scrutinee" ~loc)
+     | _ -> Err.fail "bracket pattern on non-vec scrutinee" ~loc)
   | Some (PatRecord _) -> lower_record_match tenv scrut cases result_ty loc k
 ;;
 
