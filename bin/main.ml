@@ -37,15 +37,13 @@ let compile_command =
          |> List.map ~f:(fun pass -> pass, handler pass)
          |> Glml.Passes.Map.of_alist_exn
        in
-       let result =
-         input_file
-         |> In_channel.read_all
-         |> Glml.compile ~dump
-         |> Glml.Compiler_error.ok_exn
-       in
-       match output_file with
-       | Some path -> Out_channel.write_all path ~data:result
-       | None -> print_endline result)
+       let source = In_channel.read_all input_file in
+       match Glml.compile ~dump source with
+       | Ok result ->
+         (match output_file with
+          | Some path -> Out_channel.write_all path ~data:result
+          | None -> print_endline result)
+       | Error err -> eprintf "%s\n" (Glml.Compiler_error.to_string_hum ~source err))
 ;;
 
 let list_passes_command =
