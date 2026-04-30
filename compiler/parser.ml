@@ -92,7 +92,7 @@ let ty_vec_p =
       | VEC n -> Some n
       | _ -> None)
   in
-  return (TyVec n) <??> "ty_vec"
+  return (TyVec (n, TyFloat)) <??> "ty_vec"
 ;;
 
 let ty_mat_p =
@@ -101,7 +101,7 @@ let ty_mat_p =
       | MAT (n, m) -> Some (n, m)
       | _ -> None)
   in
-  return (TyMat (n, m)) <??> "ty_mat"
+  return (TyVec (n, TyVec (m, TyFloat))) <??> "ty_mat"
 ;;
 
 let ty_singles_p =
@@ -159,9 +159,9 @@ let%expect_test "ty parse tests" =
     float
     int
     bool
-    (vec 2)
-    (mat 3 2)
-    (mat 3 3)
+    (vec 2 float)
+    (vec 3 (vec 2 float))
+    (vec 3 (vec 3 float))
     (float -> int)
     'a
     record_or_variant
@@ -170,8 +170,8 @@ let%expect_test "ty parse tests" =
   test "(mat3x2->vec2)->(vec2->int)";
   [%expect
     {|
-    (vec 4)
-    (((mat 3 2) -> (vec 2)) -> ((vec 2) -> int))
+    (vec 4 float)
+    (((vec 3 (vec 2 float)) -> (vec 2 float)) -> ((vec 2 float) -> int))
     |}];
   test "box[float]";
   test "pair[float, int]";
@@ -361,18 +361,6 @@ and term_function_p =
    <??> "term_function")
     st
 
-and term_mat_p =
-  fun st ->
-  (with_term_loc
-     ((let%bind terms = between `Bracket (commas (between `Bracket (commas term_p))) in
-       let n = List.length terms in
-       let m = List.length (List.hd_exn terms) in
-       if List.for_all terms ~f:(fun ts -> List.length ts = m)
-       then return (Mat (n, m, List.concat terms))
-       else fail "matrix contains rows of unequal size")
-      <??> "term_mat"))
-    st
-
 and term_record_p =
   fun st ->
   (with_term_loc
@@ -435,13 +423,7 @@ and term_atom_p =
          | _ -> None)
        <??> "term_single")
   in
-  (term_builtin_p
-   <|> term_singles_p
-   <|> term_mat_p
-   <|> term_vec_p
-   <|> term_record_p
-   <??> "term_atom")
-    st
+  (term_builtin_p <|> term_singles_p <|> term_vec_p <|> term_record_p <??> "term_atom") st
 
 and term_unary_neg_p =
   fun st ->
@@ -555,7 +537,7 @@ let%expect_test "term parse tests" =
     33
     false
     (vec3 1 2 3)
-    (mat3x2 1 2 3 4 5 6)
+    (vec3 (vec2 1 2) (vec2 3 4) (vec2 5 6))
     (lambda (x (bool)) x)
     (app (app f x) y)
     (let bind true bind)
@@ -600,7 +582,7 @@ let%expect_test "term parse tests" =
     (app (app f (app x y)) z)
     (- (* 2 -13) 10)
     (app f 5)
-    (lambda (u ((vec 2))) (vec3 (app (app f 10.) a) 0. 0.))
+    (lambda (u ((vec 2 float))) (vec3 (app (app f 10.) a) 0. 0.))
     (- f 5)
     (app f -5)
     (* -1 var)
@@ -812,7 +794,7 @@ let%expect_test "glml parse tests" =
       (Define Nonrec a_struct (record (x 0.) (y 0)))
       (Define Nonrec toplevel (+ 1 2)) (Define Nonrec main (+ 1 2))
       (Define Nonrec f (lambda (x (bool)) (lambda (y (bool)) (&& x y))))
-      (Define Nonrec main (lambda (u ((vec 2))) (+ (app f (vec2 1 2)) u)))
+      (Define Nonrec main (lambda (u ((vec 2 float))) (+ (app f (vec2 1 2)) u)))
       (Define (Rec 1000) g (: (float -> float)) (lambda (x (float)) (app g x)))))
     |}]
 ;;
@@ -829,10 +811,11 @@ let%expect_test "type alias parsing" =
   [%expect
     {|
     (Program
-     ((TypeDef color (AliasDecl (vec 3))) (TypeDef scalar (AliasDecl float))
+     ((TypeDef color (AliasDecl (vec 3 float)))
+      (TypeDef scalar (AliasDecl float))
       (TypeDef parameterized[a] (AliasDecl 'a))
-      (Define Nonrec main (: ((vec 2) -> color))
-       (lambda (uv ((vec 2))) (vec3 0. 0. 0.)))))
+      (Define Nonrec main (: ((vec 2 float) -> color))
+       (lambda (uv ((vec 2 float))) (vec3 0. 0. 0.)))))
     |}]
 ;;
 
@@ -852,6 +835,6 @@ let%expect_test "regression test, toplevel let parsing after record" =
      ((Define Nonrec f
        (lambda (x (float))
         (let g (lambda (y (float)) (+ x y)) (vec3 (app g 1.) 0. 0.))))
-      (Define Nonrec main (lambda (u ((vec 2))) (app f 10.)))))
+      (Define Nonrec main (lambda (u ((vec 2 float))) (app f 10.)))))
     |}]
 ;;
