@@ -13,8 +13,7 @@ type ty =
   | TyFloat
   | TyInt
   | TyBool
-  | TyVec of int
-  | TyMat of int * int
+  | TyVec of int * ty
   | TyArrow of ty * ty
   | TyRecord of string * ty list
   | TyVariant of string * ty list
@@ -25,8 +24,7 @@ let rec sexp_of_ty = function
   | TyFloat -> Atom "float"
   | TyInt -> Atom "int"
   | TyBool -> Atom "bool"
-  | TyVec i -> List [ Atom "vec"; Atom (Int.to_string i) ]
-  | TyMat (x, y) -> List [ Atom "mat"; Atom (Int.to_string x); Atom (Int.to_string y) ]
+  | TyVec (i, t) -> List [ Atom "vec"; Atom (Int.to_string i); sexp_of_ty t ]
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
   | TyRecord (s, []) -> Atom s
   | TyRecord (s, args) -> List (Atom s :: List.map args ~f:sexp_of_ty)
@@ -74,7 +72,6 @@ type term_desc =
   | Int of int
   | Bool of bool
   | Vec of int * term list
-  | Mat of int * int * term list
   | Lam of string * term
   | App of term * term
   | Let of Frontend.recur * string * constr list * term * term
@@ -122,10 +119,6 @@ let rec sexp_of_term_desc = function
   | Int i -> Atom (Int.to_string i)
   | Bool b -> Atom (Bool.to_string b)
   | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_term)
-  | Mat (x, y, ts) ->
-    List
-      (Atom ("mat" ^ Int.to_string x ^ "x" ^ Int.to_string y)
-       :: List.map ts ~f:sexp_of_term)
   | Lam (v, body) -> List [ Atom "lambda"; Atom v; sexp_of_term body ]
   | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
   | Let (Rec n, v, constrs, bind, body) ->
@@ -196,7 +189,8 @@ let fresh_tyvar () = TyVar (Utils.fresh "v")
 let rec subst_ty (sub : substitution) (ty : ty) : ty =
   match ty with
   | TyVar v -> List.Assoc.find ~equal:String.equal sub v |> Option.value ~default:ty
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ -> ty
+  | TyFloat | TyInt | TyBool -> ty
+  | TyVec (n, t) -> TyVec (n, subst_ty sub t)
   | TyVariant (s, args) -> TyVariant (s, List.map args ~f:(subst_ty sub))
   | TyRecord (s, args) -> TyRecord (s, List.map args ~f:(subst_ty sub))
   | TyArrow (f, x) -> TyArrow (subst_ty sub f, subst_ty sub x)
@@ -234,7 +228,6 @@ let rec subst_term (sub : substitution) (t : term) : term =
     match t.desc with
     | Var _ | Float _ | Int _ | Bool _ -> t.desc
     | Vec (n, ts) -> Vec (n, List.map ts ~f:subst)
-    | Mat (n, m, ts) -> Mat (n, m, List.map ts ~f:subst)
     | Lam (v, body) -> Lam (v, subst body)
     | App (f, x) -> App (subst f, subst x)
     | Let (recur, v, constrs, bind, body) ->
@@ -254,7 +247,8 @@ let rec subst_term (sub : substitution) (t : term) : term =
 
 let rec ftv_of_ty = function
   | TyVar v -> String.Set.singleton v
-  | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ -> String.Set.empty
+  | TyFloat | TyInt | TyBool -> String.Set.empty
+  | TyVec (_, t) -> ftv_of_ty t
   | TyVariant (_, args) | TyRecord (_, args) ->
     String.Set.union_list (List.map args ~f:ftv_of_ty)
   | TyArrow (t1, t2) -> Set.union (ftv_of_ty t1) (ftv_of_ty t2)
@@ -320,7 +314,8 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t
   | (loc, TyVar v, ty) :: con | (loc, ty, TyVar v) :: con ->
     let rec occurs_in = function
       | TyVar v' -> String.equal v v'
-      | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ -> false
+      | TyFloat | TyInt | TyBool -> false
+      | TyVec (_, t) -> occurs_in t
       | TyVariant (_, args) | TyRecord (_, args) -> List.exists args ~f:occurs_in
       | TyArrow (ty, ty') -> occurs_in ty || occurs_in ty'
     in
@@ -337,6 +332,7 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t
       return ((v, subst_ty sub ty) :: sub))
   | (loc, TyArrow (f, x), TyArrow (f', x')) :: con ->
     unify ((loc, f, f') :: (loc, x, x') :: con)
+  | (loc, TyVec (n, t), TyVec (n', t')) :: con when n = n' -> unify ((loc, t, t') :: con)
   | (loc, TyRecord (s, args), TyRecord (s', args')) :: con
     when String.equal s s' && List.length args = List.length args' ->
     unify (List.map2_exn args args' ~f:(Tuple3.create loc) @ con)
@@ -352,14 +348,20 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t
 
 (** Validate if a concrete type belongs to a GLSL typeclass. *)
 let check_class (cls : type_class) (ty : ty) : bool =
+  (* TODO: Get rid of this patchwork in promoting ints please *)
   match cls, ty with
-  | GenType, (TyFloat | TyVec _)
+  | GenType, TyFloat
+  | GenType, TyVec (_, (TyFloat | TyInt))
   | GenBType, TyBool
   | GenIType, TyInt
-  | MatType, TyMat _
-  | Numeric, (TyFloat | TyInt | TyVec _ | TyMat _)
+  | MatType, TyVec (_, TyVec (_, (TyFloat | TyInt)))
+  | Numeric, (TyFloat | TyInt)
+  | Numeric, TyVec (_, (TyFloat | TyInt))
+  | Numeric, TyVec (_, TyVec (_, (TyFloat | TyInt)))
   | Comparable, (TyFloat | TyInt)
-  | Equatable, (TyFloat | TyInt | TyBool | TyVec _ | TyMat _) -> true
+  | Equatable, (TyFloat | TyInt | TyBool)
+  | Equatable, TyVec (_, (TyFloat | TyInt))
+  | Equatable, TyVec (_, TyVec (_, (TyFloat | TyInt))) -> true
   | _, _ -> false
 ;;
 
@@ -372,68 +374,131 @@ let resolve_constraints structs (constrs : constr list)
     | [] -> return (List.rev deferred, List.rev eqs)
     | { desc = Eq (l, r); loc } :: rest -> aux deferred ((loc, l, r) :: eqs) rest
     | ({ desc = HasClass (cls, ty); loc } as c) :: rest ->
-      (match ty with
-       | TyVar _ -> aux (c :: deferred) eqs rest
-       | _ ->
-         if check_class cls ty
-         then aux deferred eqs rest
-         else
-           Err.fail
-             "class constraint failed"
-             ~loc
-             ~d:[%message (cls : type_class) (ty : ty)])
+      if not (Set.is_empty (ftv_of_ty ty))
+      then aux (c :: deferred) eqs rest
+      else if check_class cls ty
+      then aux deferred eqs rest
+      else
+        Err.fail "class constraint failed" ~loc ~d:[%message (cls : type_class) (ty : ty)]
     | ({ desc = Broadcast (l, r, ret); loc } as c) :: rest ->
+      (* TODO: You might be thinking 'Hey Eric, this is the most disgusting patchwork
+         of int promotion I've ever seen in my life. Why don't you just have it so that
+         int literals can be treated like float literals instead of doing this kind of
+         insanity? And to that I say I completly agree but I'm in too deep.
+
+         I'm sorry future Eric. Not really. *)
       (match l, r with
        | TyVar a, TyVar b when String.equal a b ->
          aux (c :: deferred) ((loc, ret, l) :: eqs) rest
+       | TyVar _, TyInt when Set.is_empty (ftv_of_ty ret) ->
+         aux deferred ((loc, l, ret) :: eqs) rest
+       | TyInt, TyVar _ when Set.is_empty (ftv_of_ty ret) ->
+         aux deferred ((loc, r, ret) :: eqs) rest
+       | TyVar _, TyFloat
+         when match ret with
+              | TyFloat | TyInt -> true
+              | _ -> false -> aux deferred ((loc, l, TyFloat) :: eqs) rest
+       | TyFloat, TyVar _
+         when match ret with
+              | TyFloat | TyInt -> true
+              | _ -> false -> aux deferred ((loc, r, TyFloat) :: eqs) rest
        | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
        | TyFloat, TyFloat -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
        | TyInt, TyInt -> aux deferred ((loc, ret, TyInt) :: eqs) rest
        | TyInt, TyFloat | TyFloat, TyInt -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
-       | TyVec n, TyVec n' when n = n' -> aux deferred ((loc, ret, TyVec n) :: eqs) rest
-       | TyFloat, TyVec n | TyVec n, TyFloat ->
-         aux deferred ((loc, ret, TyVec n) :: eqs) rest
-       | TyInt, TyVec n | TyVec n, TyInt -> aux deferred ((loc, ret, TyVec n) :: eqs) rest
-       | TyInt, TyMat (x, y) | TyMat (x, y), TyInt ->
-         aux deferred ((loc, ret, TyMat (x, y)) :: eqs) rest
-       | TyMat (x, y), TyMat (w, z) when x = w && y = z ->
-         aux deferred ((loc, ret, TyMat (x, y)) :: eqs) rest
+       | TyVec (n, t), TyVec (n', t') when n = n' ->
+         let bt = fresh_tyvar () in
+         aux
+           deferred
+           ((loc, ret, TyVec (n, bt)) :: eqs)
+           ({ desc = Broadcast (t, t', bt); loc } :: rest)
+       | (TyFloat | TyInt), TyVec (n, t) | TyVec (n, t), (TyFloat | TyInt) ->
+         let scalar =
+           match l with
+           | TyFloat | TyInt -> l
+           | _ -> r
+         in
+         let bt = fresh_tyvar () in
+         aux
+           deferred
+           ((loc, ret, TyVec (n, bt)) :: eqs)
+           ({ desc = Broadcast (scalar, t, bt); loc } :: rest)
        | _ -> Err.fail "invalid broadcast" ~loc ~d:[%message (l : ty) (r : ty)])
     | ({ desc = MulBroadcast (l, r, ret); loc } as c) :: rest ->
       (match l, r with
        | TyVar a, TyVar b when String.equal a b ->
          aux (c :: deferred) ((loc, ret, l) :: eqs) rest
        | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
-       | TyMat (x, y), TyMat (w, z) when x = w && y = z ->
-         aux deferred ((loc, ret, TyMat (x, y)) :: eqs) rest
-       | TyMat (x, y), TyFloat | TyFloat, TyMat (x, y) ->
-         aux deferred ((loc, ret, TyMat (x, y)) :: eqs) rest
-       | TyMat (x, y), TyVec n when y = n ->
-         aux deferred ((loc, ret, TyVec x) :: eqs) rest
-       | TyVec n, TyMat (x, y) when n = x ->
-         aux deferred ((loc, ret, TyVec y) :: eqs) rest
+       (* mat * mat (element-wise) *)
+       | TyVec (n, TyVec (m, t)), TyVec (n', TyVec (m', t')) when n = n' && m = m' ->
+         let bt = fresh_tyvar () in
+         aux
+           deferred
+           ((loc, ret, TyVec (n, TyVec (m, bt))) :: eqs)
+           ({ desc = MulBroadcast (t, t', bt); loc } :: rest)
+       (* mat * scalar *)
+       | TyVec (n, TyVec (m, t)), (TyFloat | TyInt)
+       | (TyFloat | TyInt), TyVec (n, TyVec (m, t)) ->
+         let scalar =
+           match l with
+           | TyFloat | TyInt -> l
+           | _ -> r
+         in
+         let bt = fresh_tyvar () in
+         aux
+           deferred
+           ((loc, ret, TyVec (n, TyVec (m, bt))) :: eqs)
+           ({ desc = MulBroadcast (scalar, t, bt); loc } :: rest)
+       (* mat * vec (matrix-vector multiply): TyVec(cols, TyVec(rows, t)) * TyVec(rows, t) -> TyVec(cols, t) *)
+       | TyVec (cols, TyVec (rows, t)), TyVec (rows', t') when rows = rows' ->
+         let bt = fresh_tyvar () in
+         aux
+           deferred
+           ((loc, ret, TyVec (cols, bt)) :: eqs)
+           ({ desc = MulBroadcast (t, t', bt); loc } :: rest)
+       (* vec * mat: TyVec(cols, t) * TyVec(cols, TyVec(rows, t)) -> TyVec(rows, t) *)
+       | TyVec (cols, t), TyVec (cols', TyVec (rows, t')) when cols = cols' ->
+         let bt = fresh_tyvar () in
+         aux
+           deferred
+           ((loc, ret, TyVec (rows, bt)) :: eqs)
+           ({ desc = MulBroadcast (t, t', bt); loc } :: rest)
        | TyFloat, TyFloat -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
        | TyInt, TyInt -> aux deferred ((loc, ret, TyInt) :: eqs) rest
        | TyInt, TyFloat | TyFloat, TyInt -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
-       | TyVec n, TyVec n' when n = n' -> aux deferred ((loc, ret, TyVec n) :: eqs) rest
-       | TyFloat, TyVec n | TyVec n, TyFloat ->
-         aux deferred ((loc, ret, TyVec n) :: eqs) rest
-       | TyInt, TyVec n | TyVec n, TyInt -> aux deferred ((loc, ret, TyVec n) :: eqs) rest
-       | TyInt, TyMat (x, y) | TyMat (x, y), TyInt ->
-         aux deferred ((loc, ret, TyMat (x, y)) :: eqs) rest
+       (* flat vec * flat vec (element-wise) *)
+       | TyVec (n, t), TyVec (n', t') when n = n' ->
+         let bt = fresh_tyvar () in
+         aux
+           deferred
+           ((loc, ret, TyVec (n, bt)) :: eqs)
+           ({ desc = MulBroadcast (t, t', bt); loc } :: rest)
+       (* scalar * vec *)
+       | (TyFloat | TyInt), TyVec (n, t) | TyVec (n, t), (TyFloat | TyInt) ->
+         let scalar =
+           match l with
+           | TyFloat | TyInt -> l
+           | _ -> r
+         in
+         let bt = fresh_tyvar () in
+         aux
+           deferred
+           ((loc, ret, TyVec (n, bt)) :: eqs)
+           ({ desc = MulBroadcast (scalar, t, bt); loc } :: rest)
        | _ -> Err.fail "invalid mul/div broadcast" ~loc ~d:[%message (l : ty) (r : ty)])
     | ({ desc = IndexAccess (t, i, ret); loc } as c) :: rest ->
       (match t with
-       | TyVec n ->
+       | TyVec (n, elem_ty) ->
+         let scalar_ty =
+           match elem_ty with
+           | TyInt -> TyFloat
+           | t -> t
+         in
          if 0 <= i && i < n
-         then aux deferred ((loc, ret, TyFloat) :: eqs) rest
+         then aux deferred ((loc, ret, scalar_ty) :: eqs) rest
          else Err.fail "vec index out of bounds" ~loc ~d:[%message (n : int) (i : int)]
-       | TyMat (x, y) ->
-         if 0 <= i && i < x
-         then aux deferred ((loc, ret, TyVec y) :: eqs) rest
-         else Err.fail "mat index out of bounds" ~loc ~d:[%message (x : int) (i : int)]
        | TyVar _ -> aux (c :: deferred) eqs rest
-       | ty -> Err.fail "expected vec or mat" ~loc ~d:[%message (ty : ty)])
+       | ty -> Err.fail "expected vec" ~loc ~d:[%message (ty : ty)])
     | ({ desc = FieldAccess (ty, f, ret); loc } as c) :: rest ->
       (match ty with
        | TyVar _ -> aux (c :: deferred) eqs rest
@@ -507,7 +572,6 @@ let rec is_value (t : Desugar.term) : bool =
   match t.desc with
   | Float _ | Int _ | Bool _ | Var _ | Lam _ -> true
   | Vec (_, ts) -> List.for_all ts ~f:is_value
-  | Mat (_, _, ts) -> List.for_all ts ~f:is_value
   | Record fields -> List.for_all fields ~f:(fun (_, t) -> is_value t)
   | Variant (_, args) -> List.for_all args ~f:is_value
   | Field (t, _) | Index (t, _) -> is_value t
@@ -543,8 +607,9 @@ let rec resolve_stlc_ty (env : env) (t : Frontend.ty) : ty Compiler_error.t =
   | TyFloat -> Ok TyFloat
   | TyInt -> Ok TyInt
   | TyBool -> Ok TyBool
-  | TyVec n -> Ok (TyVec n)
-  | TyMat (n, m) -> Ok (TyMat (n, m))
+  | TyVec (n, t) ->
+    let%map t = resolve t in
+    TyVec (n, t)
   | TyVar v -> Ok (TyVar v)
 ;;
 
@@ -558,29 +623,23 @@ let check_pat (env : env) loc (scrutinee_ty : ty) (pat : Frontend.pat)
   match pat, scrutinee_ty with
   | Frontend.PatVar v, _ -> Ok (bind_var env.ctx v scrutinee_ty)
   | (PatLitBool _ | PatLitInt _ | PatLitFloat _), _ -> Ok env.ctx
-  | PatBracket pats, TyVec n ->
+  | PatBracket pats, TyVec (n, elem_ty) ->
     if List.length pats <> n
     then Err.fail "vec pattern has wrong number of elements" ~loc
     else
       List.fold_result pats ~init:env.ctx ~f:(fun ctx p ->
-        match p with
-        | Frontend.PatVar v -> Ok (bind_var ctx v TyFloat)
-        | _ -> Err.fail "vec element pattern must be a variable" ~loc)
-  | PatBracket col_pats, TyMat (r, c) ->
-    if List.length col_pats <> c
-    then Err.fail "mat pattern has wrong number of columns" ~loc
-    else
-      List.fold_result col_pats ~init:env.ctx ~f:(fun ctx col_pat ->
-        match col_pat with
-        | Frontend.PatBracket row_pats ->
-          if List.length row_pats <> r
-          then Err.fail "mat column pattern has wrong number of rows" ~loc
+        match p, elem_ty with
+        | PatVar v, _ -> Ok (bind_var ctx v elem_ty)
+        | PatBracket inner_pats, TyVec (m, inner_elem_ty) ->
+          (* TODO: This will not be necessary once we have nested pattern matching *)
+          if List.length inner_pats <> m
+          then Err.fail "inner vec pattern has wrong number of elements" ~loc
           else
-            List.fold_result row_pats ~init:ctx ~f:(fun ctx p ->
+            List.fold_result inner_pats ~init:ctx ~f:(fun ctx p ->
               match p with
-              | Frontend.PatVar v -> Ok (bind_var ctx v TyFloat)
-              | _ -> Err.fail "mat element pattern must be a variable" ~loc)
-        | _ -> Err.fail "mat column pattern must be a bracket pattern" ~loc)
+              | PatVar v -> Ok (bind_var ctx v inner_elem_ty)
+              | _ -> Err.fail "inner vec element pattern must be a variable" ~loc)
+        | _ -> Err.fail "vec element pattern must be a variable or bracket" ~loc)
   | PatCtor (ctor, vars), TyVariant (variant_name, type_args) ->
     (match Map.find env.variants variant_name with
      | None -> Err.fail "unknown variant" ~loc ~d:[%message (variant_name : string)]
@@ -667,25 +726,26 @@ let resolve_match_scrutinee_ty
   in
   match first_pat with
   | None -> Ok inferred_ty
-  | Some (Frontend.PatLitBool _) -> Ok TyBool
+  | Some (PatLitBool _) -> Ok TyBool
   | Some (PatLitInt _) -> Ok TyInt
   | Some (PatLitFloat _) -> Ok TyFloat
   | Some (PatBracket _) ->
     (match inferred_ty with
-     | (TyVec _ | TyMat _) as ty -> Ok ty
+     | TyVec _ -> Ok inferred_ty
      | TyVar _ ->
        List.find_map cases ~f:(fun (pat, _) ->
+         (* TODO: Once we have nested pattern matching we won't need this *)
          match pat with
          | Frontend.PatBracket pats ->
            Some
              (match List.hd pats with
               | Some (Frontend.PatBracket inner) ->
-                Ok (TyMat (List.length inner, List.length pats))
-              | _ -> Ok (TyVec (List.length pats)))
+                Ok (TyVec (List.length pats, TyVec (List.length inner, TyFloat)))
+              | _ -> Ok (TyVec (List.length pats, TyFloat)))
          | _ -> None)
        |> Err.of_option "MatchBracket with no bracket pattern" ~loc
        |> Compiler_error.join
-     | _ -> Err.fail "bracket pattern requires vec or mat scrutinee" ~loc)
+     | _ -> Err.fail "bracket pattern requires vec scrutinee" ~loc)
   | Some (PatCtor _) ->
     let%bind variant_name, variant_params, _ =
       infer_nominal_type
@@ -1002,9 +1062,9 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
           ]
       | Cross, [ t; t' ] ->
         Ok
-          [ constr (Eq (t, TyVec 3))
-          ; constr (Eq (t', TyVec 3))
-          ; constr (Eq (ty, TyVec 3))
+          [ constr (Eq (t, TyVec (3, TyFloat)))
+          ; constr (Eq (t', TyVec (3, TyFloat)))
+          ; constr (Eq (ty, TyVec (3, TyFloat)))
           ]
       | Normalize, [ t ] ->
         let bt = fresh_tyvar () in
@@ -1042,29 +1102,16 @@ and gen_term (env : env) (t : Desugar.term) : (term * constr list) Compiler_erro
     in
     make (Builtin (b, args)) ty (builtin_constrs @ constrs_args)
   | Vec (n, args) ->
+    let elem_ty = fresh_tyvar () in
     let%bind args, constrs_args =
       List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
         let%bind arg, constrs = gen_term env arg in
-        return
-          ( arg :: acc_args
-          , (constr (HasClass (Comparable, arg.ty)) :: constrs) @ acc_constrs ))
+        return (arg :: acc_args, (constr (Eq (arg.ty, elem_ty)) :: constrs) @ acc_constrs))
     in
     let args = List.rev args in
     if List.length args = n
-    then make (Vec (n, args)) (TyVec n) constrs_args
+    then make (Vec (n, args)) (TyVec (n, elem_ty)) constrs_args
     else Err.fail "vec size mismatch" ~loc ~d:[%message (n : int)]
-  | Mat (n, m, args) ->
-    let%bind args, constrs_args =
-      List.fold_result args ~init:([], []) ~f:(fun (acc_args, acc_constrs) arg ->
-        let%bind arg, constrs = gen_term env arg in
-        return
-          ( arg :: acc_args
-          , (constr (HasClass (Comparable, arg.ty)) :: constrs) @ acc_constrs ))
-    in
-    let args = List.rev args in
-    if List.length args = n * m
-    then make (Mat (n, m, args)) (TyMat (n, m)) constrs_args
-    else Err.fail "mat size mismatch" ~loc ~d:[%message (n : int) (m : int)]
   | Record fields ->
     let provided_fields = String.Set.of_list (List.map fields ~f:fst) in
     let candidates =
@@ -1351,7 +1398,7 @@ let typecheck (Program terms : Desugar.t) : t Compiler_error.t =
               Map.find env.aliases s |> Option.value_map ~default:false ~f:occurs_in
             in
             match ty with
-            | TyFloat | TyInt | TyBool | TyVec _ | TyMat _ | TyVar _ -> false
+            | TyFloat | TyInt | TyBool | TyVec _ | TyVar _ -> false
             | TyName s -> String.equal s name || check_alias s
             | TyApp (s, args) ->
               String.equal s name || check_alias s || List.exists args ~f:occurs_in
