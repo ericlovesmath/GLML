@@ -76,7 +76,7 @@ type global_kind =
 
 type ctx =
   { globals : global_kind String.Map.t
-  ; closure_tys : ty String.Map.t
+  ; global_tys : ty String.Map.t
   ; env : ty String.Map.t
   }
 
@@ -257,12 +257,20 @@ let gen_typedef info : Lambda_lift.top =
   }
 ;;
 
-let gen_apply_fn info : Lambda_lift.top =
+let gen_apply_fn (reg : registry) info : Lambda_lift.top =
   let first_loc = entry_loc (List.hd_exn info.entries) in
   let fn_var = Utils.fresh "dfn" in
   let arg_vars = List.map info.arg_tys ~f:(fun _ -> Utils.fresh "da") in
+  let apply_arg_tys =
+    List.map info.arg_tys ~f:(fun ty ->
+      if is_fn_ty ty
+      then (
+        let i = Map.find_exn reg.by_arrow (mangle_ty ty) in
+        TyVariant i.variant_name)
+      else ty)
+  in
   let apply_params =
-    (fn_var, TyVariant info.variant_name) :: List.zip_exn arg_vars info.arg_tys
+    (fn_var, TyVariant info.variant_name) :: List.zip_exn arg_vars apply_arg_tys
   in
   let match_cases =
     List.filter_map info.entries ~f:(fun entry ->
@@ -278,7 +286,7 @@ let gen_apply_fn info : Lambda_lift.top =
       | GlobalEntry e ->
         let pat = Frontend.PatCtor (e.ctor_name, []) in
         let arg_terms =
-          List.map2_exn arg_vars info.arg_tys ~f:(fun v ty ->
+          List.map2_exn arg_vars apply_arg_tys ~f:(fun v ty ->
             ({ desc = Var v; ty; loc = e.loc } : Lambda_lift.term))
         in
         let body : Lambda_lift.term =
@@ -347,7 +355,7 @@ let rec rewrite_term
           (* Evaluates to a closure value, route through dapply instead of calling by name *)
           let reg, info = get_or_create_info reg f.ty in
           let actual_info =
-            match Map.find ctx.closure_tys v with
+            match Map.find ctx.global_tys v with
             | Some (TyVariant vname) ->
               Map.find reg.by_variant vname |> Option.value ~default:info
             | _ -> info
@@ -395,7 +403,11 @@ let rec rewrite_term
           else (
             (* Full application of a HOF: result is a function value *)
             let reg, info = get_or_create_info reg t.ty in
-            reg, { t with desc = App (f, args); ty = TyVariant info.variant_name })
+            let ty =
+              Map.find ctx.global_tys v
+              |> Option.value ~default:(TyVariant info.variant_name)
+            in
+            reg, { t with desc = App (f, args); ty })
         | _ -> reg, { t with desc = App (f, args) })
      | _ when is_fn_ty f.ty ->
        let reg, info = get_or_create_info reg f.ty in
@@ -567,8 +579,8 @@ let rec global_refs_of (globals : String.Set.t) (term : Lambda_lift.term) : Stri
   | Let (_, bind, body) -> Set.union (go bind) (go body)
   | If (c, t, e) -> union_many [ go c; go t; go e ]
   | Bop (_, l, r) -> Set.union (go l) (go r)
-  | Vec (_, ts) | Builtin (_, ts) | Record (_, ts) | Variant (_, _, ts)
-    -> union_many (List.map ts ~f:go)
+  | Vec (_, ts) | Builtin (_, ts) | Record (_, ts) | Variant (_, _, ts) ->
+    union_many (List.map ts ~f:go)
   | Match (scrut, cases) ->
     union_many (go scrut :: List.map cases ~f:(fun (_, body) -> go body))
 ;;
@@ -591,8 +603,8 @@ let rec term_ty_deps (t : Lambda_lift.term) : String.Set.t =
     | If (c, t, e) ->
       Set.union (Set.union (term_ty_deps c) (term_ty_deps t)) (term_ty_deps e)
     | Bop (_, t, t') -> Set.union (term_ty_deps t) (term_ty_deps t')
-    | Vec (_, ts) | Builtin (_, ts) | Record (_, ts) | Variant (_, _, ts)
-      -> String.Set.union_list (List.map ~f:term_ty_deps ts)
+    | Vec (_, ts) | Builtin (_, ts) | Record (_, ts) | Variant (_, _, ts) ->
+      String.Set.union_list (List.map ~f:term_ty_deps ts)
     | Index (t, _) | Field (t, _) -> term_ty_deps t
     | Match (scrut, cases) ->
       List.fold cases ~init:(term_ty_deps scrut) ~f:(fun acc (_, body) ->
@@ -657,18 +669,17 @@ let defunctionalize (Program tops : Lambda_lift.t) : Lambda_lift.t Compiler_erro
     List.fold_map
       tops
       ~init:(empty_registry, String.Map.empty)
-      ~f:(fun (reg, closure_tys) top ->
-        let ctx = { globals; closure_tys; env = String.Map.empty } in
+      ~f:(fun (reg, global_tys) top ->
+        let ctx = { globals; global_tys; env = String.Map.empty } in
         let reg, top = rewrite_top ctx reg top in
-        let closure_tys =
+        let global_tys =
           match top.desc with
-          | Const (name, term) ->
-            (match Map.find globals name with
-             | Some ClosureVal -> Map.set closure_tys ~key:name ~data:term.ty
-             | _ -> closure_tys)
-          | _ -> closure_tys
+          | Const (name, term) when Map.mem globals name ->
+            Map.set global_tys ~key:name ~data:term.ty
+          | Define { name; body; _ } -> Map.set global_tys ~key:name ~data:body.ty
+          | _ -> global_tys
         in
-        (reg, closure_tys), top)
+        (reg, global_tys), top)
   in
   let all_tops =
     let dfn_infos =
@@ -676,7 +687,7 @@ let defunctionalize (Program tops : Lambda_lift.t) : Lambda_lift.t Compiler_erro
     in
     rewritten_tops
     @ List.map ~f:gen_typedef dfn_infos
-    @ List.map ~f:gen_apply_fn dfn_infos
+    @ List.map dfn_infos ~f:(gen_apply_fn reg)
   in
   topo_sort all_tops
 ;;

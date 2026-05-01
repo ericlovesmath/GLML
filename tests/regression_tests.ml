@@ -1297,3 +1297,94 @@ let%expect_test "regression - vec broadcast against polymorphic param with int-t
     }
     |}]
 ;;
+
+let%expect_test "regression - wrong DFn return type" =
+  test
+    {|
+    type sdf = vec2 -> float
+    let constant (r : float) : sdf = fun p -> r
+    let union (f : sdf) _ r = f r
+    let dup f g x = f (g x) (g x)
+    let scene : sdf = dup union constant 0.3
+    let main (coord : vec2) = [0, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_45 {
+        int tag;
+    };
+    struct DFn_47 {
+        int tag;
+    };
+    struct DFn_43 {
+        int tag;
+        DFn_47 lctor_51_0;
+        float lctor_51_1;
+        DFn_47 lctor_55_0;
+        float lctor_55_1;
+    };
+    struct DFn_61 {
+        int tag;
+        DFn_45 lctor_62_0;
+        DFn_43 lctor_62_1;
+        DFn_43 lctor_62_2;
+    };
+    float constant_0(float r_1, vec2 p_2) {
+        return r_1;
+    }
+    float dapply_46(DFn_47 dfn_71, float da_72, vec2 da_73) {
+        return constant_0(da_72, da_73);
+    }
+    float dapply_42(DFn_43 dfn_65, vec2 da_66) {
+        int _lv_tag_80 = dfn_65.tag;
+        switch (_lv_tag_80) {
+            case 0: {
+                DFn_47 ca_48 = dfn_65.lctor_51_0;
+                float ca_49 = dfn_65.lctor_51_1;
+                return dapply_46(ca_48, ca_49, da_66);
+                break;
+            }
+            default: {
+                DFn_47 ca_52 = dfn_65.lctor_55_0;
+                float ca_53 = dfn_65.lctor_55_1;
+                return dapply_46(ca_52, ca_53, da_66);
+                break;
+            }
+        }
+    }
+    DFn_61 dup_7_vec2_to_float_to_vec2_to_float_to_vec2_to_float_to_float_to_vec2_to_float_to_float_to_vec2_to_float_41(DFn_45 f_8, DFn_47 g_9, float x_10) {
+        DFn_47 _tmp_81;
+        DFn_43 anf_76 = DFn_43(0, g_9, x_10, _tmp_81, 0.);
+        DFn_47 _tmp_82;
+        DFn_43 anf_77 = DFn_43(1, _tmp_82, 0., g_9, x_10);
+        return DFn_61(0, f_8, anf_76, anf_77);
+    }
+    DFn_61 scene_11() {
+        DFn_45 anf_78 = DFn_45(0);
+        DFn_47 anf_79 = DFn_47(0);
+        return dup_7_vec2_to_float_to_vec2_to_float_to_vec2_to_float_to_float_to_vec2_to_float_to_float_to_vec2_to_float_41(anf_78, anf_79, 0.3);
+    }
+    float union_3_vec2_to_float_to_vec2_to_float_to_vec2_to_float_40(DFn_43 f_4, DFn_43 _x_5, vec2 r_6) {
+        return dapply_42(f_4, r_6);
+    }
+    float dapply_44(DFn_45 dfn_67, DFn_43 da_68, DFn_43 da_69, vec2 da_70) {
+        return union_3_vec2_to_float_to_vec2_to_float_to_vec2_to_float_40(da_68, da_69, da_70);
+    }
+    float dapply_60(DFn_61 dfn_74, vec2 da_75) {
+        DFn_45 ca_56 = dfn_74.lctor_62_0;
+        DFn_43 ca_57 = dfn_74.lctor_62_1;
+        DFn_43 ca_58 = dfn_74.lctor_62_2;
+        return dapply_44(ca_56, ca_57, ca_58, da_75);
+    }
+    vec3 main_pure(vec2 coord_12) {
+        return vec3(0., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
