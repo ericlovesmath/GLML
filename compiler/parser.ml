@@ -71,9 +71,12 @@ let rec pat_p st =
          (tok (ID "_") *> return (PatRecord ([], true))
           <|>
           let field_p =
-            let%bind id = ident_p in
-            let%bind _ = tok EQ in
-            let%bind p = pat_p in
+            let%bind id =
+              satisfy_map (function
+                | ID s when not (String.equal s "_") -> Some s
+                | _ -> None)
+            in
+            let%bind p = tok EQ *> pat_p <|> return (PatVar id) in
             return (id, p)
           in
           let%bind fields = commas field_p in

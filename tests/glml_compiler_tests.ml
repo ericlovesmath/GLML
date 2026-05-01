@@ -3349,5 +3349,34 @@ let%expect_test "struct pattern matching" =
     6 |       match p with
     7 |       | { x = a, x = b } -> [a, 0.0, 0.0]
       |
+    |}];
+  (* Field Punning *)
+  test
+    {|
+    type point = { x : float, y : float }
+
+    let main (uv : vec2) : vec3 =
+      match { x = 1.0, y = 2.0 } with
+      | { x = a, y } -> [a, y, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct point {
+        float x;
+        float y;
+    };
+    vec3 main_pure(vec2 uv_0) {
+        point anf_7 = point(1., 2.);
+        float a_1 = anf_7.x;
+        float y_2 = anf_7.y;
+        return vec3(a_1, y_2, 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
     |}]
 ;;
