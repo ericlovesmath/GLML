@@ -1367,6 +1367,17 @@ and gen_term (env : env) (t : Desugar.term)
       , composed )
 ;;
 
+let enforce_main_type env bind ty loc v =
+  if not (String.equal v "main")
+  then Ok (bind, ty)
+  else (
+    let expected = TyArrow (TyVec (2, TyFloat), TyVec (3, TyFloat)) in
+    let main_constr = { desc = Eq (ty, expected); loc } in
+    match solve env.structs [ main_constr ] with
+    | Ok (sub, []) -> Ok (subst_term sub bind, subst_ty sub ty)
+    | _ -> Err.fail "main must have type vec2 -> vec3" ~loc ~d:[%message (ty : ty)])
+;;
+
 let typecheck (Program terms : Desugar.t) : t Compiler_error.t =
   let%map _, tops =
     List.fold_result
@@ -1380,9 +1391,9 @@ let typecheck (Program terms : Desugar.t) : t Compiler_error.t =
         , [] )
       ~f:(fun (env, acc) top ->
         match top.desc with
-        | Define (Rec n, v, return_ty, bind) ->
-          let%bind bind, ty, env, scheme_constrs, remaining, _sub_bind =
-            infer_binding env top.loc bind (Rec n) v return_ty
+        | Define (recur, v, return_ty, bind) ->
+          let%bind bind, ty, env, scheme_constrs, remaining, _ =
+            infer_binding env top.loc bind recur v return_ty
           in
           if not (List.is_empty remaining)
           then
@@ -1391,23 +1402,9 @@ let typecheck (Program terms : Desugar.t) : t Compiler_error.t =
               ~loc:top.loc
               ~d:[%message (remaining : constr list)]
           else (
+            let%bind bind, ty = enforce_main_type env bind ty top.loc v in
             let top =
-              { desc = Define (Rec n, v, bind); ty; loc = top.loc; scheme_constrs }
-            in
-            Ok (env, top :: acc))
-        | Define (Nonrec, v, return_ty, bind) ->
-          let%bind bind, ty, env, scheme_constrs, remaining, _sub_bind =
-            infer_binding env top.loc bind Nonrec v return_ty
-          in
-          if not (List.is_empty remaining)
-          then
-            Err.fail
-              "unresolved top-level constraints"
-              ~loc:top.loc
-              ~d:[%message (remaining : constr list)]
-          else (
-            let top =
-              { desc = Define (Nonrec, v, bind); ty; loc = top.loc; scheme_constrs }
+              { desc = Define (recur, v, bind); ty; loc = top.loc; scheme_constrs }
             in
             Ok (env, top :: acc))
         | Extern (ty, v) ->

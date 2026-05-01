@@ -319,9 +319,13 @@ let%expect_test "lambda lifting" =
     |};
   [%expect
     {|
-    [patch_main]: unexpected type of main
-      t: (Function (name main) (desc ()) (params (((TyVec 2) u_0)))
-     (ret_type (TyStruct DFn_6)) (body ((return (DFn_6 0)))))
+    [typecheck] at 2:5-4:8: main must have type vec2 -> vec3
+      ty: ((vec 2 float) -> (float -> float))
+      |
+    2 |     let main (u : vec2) =
+    3 |       let f = fun (x : float) -> x + 1.0 in
+    4 |       f
+      |
     |}];
   test
     {|

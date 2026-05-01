@@ -1388,3 +1388,20 @@ let%expect_test "regression - wrong DFn return type" =
     }
     |}]
 ;;
+
+let%expect_test "main type nomangle if type not concrete" =
+  test "let main uv = [0, 0, 0]";
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 main_pure(vec2 uv_0) {
+        return vec3(0., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
