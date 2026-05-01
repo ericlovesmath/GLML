@@ -7,7 +7,7 @@ type pos =
   }
 [@@deriving sexp_of]
 
-type loc = pos * pos [@@deriving sexp_of]
+type loc = pos * pos [@@deriving sexp_of, to_string]
 
 type error =
   { pass : string

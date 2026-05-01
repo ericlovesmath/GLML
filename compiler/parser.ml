@@ -12,21 +12,21 @@ let ident_p =
   satisfy_map (function
     | ID s -> Some s
     | _ -> None)
-  <??> "ident"
+  <?> "identifier"
 ;;
 
 let num_p =
   satisfy_map (function
     | NUMERIC i -> Some i
     | _ -> None)
-  <??> "num"
+  <?> "integer"
 ;;
 
 let float_p =
   satisfy_map (function
     | FLOAT_LIT f -> Some f
     | _ -> None)
-  <??> "float"
+  <?> "float literal"
 ;;
 
 let commas p = sep_by1 (tok COMMA) p
@@ -35,7 +35,7 @@ let constructor_p =
   satisfy_map (function
     | CONSTRUCTOR s -> Some s
     | _ -> None)
-  <??> "constructor"
+  <?> "constructor"
 ;;
 
 let between brace_type p =
@@ -46,7 +46,7 @@ let between brace_type p =
     | `Angle -> LANGLE, RANGLE
     | `Bracket -> LBRACKET, RBRACKET
   in
-  tok l *> p <* tok r <??> "between"
+  tok l *> p <* tok r
 ;;
 
 (** Match patterns *)
@@ -82,7 +82,7 @@ let rec pat_p st =
           in
           return (PatRecord (fields, has_wildcard)))
    <|> (ident_p >>| fun v -> PatVar v)
-   <??> "pat")
+   <??> "pattern")
     st
 ;;
 
@@ -92,7 +92,7 @@ let ty_vec_p =
       | VEC n -> Some n
       | _ -> None)
   in
-  return (TyVec (n, TyFloat)) <??> "ty_vec"
+  return (TyVec (n, TyFloat))
 ;;
 
 let ty_mat_p =
@@ -101,7 +101,7 @@ let ty_mat_p =
       | MAT (n, m) -> Some (n, m)
       | _ -> None)
   in
-  return (TyVec (n, TyVec (m, TyFloat))) <??> "ty_mat"
+  return (TyVec (n, TyVec (m, TyFloat)))
 ;;
 
 let ty_singles_p =
@@ -111,7 +111,7 @@ let ty_singles_p =
     | FLOAT -> Some TyFloat
     | TYVAR v -> Some (TyVar v)
     | _ -> None)
-  <??> "ty_single"
+  <?> "type keyword/variable"
 ;;
 
 let rec ty_atom_p st =
@@ -122,25 +122,27 @@ let rec ty_atom_p st =
    <|> ty_singles_p
    <|> ty_vec_p
    <|> ty_mat_p
-   <??> "ty_atom")
+   <??> "type")
     st
 
 and ty_arrow_p st =
   (let%bind l = ty_atom_p <|> between `Paren ty_p in
    let%bind _ = tok ARROW in
    let%bind r = ty_p in
-   return (TyArrow (l, r)) <??> "ty_arrow")
+   return (TyArrow (l, r)) <??> "function type")
     st
 
 and ty_p st =
   let p = ty_arrow_p <|> ty_atom_p in
-  (p <|> between `Paren p <??> "ty") st
+  (p <|> between `Paren p) st
 ;;
 
-let test sexp_of parser s =
-  match s |> Lexer.init |> Lexer.lex |> Compiler_error.bind ~f:(Chomp.run parser) with
+let test sexp_of parser source =
+  match
+    source |> Lexer.init |> Lexer.lex |> Compiler_error.bind ~f:(Chomp.run parser)
+  with
   | Ok x -> print_s (sexp_of x)
-  | Error err -> print_endline (Compiler_error.to_string_hum err)
+  | Error err -> print_endline (Compiler_error.to_string_hum ~source err)
 ;;
 
 let%expect_test "ty parse tests" =
@@ -186,10 +188,12 @@ let%expect_test "ty parse tests" =
   test "()";
   [%expect
     {|
-    [parser]: satisfy_eof
-      contexts: (between ty)
-    [parser]: satisfy_map_fail
-      contexts: ("ty_atom (1:2 - 1:3)" "between (1:1 - 1:2)" "ty (1:1 - 1:2)")
+    [parser]: expected one of: identifier, type keyword/variable, `(`
+    [parser] at 1:2-1:3: expected one of: identifier, type keyword/variable, `(` but found `)`
+      in: "type at 1:2-1:3"
+      |
+    1 | ()
+      |  ^
     |}]
 ;;
 
@@ -235,7 +239,7 @@ let param_p =
         let%bind ty = optional (tok COLON *> ty_p) in
         return (id, ty))
      <|> (ident_p >>| fun id -> id, None))
-  <??> "param"
+  <??> "parameter"
 ;;
 
 let make_lambdas params (body : term) =
@@ -255,7 +259,7 @@ let make_lambdas params (body : term) =
 ;;
 
 (* TODO: Hardcoded to maximum 1000 loops for now *)
-let recur_p = tok REC *> return (Rec 1000) <|> return Nonrec <??> "recur"
+let recur_p = tok REC *> return (Rec 1000) <|> return Nonrec
 
 let function_annotation params return_ty =
   match return_ty with
@@ -305,7 +309,7 @@ let rec term_let_p =
             let rhs_desc = make_lambdas params rhs in
             let%bind body = tok IN *> term_p in
             return (Let (recur, pat, ann, { desc = rhs_desc; loc = rhs.loc }, body))))
-   <??> "term_let")
+   <??> "let expression")
     st
 
 and term_if_p =
@@ -317,7 +321,7 @@ and term_if_p =
             let%bind t = tok THEN *> term_p in
             let%bind f = tok ELSE *> term_p in
             return (If (c, t, f))))
-   <??> "term_if")
+   <??> "if expression")
     st
 
 and term_lam_p =
@@ -336,7 +340,7 @@ and case_p =
    let%bind pat = pat_p in
    let%bind _ = tok ARROW in
    let%bind body = term_p in
-   return (pat, body) <??> "case")
+   return (pat, body) <??> "match case")
     st
 
 and term_match_p =
@@ -348,7 +352,7 @@ and term_match_p =
             let%bind _ = tok WITH in
             let%bind cases = many1 case_p in
             return (Match (scrutinee, cases))))
-   <??> "term_match")
+   <??> "match expression")
     st
 
 and term_function_p =
@@ -358,7 +362,7 @@ and term_function_p =
       *> commit
            (let%map cases = many1 case_p in
             Function cases))
-   <??> "term_function")
+   <??> "function expression")
     st
 
 and term_record_p =
@@ -374,14 +378,14 @@ and term_record_p =
               return (id, t)))
       in
       Record fields)
-   <??> "term_record")
+   <??> "record literal")
     st
 
 and term_vec_p =
   fun st ->
   (with_term_loc
      (let%bind terms = between `Bracket (commas term_p) in
-      return (Vec (List.length terms, terms)) <??> "term_vec"))
+      return (Vec (List.length terms, terms)) <??> "vector literal"))
     st
 
 (* NOTE: Builtins should not be special forms, but right now they are not curried so.. *)
@@ -395,7 +399,7 @@ and term_builtin_p =
           | _ -> None)
       in
       let%bind args = between `Paren (commas term_p) in
-      return (Builtin (builtin, args)) <??> "term_builtin"))
+      return (Builtin (builtin, args)) <??> "builtin call"))
     st
 
 and term_variant_p =
@@ -408,7 +412,7 @@ and term_variant_p =
         <|> return []
       in
       return (Variant (ctor, args)))
-   <??> "term_variant")
+   <??> "variant")
     st
 
 and term_atom_p =
@@ -421,9 +425,9 @@ and term_atom_p =
          | CONSTRUCTOR v -> Some (Variant (v, []))
          | ID v -> Some (Var v)
          | _ -> None)
-       <??> "term_single")
+       <?> "identifier or literal")
   in
-  (term_builtin_p <|> term_singles_p <|> term_vec_p <|> term_record_p <??> "term_atom") st
+  (term_builtin_p <|> term_singles_p <|> term_vec_p <|> term_record_p) st
 
 and term_unary_neg_p =
   fun st ->
@@ -433,7 +437,7 @@ and term_unary_neg_p =
       let neg_one : term = { desc = Int (-1); loc } in
       let loc = Lexer.merge_loc loc e.loc in
       ({ desc = Bop (Mul, neg_one, e); loc } : term))
-   <??> "term_unary_neg")
+   <??> "negation")
     st
 
 and term_head_p =
@@ -442,8 +446,7 @@ and term_head_p =
    <|> term_atom_p
    <|> term_number_p
    <|> term_unary_neg_p
-   <|> between `Paren term_p
-   <??> "term_head")
+   <|> between `Paren term_p)
     st
 
 and term_postfix_p =
@@ -477,7 +480,7 @@ and term_postfix_p =
     ({ desc = App (t, a); loc = Lexer.merge_loc t.loc a.loc } : term)
   in
   let op_p = dot_op_p <|> app_op_p in
-  (postfix_chain term_head_p op_p <??> "term_postfix_chain") st
+  (postfix_chain term_head_p op_p) st
 
 and term_base_p =
   fun st ->
@@ -486,21 +489,19 @@ and term_base_p =
    <|> term_lam_p
    <|> term_function_p
    <|> term_match_p
-   <|> List.fold_left bop_levels ~init:term_postfix_p ~f:chainl1
-   <??> "term_base")
+   <|> List.fold_left bop_levels ~init:term_postfix_p ~f:chainl1)
     st
 
 and term_pipe_p =
   fun st ->
-  ((let%bind init = term_base_p in
-    let%bind pipes = many (tok PIPE *> term_base_p) in
-    return
-      (List.fold_left pipes ~init ~f:(fun l r ->
-         { desc = Pipe (l, r); loc = Lexer.merge_loc l.loc r.loc })))
-   <??> "term_pipe")
+  (let%bind init = term_base_p in
+   let%bind pipes = many (tok PIPE *> term_base_p) in
+   return
+     (List.fold_left pipes ~init ~f:(fun l r ->
+        { desc = Pipe (l, r); loc = Lexer.merge_loc l.loc r.loc })))
     st
 
-and term_p = fun st -> (term_pipe_p <??> "term") st
+and term_p = fun st -> term_pipe_p st
 
 let%expect_test "term parse tests" =
   let test = test sexp_of_term term_p in
@@ -645,11 +646,20 @@ let%expect_test "regression test, sequential non-parenthesized terms" =
   [%expect
     {|
     (let x 1. (+ x 1.))
-    [parser]: run_stream_not_fully_consumed
+    [parser] at 1:5-1:6: unexpected `+`
+      |
+    1 | 1.0 + let x = 1.0 in x
+      |     ^
     (+ 1. (let x 1. x))
-    [parser]: run_stream_not_fully_consumed
+    [parser] at 1:3-1:6: unexpected `let`
+      |
+    1 | f let x = 1.0 in x
+      |   ^^^
     (app f (let x 1. x))
-    [parser]: run_stream_not_fully_consumed
+    [parser] at 1:12-1:15: unexpected `let`
+      |
+    1 | [1.0, 2.0] let x = 1.0 in x
+      |            ^^^
     (vec2 1. (let x 2. x))
     (if true 1. (+ 2. 3.))
     |}]
@@ -686,7 +696,7 @@ let top_let_p =
            let rhs_desc = make_lambdas params rhs in
            let ann = function_annotation params return_ty in
            return (Define (recur, id, ann, { desc = rhs_desc; loc = rhs.loc })))
-     <??> "top_let")
+     <??> "a top-level definition")
 ;;
 
 let top_extern_p =
@@ -697,7 +707,7 @@ let top_extern_p =
            let%bind ty = ty_p in
            let%bind v = ident_p in
            return (Extern (ty, v)))
-     <??> "top_extern")
+     <??> "an extern declaration")
 ;;
 
 let ty_params_p =
@@ -726,7 +736,7 @@ let top_record_p =
               return (f_id, f_ty)))
       in
       return (TypeDef (id, ty_params, RecordDecl fields)))
-   <??> "top_record")
+   <??> "a record type")
     st
 ;;
 
@@ -746,7 +756,7 @@ let top_variant_p =
        sep_by1 (tok BAR) ctor_p
      in
      return (TypeDef (id, ty_params, VariantDecl ctors)))
-  <??> "top_variant"
+  <??> "a variant type"
 ;;
 
 let top_alias_p =
@@ -757,7 +767,7 @@ let top_alias_p =
      let%bind _ = tok EQ in
      let%bind ty = ty_p in
      return (TypeDef (id, ty_params, AliasDecl ty)))
-  <??> "top_alias"
+  <??> "a type alias"
 ;;
 
 let glml_p =
@@ -836,5 +846,68 @@ let%expect_test "regression test, toplevel let parsing after record" =
        (lambda (x (float))
         (let g (lambda (y (float)) (+ x y)) (vec3 (app g 1.) 0. 0.))))
       (Define Nonrec main (lambda (u ((vec 2 float))) (app f 10.)))))
+    |}]
+;;
+
+let%expect_test "parse error messages" =
+  let test_term = test sexp_of_term term_p in
+  let test_top = test sexp_of_t glml_p in
+  let test_ty = test sexp_of_ty ty_p in
+  test_top "foo";
+  [%expect
+    {|
+    [parser] at 1:1-1:4: expected one of: `let`, `#`, `type` but found `foo`
+      in: "a type alias at 1:1-1:4"
+      |
+    1 | foo
+      | ^^^
+    |}];
+  test_top "let x , 1";
+  [%expect
+    {|
+    [parser] at 1:7-1:8: expected `=` but found `,`
+      in: "a top-level definition at 1:1-1:4"
+      |
+    1 | let x , 1
+      |       ^
+    |}];
+  test_top "let f x = let y , = 2 in y";
+  [%expect
+    {|
+    [parser] at 1:17-1:18: expected `=` but found `,`
+      in: "a let expression at 1:11-1:14"
+      in: "a top-level definition at 1:1-1:4"
+      |
+    1 | let f x = let y , = 2 in y
+      |                 ^
+    |}];
+  test_top "let f x = match x with";
+  [%expect
+    {|
+    [parser] at 1:23-1:23: expected `|` but found end of input
+      in: "a match expression at 1:11-1:16"
+      in: "a top-level definition at 1:1-1:4"
+      |
+    1 | let f x = match x with
+      |                       ^
+    |}];
+  test_term "if x then y";
+  [%expect
+    {|
+    [parser] at 1:12-1:12: expected `else` but found end of input
+      in: "an if expression at 1:1-1:3"
+      |
+    1 | if x then y
+      |            ^
+    |}];
+  test_ty "";
+  [%expect {| [parser]: expected one of: identifier, type keyword/variable, `(` |}];
+  test_ty "float ->";
+  [%expect
+    {|
+    [parser] at 1:7-1:9: unexpected `->`
+      |
+    1 | float ->
+      |       ^^
     |}]
 ;;

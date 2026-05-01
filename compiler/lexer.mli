@@ -51,7 +51,7 @@ type token =
   | NUMERIC of int
   | FLOAT_LIT of float
   | ID of string
-[@@deriving sexp, equal]
+[@@deriving sexp, equal, to_string]
 
 type t
 type pos = Compiler_error.pos [@@deriving sexp_of]

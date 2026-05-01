@@ -29,6 +29,9 @@ module Infix_syntax : sig
 
   (** Annotate with error message *)
   val ( <??> ) : 'a t -> string -> 'a t
+
+  (** Set the expected-token label shown on failure *)
+  val ( <?> ) : 'a t -> string -> 'a t
 end
 
 (** If commited, alternatives don't backtrack *)

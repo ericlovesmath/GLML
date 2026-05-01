@@ -5,7 +5,8 @@ open Compiler_error
 module Maybe = struct
   type error_info =
     { message : string
-    ; found : (token * loc) option
+    ; expected : string list
+    ; found : (token option * loc) option
     ; contexts : (string * loc option) list
     }
 
@@ -107,11 +108,15 @@ module Infix_syntax = struct
     match p st with
     | Success res -> Success res
     | Fatal e -> Fatal e
-    | Fail _ ->
+    | Fail e ->
       (match p' st with
        | Success res -> Success res
        | Fatal e' -> Fatal e'
-       | Fail e' -> Fail e')
+       | Fail e' ->
+         let expected =
+           List.stable_dedup ~compare:String.compare (e.expected @ e'.expected)
+         in
+         Fail { e' with expected })
   ;;
 
   let loc_of_stream st = Option.map ~f:(fun ((_, loc), _) -> loc) (Sequence.next st.seq)
@@ -123,12 +128,27 @@ module Infix_syntax = struct
     | Fatal e -> Fatal { e with contexts = (tag, loc_of_stream st) :: e.contexts }
     | Fail e -> Fail { e with contexts = (tag, loc_of_stream st) :: e.contexts }
   ;;
+
+  let ( <?> ) p label =
+    fun st ->
+    match p st with
+    | Success res -> Success res
+    | Fail e -> Fail { e with expected = [ label ] }
+    | Fatal e -> Fatal { e with expected = [ label ] }
+  ;;
 end
 
 open Let_syntax
 open Infix_syntax
 
-let fail ?loc ?tok message = Fail { message; found = Option.both tok loc; contexts = [] }
+let fail ?loc ?tok message =
+  Fail
+    { message
+    ; expected = []
+    ; found = Option.map loc ~f:(Tuple2.create tok)
+    ; contexts = []
+    }
+;;
 
 let commit p =
   fun st ->
@@ -137,14 +157,23 @@ let commit p =
   | Fail e | Fatal e -> Fatal e
 ;;
 
-let satisfy (pred : token -> bool) : token t =
+let satisfy_map (pred : token -> 'a option) : 'a t =
   fun st ->
   match Sequence.next st.seq with
+  | None ->
+    let loc =
+      let _, p_end = st.last_loc in
+      if p_end.line = 0 then None else Some (Lexer.loc_end st.last_loc)
+    in
+    fail ?loc "unexpected end of input"
   | Some ((tok, loc), seq) ->
-    if pred tok
-    then Success (tok, { seq; last_loc = loc })
-    else fail ~loc ~tok "satisfy_fail"
-  | None -> fail "satisfy_eof"
+    (match pred tok with
+     | Some c -> Success (c, { seq; last_loc = loc })
+     | None -> fail ~loc ~tok "unexpected")
+;;
+
+let satisfy (pred : token -> bool) : token t =
+  satisfy_map (fun tok -> Option.some_if (pred tok) tok)
 ;;
 
 let peek : token t =
@@ -152,16 +181,6 @@ let peek : token t =
   match Sequence.next st.seq with
   | Some ((c, _), _) -> Success (c, st)
   | None -> fail "peek_eof"
-;;
-
-let satisfy_map (pred : token -> 'a option) : 'a t =
-  fun st ->
-  match Sequence.next st.seq with
-  | None -> fail "satisfy_map_eof"
-  | Some ((c, loc), seq) ->
-    (match pred c with
-     | Some c -> Success (c, { seq; last_loc = loc })
-     | None -> fail ~loc "satisfy_map_fail")
 ;;
 
 let rec many1 p = List.cons <$> p <*>| lazy (many p)
@@ -188,7 +207,7 @@ let run p s =
     let last_loc = Lexer.init_loc in
     let%bind.Maybe x, st = p { seq = Sequence.of_list s; last_loc } in
     match Sequence.next st.seq with
-    | Some ((_, loc), _) -> fail ~loc "run_stream_not_fully_consumed"
+    | Some ((tok, loc), _) -> fail ~loc ~tok "unexpected"
     | None -> Success x
   in
   match maybe with
@@ -196,32 +215,51 @@ let run p s =
   | Fail info | Fatal info ->
     let loc = Option.map info.found ~f:snd in
     let msg =
-      match info.found with
-      | None -> info.message
-      | Some (token, _) ->
-        let token = Sexp.to_string_hum (sexp_of_token token) in
-        Printf.sprintf "%s on <%s>" info.message token
+      let open Printf in
+      (* Some description outputs, but maybe overkill *)
+      match info.expected, info.found with
+      | [], None -> info.message
+      | [], Some (None, _) -> "unexpected end of input"
+      | [], Some (Some tok, _) -> sprintf "unexpected %s" (string_of_token tok)
+      | [ label ], None -> sprintf "expected %s" label
+      | [ label ], Some (None, _) -> sprintf "expected %s but found end of input" label
+      | [ label ], Some (Some tok, _) ->
+        sprintf "expected %s but found %s" label (string_of_token tok)
+      | labels, None -> sprintf "expected one of: %s" (String.concat ~sep:", " labels)
+      | labels, Some (None, _) ->
+        sprintf
+          "expected one of: %s but found end of input"
+          (String.concat ~sep:", " labels)
+      | labels, Some (Some tok, _) ->
+        sprintf
+          "expected one of: %s but found %s"
+          (String.concat ~sep:", " labels)
+          (string_of_token tok)
     in
     let d =
-      (* TODO: Refactor this *)
-      if List.is_empty info.contexts
-      then None
-      else (
-        let string_of_context = function
-          | s, None -> s
-          | s, Some loc ->
-            let loc = Sexp.to_string_hum (sexp_of_loc loc) in
-            s ^ " " ^ loc
+      let fmt label loc_opt =
+        match loc_opt with
+        | None -> label
+        | Some loc -> label ^ " at " ^ string_of_loc loc
+      in
+      match List.rev info.contexts with
+      | [] -> None
+      | contexts ->
+        let others =
+          List.map contexts ~f:(fun (ctx, loc) ->
+            Sexp.List [ Sexp.Atom "in"; Sexp.Atom (fmt ctx loc) ])
         in
-        let contexts = List.rev_map ~f:string_of_context info.contexts in
-        Some [%message (contexts : string list)])
+        Some (Sexp.List others)
     in
     Compiler_error.fail ~pass:"parser" ?loc ?d msg
 ;;
 
-let tok t = satisfy (equal_token t)
-let fail message = Fn.const (Fail { message; found = None; contexts = [] })
-let fatal message = Fn.const (Fatal { message; found = None; contexts = [] })
+let tok t = satisfy (equal_token t) <?> string_of_token t
+let fail message = Fn.const (Fail { message; expected = []; found = None; contexts = [] })
+
+let fatal message =
+  Fn.const (Fatal { message; expected = []; found = None; contexts = [] })
+;;
 
 let with_loc (p : 'a t) : ('a * loc) t =
   fun st ->

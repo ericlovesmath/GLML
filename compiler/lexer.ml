@@ -56,6 +56,61 @@ type token =
   | ID of string
 [@@deriving sexp, equal]
 
+let string_of_token = function
+  | TRUE -> "true"
+  | FALSE -> "false"
+  | EQ -> "`=`"
+  | ARROW -> "`->`"
+  | LPAREN -> "`(`"
+  | RPAREN -> "`)`"
+  | DOT -> "`.`"
+  | LANGLE -> "`<`"
+  | RANGLE -> "`>`"
+  | LBRACKET -> "`[`"
+  | RBRACKET -> "`]`"
+  | SEMI -> "`;`"
+  | COLON -> "`:`"
+  | COMMA -> "`,`"
+  | IF -> "`if`"
+  | THEN -> "`then`"
+  | ELSE -> "`else`"
+  | LET -> "`let`"
+  | REC -> "`rec`"
+  | IN -> "`in`"
+  | FUN -> "`fun`"
+  | FUNCTION -> "`function`"
+  | BAR -> "`|`"
+  | MATCH -> "`match`"
+  | WITH -> "`with`"
+  | LCURLY -> "`{`"
+  | RCURLY -> "`}`"
+  | BOOL -> "bool"
+  | INT -> "int"
+  | FLOAT -> "float"
+  | TICK -> "`'`"
+  | TYVAR v -> Printf.sprintf "'%s" v
+  | VEC n -> Printf.sprintf "vec%d" n
+  | MAT (n, m) -> Printf.sprintf "mat%dx%d" n m
+  | ADD -> "`+`"
+  | SUB -> "`-`"
+  | DIV -> "`/`"
+  | MUL -> "`*`"
+  | HASH -> "`#`"
+  | LEQ -> "`<=`"
+  | GEQ -> "`>=`"
+  | PERCENT -> "`%`"
+  | LAND -> "`&&`"
+  | LOR -> "`||`"
+  | PIPE -> "`|>`"
+  | EXTERN -> "`#extern`"
+  | TYPE -> "`type`"
+  | OF -> "`of`"
+  | CONSTRUCTOR s -> Printf.sprintf "`%s`" s
+  | NUMERIC n -> Int.to_string n
+  | FLOAT_LIT f -> Printf.sprintf "%g" f
+  | ID s -> Printf.sprintf "`%s`" s
+;;
+
 type pos = Compiler_error.pos [@@deriving sexp_of]
 type loc = Compiler_error.loc [@@deriving sexp_of]
 
