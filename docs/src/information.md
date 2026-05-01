@@ -2,22 +2,15 @@
 
 This page contains a dump of current TODO items and unorganized thoughts and tasks. This will likely stay a mess.
 
-## Bugs
+## Todo Tasks / Bugs
 
-```glml
-// Strange [translate] bug??
-type sdf = vec2 -> float
-let constant (r : float) : sdf = fun p -> r
-let union (f : sdf) _ r = f r
-let dup f g x = f (g x) (g x)
-let scene : sdf = dup union constant 0.3
-let main (coord : vec2) = [0, 0, 0]
-```
-
-- main is mangled so make sure that doesn't happen, must be fixed to coord vec2
-
-## Todo Tasks
-
+- Shorten names of function outputs on monomorphization with long types
+- Allow binary operations and pipes to be used as curried functions
+- Nested destructing, removing mat pattern case
+- User defined constraints for broadcasting/others, eg: `let f (x : a) (y : b) : c where (a b +> c) = x + y`
+- Lava lamp-like example
+- Example storing functions and hotswapping functions during executions to justify DFns in variants
+- Sanity check that mats are truly vec of vecs!
 - More Demos: New examples with HOFs, IQ Palette, Beaver Logo
 - Type annotations for arbitrary terms
 - Promotion with ints/floats (true coercion enforced rather than constraint)
@@ -25,17 +18,13 @@ let main (coord : vec2) = [0, 0, 0]
 - Curried builtin functions for partial application
 - Auto lift `f : float -> float` to work over vecs?
 - Update GLML screenshot
-- Button to show GLSL output on mobile
 - Add builtin GLSL function callers or GLSL extern libraries
-- Add user definable constrained functions?
 - `uintBitsToFloat` instead of fat structs to represent variants, instead storing as uvec4 in raw bits
 - Reuse fields with same type for structs / defunctionalization
 - Tuples and static arrays
 - `when` clause for match statements
-- matching on `struct`s
 - Nested destructing
-- `mat` should be exactly a `vec` of `vec`s, not a new form which makes it ambiguous and prevents non-float vecs
-- add types to new passes like `specialize_params`, also do some general refactoring?
+- add types to new passes like `specialize_params`
 - Pathtracing example
 - Potentially some kind of recursive types like `type list['a] = Nil | Cons of 'a * list['a]`
 - Passing constraints to mono is a bit weird, they should concretize that in `typecheck` step
@@ -58,7 +47,6 @@ let main (coord : vec2) = [0, 0, 0]
 - Constant folding/propagation (Sparse conditional constant propagation)
 - Doc strings or emission of helpful comments
 - Better benchmarking tests
-- Better pipeline tests
 - Buffer passing (e.g. for Game of Life)
 - Example of rendering clouds (volumetric rendering)
 - Add sliders in playground to change values
