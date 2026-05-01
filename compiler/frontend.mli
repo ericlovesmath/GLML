@@ -3,6 +3,7 @@ type pat =
   | PatLitBool of bool
   | PatLitInt of int
   | PatLitFloat of float
+  | PatWildcard
   | PatVar of string
   | PatBracket of pat list
   (** PatRecord of [(binging * pattern) list * is_partial] *)

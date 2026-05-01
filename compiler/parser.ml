@@ -53,7 +53,9 @@ let between brace_type p =
 let rec pat_p st =
   ((let%bind ctor = constructor_p in
     let%bind vars =
-      between `Paren (commas ident_p) <|> (ident_p >>| fun v -> [ v ]) <|> return []
+      (* TODO: This should really be handled in a desugaring pass, similar to the other underscore cases *)
+      let field_p = ident_p <|> tok UNDERSCORE *> return "_wc" in
+      between `Paren (commas field_p) <|> (field_p >>| fun v -> [ v ]) <|> return []
     in
     return (PatCtor (ctor, vars)))
    <|> tok TRUE *> return (PatLitBool true)
@@ -68,22 +70,19 @@ let rec pat_p st =
    <|> (between `Bracket (commas pat_p) >>| fun pats -> PatBracket pats)
    <|> between
          `Curly
-         (tok (ID "_") *> return (PatRecord ([], true))
+         (tok UNDERSCORE *> return (PatRecord ([], true))
           <|>
           let field_p =
-            let%bind id =
-              satisfy_map (function
-                | ID s when not (String.equal s "_") -> Some s
-                | _ -> None)
-            in
+            let%bind id = ident_p in
             let%bind p = tok EQ *> pat_p <|> return (PatVar id) in
             return (id, p)
           in
           let%bind fields = commas field_p in
           let%bind has_wildcard =
-            tok COMMA *> tok (ID "_") *> return true <|> return false
+            tok COMMA *> tok UNDERSCORE *> return true <|> return false
           in
           return (PatRecord (fields, has_wildcard)))
+   <|> tok UNDERSCORE *> return PatWildcard
    <|> (ident_p >>| fun v -> PatVar v)
    <??> "pattern")
     st
@@ -241,6 +240,7 @@ let param_p =
        (let%bind id = ident_p in
         let%bind ty = optional (tok COLON *> ty_p) in
         return (id, ty))
+     <|> tok UNDERSCORE *> return ("_", None)
      <|> (ident_p >>| fun id -> id, None))
   <??> "parameter"
 ;;

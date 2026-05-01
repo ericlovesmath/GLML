@@ -1253,7 +1253,6 @@ let%expect_test "bool match" =
     vec3 main_pure(vec2 coord_0) {
         float x_1;
         if (b) {
-            bool _x_2 = b;
             x_1 = 0.;
         } else {
             x_1 = 1.;
@@ -1296,7 +1295,7 @@ let%expect_test "int match" =
                 break;
             }
             default: {
-                int _x_2 = n;
+                int _wc_4 = n;
                 x_1 = 2.;
                 break;
             }
@@ -1376,7 +1375,7 @@ let%expect_test "float match" =
             if (_lv_cmp_5) {
                 c_1 = 1.;
             } else {
-                float _x_2 = x;
+                float _wc_4 = x;
                 c_1 = 2.;
             }
         }
@@ -1412,7 +1411,7 @@ let%expect_test "float match" =
             if (_lv_cmp_6) {
                 return vec3(0., 1., 0.);
             } else {
-                float _x_1 = x;
+                float _wc_5 = x;
                 return vec3(0., 0., 1.);
             }
         }
@@ -1747,7 +1746,7 @@ let%expect_test "parametrized variants" =
                 break;
             }
             default: {
-                int _x_4 = r_1.Err_0;
+                int _wc_4 = r_1.Err_0;
                 return default_2;
                 break;
             }
@@ -2988,35 +2987,34 @@ let%expect_test "bracket pattern matching" =
     out vec4 fragColor;
     float f_0(vec3 _fn_arg_1) {
         float x_2 = _fn_arg_1[0];
-        float _x_3 = _fn_arg_1[1];
-        float z_4 = _fn_arg_1[2];
-        return (x_2 + z_4);
+        float z_3 = _fn_arg_1[2];
+        return (x_2 + z_3);
     }
-    float g_5(mat2 _fn_arg_6) {
-        vec2 _lv_col_47 = _fn_arg_6[0];
-        float a_7 = _lv_col_47[0];
-        float b_8 = _lv_col_47[1];
-        vec2 _lv_col_46 = _fn_arg_6[1];
-        float c_9 = _lv_col_46[0];
-        float d_10 = _lv_col_46[1];
-        return (a_7 + d_10);
+    float g_4(mat2 _fn_arg_5) {
+        vec2 _lv_col_46 = _fn_arg_5[0];
+        float a_6 = _lv_col_46[0];
+        float b_7 = _lv_col_46[1];
+        vec2 _lv_col_45 = _fn_arg_5[1];
+        float c_8 = _lv_col_45[0];
+        float d_9 = _lv_col_45[1];
+        return (a_6 + d_9);
     }
-    float h_11(vec2 v_12) {
-        float x_13 = v_12[0];
-        float y_14 = v_12[1];
-        return (x_13 + y_14);
+    float h_10(vec2 v_11) {
+        float x_12 = v_11[0];
+        float y_13 = v_11[1];
+        return (x_12 + y_13);
     }
-    vec3 main_pure(vec2 coord_15) {
-        float anf_40 = coord_15[0];
-        float anf_41 = coord_15[1];
-        vec3 anf_42 = vec3(anf_40, anf_41, 0.);
-        float a_16 = f_0(anf_42);
-        vec2 anf_43 = vec2(1., 0.);
-        vec2 anf_44 = vec2(0., 1.);
-        mat2 anf_45 = mat2(anf_43, anf_44);
-        float b_17 = g_5(anf_45);
-        float c_18 = h_11(coord_15);
-        return vec3(a_16, b_17, c_18);
+    vec3 main_pure(vec2 coord_14) {
+        float anf_39 = coord_14[0];
+        float anf_40 = coord_14[1];
+        vec3 anf_41 = vec3(anf_39, anf_40, 0.);
+        float a_15 = f_0(anf_41);
+        vec2 anf_42 = vec2(1., 0.);
+        vec2 anf_43 = vec2(0., 1.);
+        mat2 anf_44 = mat2(anf_42, anf_43);
+        float b_16 = g_4(anf_44);
+        float c_17 = h_10(coord_14);
+        return vec3(a_15, b_16, c_17);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

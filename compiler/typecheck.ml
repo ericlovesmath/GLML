@@ -619,14 +619,13 @@ let rec resolve_stlc_ty (env : env) (t : Frontend.ty) : ty Compiler_error.t =
   | TyVar v -> Ok (TyVar v)
 ;;
 
-let bind_var ctx v ty =
-  if String.equal v "_" then ctx else Map.set ctx ~key:v ~data:([], [], ty)
-;;
+let bind_var ctx v ty = Map.set ctx ~key:v ~data:([], [], ty)
 
 let check_pat (env : env) loc (scrutinee_ty : ty) (pat : Frontend.pat)
   : context Compiler_error.t
   =
   match pat, scrutinee_ty with
+  | Frontend.PatWildcard, _ -> Ok env.ctx
   | Frontend.PatVar v, _ -> Ok (bind_var env.ctx v scrutinee_ty)
   | (PatLitBool _ | PatLitInt _ | PatLitFloat _), _ -> Ok env.ctx
   | PatBracket pats, TyVec (n, elem_ty) ->
@@ -635,6 +634,7 @@ let check_pat (env : env) loc (scrutinee_ty : ty) (pat : Frontend.pat)
     else
       List.fold_result pats ~init:env.ctx ~f:(fun ctx p ->
         match p, elem_ty with
+        | PatWildcard, _ -> Ok ctx
         | PatVar v, _ -> Ok (bind_var ctx v elem_ty)
         | PatBracket inner_pats, TyVec (m, inner_elem_ty) ->
           (* TODO: This will not be necessary once we have nested pattern matching *)
@@ -643,6 +643,7 @@ let check_pat (env : env) loc (scrutinee_ty : ty) (pat : Frontend.pat)
           else
             List.fold_result inner_pats ~init:ctx ~f:(fun ctx p ->
               match p with
+              | PatWildcard -> Ok ctx
               | PatVar v -> Ok (bind_var ctx v inner_elem_ty)
               | _ -> Err.fail "inner vec element pattern must be a variable" ~loc)
         | _ -> Err.fail "vec element pattern must be a variable or bracket" ~loc)
@@ -688,6 +689,7 @@ let check_pat (env : env) loc (scrutinee_ty : ty) (pat : Frontend.pat)
                  let field_ty = subst_ty param_sub ty in
                  let%map ctx =
                    match fpat with
+                   | Frontend.PatWildcard -> Ok ctx
                    | Frontend.PatVar v -> Ok (bind_var ctx v field_ty)
                    | _ -> Err.fail "record field pattern must be a variable" ~loc
                  in
@@ -782,7 +784,7 @@ let resolve_match_scrutinee_ty
     let param_sub = List.map struct_params ~f:(fun p -> p, fresh_tyvar ()) in
     let type_args = List.map param_sub ~f:snd in
     Ok (TyRecord (struct_name, type_args))
-  | Some (PatVar _) -> Ok inferred_ty
+  | Some (PatWildcard | PatVar _) -> Ok inferred_ty
 ;;
 
 let check_match_exhaustiveness
@@ -796,7 +798,11 @@ let check_match_exhaustiveness
   =
   let require_catchall msg = if has_catchall then Ok () else Err.fail msg ~loc in
   match first_pat with
-  | None | Some (Frontend.PatBracket _) | Some (PatRecord _) | Some (PatVar _) -> Ok ()
+  | None
+  | Some (Frontend.PatBracket _)
+  | Some (PatRecord _)
+  | Some (PatWildcard)
+  | Some (PatVar _) -> Ok ()
   | Some (PatLitBool _) ->
     if has_catchall
     then Ok ()
@@ -1272,11 +1278,11 @@ and gen_term (env : env) (t : Desugar.term)
     let has_catchall =
       List.exists cases ~f:(fun (pat, _) ->
         match pat with
-        | Frontend.PatVar _ -> true
+        | Frontend.PatWildcard | Frontend.PatVar _ -> true
         | _ -> false)
     in
     let is_catchall = function
-      | Frontend.PatVar _ -> true
+      | Frontend.PatWildcard | Frontend.PatVar _ -> true
       | _ -> false
     in
     let same_family p q =
@@ -1286,7 +1292,8 @@ and gen_term (env : env) (t : Desugar.term)
       | PatLitInt _, PatLitInt _
       | PatLitFloat _, PatLitFloat _
       | PatBracket _, PatBracket _
-      | PatRecord _, PatRecord _ -> true
+      | PatRecord _, PatRecord _
+      | PatWildcard, PatWildcard -> true
       | _ -> false
     in
     let first_pat =

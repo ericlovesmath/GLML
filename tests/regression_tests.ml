@@ -289,7 +289,7 @@ let%expect_test "regression - polymorphic variant type in function" =
         int _lv_tag_16 = o_1.tag;
         switch (_lv_tag_16) {
             case 0: {
-                float _x_2 = o_1.Some_0;
+                float _wc_2 = o_1.Some_0;
                 return true;
                 break;
             }

@@ -140,6 +140,7 @@ let find_tag (ctors : (string * ty list) list) (ctor : string) : int Compiler_er
 let find_catchall (cases : (Frontend.pat * _) list) =
   List.find_map cases ~f:(fun (pat, body) ->
     match pat with
+    | PatWildcard -> Some (Utils.fresh "_wc", body)
     | PatVar v -> Some (v, body)
     | _ -> None)
 ;;
@@ -333,6 +334,7 @@ and lower_bool_match
     List.find_map cases ~f:(fun (pat, body) ->
       match pat with
       | PatLitBool lit when Bool.equal lit b -> Some (None, body)
+      | PatWildcard -> Some (None, body)
       | PatVar v -> Some (Some v, body)
       | _ -> None)
   in
@@ -472,7 +474,7 @@ and lower_vec_match
     let with_bindings =
       List.fold_right indexed ~init:lowered_body ~f:(fun (i, p) acc ->
         match p with
-        | PatVar v when String.equal v "_" -> acc
+        | PatWildcard -> acc
         | PatVar v ->
           let elem_bind : term = { desc = Index (scrut, i); ty = elem_ty; loc } in
           ({ desc = Let (v, elem_bind, acc); ty = result_ty_lowered; loc } : anf)
@@ -490,7 +492,7 @@ and lower_vec_match
           let inner_with_bindings =
             List.fold_right inner_indexed ~init:acc ~f:(fun (j, p) inner_acc ->
               match p with
-              | PatVar v when String.equal v "_" -> inner_acc
+              | PatWildcard -> inner_acc
               | PatVar v ->
                 let e : term = { desc = Index (col_atom, j); ty = inner_elem_ty; loc } in
                 ({ desc = Let (v, e, inner_acc); ty = result_ty_lowered; loc } : anf)
@@ -540,6 +542,7 @@ and lower_record_match
       List.fold_right fields ~init:(Ok lowered_body) ~f:(fun (fname, fpat) acc ->
         let%map acc = acc in
         match fpat with
+        | PatWildcard -> acc
         | PatVar v ->
           let ty =
             lower_ty (List.Assoc.find_exn struct_fields ~equal:String.equal fname)
@@ -563,12 +566,11 @@ and lower_match
   let kind =
     List.find_map cases ~f:(fun (pat, _) ->
       match pat with
-      | PatVar _ -> None
+      | PatWildcard | PatVar _ -> None
       | _ -> Some pat)
   in
   match kind with
-  | None | Some (PatVar _) ->
-    (* [PatVar] never exists, but needed for exhaustiveness, hacky? *)
+  | None | Some (PatWildcard | PatVar _) ->
     (match cases with
      | [] -> Err.fail "empty cases"
      | (pat, body) :: _ ->

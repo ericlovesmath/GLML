@@ -54,6 +54,7 @@ type token =
   | NUMERIC of int
   | FLOAT_LIT of float
   | ID of string
+  | UNDERSCORE
 [@@deriving sexp, equal]
 
 let string_of_token = function
@@ -109,6 +110,7 @@ let string_of_token = function
   | NUMERIC n -> Int.to_string n
   | FLOAT_LIT f -> Printf.sprintf "%g" f
   | ID s -> Printf.sprintf "`%s`" s
+  | UNDERSCORE -> "`_`"
 ;;
 
 type pos = Compiler_error.pos [@@deriving sexp_of]
@@ -284,6 +286,7 @@ let read_lexeme (t : t) : token Or_error.t =
         | "of" -> Ok OF
         | s when Map.mem vecs s -> Map.find_or_error vecs s
         | s when Map.mem mats s -> Map.find_or_error mats s
+        | "_" -> Ok UNDERSCORE
         | s when Char.is_uppercase (String.get s 0) -> Ok (CONSTRUCTOR s)
         | _ -> Ok (ID s))
      | char -> error_s [%message "lexer: invalid char" (char : char) (t.pos : pos)])
@@ -318,7 +321,7 @@ let%expect_test "lexer" =
     |> print_s
   in
   test "true false = -> ( ) . < >";
-  test "{ } ; : , if then else let";
+  test "{ } ; : , if then else let _";
   test "in fun | match with { } function";
   test "bool int float ' 'a 10 s_var let type of |>";
   test "+ - / * # <= >= % && || extern vec2 mat3x3";
@@ -327,7 +330,7 @@ let%expect_test "lexer" =
   [%expect
     {|
     (Ok (TRUE FALSE EQ ARROW LPAREN RPAREN DOT LANGLE RANGLE))
-    (Ok (LCURLY RCURLY SEMI COLON COMMA IF THEN ELSE LET))
+    (Ok (LCURLY RCURLY SEMI COLON COMMA IF THEN ELSE LET UNDERSCORE))
     (Ok (IN FUN BAR MATCH WITH LCURLY RCURLY FUNCTION))
     (Ok (BOOL INT FLOAT TICK (TYVAR a) (NUMERIC 10) (ID s_var) LET TYPE OF PIPE))
     (Ok (ADD SUB DIV MUL HASH LEQ GEQ PERCENT LAND LOR EXTERN (VEC 2) (MAT 3 3)))

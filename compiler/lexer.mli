@@ -51,6 +51,7 @@ type token =
   | NUMERIC of int
   | FLOAT_LIT of float
   | ID of string
+  | UNDERSCORE
 [@@deriving sexp, equal, to_string]
 
 type t

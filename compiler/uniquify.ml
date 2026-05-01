@@ -90,6 +90,7 @@ let rec uniquify_term (ctx : env) (t : term) : term Compiler_error.t =
               List.fold2_exn vs vs' ~init:ctx ~f:(fun c v v' -> Map.set c ~key:v ~data:v')
             in
             Frontend.PatCtor (ctor, vs'), ctx
+          | PatWildcard -> pat, ctx
           | PatVar v ->
             let v, ctx = fresh v ctx in
             PatVar v, ctx
@@ -98,6 +99,7 @@ let rec uniquify_term (ctx : env) (t : term) : term Compiler_error.t =
             let ctx, pats =
               List.fold_map pats ~init:ctx ~f:(fun ctx p ->
                 match p with
+                | PatWildcard -> ctx, p
                 | PatVar v ->
                   let v, ctx = fresh v ctx in
                   ctx, Frontend.PatVar v
@@ -105,6 +107,7 @@ let rec uniquify_term (ctx : env) (t : term) : term Compiler_error.t =
                   let ctx, inner =
                     List.fold_map inner ~init:ctx ~f:(fun ctx p ->
                       match p with
+                      | PatWildcard -> ctx, p
                       | PatVar v ->
                         let v, ctx = fresh v ctx in
                         ctx, Frontend.PatVar v
@@ -118,7 +121,7 @@ let rec uniquify_term (ctx : env) (t : term) : term Compiler_error.t =
             let ctx, fields =
               List.fold_map fields ~init:ctx ~f:(fun ctx (fname, fpat) ->
                 match fpat with
-                | PatVar v when not (String.equal v "_") ->
+                | PatVar v ->
                   let v, ctx = fresh v ctx in
                   ctx, (fname, Frontend.PatVar v)
                 | _ -> ctx, (fname, fpat))
