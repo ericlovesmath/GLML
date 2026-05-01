@@ -103,6 +103,47 @@ let arrow_parts (fn_ty : ty) (n_args : int) : ty list * ty =
   collect fn_ty, skip n_args fn_ty
 ;;
 
+let rec last_return_ty (a : anf) : ty =
+  match a.desc with
+  | Return t -> t.ty
+  | Let (_, _, tl) | While (_, _, tl) | Set (_, _, tl) -> last_return_ty tl
+  | Continue -> a.ty
+;;
+
+let coerce_term (env : ty String.Map.t) (term : term) : term * bindings =
+  match term.desc with
+  | Atom a ->
+    let a, b = coerce_atom env term.loc a in
+    { term with desc = Atom a; ty = TyFloat }, b
+  | _ ->
+    let v = Utils.fresh "icoerce" in
+    let cast_v = Utils.fresh "pf" in
+    let v_atom : atom = { desc = Var v; ty = TyInt; loc = term.loc } in
+    let cast : term =
+      { desc = Builtin (Float, [ v_atom ]); ty = TyFloat; loc = term.loc }
+    in
+    let new_atom : atom = { desc = Var cast_v; ty = TyFloat; loc = term.loc } in
+    { term with desc = Atom new_atom; ty = TyFloat }, [ v, term; cast_v, cast ]
+;;
+
+let rec coerce_branch (env : ty String.Map.t) (a : anf) : anf =
+  match a.desc with
+  | Return term when equal_ty term.ty TyInt ->
+    let term, binds = coerce_term env term in
+    make_lets binds a.loc { a with desc = Return term; ty = TyFloat }
+  | Return _ -> { a with ty = TyFloat }
+  | Let (v, b, tl) ->
+    let tl = coerce_branch env tl in
+    { a with desc = Let (v, b, tl); ty = tl.ty }
+  | While (c, b, tl) ->
+    let tl = coerce_branch env tl in
+    { a with desc = While (c, b, tl); ty = tl.ty }
+  | Set (v, at, tl) ->
+    let tl = coerce_branch env tl in
+    { a with desc = Set (v, at, tl); ty = tl.ty }
+  | Continue -> a
+;;
+
 let rec promote_anf (env : ty String.Map.t) (anf : anf) : anf =
   match anf.desc with
   | Let (v, bind, tl) ->
@@ -143,10 +184,14 @@ and promote_term (env : ty String.Map.t) (term : term) : term * bindings =
     let l, bl = coerce_atom env loc l in
     let r, br = coerce_atom env loc r in
     { term with desc = Bop (op, l, r) }, bl @ br
+  (* The operands' stamped [.ty] from typecheck may both read [TyInt]
+     even when an earlier promotion in the same scope) has put a [TyFloat]
+     type into [env] for one of them. Resolve through [env] instead. *)
   | Bop (((Lt | Gt | Leq | Geq) as op), l, r), TyBool
-  (* TODO: Insane behavior that I should not be tolerating these stupid edge cases for *)
-    when (equal_ty l.ty TyInt && equal_ty r.ty TyFloat)
-         || (equal_ty l.ty TyFloat && equal_ty r.ty TyInt) ->
+    when let lty = resolve_atom_ty env l in
+         let rty = resolve_atom_ty env r in
+         (equal_ty lty TyInt && equal_ty rty TyFloat)
+         || (equal_ty lty TyFloat && equal_ty rty TyInt) ->
     let l, bl = coerce_atom env loc l in
     let r, br = coerce_atom env loc r in
     { term with desc = Bop (op, l, r) }, bl @ br
@@ -205,11 +250,121 @@ and promote_term (env : ty String.Map.t) (term : term) : term * bindings =
     in
     { term with desc = Record (s, atoms) }, binds
   | If (c, t, e), _ ->
-    { term with desc = If (c, promote_anf env t, promote_anf env e) }, []
+    let t = promote_anf env t in
+    let e = promote_anf env e in
+    let t, e, ty =
+      if equal_ty (last_return_ty t) TyFloat || equal_ty (last_return_ty e) TyFloat
+      then coerce_branch env t, coerce_branch env e, TyFloat
+      else t, e, term.ty
+    in
+    { term with desc = If (c, t, e); ty }, []
   | Switch (tag, cases), _ ->
     let desc = Switch (tag, List.map cases ~f:(fun (l, b) -> l, promote_anf env b)) in
     { term with desc }, []
   | Field _, _ -> term, []
+;;
+
+let resolve_var_ty (env : ty String.Map.t) (mf : String.Set.t) (v : string) : ty =
+  if Set.mem mf v then TyFloat else Map.find env v |> Option.value ~default:TyInt
+;;
+
+let resolve_atom_ty_mf (env : ty String.Map.t) (mf : String.Set.t) (a : atom) : ty =
+  match a.desc with
+  | Var v -> resolve_var_ty env mf v
+  | Float _ -> TyFloat
+  | Int _ -> TyInt
+  | Bool _ -> TyBool
+  | Temp -> a.ty
+;;
+
+let rec predict_anf_ty (env : ty String.Map.t) (mf : String.Set.t) (a : anf) : ty =
+  match a.desc with
+  | Return t -> predict_term_ty env mf t
+  | Let (v, bind, tl) ->
+    let bty = predict_term_ty env mf bind in
+    let mf = if equal_ty bty TyFloat then Set.add mf v else mf in
+    predict_anf_ty env mf tl
+  | While (_, _, tl) | Set (_, _, tl) -> predict_anf_ty env mf tl
+  | Continue -> a.ty
+
+and predict_term_ty (env : ty String.Map.t) (mf : String.Set.t) (t : term) : ty =
+  match t.desc with
+  | Atom a when equal_ty t.ty TyInt ->
+    (match resolve_atom_ty_mf env mf a with
+     | TyFloat -> TyFloat
+     | _ -> t.ty)
+  | Bop (_, l, r) when equal_ty t.ty TyInt ->
+    let lty = resolve_atom_ty_mf env mf l in
+    let rty = resolve_atom_ty_mf env mf r in
+    if equal_ty lty TyFloat || equal_ty rty TyFloat then TyFloat else t.ty
+  | If (_, t', e') ->
+    let tt = predict_anf_ty env mf t' in
+    let et = predict_anf_ty env mf e' in
+    if equal_ty tt TyFloat || equal_ty et TyFloat then TyFloat else t.ty
+  | App (f, atoms) ->
+    (match Map.find env f with
+     | Some fn_ty -> snd (arrow_parts fn_ty (List.length atoms))
+     | None -> t.ty)
+  | _ -> t.ty
+;;
+
+(** Accumulative set of vars that must be coerced *)
+let rec collect_anf (env : ty String.Map.t) (mf : String.Set.t) (a : anf) : String.Set.t =
+  match a.desc with
+  | Let (v, bind, tl) ->
+    let mf = collect_term env mf bind in
+    let bty = predict_term_ty env mf bind in
+    let mf = if equal_ty bty TyFloat then Set.add mf v else mf in
+    collect_anf env mf tl
+  | Return t -> collect_term env mf t
+  | While (cond, body, tl) ->
+    let mf = collect_term env mf cond in
+    let mf = collect_anf env mf body in
+    collect_anf env mf tl
+  | Set (v, atom, tl) ->
+    let aty = resolve_atom_ty_mf env mf atom in
+    let mf = if equal_ty aty TyFloat then Set.add mf v else mf in
+    collect_anf env mf tl
+  | Continue -> mf
+
+and collect_term (env : ty String.Map.t) (mf : String.Set.t) (t : term) : String.Set.t =
+  match t.desc with
+  | If (_, t', e') ->
+    let mf = collect_anf env mf t' in
+    collect_anf env mf e'
+  | Switch (_, cases) ->
+    List.fold cases ~init:mf ~f:(fun acc (_, b) -> collect_anf env acc b)
+  | _ -> mf
+;;
+
+(* Iterate [collect_anf] to a fixpoint, function is monotone so termination is guarenteed
+   to terminate, but not sure how efficient this is? *)
+let must_float_of_body (env : ty String.Map.t) (body : anf) : String.Set.t =
+  let rec fix mf =
+    let mf' = collect_anf env mf body in
+    if Set.equal mf mf' then mf else fix mf'
+  in
+  fix String.Set.empty
+;;
+
+(** Run the fixpoint on a [Define] and rewrite its [args] + [top.ty] so any
+    int param that the body treats as float gets declared as float. *)
+let upgrade_define (global_env : ty String.Map.t) (top : top) : top =
+  match top.desc with
+  | Define ({ args; body; ret_ty; _ } as d) ->
+    let arg_env =
+      List.fold args ~init:global_env ~f:(fun acc (v, ty) -> Map.set acc ~key:v ~data:ty)
+    in
+    let mf = must_float_of_body arg_env body in
+    let args' =
+      List.map args ~f:(fun (v, ty) ->
+        if Set.mem mf v && equal_ty ty TyInt then v, TyFloat else v, ty)
+    in
+    let new_ty =
+      List.fold_right args' ~init:ret_ty ~f:(fun (_, t) acc -> TyArrow (t, acc))
+    in
+    { top with desc = Define { d with args = args' }; ty = new_ty }
+  | _ -> top
 ;;
 
 let promote_top (env : ty String.Map.t) (top : top) : top =
@@ -223,15 +378,19 @@ let promote_top (env : ty String.Map.t) (top : top) : top =
   | Extern _ | TypeDef _ -> top
 ;;
 
+let build_global_env tops =
+  List.fold tops ~init:String.Map.empty ~f:(fun acc top ->
+    match top.desc with
+    | Extern name -> Map.set acc ~key:name ~data:top.ty
+    | Const (name, body) -> Map.set acc ~key:name ~data:body.ty
+    | Define { name; _ } -> Map.set acc ~key:name ~data:top.ty
+    | TypeDef _ -> acc)
+;;
+
 let promote (Program tops : t) : t =
   let tops = List.map tops ~f:map_ty_top in
-  let global_env =
-    List.fold tops ~init:String.Map.empty ~f:(fun acc top ->
-      match top.desc with
-      | Extern name -> Map.set acc ~key:name ~data:top.ty
-      | Const (name, body) -> Map.set acc ~key:name ~data:body.ty
-      | Define { name; _ } -> Map.set acc ~key:name ~data:top.ty
-      | TypeDef _ -> acc)
-  in
+  let env = build_global_env tops in
+  let tops = List.map tops ~f:(upgrade_define env) in
+  let global_env = build_global_env tops in
   Program (List.map tops ~f:(promote_top global_env))
 ;;
