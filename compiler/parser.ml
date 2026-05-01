@@ -875,7 +875,7 @@ let%expect_test "parse error messages" =
   [%expect
     {|
     [parser] at 1:17-1:18: expected `=` but found `,`
-      in: "a let expression at 1:11-1:14"
+      in: "let expression at 1:11-1:14"
       in: "a top-level definition at 1:1-1:4"
       |
     1 | let f x = let y , = 2 in y
@@ -885,7 +885,7 @@ let%expect_test "parse error messages" =
   [%expect
     {|
     [parser] at 1:23-1:23: expected `|` but found end of input
-      in: "a match expression at 1:11-1:16"
+      in: "match expression at 1:11-1:16"
       in: "a top-level definition at 1:1-1:4"
       |
     1 | let f x = match x with
@@ -895,7 +895,7 @@ let%expect_test "parse error messages" =
   [%expect
     {|
     [parser] at 1:12-1:12: expected `else` but found end of input
-      in: "an if expression at 1:1-1:3"
+      in: "if expression at 1:1-1:3"
       |
     1 | if x then y
       |            ^
