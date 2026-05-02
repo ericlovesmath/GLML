@@ -2,71 +2,69 @@
 
 This page contains a dump of current TODO items and unorganized thoughts and tasks. This will likely stay a mess.
 
-## Todo Tasks / Bugs
+## Tasks / Bugs
 
 - Shorten names of function outputs on monomorphization with long types
 - Allow binary operations and pipes to be used as curried functions
 - Nested destructing, removing mat pattern case
 - User defined constraints for broadcasting/others, eg: `let f (x : a) (y : b) : c where (a b +> c) = x + y`
-- Lava lamp-like example
-- Example storing functions and hotswapping functions during executions to justify DFns in variants
 - Sanity check that mats are truly vec of vecs!
-- More Demos: New examples with HOFs, IQ Palette, Beaver Logo
 - Type annotations for arbitrary terms
 - Promotion with ints/floats (true coercion enforced rather than constraint)
 - Type aliases with parameters
 - Curried builtin functions for partial application
 - Auto lift `f : float -> float` to work over vecs?
-- Update GLML screenshot
 - Add builtin GLSL function callers or GLSL extern libraries
 - `uintBitsToFloat` instead of fat structs to represent variants, instead storing as uvec4 in raw bits
 - Reuse fields with same type for structs / defunctionalization
 - Tuples and static arrays
 - `when` clause for match statements
-- Nested destructing
-- add types to new passes like `specialize_params`
-- Pathtracing example
+- Add types to new passes like `specialize_params`
 - Potentially some kind of recursive types like `type list['a] = Nil | Cons of 'a * list['a]`
 - Passing constraints to mono is a bit weird, they should concretize that in `typecheck` step
 - Merging specialize and mono passes since they interplay like they're supposed to be the same pass
 - Mutual recursion
-- Make logo with GLML
 - Add a guide or overview to playground
-- Export to shadertoy?
 - Refactor Makefile if needed to shared playground build files, since we rebuild playground on serve
 - Add common GLSL builtins: `#radians` / `#degrees`, `#refract`, `#faceforward`, `#dFdx`, `#dFdy`, `#fwidth`,`#matrixCompMult`, `#transpose`, `#inverse`, `#determinant`
 
-## Long term Todo Tasks
+## Example Ideas
 
+- Raymarched volumetric clouds
+- Buffer passing uses (e.g. Game of Life)
+- Lava lamp-like example
+- Example storing functions and hotswapping functions during executions to justify DFns in variants
+- Pathtracing
+- Make logo with GLML (finish beaver)
+
+## Long Term Tasks
+
+- Update GLML screenshot
 - Implicit error field added to every function to propagate error color back
-- Add support for LSP hover or something like an [inspect]
-- Typechecking (Church-typed LC -> HM -> Size dependent)
+- Add support for LSP hover or something, at least a simple [inspect] for the playground
+- Size dependent types
 - Swizzle syntax or some kind of rank polymorphism
 - Function `inlining` / `specialize` (but likely everything is specialized)
 - Dead code elimination
 - Constant folding/propagation (Sparse conditional constant propagation)
 - Doc strings or emission of helpful comments
 - Better benchmarking tests
-- Buffer passing (e.g. for Game of Life)
-- Example of rendering clouds (volumetric rendering)
 - Add sliders in playground to change values
 - Update blog posts
-- Set up vim/treesitter plugins
-- Set up Github org more
-- Vim/Emacs syntax file
+- Set up Neovim/Emacs/Treesitter plugins
+- Set up Github organization
 - Add language reference and examples to mdbook
-- TUI pass explorer with minttea (bug with conflicting minttea and Core naming preventing this)
 
 ## Potentially Interesting Thoughts
 
 - `wasm_of_ocaml` build? `Core` seems to cause `Error: Base_am_testing not implemented`
-- Do I separate camera and make it specific like a 3D ShaderToy for Raymarching in the web playground?
 - Write Nix derivation for Javascript and OCaml bindings
 - Emit on compilation what data needs to be passed from host
 - Indexing vectors by arbitrary terms?
 - Differentiate int and float division explicitly
 - Have `int <: float` be a true subtype (currently can't assign `let (x : option[float]) = Some 5`)
 - WebGPU backend for computer shaders and SSBOs?
+- Export to shadertoy?
 
 ## Resources
 
