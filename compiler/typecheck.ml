@@ -1007,6 +1007,16 @@ let check_match_exhaustiveness
       | _ -> Err.fail "expected variant scrutinee type for exhaustiveness check" ~loc)
 ;;
 
+let coerce_arg_to_ty loc (arg : term) (expected_ty : ty) : term * constr list =
+  let c desc = { desc; loc } in
+  match expected_ty with
+  | TyFloat ->
+    let coerce_ty = fresh_tyvar () in
+    ( { arg with ty = coerce_ty }
+    , [ c (HasClass (Comparable, arg.ty)); c (Broadcast (arg.ty, TyFloat, coerce_ty)) ] )
+  | _ -> arg, [ c (Coerce (arg.ty, expected_ty)) ]
+;;
+
 let rec infer_binding
           (env : env)
           (loc : Lexer.loc)
@@ -1108,9 +1118,9 @@ and gen_term (env : env) (t : Desugar.term)
     let x = { x with ty = arg_ty } in
     let composed = compose_sub sub_x sub_f in
     Ok ({ desc = App (f, x); ty = ret_ty; loc }, constrs, composed)
-  | Let (Nonrec, v, return_ty, bind_stlc, body_stlc) ->
+  | Let (recur, v, return_ty, bind_stlc, body_stlc) ->
     let%bind bind, _, env, scheme_constrs, remaining, sub_bind =
-      infer_binding env loc bind_stlc Nonrec v return_ty
+      infer_binding env loc bind_stlc recur v return_ty
     in
     let%bind body, constrs_body, body_sub = gen_term env body_stlc in
     let bind = subst_term body_sub bind in
@@ -1118,20 +1128,7 @@ and gen_term (env : env) (t : Desugar.term)
     let scheme_constrs = subst_constraints body_sub scheme_constrs in
     let composed = compose_sub body_sub sub_bind in
     Ok
-      ( { desc = Let (Nonrec, v, scheme_constrs, bind, body); ty = body.ty; loc }
-      , remaining @ constrs_body
-      , composed )
-  | Let (Rec n, v, return_ty, bind_stlc, body_stlc) ->
-    let%bind bind, _, env, scheme_constrs, remaining, sub_bind =
-      infer_binding env loc bind_stlc (Rec n) v return_ty
-    in
-    let%bind body, constrs_body, body_sub = gen_term env body_stlc in
-    let bind = subst_term body_sub bind in
-    let remaining = subst_constraints body_sub remaining in
-    let scheme_constrs = subst_constraints body_sub scheme_constrs in
-    let composed = compose_sub body_sub sub_bind in
-    Ok
-      ( { desc = Let (Rec n, v, scheme_constrs, bind, body); ty = body.ty; loc }
+      ( { desc = Let (recur, v, scheme_constrs, bind, body); ty = body.ty; loc }
       , remaining @ constrs_body
       , composed )
   | If (c, t, e) ->
@@ -1359,16 +1356,7 @@ and gen_term (env : env) (t : Desugar.term)
              match List.Assoc.find fields ~equal:String.equal name with
              | Some arg ->
                let%bind arg, constrs, sub = gen_term env arg in
-               let arg, field_constrs =
-                 match ty with
-                 | TyFloat ->
-                   let coerce_ty = fresh_tyvar () in
-                   ( { arg with ty = coerce_ty }
-                   , [ constr (HasClass (Comparable, arg.ty))
-                     ; constr (Broadcast (arg.ty, TyFloat, coerce_ty))
-                     ] )
-                 | _ -> arg, [ constr (Coerce (arg.ty, ty)) ]
-               in
+               let arg, field_constrs = coerce_arg_to_ty loc arg ty in
                return
                  ( arg :: acc
                  , field_constrs @ constrs @ acc_constrs
@@ -1410,23 +1398,12 @@ and gen_term (env : env) (t : Desugar.term)
     then Err.fail "wrong number of args to constructor" ~loc ~d:[%message (ctor : string)]
     else (
       let%bind args, constrs_args, sub_var =
-        List.fold2_exn
-          args
-          expected_arg_tys
-          ~init:(Ok ([], [], []))
-          ~f:(fun acc arg expected_ty ->
-            let%bind acc_args, acc_constrs, acc_sub = acc in
+        List.fold_result
+          (List.zip_exn args expected_arg_tys)
+          ~init:([], [], [])
+          ~f:(fun (acc_args, acc_constrs, acc_sub) (arg, expected_ty) ->
             let%bind arg, constrs, sub = gen_term env arg in
-            let arg, arg_constrs =
-              match expected_ty with
-              | TyFloat ->
-                let coerce_ty = fresh_tyvar () in
-                ( { arg with ty = coerce_ty }
-                , [ constr (HasClass (Comparable, arg.ty))
-                  ; constr (Broadcast (arg.ty, TyFloat, coerce_ty))
-                  ] )
-              | _ -> arg, [ constr (Coerce (arg.ty, expected_ty)) ]
-            in
+            let arg, arg_constrs = coerce_arg_to_ty loc arg expected_ty in
             return
               ( arg :: acc_args
               , arg_constrs @ constrs @ acc_constrs
