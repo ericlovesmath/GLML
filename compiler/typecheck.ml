@@ -409,8 +409,14 @@ let resolve_constraints structs (constrs : constr list)
       else
         Err.fail "class constraint failed" ~loc ~d:[%message (cls : type_class) (ty : ty)]
     | ({ desc = Broadcast (l, r, ret); loc } as c) :: rest ->
-      (* TODO: A lot of these cases feel like they could be merged *)
-      (* Shape-only reasoning, since int/float subtyping is delegated entirely to [Coerce] *)
+      let mk desc = { desc; loc } in
+      let broadcast_vec_scalar n t s =
+        let bt = fresh_tyvar () in
+        aux deferred ((loc, ret, TyVec (n, bt)) :: eqs) (mk (Broadcast (s, t, bt)) :: rest)
+      in
+      let coerce_pair a b =
+        aux deferred eqs (mk (Coerce (a, ret)) :: mk (Coerce (b, ret)) :: rest)
+      in
       (match l, r with
        | TyVar a, TyVar b when String.equal a b ->
          aux (c :: deferred) ((loc, ret, l) :: eqs) rest
@@ -419,116 +425,75 @@ let resolve_constraints structs (constrs : constr list)
          aux
            deferred
            ((loc, ret, TyVec (n, bt)) :: eqs)
-           ({ desc = Broadcast (t, t', bt); loc } :: rest)
-       | TyVec (n, t), s when is_scalar s ->
-         let bt = fresh_tyvar () in
-         aux
-           deferred
-           ((loc, ret, TyVec (n, bt)) :: eqs)
-           ({ desc = Broadcast (s, t, bt); loc } :: rest)
-       | s, TyVec (n, t) when is_scalar s ->
-         let bt = fresh_tyvar () in
-         aux
-           deferred
-           ((loc, ret, TyVec (n, bt)) :: eqs)
-           ({ desc = Broadcast (s, t, bt); loc } :: rest)
-       | _, _ when is_scalar l && is_scalar r ->
-         aux
-           deferred
-           eqs
-           ({ desc = Coerce (l, ret); loc } :: { desc = Coerce (r, ret); loc } :: rest)
+           (mk (Broadcast (t, t', bt)) :: rest)
+       | TyVec (n, t), s when is_scalar s -> broadcast_vec_scalar n t s
+       | s, TyVec (n, t) when is_scalar s -> broadcast_vec_scalar n t s
+       | _, _ when is_scalar l && is_scalar r -> coerce_pair l r
        | (TyVar _ as v), s
          when is_scalar s && Set.is_empty (ftv_of_ty ret) && is_scalar ret ->
-         aux
-           deferred
-           eqs
-           ({ desc = Coerce (v, ret); loc } :: { desc = Coerce (s, ret); loc } :: rest)
+         coerce_pair v s
        | s, (TyVar _ as v)
          when is_scalar s && Set.is_empty (ftv_of_ty ret) && is_scalar ret ->
-         aux
-           deferred
-           eqs
-           ({ desc = Coerce (s, ret); loc } :: { desc = Coerce (v, ret); loc } :: rest)
+         coerce_pair s v
        | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
        | _ -> Err.fail "invalid broadcast" ~loc ~d:[%message (l : ty) (r : ty)])
     | ({ desc = MulBroadcast (l, r, ret); loc } as c) :: rest ->
-      (* Shape-only reasoning here too *)
+      let mk desc = { desc; loc } in
+      let mul_mat_scalar n m t s =
+        let bt = fresh_tyvar () in
+        aux
+          deferred
+          ((loc, ret, TyVec (n, TyVec (m, bt))) :: eqs)
+          (mk (MulBroadcast (s, t, bt)) :: rest)
+      in
+      let mul_vec_scalar n t s =
+        let bt = fresh_tyvar () in
+        aux
+          deferred
+          ((loc, ret, TyVec (n, bt)) :: eqs)
+          (mk (MulBroadcast (s, t, bt)) :: rest)
+      in
+      let coerce_pair a b =
+        aux deferred eqs (mk (Coerce (a, ret)) :: mk (Coerce (b, ret)) :: rest)
+      in
       (match l, r with
        | TyVar a, TyVar b when String.equal a b ->
          aux (c :: deferred) ((loc, ret, l) :: eqs) rest
-       (* mat * mat *)
        | TyVec (n, TyVec (m, t)), TyVec (n', TyVec (m', t')) when n = n' && m = m' ->
          let bt = fresh_tyvar () in
          aux
            deferred
            ((loc, ret, TyVec (n, TyVec (m, bt))) :: eqs)
-           ({ desc = MulBroadcast (t, t', bt); loc } :: rest)
-       (* mat * scalar *)
-       | TyVec (n, TyVec (m, t)), s when is_scalar s ->
-         let bt = fresh_tyvar () in
-         aux
-           deferred
-           ((loc, ret, TyVec (n, TyVec (m, bt))) :: eqs)
-           ({ desc = MulBroadcast (s, t, bt); loc } :: rest)
-       | s, TyVec (n, TyVec (m, t)) when is_scalar s ->
-         let bt = fresh_tyvar () in
-         aux
-           deferred
-           ((loc, ret, TyVec (n, TyVec (m, bt))) :: eqs)
-           ({ desc = MulBroadcast (s, t, bt); loc } :: rest)
-       (* mat * vec *)
+           (mk (MulBroadcast (t, t', bt)) :: rest)
+       | TyVec (n, TyVec (m, t)), s when is_scalar s -> mul_mat_scalar n m t s
+       | s, TyVec (n, TyVec (m, t)) when is_scalar s -> mul_mat_scalar n m t s
        | TyVec (cols, TyVec (rows, t)), TyVec (rows', t') when rows = rows' ->
          let bt = fresh_tyvar () in
          aux
            deferred
            ((loc, ret, TyVec (cols, bt)) :: eqs)
-           ({ desc = MulBroadcast (t, t', bt); loc } :: rest)
-       (* vec * mat *)
+           (mk (MulBroadcast (t, t', bt)) :: rest)
        | TyVec (cols, t), TyVec (cols', TyVec (rows, t')) when cols = cols' ->
          let bt = fresh_tyvar () in
          aux
            deferred
            ((loc, ret, TyVec (rows, bt)) :: eqs)
-           ({ desc = MulBroadcast (t, t', bt); loc } :: rest)
-       (* flat vec * flat vec (element-wise) *)
+           (mk (MulBroadcast (t, t', bt)) :: rest)
        | TyVec (n, t), TyVec (n', t') when n = n' ->
          let bt = fresh_tyvar () in
          aux
            deferred
            ((loc, ret, TyVec (n, bt)) :: eqs)
-           ({ desc = MulBroadcast (t, t', bt); loc } :: rest)
-       (* scalar * vec *)
-       | TyVec (n, t), s when is_scalar s ->
-         let bt = fresh_tyvar () in
-         aux
-           deferred
-           ((loc, ret, TyVec (n, bt)) :: eqs)
-           ({ desc = MulBroadcast (s, t, bt); loc } :: rest)
-       | s, TyVec (n, t) when is_scalar s ->
-         let bt = fresh_tyvar () in
-         aux
-           deferred
-           ((loc, ret, TyVec (n, bt)) :: eqs)
-           ({ desc = MulBroadcast (s, t, bt); loc } :: rest)
-       (* scalar * scalar *)
-       | _, _ when is_scalar l && is_scalar r ->
-         aux
-           deferred
-           eqs
-           ({ desc = Coerce (l, ret); loc } :: { desc = Coerce (r, ret); loc } :: rest)
-       (* var paired with a concrete scalar and concrete scalar ret *)
+           (mk (MulBroadcast (t, t', bt)) :: rest)
+       | TyVec (n, t), s when is_scalar s -> mul_vec_scalar n t s
+       | s, TyVec (n, t) when is_scalar s -> mul_vec_scalar n t s
+       | _, _ when is_scalar l && is_scalar r -> coerce_pair l r
        | (TyVar _ as v), s
          when is_scalar s && Set.is_empty (ftv_of_ty ret) && is_scalar ret ->
-         aux
-           deferred
-           eqs
-           ({ desc = Coerce (v, ret); loc } :: { desc = Coerce (s, ret); loc } :: rest)
+         coerce_pair v s
        | s, (TyVar _ as v)
          when is_scalar s && Set.is_empty (ftv_of_ty ret) && is_scalar ret ->
-         aux
-           deferred
-           eqs
-           ({ desc = Coerce (s, ret); loc } :: { desc = Coerce (v, ret); loc } :: rest)
+         coerce_pair s v
        | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
        | _ -> Err.fail "invalid mul/div broadcast" ~loc ~d:[%message (l : ty) (r : ty)])
     | ({ desc = IndexAccess (t, i, ret); loc } as c) :: rest ->
@@ -566,30 +531,27 @@ let resolve_constraints structs (constrs : constr list)
                 aux deferred ((loc, ret, field_ty) :: eqs) rest))
        | ty -> Err.fail "field access on non-record type" ~loc ~d:[%message (ty : ty)])
     | ({ desc = Coerce (from_ty, to_ty); loc } as c) :: rest ->
+      let mk desc = { desc; loc } in
       if equal_ty from_ty to_ty
       then aux deferred eqs rest
       else (
+        let coerce_type_args s args s' args' =
+          if String.equal s s' && List.length args = List.length args'
+          then
+            aux
+              deferred
+              eqs
+              (List.map2_exn args args' ~f:(fun a b -> mk (Coerce (a, b))) @ rest)
+          else aux deferred ((loc, from_ty, to_ty) :: eqs) rest
+        in
         match from_ty, to_ty with
         | TyInt, TyFloat -> aux deferred eqs rest
         | TyArrow (p, r), TyArrow (p', r') ->
-          aux
-            deferred
-            eqs
-            ({ desc = Coerce (p', p); loc } :: { desc = Coerce (r, r'); loc } :: rest)
+          aux deferred eqs (mk (Coerce (p', p)) :: mk (Coerce (r, r')) :: rest)
         | TyVec (n, t), TyVec (n', t') when n = n' ->
-          aux deferred eqs ({ desc = Coerce (t, t'); loc } :: rest)
-        | TyRecord (s, args), TyRecord (s', args')
-          when String.equal s s' && List.length args = List.length args' ->
-          let extras =
-            List.map2_exn args args' ~f:(fun a b -> { desc = Coerce (a, b); loc })
-          in
-          aux deferred eqs (extras @ rest)
-        | TyVariant (s, args), TyVariant (s', args')
-          when String.equal s s' && List.length args = List.length args' ->
-          let extras =
-            List.map2_exn args args' ~f:(fun a b -> { desc = Coerce (a, b); loc })
-          in
-          aux deferred eqs (extras @ rest)
+          aux deferred eqs (mk (Coerce (t, t')) :: rest)
+        | TyRecord (s, args), TyRecord (s', args') -> coerce_type_args s args s' args'
+        | TyVariant (s, args), TyVariant (s', args') -> coerce_type_args s args s' args'
         | TyVar _, _ | _, TyVar _ ->
           (* NOTE: When we have a [TyVar], defer for the LUB-resolution phase.
              We SHOULD NOT eagerly unify here, premature unification can lock
@@ -605,20 +567,19 @@ let rec join_ty (a : ty) (b : ty) : ty option =
   if equal_ty a b
   then Some a
   else (
+    let join_nominal mk s args s' args' =
+      if String.equal s s' && List.length args = List.length args'
+      then List.map2_exn args args' ~f:join_ty |> Option.all |> Option.map ~f:(mk s)
+      else None
+    in
     match a, b with
     | TyInt, TyFloat | TyFloat, TyInt -> Some TyFloat
     | TyVec (n, t), TyVec (n', t') when n = n' ->
       Option.map (join_ty t t') ~f:(fun t -> TyVec (n, t))
-    | TyRecord (s, args), TyRecord (s', args')
-      when String.equal s s' && List.length args = List.length args' ->
-      List.map2_exn args args' ~f:join_ty
-      |> Option.all
-      |> Option.map ~f:(fun ts -> TyRecord (s, ts))
-    | TyVariant (s, args), TyVariant (s', args')
-      when String.equal s s' && List.length args = List.length args' ->
-      List.map2_exn args args' ~f:join_ty
-      |> Option.all
-      |> Option.map ~f:(fun ts -> TyVariant (s, ts))
+    | TyRecord (s, args), TyRecord (s', args') ->
+      join_nominal (fun s ts -> TyRecord (s, ts)) s args s' args'
+    | TyVariant (s, args), TyVariant (s', args') ->
+      join_nominal (fun s ts -> TyVariant (s, ts)) s args s' args'
     | _ -> None)
 ;;
 
