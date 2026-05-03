@@ -28,28 +28,28 @@ let%expect_test "compile examples" =
         float Rect_1;
     };
     float sdf_shape_0(shape s_1, vec2 p_2) {
-        int _lv_tag_225 = s_1.tag;
-        switch (_lv_tag_225) {
+        int _lv_tag_226 = s_1.tag;
+        switch (_lv_tag_226) {
             case 0: {
                 float r_3 = s_1.Circle_0;
-                float anf_187 = length(p_2);
-                return (anf_187 - r_3);
+                float anf_188 = length(p_2);
+                return (anf_188 - r_3);
                 break;
             }
             case 1: {
                 float w_4 = s_1.Rect_0;
                 float h_5 = s_1.Rect_1;
-                vec2 anf_188 = abs(p_2);
-                vec2 anf_189 = vec2(w_4, h_5);
-                vec2 d_6 = (anf_188 - anf_189);
-                vec2 anf_190 = vec2(0., 0.);
-                vec2 anf_191 = max(d_6, anf_190);
-                float anf_192 = length(anf_191);
-                float anf_193 = d_6[0];
-                float anf_194 = d_6[1];
-                float anf_195 = max(anf_193, anf_194);
-                float anf_196 = min(anf_195, 0.);
-                return (anf_192 + anf_196);
+                vec2 anf_189 = abs(p_2);
+                vec2 anf_190 = vec2(w_4, h_5);
+                vec2 d_6 = (anf_189 - anf_190);
+                vec2 anf_191 = vec2(0., 0.);
+                vec2 anf_192 = max(d_6, anf_191);
+                float anf_193 = length(anf_192);
+                float anf_194 = d_6[0];
+                float anf_195 = d_6[1];
+                float anf_196 = max(anf_194, anf_195);
+                float anf_197 = min(anf_196, 0.);
+                return (anf_193 + anf_197);
                 break;
             }
             default: {
@@ -58,101 +58,101 @@ let%expect_test "compile examples" =
             }
         }
     }
-    struct DFn_170 {
+    struct DFn_171 {
         int tag;
-        shape lctor_173_0;
-        shape lctor_176_0;
+        shape lctor_174_0;
+        shape lctor_177_0;
     };
-    struct DFn_181 {
+    struct DFn_182 {
         int tag;
-        DFn_170 lctor_182_0;
-        DFn_170 lctor_182_1;
+        DFn_171 lctor_183_0;
+        DFn_171 lctor_183_1;
     };
-    DFn_181 scene_11() {
-        shape anf_197 = shape(0, 0.3, 0., 0.);
-        shape _tmp_227;
-        DFn_170 circle_12 = DFn_170(0, anf_197, _tmp_227);
-        shape anf_198 = shape(1, 0., 0.7, 0.1);
+    DFn_182 scene_11() {
+        shape anf_198 = shape(0, 0.3, 0., 0.);
         shape _tmp_228;
-        DFn_170 rect_13 = DFn_170(1, _tmp_228, anf_198);
-        return DFn_181(0, circle_12, rect_13);
+        DFn_171 circle_12 = DFn_171(0, anf_198, _tmp_228);
+        shape anf_199 = shape(1, 0., 0.7, 0.1);
+        shape _tmp_229;
+        DFn_171 rect_13 = DFn_171(1, _tmp_229, anf_199);
+        return DFn_182(0, circle_12, rect_13);
     }
-    float dapply_169(DFn_170 dfn_183, vec2 da_184) {
-        int _lv_tag_226 = dfn_183.tag;
-        switch (_lv_tag_226) {
+    float dapply_170(DFn_171 dfn_184, vec2 da_185) {
+        int _lv_tag_227 = dfn_184.tag;
+        switch (_lv_tag_227) {
             case 0: {
-                shape ca_172 = dfn_183.lctor_173_0;
-                return sdf_shape_0(ca_172, da_184);
+                shape ca_173 = dfn_184.lctor_174_0;
+                return sdf_shape_0(ca_173, da_185);
                 break;
             }
             default: {
-                shape ca_175 = dfn_183.lctor_176_0;
-                return sdf_shape_0(ca_175, da_184);
+                shape ca_176 = dfn_184.lctor_177_0;
+                return sdf_shape_0(ca_176, da_185);
                 break;
             }
         }
     }
     uniform vec2 u_mouse;
     uniform vec2 u_resolution;
-    vec2 get_uv_14_vec2_to_vec2_165(vec2 coord_15) {
-        vec2 anf_199 = (2. * coord_15);
-        vec2 top_16 = (anf_199 - u_resolution);
-        float anf_200 = u_resolution[0];
-        float anf_201 = u_resolution[1];
-        float bot_17 = min(anf_200, anf_201);
+    vec2 get_uv_14_vec2_to_vec2_166(vec2 coord_15) {
+        vec2 anf_200 = (2. * coord_15);
+        vec2 top_16 = (anf_200 - u_resolution);
+        float anf_201 = u_resolution[0];
+        float anf_202 = u_resolution[1];
+        float bot_17 = min(anf_201, anf_202);
         return (top_16 / bot_17);
     }
-    float union_7(DFn_170 f_8, DFn_170 f_prime_9, vec2 p_10) {
-        float anf_202 = dapply_169(f_8, p_10);
-        float anf_203 = dapply_169(f_prime_9, p_10);
-        return min(anf_202, anf_203);
+    float union_7(DFn_171 f_8, DFn_171 f_prime_9, vec2 p_10) {
+        float anf_203 = dapply_170(f_8, p_10);
+        float anf_204 = dapply_170(f_prime_9, p_10);
+        return min(anf_203, anf_204);
     }
-    float dapply_180(DFn_181 dfn_185, vec2 da_186) {
-        DFn_170 ca_178 = dfn_185.lctor_182_0;
-        DFn_170 ca_179 = dfn_185.lctor_182_1;
-        return union_7(ca_178, ca_179, da_186);
+    float dapply_181(DFn_182 dfn_186, vec2 da_187) {
+        DFn_171 ca_179 = dfn_186.lctor_183_0;
+        DFn_171 ca_180 = dfn_186.lctor_183_1;
+        return union_7(ca_179, ca_180, da_187);
     }
     vec3 main_pure(vec2 coord_20) {
-        vec2 p_21 = get_uv_14_vec2_to_vec2_165(coord_20);
-        vec2 m_22 = get_uv_14_vec2_to_vec2_165(u_mouse);
-        DFn_181 _lc_229 = scene_11();
-        float d_23 = dapply_180(_lc_229, p_21);
-        bool anf_204 = (d_23 > 0.);
+        vec2 p_21 = get_uv_14_vec2_to_vec2_166(coord_20);
+        vec2 m_22 = get_uv_14_vec2_to_vec2_166(u_mouse);
+        DFn_182 _lc_230 = scene_11();
+        float d_23 = dapply_181(_lc_230, p_21);
+        bool anf_205 = (d_23 > 0.);
         vec3 col_24;
-        if (anf_204) {
+        if (anf_205) {
             col_24 = orange_18;
         } else {
             col_24 = blue_19;
         }
-        float anf_205 = abs(d_23);
-        float anf_206 = (-6. * anf_205);
-        float anf_207 = exp(anf_206);
-        float darken_26 = (1. - anf_207);
-        float anf_208 = (150. * d_23);
-        float anf_209 = cos(anf_208);
-        float anf_210 = (0.2 * anf_209);
-        float rings_27 = (0.8 + anf_210);
-        vec3 anf_211 = (col_24 * darken_26);
-        vec3 col_25 = (anf_211 * rings_27);
-        vec3 anf_212 = vec3(1., 1., 1.);
-        float anf_213 = abs(d_23);
-        float anf_214 = smoothstep(0., 0.01, anf_213);
-        float anf_215 = (1. - anf_214);
-        vec3 col_28 = mix(col_25, anf_212, anf_215);
-        DFn_181 _lc_230 = scene_11();
-        float anf_216 = dapply_180(_lc_230, m_22);
-        float d_30 = abs(anf_216);
-        vec2 anf_217 = (p_21 - m_22);
-        float dm_31 = length(anf_217);
-        float anf_218 = (dm_31 - d_30);
-        float anf_219 = abs(anf_218);
-        float anf_220 = (anf_219 - 0.0025);
-        float anf_221 = (dm_31 - 0.015);
-        float d_32 = min(anf_220, anf_221);
-        vec3 anf_222 = vec3(1., 1., 0.);
-        float anf_223 = smoothstep(0., 0.005, d_32);
-        float anf_224 = (1. - anf_223);
-        vec3 col_29 = mix(col_28, anf_222, anf_224);
+        float anf_206 = abs(d_23);
+        float anf_207 = (-6. * anf_206);
+        float anf_208 = exp(anf_207);
+        float darken_26 = (1. - anf_208);
+        float anf_209 = (150. * d_23);
+        float anf_210 = cos(anf_209);
+        float anf_211 = (0.2 * anf_210);
+        float rings_27 = (0.8 + anf_211);
+        vec3 anf_212 = (col_24 * darken_26);
+        vec3 col_25 = (anf_212 * rings_27);
+        vec3 anf_213 = vec3(1., 1., 1.);
+        float anf_214 = abs(d_23);
+        float anf_215 = smoothstep(0., 0.01, anf_214);
+        float anf_216 = (1. - anf_215);
+        vec3 col_28 = mix(col_25, anf_213, anf_216);
+        DFn_182 _lc_231 = scene_11();
+        float anf_217 = dapply_181(_lc_231, m_22);
+        float d_30 = abs(anf_217);
+        vec2 anf_218 = (p_21 - m_22);
+        float dm_31 = length(anf_218);
+        float anf_219 = (dm_31 - d_30);
+        float anf_220 = abs(anf_219);
+        float anf_221 = (anf_220 - 0.0025);
+        float anf_222 = (dm_31 - 0.015);
+        float d_32 = min(anf_221, anf_222);
+        vec3 anf_223 = vec3(1., 1., 0.);
+        float anf_224 = smoothstep(0., 0.005, d_32);
+        float anf_225 = (1. - anf_224);
+        vec3 col_29 = mix(col_28, anf_223, anf_225);
         return col_29;
     }
     uniform float u_time;
@@ -458,32 +458,32 @@ let%expect_test "compile examples" =
     out vec4 fragColor;
     const int size_0 = 5;
     uniform vec2 u_resolution;
-    vec2 get_uv_1_vec2_to_vec2_48(vec2 coord_2) {
-        vec2 anf_52 = (2. * coord_2);
-        vec2 top_3 = (anf_52 - u_resolution);
-        float anf_53 = u_resolution[0];
-        float anf_54 = u_resolution[1];
-        float bot_4 = min(anf_53, anf_54);
+    vec2 get_uv_1_vec2_to_vec2_49(vec2 coord_2) {
+        vec2 anf_53 = (2. * coord_2);
+        vec2 top_3 = (anf_53 - u_resolution);
+        float anf_54 = u_resolution[0];
+        float anf_55 = u_resolution[1];
+        float bot_4 = min(anf_54, anf_55);
         return (top_3 / bot_4);
     }
     uniform float u_time;
     vec3 main_pure(vec2 coord_5) {
-        vec2 uv_6 = get_uv_1_vec2_to_vec2_48(coord_5);
-        float pf_65 = float(size_0);
-        vec2 anf_55 = (uv_6 * pf_65);
-        float anf_56 = (2. * u_time);
-        vec2 anf_57 = vec2(anf_56, 0.);
-        vec2 anf_58 = (anf_55 + anf_57);
-        vec2 c_7 = floor(anf_58);
-        float anf_59 = c_7[0];
-        float anf_60 = c_7[1];
-        float checker_sum_8 = (anf_59 + anf_60);
-        float anf_61 = (checker_sum_8 / 2.);
-        float anf_62 = floor(anf_61);
-        float anf_63 = (anf_62 * 2.);
-        float is_even_9 = (checker_sum_8 - anf_63);
-        bool anf_64 = (is_even_9 < 0.5);
-        if (anf_64) {
+        vec2 uv_6 = get_uv_1_vec2_to_vec2_49(coord_5);
+        float pf_66 = float(size_0);
+        vec2 anf_56 = (uv_6 * pf_66);
+        float anf_57 = (2. * u_time);
+        vec2 anf_58 = vec2(anf_57, 0.);
+        vec2 anf_59 = (anf_56 + anf_58);
+        vec2 c_7 = floor(anf_59);
+        float anf_60 = c_7[0];
+        float anf_61 = c_7[1];
+        float checker_sum_8 = (anf_60 + anf_61);
+        float anf_62 = (checker_sum_8 / 2.);
+        float anf_63 = floor(anf_62);
+        float anf_64 = (anf_63 * 2.);
+        float is_even_9 = (checker_sum_8 - anf_64);
+        bool anf_65 = (is_even_9 < 0.5);
+        if (anf_65) {
             return vec3(0.2, 0.2, 0.2);
         } else {
             return vec3(0.8, 0.8, 0.8);
@@ -506,84 +506,84 @@ let%expect_test "compile examples" =
         int tag;
         float Some_0;
     };
-    v_option_float mandel_2_108(vec2 c_1, vec2 z_3, int i_4) {
-        int _iter_143 = 0;
-        while ((_iter_143 < 1000)) {
-            bool anf_109 = (i_4 > 150);
-            if (anf_109) {
+    v_option_float mandel_2_115(vec2 c_1, vec2 z_3, int i_4) {
+        int _iter_150 = 0;
+        while ((_iter_150 < 1000)) {
+            bool anf_116 = (i_4 > 150);
+            if (anf_116) {
                 return v_option_float(1, 0.);
             } else {
-                float anf_110 = length(z_3);
-                bool anf_111 = (anf_110 > 4.);
-                if (anf_111) {
-                    float anf_112 = length(z_3);
-                    float anf_113 = log2(anf_112);
-                    float nu_5 = log2(anf_113);
-                    float pf_146 = float(i_4);
-                    float anf_114 = (pf_146 - nu_5);
-                    float anf_115 = (anf_114 / 150.);
-                    return v_option_float(0, anf_115);
+                float anf_117 = length(z_3);
+                bool anf_118 = (anf_117 > 4.);
+                if (anf_118) {
+                    float anf_119 = length(z_3);
+                    float anf_120 = log2(anf_119);
+                    float nu_5 = log2(anf_120);
+                    float pf_153 = float(i_4);
+                    float anf_121 = (pf_153 - nu_5);
+                    float anf_122 = (anf_121 / 150.);
+                    return v_option_float(0, anf_122);
                 } else {
-                    float anf_116 = z_3[0];
-                    float anf_117 = z_3[0];
-                    float anf_118 = (anf_116 * anf_117);
-                    float anf_119 = z_3[1];
-                    float anf_120 = z_3[1];
-                    float anf_121 = (anf_119 * anf_120);
-                    float zx_6 = (anf_118 - anf_121);
-                    float anf_122 = z_3[0];
-                    float anf_123 = (2. * anf_122);
-                    float anf_124 = z_3[1];
-                    float zy_7 = (anf_123 * anf_124);
-                    vec2 anf_125 = vec2(zx_6, zy_7);
-                    vec2 z_prime_8 = (anf_125 + c_1);
-                    int anf_126 = (i_4 + 1);
+                    float anf_123 = z_3[0];
+                    float anf_124 = z_3[0];
+                    float anf_125 = (anf_123 * anf_124);
+                    float anf_126 = z_3[1];
+                    float anf_127 = z_3[1];
+                    float anf_128 = (anf_126 * anf_127);
+                    float zx_6 = (anf_125 - anf_128);
+                    float anf_129 = z_3[0];
+                    float anf_130 = (2. * anf_129);
+                    float anf_131 = z_3[1];
+                    float zy_7 = (anf_130 * anf_131);
+                    vec2 anf_132 = vec2(zx_6, zy_7);
+                    vec2 z_prime_8 = (anf_132 + c_1);
+                    int anf_133 = (i_4 + 1);
                     c_1 = c_1;
                     z_3 = z_prime_8;
-                    i_4 = anf_126;
-                    int _iter_inc_144 = (_iter_143 + 1);
-                    _iter_143 = _iter_inc_144;
+                    i_4 = anf_133;
+                    int _iter_inc_151 = (_iter_150 + 1);
+                    _iter_150 = _iter_inc_151;
                     continue;
                 }
             }
         }
-        v_option_float _tmp_147;
-        return _tmp_147;
+        v_option_float _tmp_154;
+        return _tmp_154;
     }
-    v_option_float mandelbrot_0_vec2_to_v_option_float_106(vec2 c_1) {
-        vec2 anf_127 = vec2(0., 0.);
-        return mandel_2_108(c_1, anf_127, 0);
+    v_option_float mandelbrot_0_vec2_to_v_option_float_113(vec2 c_1) {
+        vec2 anf_134 = vec2(0., 0.);
+        return mandel_2_115(c_1, anf_134, 0);
     }
     vec3 main_pure(vec2 coord_9) {
-        vec2 anf_128 = (2. * coord_9);
-        vec2 top_11 = (anf_128 - u_resolution);
-        float anf_129 = u_resolution[0];
-        float anf_130 = u_resolution[1];
-        float bot_12 = min(anf_129, anf_130);
+        vec2 anf_135 = (2. * coord_9);
+        vec2 top_11 = (anf_135 - u_resolution);
+        float anf_136 = u_resolution[0];
+        float anf_137 = u_resolution[1];
+        float bot_12 = min(anf_136, anf_137);
         vec2 uv_10 = (top_11 / bot_12);
-        float anf_131 = (u_time * 0.4);
-        float anf_132 = sin(anf_131);
-        float anf_133 = (anf_132 * 4.5);
-        float anf_134 = (anf_133 + 3.5);
-        float zoom_13 = exp(anf_134);
-        vec2 anf_135 = vec2(-0.7453, 0.1127);
-        vec2 anf_136 = (uv_10 / zoom_13);
-        vec2 seahorse_valley_14 = (anf_135 + anf_136);
-        v_option_float anf_137 = mandelbrot_0_vec2_to_v_option_float_106(seahorse_valley_14);
-        int _lv_tag_145 = anf_137.tag;
-        switch (_lv_tag_145) {
+        float anf_138 = (u_time * 0.4);
+        float anf_139 = sin(anf_138);
+        float anf_140 = (anf_139 * 4.5);
+        float anf_141 = (anf_140 + 3.5);
+        float zoom_13 = exp(anf_141);
+        vec2 anf_142 = vec2(-0.7453, 0.1127);
+        vec2 anf_143 = (uv_10 / zoom_13);
+        vec2 seahorse_valley_14 = (anf_142 + anf_143);
+        v_option_float anf_144 = mandelbrot_0_vec2_to_v_option_float_113(seahorse_valley_14);
+        int _lv_tag_152 = anf_144.tag;
+        switch (_lv_tag_152) {
             case 1: {
                 return vec3(0., 0., 0.);
                 break;
             }
             default: {
-                float n_15 = anf_137.Some_0;
-                vec3 anf_138 = vec3(10., 20., 30.);
-                vec3 anf_139 = (n_15 * anf_138);
-                vec3 anf_140 = (anf_139 + u_time);
-                vec3 anf_141 = sin(anf_140);
-                vec3 anf_142 = (anf_141 * 0.5);
-                return (anf_142 + 0.5);
+                float n_15 = anf_144.Some_0;
+                vec3 anf_145 = vec3(10., 20., 30.);
+                vec3 anf_146 = (n_15 * anf_145);
+                vec3 anf_147 = (anf_146 + u_time);
+                vec3 anf_148 = sin(anf_147);
+                vec3 anf_149 = (anf_148 * 0.5);
+                return (anf_149 + 0.5);
                 break;
             }
         }
@@ -601,28 +601,28 @@ let%expect_test "compile examples" =
     out vec4 fragColor;
     uniform vec2 u_mouse;
     uniform vec2 u_resolution;
-    vec2 get_uv_0_vec2_to_vec2_42(vec2 coord_1) {
-        vec2 anf_46 = (2. * coord_1);
-        vec2 top_2 = (anf_46 - u_resolution);
-        float anf_47 = u_resolution[0];
-        float anf_48 = u_resolution[1];
-        float bot_3 = min(anf_47, anf_48);
+    vec2 get_uv_0_vec2_to_vec2_43(vec2 coord_1) {
+        vec2 anf_47 = (2. * coord_1);
+        vec2 top_2 = (anf_47 - u_resolution);
+        float anf_48 = u_resolution[0];
+        float anf_49 = u_resolution[1];
+        float bot_3 = min(anf_48, anf_49);
         return (top_2 / bot_3);
     }
     uniform float u_time;
     vec3 main_pure(vec2 coord_4) {
-        vec2 uv_5 = get_uv_0_vec2_to_vec2_42(coord_4);
-        vec2 anf_49 = (2. * u_mouse);
-        vec2 anf_50 = (anf_49 - u_resolution);
-        float anf_51 = u_resolution[1];
-        vec2 mouseUV_6 = (anf_50 / anf_51);
-        float anf_52 = (u_time * 2.);
-        float anf_53 = sin(anf_52);
-        float anf_54 = (anf_53 * 0.1);
-        float radius_7 = (anf_54 + 0.15);
-        float anf_55 = distance(uv_5, mouseUV_6);
-        bool anf_56 = (anf_55 < radius_7);
-        if (anf_56) {
+        vec2 uv_5 = get_uv_0_vec2_to_vec2_43(coord_4);
+        vec2 anf_50 = (2. * u_mouse);
+        vec2 anf_51 = (anf_50 - u_resolution);
+        float anf_52 = u_resolution[1];
+        vec2 mouseUV_6 = (anf_51 / anf_52);
+        float anf_53 = (u_time * 2.);
+        float anf_54 = sin(anf_53);
+        float anf_55 = (anf_54 * 0.1);
+        float radius_7 = (anf_55 + 0.15);
+        float anf_56 = distance(uv_5, mouseUV_6);
+        bool anf_57 = (anf_56 < radius_7);
+        if (anf_57) {
             return vec3(0., 0., 0.5);
         } else {
             return vec3(0.5, 0.5, 1.);
@@ -640,143 +640,123 @@ let%expect_test "compile examples" =
     precision highp float;
     out vec4 fragColor;
     const vec3 deepColor_53 = vec3(0.02, 0.05, 0.2);
-    float hash_10_431(vec3 p_11) {
-        vec3 anf_435 = vec3(127.1, 311.7, 74.7);
-        float d_12 = dot(p_11, anf_435);
-        float anf_436 = sin(d_12);
-        float anf_437 = (anf_436 * 43758.5453);
-        return fract(anf_437);
+    float hash_10_435(vec3 p_11) {
+        vec3 anf_438 = vec3(127.1, 311.7, 74.7);
+        float d_12 = dot(p_11, anf_438);
+        float anf_439 = sin(d_12);
+        float anf_440 = (anf_439 * 43758.5453);
+        return fract(anf_440);
     }
     const vec3 landColor_54 = vec3(0.15, 0.35, 0.1);
     const vec3 mountColor_55 = vec3(0.4, 0.3, 0.2);
     float noise3d_5(vec3 p_6) {
         vec3 i_7 = floor(p_6);
         vec3 f_8 = fract(p_6);
-        vec3 anf_438 = (f_8 * f_8);
-        vec3 anf_439 = (2. * f_8);
-        vec3 anf_440 = (3. - anf_439);
-        vec3 u_9 = (anf_438 * anf_440);
-        float a_13 = hash_10_431(i_7);
-        vec3 anf_441 = vec3(1., 0., 0.);
-        vec3 anf_442 = (i_7 + anf_441);
-        float b_14 = hash_10_431(anf_442);
-        vec3 anf_443 = vec3(0., 1., 0.);
-        vec3 anf_444 = (i_7 + anf_443);
-        float c_15 = hash_10_431(anf_444);
-        vec3 anf_445 = vec3(1., 1., 0.);
-        vec3 anf_446 = (i_7 + anf_445);
-        float d_16 = hash_10_431(anf_446);
-        vec3 anf_447 = vec3(0., 0., 1.);
-        vec3 anf_448 = (i_7 + anf_447);
-        float e_17 = hash_10_431(anf_448);
-        vec3 anf_449 = vec3(1., 0., 1.);
-        vec3 anf_450 = (i_7 + anf_449);
-        float f_18 = hash_10_431(anf_450);
-        vec3 anf_451 = vec3(0., 1., 1.);
-        vec3 anf_452 = (i_7 + anf_451);
-        float g_19 = hash_10_431(anf_452);
-        vec3 anf_453 = vec3(1., 1., 1.);
-        vec3 anf_454 = (i_7 + anf_453);
-        float h_20 = hash_10_431(anf_454);
-        float anf_455 = u_9[0];
-        float ab_21 = mix(a_13, b_14, anf_455);
-        float anf_456 = u_9[0];
-        float cd_22 = mix(c_15, d_16, anf_456);
-        float anf_457 = u_9[0];
-        float ef_23 = mix(e_17, f_18, anf_457);
+        vec3 anf_441 = (f_8 * f_8);
+        vec3 anf_442 = (2. * f_8);
+        vec3 anf_443 = (3. - anf_442);
+        vec3 u_9 = (anf_441 * anf_443);
+        float a_13 = hash_10_435(i_7);
+        vec3 anf_444 = vec3(1., 0., 0.);
+        vec3 anf_445 = (i_7 + anf_444);
+        float b_14 = hash_10_435(anf_445);
+        vec3 anf_446 = vec3(0., 1., 0.);
+        vec3 anf_447 = (i_7 + anf_446);
+        float c_15 = hash_10_435(anf_447);
+        vec3 anf_448 = vec3(1., 1., 0.);
+        vec3 anf_449 = (i_7 + anf_448);
+        float d_16 = hash_10_435(anf_449);
+        vec3 anf_450 = vec3(0., 0., 1.);
+        vec3 anf_451 = (i_7 + anf_450);
+        float e_17 = hash_10_435(anf_451);
+        vec3 anf_452 = vec3(1., 0., 1.);
+        vec3 anf_453 = (i_7 + anf_452);
+        float f_18 = hash_10_435(anf_453);
+        vec3 anf_454 = vec3(0., 1., 1.);
+        vec3 anf_455 = (i_7 + anf_454);
+        float g_19 = hash_10_435(anf_455);
+        vec3 anf_456 = vec3(1., 1., 1.);
+        vec3 anf_457 = (i_7 + anf_456);
+        float h_20 = hash_10_435(anf_457);
         float anf_458 = u_9[0];
-        float gh_24 = mix(g_19, h_20, anf_458);
-        float anf_459 = u_9[1];
-        float abcd_25 = mix(ab_21, cd_22, anf_459);
-        float anf_460 = u_9[1];
-        float efgh_26 = mix(ef_23, gh_24, anf_460);
-        float anf_461 = u_9[2];
-        return mix(abcd_25, efgh_26, anf_461);
+        float ab_21 = mix(a_13, b_14, anf_458);
+        float anf_459 = u_9[0];
+        float cd_22 = mix(c_15, d_16, anf_459);
+        float anf_460 = u_9[0];
+        float ef_23 = mix(e_17, f_18, anf_460);
+        float anf_461 = u_9[0];
+        float gh_24 = mix(g_19, h_20, anf_461);
+        float anf_462 = u_9[1];
+        float abcd_25 = mix(ab_21, cd_22, anf_462);
+        float anf_463 = u_9[1];
+        float efgh_26 = mix(ef_23, gh_24, anf_463);
+        float anf_464 = u_9[2];
+        return mix(abcd_25, efgh_26, anf_464);
     }
     float fbm_27(vec3 p_28) {
-        vec3 anf_462 = (p_28 * 1.);
-        float anf_463 = noise3d_5(anf_462);
-        float anf_464 = (anf_463 * 0.5);
-        vec3 anf_465 = (p_28 * 2.);
+        vec3 anf_465 = (p_28 * 1.);
         float anf_466 = noise3d_5(anf_465);
-        float anf_467 = (anf_466 * 0.25);
-        float anf_468 = (anf_464 + anf_467);
-        vec3 anf_469 = (p_28 * 4.);
-        float anf_470 = noise3d_5(anf_469);
-        float anf_471 = (anf_470 * 0.125);
-        float anf_472 = (anf_468 + anf_471);
-        vec3 anf_473 = (p_28 * 8.);
-        float anf_474 = noise3d_5(anf_473);
-        float anf_475 = (anf_474 * 0.0625);
-        float anf_476 = (anf_472 + anf_475);
-        vec3 anf_477 = (p_28 * 16.);
-        float anf_478 = noise3d_5(anf_477);
-        float anf_479 = (anf_478 * 0.03125);
-        return (anf_476 + anf_479);
+        float anf_467 = (anf_466 * 0.5);
+        vec3 anf_468 = (p_28 * 2.);
+        float anf_469 = noise3d_5(anf_468);
+        float anf_470 = (anf_469 * 0.25);
+        float anf_471 = (anf_467 + anf_470);
+        vec3 anf_472 = (p_28 * 4.);
+        float anf_473 = noise3d_5(anf_472);
+        float anf_474 = (anf_473 * 0.125);
+        float anf_475 = (anf_471 + anf_474);
+        vec3 anf_476 = (p_28 * 8.);
+        float anf_477 = noise3d_5(anf_476);
+        float anf_478 = (anf_477 * 0.0625);
+        float anf_479 = (anf_475 + anf_478);
+        vec3 anf_480 = (p_28 * 16.);
+        float anf_481 = noise3d_5(anf_480);
+        float anf_482 = (anf_481 * 0.03125);
+        return (anf_479 + anf_482);
     }
     vec2 rotate_0(vec2 p_1, float angle_2) {
         float s_3 = sin(angle_2);
         float c_4 = cos(angle_2);
-        float anf_480 = p_1[0];
-        float anf_481 = (anf_480 * c_4);
-        float anf_482 = p_1[1];
-        float anf_483 = (anf_482 * s_3);
-        float anf_484 = (anf_481 - anf_483);
-        float anf_485 = p_1[0];
+        float anf_483 = p_1[0];
+        float anf_484 = (anf_483 * c_4);
+        float anf_485 = p_1[1];
         float anf_486 = (anf_485 * s_3);
-        float anf_487 = p_1[1];
-        float anf_488 = (anf_487 * c_4);
-        float anf_489 = (anf_486 + anf_488);
-        return vec2(anf_484, anf_489);
+        float anf_487 = (anf_484 - anf_486);
+        float anf_488 = p_1[0];
+        float anf_489 = (anf_488 * s_3);
+        float anf_490 = p_1[1];
+        float anf_491 = (anf_490 * c_4);
+        float anf_492 = (anf_489 + anf_491);
+        return vec2(anf_487, anf_492);
     }
-    vec3 rotate_by_mouse_61_vec3_int_to_vec3_430_434(vec2 mouseUV_60, vec3 ray_62) {
-        float anf_490 = mouseUV_60[1];
-        float anf_491 = (-1. * anf_490);
-        float rotX_63 = (anf_491 * 1.5);
-        float anf_492 = ray_62[1];
-        float anf_493 = ray_62[2];
-        vec2 anf_494 = vec2(anf_492, anf_493);
-        vec2 ro_yz_64 = rotate_0(anf_494, rotX_63);
-        float anf_495 = mouseUV_60[0];
-        float anf_496 = (-1. * anf_495);
-        float rotY_65 = (anf_496 * 1.5);
-        float anf_497 = ray_62[0];
-        float anf_498 = ro_yz_64[1];
-        vec2 anf_499 = vec2(anf_497, anf_498);
-        vec2 ro_xz_66 = rotate_0(anf_499, rotY_65);
-        float anf_500 = ro_xz_66[0];
-        float anf_501 = ro_yz_64[0];
-        float anf_502 = ro_xz_66[1];
-        return vec3(anf_500, anf_501, anf_502);
-    }
-    vec3 rotate_by_mouse_61_vec3_to_vec3_429_433(vec2 mouseUV_60, vec3 ray_62) {
-        float anf_503 = mouseUV_60[1];
-        float anf_504 = (-1. * anf_503);
-        float rotX_63 = (anf_504 * 1.5);
-        float anf_505 = ray_62[1];
-        float anf_506 = ray_62[2];
-        vec2 anf_507 = vec2(anf_505, anf_506);
-        vec2 ro_yz_64 = rotate_0(anf_507, rotX_63);
-        float anf_508 = mouseUV_60[0];
-        float anf_509 = (-1. * anf_508);
-        float rotY_65 = (anf_509 * 1.5);
-        float anf_510 = ray_62[0];
-        float anf_511 = ro_yz_64[1];
-        vec2 anf_512 = vec2(anf_510, anf_511);
-        vec2 ro_xz_66 = rotate_0(anf_512, rotY_65);
-        float anf_513 = ro_xz_66[0];
-        float anf_514 = ro_yz_64[0];
-        float anf_515 = ro_xz_66[1];
-        return vec3(anf_513, anf_514, anf_515);
+    vec3 rotate_by_mouse_61_vec3_to_vec3_434_437(vec2 mouseUV_60, vec3 ray_62) {
+        float anf_493 = mouseUV_60[1];
+        float anf_494 = (-1. * anf_493);
+        float rotX_63 = (anf_494 * 1.5);
+        float anf_495 = ray_62[1];
+        float anf_496 = ray_62[2];
+        vec2 anf_497 = vec2(anf_495, anf_496);
+        vec2 ro_yz_64 = rotate_0(anf_497, rotX_63);
+        float anf_498 = mouseUV_60[0];
+        float anf_499 = (-1. * anf_498);
+        float rotY_65 = (anf_499 * 1.5);
+        float anf_500 = ray_62[0];
+        float anf_501 = ro_yz_64[1];
+        vec2 anf_502 = vec2(anf_500, anf_501);
+        vec2 ro_xz_66 = rotate_0(anf_502, rotY_65);
+        float anf_503 = ro_xz_66[0];
+        float anf_504 = ro_yz_64[0];
+        float anf_505 = ro_xz_66[1];
+        return vec3(anf_503, anf_504, anf_505);
     }
     float sdPlanet_29(vec3 p_30, float radius_31) {
         float len_32 = length(p_30);
         vec3 dir_33 = (p_30 / len_32);
-        vec3 anf_516 = (dir_33 * 3.);
-        float anf_517 = fbm_27(anf_516);
-        float terrain_34 = (anf_517 * 0.4);
-        float anf_518 = (len_32 - radius_31);
-        return (anf_518 - terrain_34);
+        vec3 anf_506 = (dir_33 * 3.);
+        float anf_507 = fbm_27(anf_506);
+        float terrain_34 = (anf_507 * 0.4);
+        float anf_508 = (len_32 - radius_31);
+        return (anf_508 - terrain_34);
     }
     float map_35(vec3 p_36) {
         return sdPlanet_29(p_36, 1.5);
@@ -786,23 +766,23 @@ let%expect_test "compile examples" =
         vec3 e_x_40 = vec3(e_39, 0., 0.);
         vec3 e_y_41 = vec3(0., e_39, 0.);
         vec3 e_z_42 = vec3(0., 0., e_39);
-        vec3 anf_519 = (p_38 + e_x_40);
+        vec3 anf_509 = (p_38 + e_x_40);
+        float anf_510 = map_35(anf_509);
+        vec3 anf_511 = (p_38 - e_x_40);
+        float anf_512 = map_35(anf_511);
+        float dx_43 = (anf_510 - anf_512);
+        vec3 anf_513 = (p_38 + e_y_41);
+        float anf_514 = map_35(anf_513);
+        vec3 anf_515 = (p_38 - e_y_41);
+        float anf_516 = map_35(anf_515);
+        float dy_44 = (anf_514 - anf_516);
+        vec3 anf_517 = (p_38 + e_z_42);
+        float anf_518 = map_35(anf_517);
+        vec3 anf_519 = (p_38 - e_z_42);
         float anf_520 = map_35(anf_519);
-        vec3 anf_521 = (p_38 - e_x_40);
-        float anf_522 = map_35(anf_521);
-        float dx_43 = (anf_520 - anf_522);
-        vec3 anf_523 = (p_38 + e_y_41);
-        float anf_524 = map_35(anf_523);
-        vec3 anf_525 = (p_38 - e_y_41);
-        float anf_526 = map_35(anf_525);
-        float dy_44 = (anf_524 - anf_526);
-        vec3 anf_527 = (p_38 + e_z_42);
-        float anf_528 = map_35(anf_527);
-        vec3 anf_529 = (p_38 - e_z_42);
-        float anf_530 = map_35(anf_529);
-        float dz_45 = (anf_528 - anf_530);
-        vec3 anf_531 = vec3(dx_43, dy_44, dz_45);
-        return normalize(anf_531);
+        float dz_45 = (anf_518 - anf_520);
+        vec3 anf_521 = vec3(dx_43, dy_44, dz_45);
+        return normalize(anf_521);
     }
     const vec3 snowColor_56 = vec3(0.85, 0.85, 0.9);
     uniform vec2 u_mouse;
@@ -811,117 +791,117 @@ let%expect_test "compile examples" =
         int tag;
         float Some_0;
     };
-    v_option_float march_49_432(vec3 rd_48, vec3 ro_47, float t_50, int steps_51) {
-        int _iter_575 = 0;
-        while ((_iter_575 < 1000)) {
-            bool anf_532 = (steps_51 > 120);
-            if (anf_532) {
+    v_option_float march_49_436(vec3 rd_48, vec3 ro_47, float t_50, int steps_51) {
+        int _iter_565 = 0;
+        while ((_iter_565 < 1000)) {
+            bool anf_522 = (steps_51 > 120);
+            if (anf_522) {
                 return v_option_float(1, 0.);
             } else {
-                vec3 anf_533 = (rd_48 * t_50);
-                vec3 anf_534 = (ro_47 + anf_533);
-                float d_52 = map_35(anf_534);
-                bool anf_535 = (d_52 < 0.0005);
-                if (anf_535) {
+                vec3 anf_523 = (rd_48 * t_50);
+                vec3 anf_524 = (ro_47 + anf_523);
+                float d_52 = map_35(anf_524);
+                bool anf_525 = (d_52 < 0.0005);
+                if (anf_525) {
                     return v_option_float(0, t_50);
                 } else {
-                    bool anf_536 = (t_50 > 50.);
-                    if (anf_536) {
+                    bool anf_526 = (t_50 > 50.);
+                    if (anf_526) {
                         return v_option_float(1, 0.);
                     } else {
-                        float anf_537 = (d_52 * 0.8);
-                        float anf_538 = (t_50 + anf_537);
-                        int anf_539 = (steps_51 + 1);
+                        float anf_527 = (d_52 * 0.8);
+                        float anf_528 = (t_50 + anf_527);
+                        int anf_529 = (steps_51 + 1);
                         rd_48 = rd_48;
                         ro_47 = ro_47;
-                        t_50 = anf_538;
-                        steps_51 = anf_539;
-                        int _iter_inc_576 = (_iter_575 + 1);
-                        _iter_575 = _iter_inc_576;
+                        t_50 = anf_528;
+                        steps_51 = anf_529;
+                        int _iter_inc_566 = (_iter_565 + 1);
+                        _iter_565 = _iter_inc_566;
                         continue;
                     }
                 }
             }
         }
-        v_option_float _tmp_578;
-        return _tmp_578;
+        v_option_float _tmp_568;
+        return _tmp_568;
     }
     v_option_float march_46(vec3 ro_47, vec3 rd_48) {
-        return march_49_432(rd_48, ro_47, 0., 0);
+        return march_49_436(rd_48, ro_47, 0., 0);
     }
     vec3 main_pure(vec2 coord_57) {
-        float anf_540 = u_resolution[0];
-        float anf_541 = u_resolution[1];
-        float res_min_58 = min(anf_540, anf_541);
-        vec2 anf_542 = (coord_57 * 2.);
-        vec2 anf_543 = (anf_542 - u_resolution);
-        vec2 uv_59 = (anf_543 / res_min_58);
-        vec2 anf_544 = (u_mouse * 2.);
-        vec2 anf_545 = (anf_544 - u_resolution);
-        vec2 mouseUV_60 = (anf_545 / res_min_58);
-        vec3 anf_546 = vec3(0., 0., -4.);
-        vec3 ro_67 = rotate_by_mouse_61_vec3_int_to_vec3_430_434(mouseUV_60, anf_546);
-        float anf_547 = uv_59[0];
-        float anf_548 = uv_59[1];
-        vec3 anf_549 = vec3(anf_547, anf_548, 1.5);
-        vec3 anf_550 = normalize(anf_549);
-        vec3 rd_68 = rotate_by_mouse_61_vec3_to_vec3_429_433(mouseUV_60, anf_550);
+        float anf_530 = u_resolution[0];
+        float anf_531 = u_resolution[1];
+        float res_min_58 = min(anf_530, anf_531);
+        vec2 anf_532 = (coord_57 * 2.);
+        vec2 anf_533 = (anf_532 - u_resolution);
+        vec2 uv_59 = (anf_533 / res_min_58);
+        vec2 anf_534 = (u_mouse * 2.);
+        vec2 anf_535 = (anf_534 - u_resolution);
+        vec2 mouseUV_60 = (anf_535 / res_min_58);
+        vec3 anf_536 = vec3(0., 0., -4.);
+        vec3 ro_67 = rotate_by_mouse_61_vec3_to_vec3_434_437(mouseUV_60, anf_536);
+        float anf_537 = uv_59[0];
+        float anf_538 = uv_59[1];
+        vec3 anf_539 = vec3(anf_537, anf_538, 1.5);
+        vec3 anf_540 = normalize(anf_539);
+        vec3 rd_68 = rotate_by_mouse_61_vec3_to_vec3_434_437(mouseUV_60, anf_540);
         v_option_float t_69 = march_46(ro_67, rd_68);
-        int _lv_tag_577 = t_69.tag;
-        switch (_lv_tag_577) {
+        int _lv_tag_567 = t_69.tag;
+        switch (_lv_tag_567) {
             case 1: {
                 return vec3(0., 0., 0.);
                 break;
             }
             default: {
                 float t_70 = t_69.Some_0;
-                vec3 anf_551 = (rd_68 * t_70);
-                vec3 hitPos_71 = (ro_67 + anf_551);
+                vec3 anf_541 = (rd_68 * t_70);
+                vec3 hitPos_71 = (ro_67 + anf_541);
                 vec3 n_72 = getNormal_37(hitPos_71);
-                vec3 anf_552 = vec3(1., 0.8, -0.5);
-                vec3 lightDir_73 = normalize(anf_552);
-                float anf_553 = dot(n_72, lightDir_73);
-                float diff_74 = max(anf_553, 0.);
+                vec3 anf_542 = vec3(1., 0.8, -0.5);
+                vec3 lightDir_73 = normalize(anf_542);
+                float anf_543 = dot(n_72, lightDir_73);
+                float diff_74 = max(anf_543, 0.);
                 float ambient_75 = 0.08;
-                float anf_554 = length(hitPos_71);
-                vec3 dir_76 = (hitPos_71 / anf_554);
-                vec3 anf_555 = (dir_76 * 3.);
-                float rawHeight_77 = fbm_27(anf_555);
+                float anf_544 = length(hitPos_71);
+                vec3 dir_76 = (hitPos_71 / anf_544);
+                vec3 anf_545 = (dir_76 * 3.);
+                float rawHeight_77 = fbm_27(anf_545);
                 float seaLevel_78 = 0.35;
-                float anf_556 = (rawHeight_77 - seaLevel_78);
-                float anf_557 = (1. - seaLevel_78);
-                float anf_558 = (anf_556 / anf_557);
-                float h_norm_79 = clamp(anf_558, 0., 1.);
-                bool anf_559 = (h_norm_79 < 0.3);
+                float anf_546 = (rawHeight_77 - seaLevel_78);
+                float anf_547 = (1. - seaLevel_78);
+                float anf_548 = (anf_546 / anf_547);
+                float h_norm_79 = clamp(anf_548, 0., 1.);
+                bool anf_549 = (h_norm_79 < 0.3);
                 vec3 baseColor_80;
-                if (anf_559) {
-                    float anf_560 = (h_norm_79 / 0.3);
-                    baseColor_80 = mix(deepColor_53, landColor_54, anf_560);
+                if (anf_549) {
+                    float anf_550 = (h_norm_79 / 0.3);
+                    baseColor_80 = mix(deepColor_53, landColor_54, anf_550);
                 } else {
-                    bool anf_561 = (h_norm_79 < 0.6);
-                    if (anf_561) {
-                        float anf_562 = (h_norm_79 - 0.3);
-                        float anf_563 = (anf_562 / 0.3);
-                        baseColor_80 = mix(landColor_54, mountColor_55, anf_563);
+                    bool anf_551 = (h_norm_79 < 0.6);
+                    if (anf_551) {
+                        float anf_552 = (h_norm_79 - 0.3);
+                        float anf_553 = (anf_552 / 0.3);
+                        baseColor_80 = mix(landColor_54, mountColor_55, anf_553);
                     } else {
-                        float anf_564 = (h_norm_79 - 0.6);
-                        float anf_565 = (anf_564 / 0.4);
-                        baseColor_80 = mix(mountColor_55, snowColor_56, anf_565);
+                        float anf_554 = (h_norm_79 - 0.6);
+                        float anf_555 = (anf_554 / 0.4);
+                        baseColor_80 = mix(mountColor_55, snowColor_56, anf_555);
                     }
                 }
-                vec3 anf_566 = (rd_68 * -1.);
-                float anf_567 = dot(n_72, anf_566);
-                float anf_568 = max(anf_567, 0.);
-                float fresnel_81 = (1. - anf_568);
-                float anf_569 = (fresnel_81 * fresnel_81);
-                float anf_570 = (anf_569 * fresnel_81);
-                float rim_82 = (anf_570 * 0.4);
+                vec3 anf_556 = (rd_68 * -1.);
+                float anf_557 = dot(n_72, anf_556);
+                float anf_558 = max(anf_557, 0.);
+                float fresnel_81 = (1. - anf_558);
+                float anf_559 = (fresnel_81 * fresnel_81);
+                float anf_560 = (anf_559 * fresnel_81);
+                float rim_82 = (anf_560 * 0.4);
                 vec3 atmoColor_83 = vec3(0.3, 0.5, 1.);
-                float anf_571 = (diff_74 * 0.9);
-                float anf_572 = (anf_571 + ambient_75);
-                vec3 anf_573 = (baseColor_80 * anf_572);
-                vec3 anf_574 = (atmoColor_83 * rim_82);
-                return (anf_573 + anf_574);
+                float anf_561 = (diff_74 * 0.9);
+                float anf_562 = (anf_561 + ambient_75);
+                vec3 anf_563 = (baseColor_80 * anf_562);
+                vec3 anf_564 = (atmoColor_83 * rim_82);
+                return (anf_563 + anf_564);
                 break;
             }
         }
@@ -974,190 +954,190 @@ let%expect_test "compile examples" =
     out vec4 fragColor;
     vec3 palette_10(float t_11) {
         vec3 cfg_12 = vec3(0.3, 0.416, 0.557);
-        vec3 anf_259 = (cfg_12 + t_11);
-        vec3 anf_260 = (anf_259 * 6.28318);
-        vec3 anf_261 = cos(anf_260);
-        vec3 anf_262 = (anf_261 * 0.5);
-        return (anf_262 + 0.5);
+        vec3 anf_262 = (cfg_12 + t_11);
+        vec3 anf_263 = (anf_262 * 6.28318);
+        vec3 anf_264 = cos(anf_263);
+        vec3 anf_265 = (anf_264 * 0.5);
+        return (anf_265 + 0.5);
     }
     vec2 rotate_0(vec2 p_1, float angle_2) {
         float s_3 = sin(angle_2);
         float c_4 = cos(angle_2);
-        float anf_263 = p_1[0];
-        float anf_264 = (anf_263 * c_4);
-        float anf_265 = p_1[1];
-        float anf_266 = (anf_265 * s_3);
-        float anf_267 = (anf_264 - anf_266);
-        float anf_268 = p_1[0];
+        float anf_266 = p_1[0];
+        float anf_267 = (anf_266 * c_4);
+        float anf_268 = p_1[1];
         float anf_269 = (anf_268 * s_3);
-        float anf_270 = p_1[1];
-        float anf_271 = (anf_270 * c_4);
-        float anf_272 = (anf_269 + anf_271);
-        return vec2(anf_267, anf_272);
+        float anf_270 = (anf_267 - anf_269);
+        float anf_271 = p_1[0];
+        float anf_272 = (anf_271 * s_3);
+        float anf_273 = p_1[1];
+        float anf_274 = (anf_273 * c_4);
+        float anf_275 = (anf_272 + anf_274);
+        return vec2(anf_270, anf_275);
     }
     float sMin_5(float a_6, float b_7) {
         float k_8 = 0.1;
-        float anf_273 = (b_7 - a_6);
-        float anf_274 = (0.5 * anf_273);
-        float anf_275 = (anf_274 / k_8);
-        float anf_276 = (0.5 + anf_275);
-        float h_9 = clamp(anf_276, 0., 1.);
-        float anf_277 = mix(b_7, a_6, h_9);
-        float anf_278 = (k_8 * h_9);
-        float anf_279 = (1. - h_9);
-        float anf_280 = (anf_278 * anf_279);
-        return (anf_277 - anf_280);
+        float anf_276 = (b_7 - a_6);
+        float anf_277 = (0.5 * anf_276);
+        float anf_278 = (anf_277 / k_8);
+        float anf_279 = (0.5 + anf_278);
+        float h_9 = clamp(anf_279, 0., 1.);
+        float anf_280 = mix(b_7, a_6, h_9);
+        float anf_281 = (k_8 * h_9);
+        float anf_282 = (1. - h_9);
+        float anf_283 = (anf_281 * anf_282);
+        return (anf_280 - anf_283);
     }
     float sdTorus_13(vec3 p_14, vec2 t_15) {
-        float anf_281 = p_14[0];
-        float anf_282 = p_14[2];
-        vec2 anf_283 = vec2(anf_281, anf_282);
-        float anf_284 = length(anf_283);
-        float anf_285 = t_15[0];
-        float anf_286 = (anf_284 - anf_285);
-        float anf_287 = p_14[1];
-        vec2 q_16 = vec2(anf_286, anf_287);
-        float anf_288 = length(q_16);
-        float anf_289 = t_15[1];
-        return (anf_288 - anf_289);
+        float anf_284 = p_14[0];
+        float anf_285 = p_14[2];
+        vec2 anf_286 = vec2(anf_284, anf_285);
+        float anf_287 = length(anf_286);
+        float anf_288 = t_15[0];
+        float anf_289 = (anf_287 - anf_288);
+        float anf_290 = p_14[1];
+        vec2 q_16 = vec2(anf_289, anf_290);
+        float anf_291 = length(q_16);
+        float anf_292 = t_15[1];
+        return (anf_291 - anf_292);
     }
     uniform vec2 u_mouse;
     uniform vec2 u_resolution;
     uniform float u_time;
     float map_17(vec3 p_18) {
         float angle_19 = (u_time * 2.);
-        float anf_290 = p_18[0];
-        float anf_291 = p_18[1];
-        vec2 anf_292 = vec2(anf_290, anf_291);
-        vec2 p_xy_20 = rotate_0(anf_292, angle_19);
-        float anf_293 = p_xy_20[0];
-        float anf_294 = p_xy_20[1];
-        float anf_295 = p_18[2];
-        vec3 p_prime_21 = vec3(anf_293, anf_294, anf_295);
-        float anf_296 = p_prime_21[1];
-        float anf_297 = p_prime_21[2];
-        vec2 anf_298 = vec2(anf_296, anf_297);
-        vec2 p_yz_22 = rotate_0(anf_298, angle_19);
-        float anf_299 = p_prime_21[0];
-        float anf_300 = p_yz_22[0];
-        float anf_301 = p_yz_22[1];
-        vec3 p_prime_23 = vec3(anf_299, anf_300, anf_301);
-        vec2 anf_302 = vec2(1., 0.3);
-        float anf_303 = sdTorus_13(p_prime_23, anf_302);
-        vec2 anf_304 = vec2(2., 0.5);
-        float anf_305 = sdTorus_13(p_18, anf_304);
-        return sMin_5(anf_303, anf_305);
+        float anf_293 = p_18[0];
+        float anf_294 = p_18[1];
+        vec2 anf_295 = vec2(anf_293, anf_294);
+        vec2 p_xy_20 = rotate_0(anf_295, angle_19);
+        float anf_296 = p_xy_20[0];
+        float anf_297 = p_xy_20[1];
+        float anf_298 = p_18[2];
+        vec3 p_prime_21 = vec3(anf_296, anf_297, anf_298);
+        float anf_299 = p_prime_21[1];
+        float anf_300 = p_prime_21[2];
+        vec2 anf_301 = vec2(anf_299, anf_300);
+        vec2 p_yz_22 = rotate_0(anf_301, angle_19);
+        float anf_302 = p_prime_21[0];
+        float anf_303 = p_yz_22[0];
+        float anf_304 = p_yz_22[1];
+        vec3 p_prime_23 = vec3(anf_302, anf_303, anf_304);
+        vec2 anf_305 = vec2(1., 0.3);
+        float anf_306 = sdTorus_13(p_prime_23, anf_305);
+        vec2 anf_307 = vec2(2., 0.5);
+        float anf_308 = sdTorus_13(p_18, anf_307);
+        return sMin_5(anf_306, anf_308);
     }
     struct v_option_float {
         int tag;
         float Some_0;
     };
-    v_option_float march_27_258(vec3 rd_26, vec3 ro_25, float t_28, int steps_29) {
-        int _iter_352 = 0;
-        while ((_iter_352 < 1000)) {
-            bool anf_306 = (steps_29 > 80);
-            if (anf_306) {
+    v_option_float march_27_261(vec3 rd_26, vec3 ro_25, float t_28, int steps_29) {
+        int _iter_355 = 0;
+        while ((_iter_355 < 1000)) {
+            bool anf_309 = (steps_29 > 80);
+            if (anf_309) {
                 return v_option_float(1, 0.);
             } else {
-                vec3 anf_307 = (rd_26 * t_28);
-                vec3 anf_308 = (ro_25 + anf_307);
-                float d_30 = map_17(anf_308);
-                bool anf_309 = (d_30 < 0.001);
-                if (anf_309) {
+                vec3 anf_310 = (rd_26 * t_28);
+                vec3 anf_311 = (ro_25 + anf_310);
+                float d_30 = map_17(anf_311);
+                bool anf_312 = (d_30 < 0.001);
+                if (anf_312) {
                     return v_option_float(0, t_28);
                 } else {
-                    bool anf_310 = (t_28 > 100.);
-                    if (anf_310) {
+                    bool anf_313 = (t_28 > 100.);
+                    if (anf_313) {
                         return v_option_float(1, 0.);
                     } else {
-                        float anf_311 = (t_28 + d_30);
-                        int anf_312 = (steps_29 + 1);
+                        float anf_314 = (t_28 + d_30);
+                        int anf_315 = (steps_29 + 1);
                         rd_26 = rd_26;
                         ro_25 = ro_25;
-                        t_28 = anf_311;
-                        steps_29 = anf_312;
-                        int _iter_inc_353 = (_iter_352 + 1);
-                        _iter_352 = _iter_inc_353;
+                        t_28 = anf_314;
+                        steps_29 = anf_315;
+                        int _iter_inc_356 = (_iter_355 + 1);
+                        _iter_355 = _iter_inc_356;
                         continue;
                     }
                 }
             }
         }
-        v_option_float _tmp_355;
-        return _tmp_355;
+        v_option_float _tmp_358;
+        return _tmp_358;
     }
     v_option_float march_24(vec3 ro_25, vec3 rd_26) {
-        return march_27_258(rd_26, ro_25, 0., 0);
+        return march_27_261(rd_26, ro_25, 0., 0);
     }
     vec3 main_pure(vec2 coord_31) {
-        float anf_313 = u_resolution[0];
-        float anf_314 = u_resolution[1];
-        float res_min_32 = min(anf_313, anf_314);
-        vec2 anf_315 = (coord_31 * 2.);
-        vec2 anf_316 = (anf_315 - u_resolution);
-        vec2 uv_33 = (anf_316 / res_min_32);
-        vec2 anf_317 = (u_mouse * 2.);
-        vec2 anf_318 = (anf_317 - u_resolution);
-        vec2 mouseUV_34 = (anf_318 / res_min_32);
+        float anf_316 = u_resolution[0];
+        float anf_317 = u_resolution[1];
+        float res_min_32 = min(anf_316, anf_317);
+        vec2 anf_318 = (coord_31 * 2.);
+        vec2 anf_319 = (anf_318 - u_resolution);
+        vec2 uv_33 = (anf_319 / res_min_32);
+        vec2 anf_320 = (u_mouse * 2.);
+        vec2 anf_321 = (anf_320 - u_resolution);
+        vec2 mouseUV_34 = (anf_321 / res_min_32);
         vec3 ro_init_35 = vec3(0., 0., -6.);
-        float anf_319 = uv_33[0];
-        float anf_320 = uv_33[1];
-        vec3 anf_321 = vec3(anf_319, anf_320, 1.);
-        vec3 rd_init_36 = normalize(anf_321);
-        float anf_322 = mouseUV_34[1];
-        float rotX_37 = (-1. * anf_322);
-        float anf_323 = mouseUV_34[0];
-        float rotY_38 = (-1. * anf_323);
-        float anf_324 = ro_init_35[1];
-        float anf_325 = ro_init_35[2];
-        vec2 anf_326 = vec2(anf_324, anf_325);
-        vec2 ro_yz_39 = rotate_0(anf_326, rotX_37);
-        float anf_327 = rd_init_36[1];
-        float anf_328 = rd_init_36[2];
+        float anf_322 = uv_33[0];
+        float anf_323 = uv_33[1];
+        vec3 anf_324 = vec3(anf_322, anf_323, 1.);
+        vec3 rd_init_36 = normalize(anf_324);
+        float anf_325 = mouseUV_34[1];
+        float rotX_37 = (-1. * anf_325);
+        float anf_326 = mouseUV_34[0];
+        float rotY_38 = (-1. * anf_326);
+        float anf_327 = ro_init_35[1];
+        float anf_328 = ro_init_35[2];
         vec2 anf_329 = vec2(anf_327, anf_328);
-        vec2 rd_yz_40 = rotate_0(anf_329, rotX_37);
-        float anf_330 = ro_init_35[0];
-        float anf_331 = ro_yz_39[0];
-        float anf_332 = ro_yz_39[1];
-        vec3 ro_41 = vec3(anf_330, anf_331, anf_332);
-        float anf_333 = rd_init_36[0];
-        float anf_334 = rd_yz_40[0];
-        float anf_335 = rd_yz_40[1];
-        vec3 rd_42 = vec3(anf_333, anf_334, anf_335);
-        float anf_336 = ro_41[0];
-        float anf_337 = ro_41[2];
-        vec2 anf_338 = vec2(anf_336, anf_337);
-        vec2 ro_xz_43 = rotate_0(anf_338, rotY_38);
-        float anf_339 = rd_42[0];
-        float anf_340 = rd_42[2];
+        vec2 ro_yz_39 = rotate_0(anf_329, rotX_37);
+        float anf_330 = rd_init_36[1];
+        float anf_331 = rd_init_36[2];
+        vec2 anf_332 = vec2(anf_330, anf_331);
+        vec2 rd_yz_40 = rotate_0(anf_332, rotX_37);
+        float anf_333 = ro_init_35[0];
+        float anf_334 = ro_yz_39[0];
+        float anf_335 = ro_yz_39[1];
+        vec3 ro_41 = vec3(anf_333, anf_334, anf_335);
+        float anf_336 = rd_init_36[0];
+        float anf_337 = rd_yz_40[0];
+        float anf_338 = rd_yz_40[1];
+        vec3 rd_42 = vec3(anf_336, anf_337, anf_338);
+        float anf_339 = ro_41[0];
+        float anf_340 = ro_41[2];
         vec2 anf_341 = vec2(anf_339, anf_340);
-        vec2 rd_xz_44 = rotate_0(anf_341, rotY_38);
-        float anf_342 = ro_xz_43[0];
-        float anf_343 = ro_41[1];
-        float anf_344 = ro_xz_43[1];
-        vec3 ro_45 = vec3(anf_342, anf_343, anf_344);
-        float anf_345 = rd_xz_44[0];
-        float anf_346 = rd_42[1];
-        float anf_347 = rd_xz_44[1];
-        vec3 rd_46 = vec3(anf_345, anf_346, anf_347);
-        v_option_float anf_348 = march_24(ro_45, rd_46);
-        int _lv_tag_354 = anf_348.tag;
+        vec2 ro_xz_43 = rotate_0(anf_341, rotY_38);
+        float anf_342 = rd_42[0];
+        float anf_343 = rd_42[2];
+        vec2 anf_344 = vec2(anf_342, anf_343);
+        vec2 rd_xz_44 = rotate_0(anf_344, rotY_38);
+        float anf_345 = ro_xz_43[0];
+        float anf_346 = ro_41[1];
+        float anf_347 = ro_xz_43[1];
+        vec3 ro_45 = vec3(anf_345, anf_346, anf_347);
+        float anf_348 = rd_xz_44[0];
+        float anf_349 = rd_42[1];
+        float anf_350 = rd_xz_44[1];
+        vec3 rd_46 = vec3(anf_348, anf_349, anf_350);
+        v_option_float anf_351 = march_24(ro_45, rd_46);
+        int _lv_tag_357 = anf_351.tag;
         vec3 col_47;
-        switch (_lv_tag_354) {
+        switch (_lv_tag_357) {
             case 1: {
                 col_47 = vec3(0.2, 0.2, 0.2);
                 break;
             }
             default: {
-                float t_48 = anf_348.Some_0;
-                float anf_349 = (t_48 * 0.3);
-                col_47 = palette_10(anf_349);
+                float t_48 = anf_351.Some_0;
+                float anf_352 = (t_48 * 0.3);
+                col_47 = palette_10(anf_352);
                 break;
             }
         }
-        vec2 anf_350 = (uv_33 - mouseUV_34);
-        float anf_351 = length(anf_350);
-        float glow_49 = (0.02 / anf_351);
+        vec2 anf_353 = (uv_33 - mouseUV_34);
+        float anf_354 = length(anf_353);
+        float glow_49 = (0.02 / anf_354);
         return (col_47 + glow_49);
     }
     void main() {
@@ -1171,31 +1151,31 @@ let%expect_test "compile examples" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float gcd_8_float_to_float_to_float_80(float a_9, float b_10) {
-        int _iter_101 = 0;
-        while ((_iter_101 < 1000)) {
-            bool anf_81 = (a_9 < 0.05);
-            if (anf_81) {
+    float gcd_8_float_to_float_to_float_90(float a_9, float b_10) {
+        int _iter_111 = 0;
+        while ((_iter_111 < 1000)) {
+            bool anf_91 = (a_9 < 0.05);
+            if (anf_91) {
                 return b_10;
             } else {
-                bool anf_82 = (b_10 < 0.05);
-                if (anf_82) {
+                bool anf_92 = (b_10 < 0.05);
+                if (anf_92) {
                     return a_9;
                 } else {
-                    bool anf_83 = (a_9 > b_10);
-                    if (anf_83) {
-                        float anf_84 = (a_9 - b_10);
-                        a_9 = anf_84;
+                    bool anf_93 = (a_9 > b_10);
+                    if (anf_93) {
+                        float anf_94 = (a_9 - b_10);
+                        a_9 = anf_94;
                         b_10 = b_10;
-                        int _iter_inc_102 = (_iter_101 + 1);
-                        _iter_101 = _iter_inc_102;
+                        int _iter_inc_112 = (_iter_111 + 1);
+                        _iter_111 = _iter_inc_112;
                         continue;
                     } else {
-                        float anf_85 = (b_10 - a_9);
+                        float anf_95 = (b_10 - a_9);
                         a_9 = a_9;
-                        b_10 = anf_85;
-                        int _iter_inc_103 = (_iter_101 + 1);
-                        _iter_101 = _iter_inc_103;
+                        b_10 = anf_95;
+                        int _iter_inc_113 = (_iter_111 + 1);
+                        _iter_111 = _iter_inc_113;
                         continue;
                     }
                 }
@@ -1206,36 +1186,36 @@ let%expect_test "compile examples" =
     mat2 rotate_4(float angle_5) {
         float s_6 = sin(angle_5);
         float c_7 = cos(angle_5);
-        float anf_86 = (-1. * s_6);
-        vec2 anf_87 = vec2(c_7, anf_86);
-        vec2 anf_88 = vec2(s_6, c_7);
-        return mat2(anf_87, anf_88);
+        float anf_96 = (-1. * s_6);
+        vec2 anf_97 = vec2(c_7, anf_96);
+        vec2 anf_98 = vec2(s_6, c_7);
+        return mat2(anf_97, anf_98);
     }
     uniform vec2 u_resolution;
     vec2 get_uv_0(vec2 coord_1) {
-        vec2 anf_89 = (2. * coord_1);
-        vec2 top_2 = (anf_89 - u_resolution);
-        float anf_90 = u_resolution[0];
-        float anf_91 = u_resolution[1];
-        float bot_3 = min(anf_90, anf_91);
+        vec2 anf_99 = (2. * coord_1);
+        vec2 top_2 = (anf_99 - u_resolution);
+        float anf_100 = u_resolution[0];
+        float anf_101 = u_resolution[1];
+        float bot_3 = min(anf_100, anf_101);
         return (top_2 / bot_3);
     }
     uniform float u_time;
     vec3 main_pure(vec2 coord_11) {
-        mat2 anf_92 = rotate_4(u_time);
-        vec2 anf_93 = get_uv_0(coord_11);
-        vec2 uv_12 = (anf_92 * anf_93);
-        float anf_94 = (u_time * 2.);
-        float anf_95 = sin(anf_94);
-        vec2 anf_96 = (uv_12 * anf_95);
-        vec2 anf_97 = (anf_96 * 2.);
-        vec2 anf_98 = abs(anf_97);
-        float x_13 = anf_98[0];
-        float y_14 = anf_98[1];
-        float res_15 = gcd_8_float_to_float_to_float_80(x_13, y_14);
-        float anf_99 = (res_15 * 0.5);
-        float anf_100 = (1. - res_15);
-        return vec3(res_15, anf_99, anf_100);
+        mat2 anf_102 = rotate_4(u_time);
+        vec2 anf_103 = get_uv_0(coord_11);
+        vec2 uv_12 = (anf_102 * anf_103);
+        float anf_104 = (u_time * 2.);
+        float anf_105 = sin(anf_104);
+        vec2 anf_106 = (uv_12 * anf_105);
+        vec2 anf_107 = (anf_106 * 2.);
+        vec2 anf_108 = abs(anf_107);
+        float x_13 = anf_108[0];
+        float y_14 = anf_108[1];
+        float res_15 = gcd_8_float_to_float_to_float_90(x_13, y_14);
+        float anf_109 = (res_15 * 0.5);
+        float anf_110 = (1. - res_15);
+        return vec3(res_15, anf_109, anf_110);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
