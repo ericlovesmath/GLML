@@ -58,8 +58,7 @@ type constr_desc =
   | MulBroadcast of ty * ty * ty (** Matrix multiplication rules *)
   | IndexAccess of ty * int * ty (** Vector/Matrix indexing *)
   | FieldAccess of ty * string * ty (** Field access on a record *)
-  | Coerce of ty * ty
-  (** Coercion: first type is coercible to second (e.g. int -> float) *)
+  | Coerce of ty * ty (** Coercion: first type is coercible to second (int -> float) *)
 
 type constr =
   { desc : constr_desc
@@ -345,29 +344,52 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t
   | (loc, TyVariant (s, args), TyVariant (s', args')) :: con
     when String.equal s s' && List.length args = List.length args' ->
     unify (List.map2_exn args args' ~f:(Tuple3.create loc) @ con)
-  | (_, TyInt, TyFloat) :: con | (_, TyFloat, TyInt) :: con -> unify con
   | (loc, ty, ty') :: con ->
     if equal_ty ty ty'
     then unify con
     else Err.fail "type mismatch" ~loc ~d:[%message (ty : ty) (ty' : ty)]
 ;;
 
-(** Validate if a concrete type belongs to a GLSL typeclass. *)
+(* TODO: Centralize more of that [TyFloat | TyInt] logic here *)
+(** int <: float subtyping to make canonical type *)
+let rec widen_numeric = function
+  | TyInt -> TyFloat
+  | TyVec (n, t) -> TyVec (n, widen_numeric t)
+  | TyRecord (s, args) -> TyRecord (s, List.map args ~f:widen_numeric)
+  | TyVariant (s, args) -> TyVariant (s, List.map args ~f:widen_numeric)
+  | TyArrow (a, b) -> TyArrow (widen_numeric a, widen_numeric b)
+  | t -> t
+;;
+
+let is_scalar = function
+  | TyFloat | TyInt -> true
+  | _ -> false
+;;
+
+(** Validate if a concrete type belongs to a GLSL typeclass. Numeric classes
+    accept ints anywhere a float is expected, so we widen first and the patterns
+    only need to mention TyFloat.
+
+    [GenIType]/[GenBType] are int and bool specific so we skip widening. *)
 let check_class (cls : type_class) (ty : ty) : bool =
-  (* TODO: Get rid of this patchwork in promoting ints please *)
+  let ty =
+    match cls with
+    | GenIType | GenBType -> ty
+    | _ -> widen_numeric ty
+  in
   match cls, ty with
   | GenType, TyFloat
-  | GenType, TyVec (_, (TyFloat | TyInt))
+  | GenType, TyVec (_, TyFloat)
   | GenBType, TyBool
   | GenIType, TyInt
-  | MatType, TyVec (_, TyVec (_, (TyFloat | TyInt)))
-  | Numeric, (TyFloat | TyInt)
-  | Numeric, TyVec (_, (TyFloat | TyInt))
-  | Numeric, TyVec (_, TyVec (_, (TyFloat | TyInt)))
-  | Comparable, (TyFloat | TyInt)
-  | Equatable, (TyFloat | TyInt | TyBool)
-  | Equatable, TyVec (_, (TyFloat | TyInt))
-  | Equatable, TyVec (_, TyVec (_, (TyFloat | TyInt))) -> true
+  | MatType, TyVec (_, TyVec (_, TyFloat))
+  | Numeric, TyFloat
+  | Numeric, TyVec (_, TyFloat)
+  | Numeric, TyVec (_, TyVec (_, TyFloat))
+  | Comparable, TyFloat
+  | Equatable, (TyFloat | TyBool)
+  | Equatable, TyVec (_, TyFloat)
+  | Equatable, TyVec (_, TyVec (_, TyFloat)) -> true
   | _, _ -> false
 ;;
 
@@ -387,55 +409,54 @@ let resolve_constraints structs (constrs : constr list)
       else
         Err.fail "class constraint failed" ~loc ~d:[%message (cls : type_class) (ty : ty)]
     | ({ desc = Broadcast (l, r, ret); loc } as c) :: rest ->
-      (* TODO: You might be thinking 'Hey Eric, this is the most disgusting patchwork
-         of int promotion I've ever seen in my life. Why don't you just have it so that
-         int literals can be treated like float literals instead of doing this kind of
-         insanity? And to that I say I completly agree but I'm in too deep.
-
-         I'm sorry future Eric. Not really. *)
+      (* TODO: A lot of these cases feel like they could be merged *)
+      (* Shape-only reasoning, since int/float subtyping is delegated entirely to [Coerce] *)
       (match l, r with
        | TyVar a, TyVar b when String.equal a b ->
          aux (c :: deferred) ((loc, ret, l) :: eqs) rest
-       | TyVar _, TyInt when Set.is_empty (ftv_of_ty ret) ->
-         aux deferred ((loc, l, ret) :: eqs) rest
-       | TyInt, TyVar _ when Set.is_empty (ftv_of_ty ret) ->
-         aux deferred ((loc, r, ret) :: eqs) rest
-       | TyVar _, TyFloat
-         when match ret with
-              | TyFloat | TyInt -> true
-              | _ -> false -> aux deferred ((loc, l, TyFloat) :: eqs) rest
-       | TyFloat, TyVar _
-         when match ret with
-              | TyFloat | TyInt -> true
-              | _ -> false -> aux deferred ((loc, r, TyFloat) :: eqs) rest
-       | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
-       | TyFloat, TyFloat -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
-       | TyInt, TyInt -> aux deferred ((loc, ret, TyInt) :: eqs) rest
-       | TyInt, TyFloat | TyFloat, TyInt -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
        | TyVec (n, t), TyVec (n', t') when n = n' ->
          let bt = fresh_tyvar () in
          aux
            deferred
            ((loc, ret, TyVec (n, bt)) :: eqs)
            ({ desc = Broadcast (t, t', bt); loc } :: rest)
-       | (TyFloat | TyInt), TyVec (n, t) | TyVec (n, t), (TyFloat | TyInt) ->
-         let scalar =
-           match l with
-           | TyFloat | TyInt -> l
-           | _ -> r
-         in
+       | TyVec (n, t), s when is_scalar s ->
          let bt = fresh_tyvar () in
          aux
            deferred
            ((loc, ret, TyVec (n, bt)) :: eqs)
-           ({ desc = Broadcast (scalar, t, bt); loc } :: rest)
+           ({ desc = Broadcast (s, t, bt); loc } :: rest)
+       | s, TyVec (n, t) when is_scalar s ->
+         let bt = fresh_tyvar () in
+         aux
+           deferred
+           ((loc, ret, TyVec (n, bt)) :: eqs)
+           ({ desc = Broadcast (s, t, bt); loc } :: rest)
+       | _, _ when is_scalar l && is_scalar r ->
+         aux
+           deferred
+           eqs
+           ({ desc = Coerce (l, ret); loc } :: { desc = Coerce (r, ret); loc } :: rest)
+       | (TyVar _ as v), s
+         when is_scalar s && Set.is_empty (ftv_of_ty ret) && is_scalar ret ->
+         aux
+           deferred
+           eqs
+           ({ desc = Coerce (v, ret); loc } :: { desc = Coerce (s, ret); loc } :: rest)
+       | s, (TyVar _ as v)
+         when is_scalar s && Set.is_empty (ftv_of_ty ret) && is_scalar ret ->
+         aux
+           deferred
+           eqs
+           ({ desc = Coerce (s, ret); loc } :: { desc = Coerce (v, ret); loc } :: rest)
+       | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
        | _ -> Err.fail "invalid broadcast" ~loc ~d:[%message (l : ty) (r : ty)])
     | ({ desc = MulBroadcast (l, r, ret); loc } as c) :: rest ->
+      (* Shape-only reasoning here too *)
       (match l, r with
        | TyVar a, TyVar b when String.equal a b ->
          aux (c :: deferred) ((loc, ret, l) :: eqs) rest
-       | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
-       (* mat * mat (element-wise) *)
+       (* mat * mat *)
        | TyVec (n, TyVec (m, t)), TyVec (n', TyVec (m', t')) when n = n' && m = m' ->
          let bt = fresh_tyvar () in
          aux
@@ -443,35 +464,32 @@ let resolve_constraints structs (constrs : constr list)
            ((loc, ret, TyVec (n, TyVec (m, bt))) :: eqs)
            ({ desc = MulBroadcast (t, t', bt); loc } :: rest)
        (* mat * scalar *)
-       | TyVec (n, TyVec (m, t)), (TyFloat | TyInt)
-       | (TyFloat | TyInt), TyVec (n, TyVec (m, t)) ->
-         let scalar =
-           match l with
-           | TyFloat | TyInt -> l
-           | _ -> r
-         in
+       | TyVec (n, TyVec (m, t)), s when is_scalar s ->
          let bt = fresh_tyvar () in
          aux
            deferred
            ((loc, ret, TyVec (n, TyVec (m, bt))) :: eqs)
-           ({ desc = MulBroadcast (scalar, t, bt); loc } :: rest)
-       (* mat * vec (matrix-vector multiply): TyVec(cols, TyVec(rows, t)) * TyVec(rows, t) -> TyVec(cols, t) *)
+           ({ desc = MulBroadcast (s, t, bt); loc } :: rest)
+       | s, TyVec (n, TyVec (m, t)) when is_scalar s ->
+         let bt = fresh_tyvar () in
+         aux
+           deferred
+           ((loc, ret, TyVec (n, TyVec (m, bt))) :: eqs)
+           ({ desc = MulBroadcast (s, t, bt); loc } :: rest)
+       (* mat * vec *)
        | TyVec (cols, TyVec (rows, t)), TyVec (rows', t') when rows = rows' ->
          let bt = fresh_tyvar () in
          aux
            deferred
            ((loc, ret, TyVec (cols, bt)) :: eqs)
            ({ desc = MulBroadcast (t, t', bt); loc } :: rest)
-       (* vec * mat: TyVec(cols, t) * TyVec(cols, TyVec(rows, t)) -> TyVec(rows, t) *)
+       (* vec * mat *)
        | TyVec (cols, t), TyVec (cols', TyVec (rows, t')) when cols = cols' ->
          let bt = fresh_tyvar () in
          aux
            deferred
            ((loc, ret, TyVec (rows, bt)) :: eqs)
            ({ desc = MulBroadcast (t, t', bt); loc } :: rest)
-       | TyFloat, TyFloat -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
-       | TyInt, TyInt -> aux deferred ((loc, ret, TyInt) :: eqs) rest
-       | TyInt, TyFloat | TyFloat, TyInt -> aux deferred ((loc, ret, TyFloat) :: eqs) rest
        (* flat vec * flat vec (element-wise) *)
        | TyVec (n, t), TyVec (n', t') when n = n' ->
          let bt = fresh_tyvar () in
@@ -480,26 +498,43 @@ let resolve_constraints structs (constrs : constr list)
            ((loc, ret, TyVec (n, bt)) :: eqs)
            ({ desc = MulBroadcast (t, t', bt); loc } :: rest)
        (* scalar * vec *)
-       | (TyFloat | TyInt), TyVec (n, t) | TyVec (n, t), (TyFloat | TyInt) ->
-         let scalar =
-           match l with
-           | TyFloat | TyInt -> l
-           | _ -> r
-         in
+       | TyVec (n, t), s when is_scalar s ->
          let bt = fresh_tyvar () in
          aux
            deferred
            ((loc, ret, TyVec (n, bt)) :: eqs)
-           ({ desc = MulBroadcast (scalar, t, bt); loc } :: rest)
+           ({ desc = MulBroadcast (s, t, bt); loc } :: rest)
+       | s, TyVec (n, t) when is_scalar s ->
+         let bt = fresh_tyvar () in
+         aux
+           deferred
+           ((loc, ret, TyVec (n, bt)) :: eqs)
+           ({ desc = MulBroadcast (s, t, bt); loc } :: rest)
+       (* scalar * scalar *)
+       | _, _ when is_scalar l && is_scalar r ->
+         aux
+           deferred
+           eqs
+           ({ desc = Coerce (l, ret); loc } :: { desc = Coerce (r, ret); loc } :: rest)
+       (* var paired with a concrete scalar and concrete scalar ret *)
+       | (TyVar _ as v), s
+         when is_scalar s && Set.is_empty (ftv_of_ty ret) && is_scalar ret ->
+         aux
+           deferred
+           eqs
+           ({ desc = Coerce (v, ret); loc } :: { desc = Coerce (s, ret); loc } :: rest)
+       | s, (TyVar _ as v)
+         when is_scalar s && Set.is_empty (ftv_of_ty ret) && is_scalar ret ->
+         aux
+           deferred
+           eqs
+           ({ desc = Coerce (s, ret); loc } :: { desc = Coerce (v, ret); loc } :: rest)
+       | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
        | _ -> Err.fail "invalid mul/div broadcast" ~loc ~d:[%message (l : ty) (r : ty)])
     | ({ desc = IndexAccess (t, i, ret); loc } as c) :: rest ->
       (match t with
        | TyVec (n, elem_ty) ->
-         let scalar_ty =
-           match elem_ty with
-           | TyInt -> TyFloat
-           | t -> t
-         in
+         let scalar_ty = widen_numeric elem_ty in
          if 0 <= i && i < n
          then aux deferred ((loc, ret, scalar_ty) :: eqs) rest
          else Err.fail "vec index out of bounds" ~loc ~d:[%message (n : int) (i : int)]
@@ -530,31 +565,159 @@ let resolve_constraints structs (constrs : constr list)
                 let field_ty = subst_ty sub field_ty in
                 aux deferred ((loc, ret, field_ty) :: eqs) rest))
        | ty -> Err.fail "field access on non-record type" ~loc ~d:[%message (ty : ty)])
-    | ({ desc = Coerce (from_ty, to_ty); loc } as _c) :: rest ->
+    | ({ desc = Coerce (from_ty, to_ty); loc } as c) :: rest ->
       if equal_ty from_ty to_ty
       then aux deferred eqs rest
       else (
         match from_ty, to_ty with
         | TyInt, TyFloat -> aux deferred eqs rest
+        | TyArrow (p, r), TyArrow (p', r') ->
+          aux
+            deferred
+            eqs
+            ({ desc = Coerce (p', p); loc } :: { desc = Coerce (r, r'); loc } :: rest)
+        | TyVec (n, t), TyVec (n', t') when n = n' ->
+          aux deferred eqs ({ desc = Coerce (t, t'); loc } :: rest)
+        | TyRecord (s, args), TyRecord (s', args')
+          when String.equal s s' && List.length args = List.length args' ->
+          let extras =
+            List.map2_exn args args' ~f:(fun a b -> { desc = Coerce (a, b); loc })
+          in
+          aux deferred eqs (extras @ rest)
+        | TyVariant (s, args), TyVariant (s', args')
+          when String.equal s s' && List.length args = List.length args' ->
+          let extras =
+            List.map2_exn args args' ~f:(fun a b -> { desc = Coerce (a, b); loc })
+          in
+          aux deferred eqs (extras @ rest)
+        | TyVar _, _ | _, TyVar _ ->
+          (* NOTE: When we have a [TyVar], defer for the LUB-resolution phase.
+             We SHOULD NOT eagerly unify here, premature unification can lock
+             a [var] to [int] when it later needs to be [float]. *)
+          aux (c :: deferred) eqs rest
         | _ -> aux deferred ((loc, from_ty, to_ty) :: eqs) rest)
   in
   aux [] [] constrs
 ;;
 
+(** Join concrete types under int <: float lattice *)
+let rec join_ty (a : ty) (b : ty) : ty option =
+  if equal_ty a b
+  then Some a
+  else (
+    match a, b with
+    | TyInt, TyFloat | TyFloat, TyInt -> Some TyFloat
+    | TyVec (n, t), TyVec (n', t') when n = n' ->
+      Option.map (join_ty t t') ~f:(fun t -> TyVec (n, t))
+    | TyRecord (s, args), TyRecord (s', args')
+      when String.equal s s' && List.length args = List.length args' ->
+      List.map2_exn args args' ~f:join_ty
+      |> Option.all
+      |> Option.map ~f:(fun ts -> TyRecord (s, ts))
+    | TyVariant (s, args), TyVariant (s', args')
+      when String.equal s s' && List.length args = List.length args' ->
+      List.map2_exn args args' ~f:join_ty
+      |> Option.all
+      |> Option.map ~f:(fun ts -> TyVariant (s, ts))
+    | _ -> None)
+;;
+
+let lub_of (tys : ty list) : ty option =
+  match tys with
+  | [] -> None
+  | t :: rest ->
+    List.fold_right rest ~init:(Some t) ~f:(fun t -> Option.bind ~f:(join_ty t))
+;;
+
+(** Look at the deferred [Coerce] constraints and try to resolve any tyvar
+    whose lower bounds are all concrete: bind it to the LUB of its lowers.
+    A tyvar with only concrete upper bounds is bound to its single upper. *)
+let resolve_subtype_bounds (deferred : constr list) : substitution =
+  let add_to map v t = Map.update map v ~f:(fun e -> t :: Option.value e ~default:[]) in
+  let add_edge map ~from_v ~to_v =
+    Map.update map to_v ~f:(fun e ->
+      Set.add (Option.value e ~default:String.Set.empty) from_v)
+  in
+  (* edges_into[b] = set of a such that a <: b. Concrete lowers of a flow to b. *)
+  let lowers, uppers, edges_into =
+    List.fold
+      deferred
+      ~init:(String.Map.empty, String.Map.empty, String.Map.empty)
+      ~f:(fun ((l, u, e) as acc) c ->
+        match c.desc with
+        | Coerce (TyVar a, TyVar b) -> l, u, add_edge e ~from_v:a ~to_v:b
+        | Coerce (t, TyVar a) when Set.is_empty (ftv_of_ty t) -> add_to l a t, u, e
+        | Coerce (TyVar a, t) when Set.is_empty (ftv_of_ty t) -> l, add_to u a t, e
+        | _ -> acc)
+  in
+  (* Propagate concrete lowers along subtype edges to fixed point. *)
+  let step lowers =
+    Map.fold edges_into ~init:lowers ~f:(fun ~key:to_v ~data:froms acc ->
+      Set.fold froms ~init:acc ~f:(fun acc from_v ->
+        match Map.find acc from_v with
+        | None -> acc
+        | Some lows ->
+          let existing = Map.find acc to_v |> Option.value ~default:[] in
+          let new_lows =
+            List.filter lows ~f:(fun l -> not (List.exists existing ~f:(equal_ty l)))
+          in
+          if List.is_empty new_lows
+          then acc
+          else Map.set acc ~key:to_v ~data:(new_lows @ existing)))
+  in
+  let rec fix lowers =
+    let lowers' = step lowers in
+    let equal_lowers = String.Map.equal (List.equal equal_ty) in
+    if equal_lowers lowers lowers' then lowers else fix lowers'
+  in
+  let lowers = fix lowers in
+  Set.union (Map.key_set lowers) (Map.key_set uppers)
+  |> Set.to_list
+  |> List.filter_map ~f:(fun v ->
+    match Map.find lowers v, Map.find uppers v with
+    | Some lows, _ ->
+      let promote_vec_lb = function
+        | TyVec (n, t) -> TyVec (n, widen_numeric t)
+        | t -> t
+      in
+      let lows = List.map lows ~f:promote_vec_lb in
+      (* NOTE: IF lows have a clean LUB, pick it, otherwise pick an arbitrary
+         lower bound. The conflicting [Coerce] constraints will then
+         substitute into incompatible concrete pairs and fail in [unify]. *)
+      (match lub_of lows with
+       | Some t -> Some (v, t)
+       | None -> List.hd lows |> Option.map ~f:(fun t -> v, t))
+    | None, Some us ->
+      us
+      |> List.dedup_and_sort ~compare:compare_ty
+      |> List.hd
+      |> Option.map ~f:(Tuple2.create v)
+    | None, _ -> None)
+;;
+
 (** Solve a set of constraints to produce a substitution and deferred constraints. *)
 let solve structs (constrs : constr list) : (substitution * constr list) Compiler_error.t =
+  let apply_sub sub new_sub deferred =
+    let sub = List.map sub ~f:(fun (v, t) -> v, subst_ty new_sub t) @ new_sub in
+    let deferred = subst_constraints new_sub deferred in
+    sub, deferred
+  in
   let rec go sub constrs =
     let%bind deferred, eqs = resolve_constraints structs constrs in
-    if List.is_empty eqs
-    then return (sub, deferred)
-    else (
-      let%bind new_sub = unify eqs in
-      if List.is_empty new_sub
+    let%bind new_sub = if List.is_empty eqs then return [] else unify eqs in
+    if List.is_empty new_sub
+    then (
+      (* Try to resolve deferred [Coerce]s by picking the LUB of each
+         tyvar's concrete lower bounds... dubious *)
+      let lub_sub = resolve_subtype_bounds deferred in
+      if List.is_empty lub_sub
       then return (sub, deferred)
       else (
-        let sub = List.map sub ~f:(fun (v, t) -> v, subst_ty new_sub t) @ new_sub in
-        let deferred = subst_constraints new_sub deferred in
+        let sub, deferred = apply_sub sub lub_sub deferred in
         go sub deferred))
+    else (
+      let sub, deferred = apply_sub sub new_sub deferred in
+      go sub deferred)
   in
   go [] constrs
 ;;
@@ -801,7 +964,7 @@ let check_match_exhaustiveness
   | None
   | Some (Frontend.PatBracket _)
   | Some (PatRecord _)
-  | Some (PatWildcard)
+  | Some PatWildcard
   | Some (PatVar _) -> Ok ()
   | Some (PatLitBool _) ->
     if has_catchall
@@ -879,7 +1042,7 @@ let rec infer_binding
       | Some ty_v -> constr (Eq (ty_v, bind.ty)) :: constrs_bind
     in
     match recur, return_ty with
-    | Nonrec, Some full_ty -> constr (Eq (full_ty, bind.ty)) :: rec_constrs
+    | Nonrec, Some full_ty -> constr (Coerce (bind.ty, full_ty)) :: rec_constrs
     | _ -> rec_constrs
   in
   let%bind sub_bind, deferred = solve env.structs constrs in
@@ -940,7 +1103,7 @@ and gen_term (env : env) (t : Desugar.term)
     let constrs =
       (constr (Eq (f.ty, TyArrow (arg_ty, ret_ty))) :: constrs_f)
       @ constrs_x
-      @ [ constr (Eq (arg_ty, x.ty)) ]
+      @ [ constr (Coerce (x.ty, arg_ty)) ]
     in
     let x = { x with ty = arg_ty } in
     let composed = compose_sub sub_x sub_f in
@@ -975,13 +1138,15 @@ and gen_term (env : env) (t : Desugar.term)
     let%bind c, constrs_c, sub_c = gen_term env c in
     let%bind t, constrs_t, sub_t = gen_term env t in
     let%bind e, constrs_e, sub_e = gen_term env e in
+    let join_ty = fresh_tyvar () in
     let constrs =
       constr (Eq (c.ty, TyBool))
-      :: constr (Eq (t.ty, e.ty))
+      :: constr (Coerce (t.ty, join_ty))
+      :: constr (Coerce (e.ty, join_ty))
       :: (constrs_c @ constrs_t @ constrs_e)
     in
     let composed = compose_sub sub_e (compose_sub sub_t sub_c) in
-    Ok ({ desc = If (c, t, e); ty = t.ty; loc }, constrs, composed)
+    Ok ({ desc = If (c, t, e); ty = join_ty; loc }, constrs, composed)
   | Bop (op, l, r) ->
     let%bind l, constrs_l, sub_l = gen_term env l in
     let%bind r, constrs_r, sub_r = gen_term env r in
@@ -997,8 +1162,10 @@ and gen_term (env : env) (t : Desugar.term)
         ]
       | Mul | Div -> [ constr (MulBroadcast (l.ty, r.ty, ret_ty)) ]
       | Eq ->
-        [ constr (HasClass (Equatable, l.ty))
-        ; constr (Eq (l.ty, r.ty))
+        let eq_ty = fresh_tyvar () in
+        [ constr (HasClass (Equatable, eq_ty))
+        ; constr (Coerce (l.ty, eq_ty))
+        ; constr (Coerce (r.ty, eq_ty))
         ; constr (Eq (ret_ty, TyBool))
         ]
       | Lt | Gt | Leq | Geq ->
@@ -1152,7 +1319,7 @@ and gen_term (env : env) (t : Desugar.term)
           let%bind arg, constrs, sub = gen_term env arg in
           return
             ( arg :: acc_args
-            , (constr (Eq (arg.ty, elem_ty)) :: constrs) @ acc_constrs
+            , (constr (Coerce (arg.ty, elem_ty)) :: constrs) @ acc_constrs
             , compose_sub sub acc_sub ))
     in
     let args = List.rev args in
@@ -1200,7 +1367,7 @@ and gen_term (env : env) (t : Desugar.term)
                    , [ constr (HasClass (Comparable, arg.ty))
                      ; constr (Broadcast (arg.ty, TyFloat, coerce_ty))
                      ] )
-                 | _ -> arg, [ constr (Eq (arg.ty, ty)) ]
+                 | _ -> arg, [ constr (Coerce (arg.ty, ty)) ]
                in
                return
                  ( arg :: acc
@@ -1258,7 +1425,7 @@ and gen_term (env : env) (t : Desugar.term)
                 , [ constr (HasClass (Comparable, arg.ty))
                   ; constr (Broadcast (arg.ty, TyFloat, coerce_ty))
                   ] )
-              | _ -> arg, [ constr (Eq (arg.ty, expected_ty)) ]
+              | _ -> arg, [ constr (Coerce (arg.ty, expected_ty)) ]
             in
             return
               ( arg :: acc_args
@@ -1364,7 +1531,7 @@ and gen_term (env : env) (t : Desugar.term)
           let%bind body, constrs_body, body_sub = gen_term { env with ctx } body in
           return
             ( (pat, body) :: acc_cases
-            , (constr (Eq (body.ty, ret_ty)) :: constrs_body) @ acc_constrs
+            , (constr (Coerce (body.ty, ret_ty)) :: constrs_body) @ acc_constrs
             , compose_sub body_sub acc_sub ))
     in
     let composed = compose_sub sub_cases sub_s in
@@ -1379,7 +1546,7 @@ let enforce_main_type env bind ty loc v =
   then Ok (bind, ty)
   else (
     let expected = TyArrow (TyVec (2, TyFloat), TyVec (3, TyFloat)) in
-    let main_constr = { desc = Eq (ty, expected); loc } in
+    let main_constr = { desc = Coerce (ty, expected); loc } in
     match solve env.structs [ main_constr ] with
     | Ok (sub, []) -> Ok (subst_term sub bind, subst_ty sub ty)
     | _ -> Err.fail "main must have type vec2 -> vec3" ~loc ~d:[%message (ty : ty)])
