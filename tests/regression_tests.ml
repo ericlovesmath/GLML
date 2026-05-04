@@ -1405,3 +1405,180 @@ let%expect_test "main type nomangle if type not concrete" =
     }
     |}]
 ;;
+
+let%expect_test "defunctionalize unifies int/float arrow flavors" =
+  test
+    {|
+    type albedo_fn = vec3 -> vec3
+    type material = Phong of albedo_fn * float
+
+    let make_waves (c : vec3) : albedo_fn = fun p -> c
+    let add_noise (strength : float) : albedo_fn = fun p -> [0, 0, 0]
+
+    let scene_mat (p : vec3) : material =
+      let waves = make_waves [1.0, 0.2, 0.5] in
+      let noisy_waves = add_noise 0.15 in
+      Phong (noisy_waves, 64.0)
+
+    let main (uv : vec2) = [0, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_22 {
+        int tag;
+        vec3 lctor_25_0;
+        float lctor_28_0;
+    };
+    vec3 add_noise_3(float strength_4, vec3 p_5) {
+        return vec3(0., 0., 0.);
+    }
+    vec3 make_waves_0(vec3 c_1, vec3 p_2) {
+        return c_1;
+    }
+    vec3 dapply_21(DFn_22 dfn_29, vec3 da_30) {
+        int _lv_tag_32 = dfn_29.tag;
+        switch (_lv_tag_32) {
+            case 0: {
+                vec3 ca_24 = dfn_29.lctor_25_0;
+                return make_waves_0(ca_24, da_30);
+                break;
+            }
+            default: {
+                float ca_27 = dfn_29.lctor_28_0;
+                return add_noise_3(ca_27, da_30);
+                break;
+            }
+        }
+    }
+    struct material {
+        int tag;
+        DFn_22 Phong_0;
+        float Phong_1;
+    };
+    material scene_mat_6(vec3 p_7) {
+        vec3 anf_31 = vec3(1., 0.2, 0.5);
+        DFn_22 waves_8 = DFn_22(0, anf_31, 0.);
+        vec3 _tmp_33;
+        DFn_22 noisy_waves_9 = DFn_22(1, _tmp_33, 0.15);
+        return material(0, noisy_waves_9, 64.);
+    }
+    vec3 main_pure(vec2 uv_10) {
+        return vec3(0., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    let pick (f : vec3 -> vec3) (p : vec3) : vec3 = f p
+
+    let main (uv : vec2) =
+      let a = pick (fun p -> [0, 0, 0]) [1.0, 0.0, 0.0] in
+      let b = pick (fun p -> p) [0.0, 1.0, 0.0] in
+      a + b
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_28 {
+        int tag;
+    };
+    vec3 lam_25(vec3 p_5) {
+        return vec3(0., 0., 0.);
+    }
+    vec3 lam_26(vec3 p_7) {
+        return p_7;
+    }
+    vec3 dapply_27(DFn_28 dfn_31, vec3 da_32) {
+        int _lv_tag_37 = dfn_31.tag;
+        switch (_lv_tag_37) {
+            case 0: {
+                return lam_25(da_32);
+                break;
+            }
+            default: {
+                return lam_26(da_32);
+                break;
+            }
+        }
+    }
+    vec3 pick_0(DFn_28 f_1, vec3 p_2) {
+        return dapply_27(f_1, p_2);
+    }
+    vec3 main_pure(vec2 uv_3) {
+        DFn_28 anf_33 = DFn_28(0);
+        vec3 anf_34 = vec3(1., 0., 0.);
+        vec3 a_4 = pick_0(anf_33, anf_34);
+        DFn_28 anf_35 = DFn_28(1);
+        vec3 anf_36 = vec3(0., 1., 0.);
+        vec3 b_6 = pick_0(anf_35, anf_36);
+        return (a_4 + b_6);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    let make (b : bool) : vec3 -> vec3 =
+      if b then fun p -> [0, 0, 0] else fun p -> p
+
+    let main (uv : vec2) =
+      let f = make (uv.0 > 0.5) in
+      f [1.0, 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_21 {
+        int tag;
+    };
+    vec3 lam_18(vec3 p_2) {
+        return vec3(0., 0., 0.);
+    }
+    vec3 lam_19(vec3 p_3) {
+        return p_3;
+    }
+    vec3 dapply_20(DFn_21 dfn_24, vec3 da_25) {
+        int _lv_tag_29 = dfn_24.tag;
+        switch (_lv_tag_29) {
+            case 0: {
+                return lam_18(da_25);
+                break;
+            }
+            default: {
+                return lam_19(da_25);
+                break;
+            }
+        }
+    }
+    DFn_21 make_0(bool b_1) {
+        if (b_1) {
+            return DFn_21(0);
+        } else {
+            return DFn_21(1);
+        }
+    }
+    vec3 main_pure(vec2 uv_4) {
+        float anf_26 = uv_4[0];
+        bool anf_27 = (anf_26 > 0.5);
+        DFn_21 f_5 = make_0(anf_27);
+        vec3 anf_28 = vec3(1., 0., 0.);
+        return dapply_20(f_5, anf_28);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;

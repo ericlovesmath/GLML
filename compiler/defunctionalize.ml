@@ -11,6 +11,17 @@ let is_fn_ty = function
   | _ -> false
 ;;
 
+let rec normalize_arrow_ty : ty -> ty = function
+  | TyVec (n, t) -> TyVec (n, normalize_vec_elem t)
+  | TyArrow (a, b) -> TyArrow (normalize_arrow_ty a, normalize_arrow_ty b)
+  | (TyInt | TyFloat | TyBool | TyRecord _ | TyVariant _) as t -> t
+
+and normalize_vec_elem : ty -> ty = function
+  | TyInt -> TyFloat
+  | TyVec (n, t) -> TyVec (n, normalize_vec_elem t)
+  | t -> t
+;;
+
 let rec mangle_ty : ty -> string = function
   | TyFloat -> "float"
   | TyInt -> "int"
@@ -133,6 +144,7 @@ let rec subst_vars (subs : (string * string) list) (t : Lambda_lift.term)
 ;;
 
 let get_or_create_info (reg : registry) (ty : ty) : registry * fn_type_info =
+  let ty = normalize_arrow_ty ty in
   let key = mangle_ty ty in
   match Map.find reg.by_arrow key with
   | Some info -> reg, info
@@ -177,6 +189,7 @@ let retype_params (reg : registry) params =
 let add_lambda_entry (reg : registry) (ty : ty) params body captured loc
   : registry * fn_type_info * string
   =
+  let ty = normalize_arrow_ty ty in
   let reg, canonical_info = get_or_create_info reg ty in
   let canonical_key = mangle_ty ty in
   let max_captured_level =
@@ -225,6 +238,7 @@ let add_lambda_entry (reg : registry) (ty : ty) params body captured loc
 let add_global_entry (reg : registry) (ty : ty) (fn_name : string) (loc : Lexer.loc)
   : registry * fn_type_info * string
   =
+  let ty = normalize_arrow_ty ty in
   let reg, info = get_or_create_info reg ty in
   match
     List.find info.entries ~f:(function
@@ -482,7 +496,8 @@ let rec rewrite_term
     let reg, c = rw reg c in
     let reg, tt = rw reg tt in
     let reg, e = rw reg e in
-    reg, { t with desc = If (c, tt, e) }
+    let ty = if is_fn_ty t.ty then tt.ty else t.ty in
+    reg, { t with desc = If (c, tt, e); ty }
   | Bop (op, l, r) ->
     let reg, l = rw reg l in
     let reg, r = rw reg r in
