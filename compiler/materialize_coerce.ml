@@ -38,7 +38,7 @@ let lower_coerce ~loc (target : ty) (inner : term) : term =
   else (
     match target, inner.ty, inner.desc with
     | TyFloat, TyInt, Int i -> { desc = Float (Float.of_int i); ty = TyFloat; loc }
-    | TyFloat, TyInt, _ -> { desc = Promote inner; ty = TyFloat; loc }
+    | TyFloat, TyInt, _ -> { desc = Builtin (Glsl.Float, [ inner ]); ty = TyFloat; loc }
     | _ when coercible inner.ty target -> { inner with ty = target }
     | _ -> inner)
 ;;
@@ -102,7 +102,6 @@ let rec rewrite (t : term) : term =
     { t with desc = Variant (tn, ctor, List.map args ~f:rewrite) }
   | Match (scrut, cases) ->
     { t with desc = Match (rewrite scrut, List.map cases ~f:(Tuple2.map_snd ~f:rewrite)) }
-  | Promote inner -> { t with desc = Promote (rewrite inner) }
 ;;
 
 let materialize (Program tops : t) : t =

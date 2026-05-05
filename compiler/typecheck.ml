@@ -82,7 +82,6 @@ type term_desc =
   | Field of term * string
   | Variant of string * string * term list
   | Match of term * (Frontend.pat * term) list
-  | Promote of term
   | Coerce of ty * term
 
 and term =
@@ -146,7 +145,6 @@ let rec sexp_of_term_desc = function
   | Match (scrutinee, cases) ->
     let sexp_of_case (pat, body) = List [ Frontend.sexp_of_pat pat; sexp_of_term body ] in
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
-  | Promote t -> List [ Atom "promote"; sexp_of_term t ]
   | Coerce (target, inner) ->
     List [ Atom "coerce"; sexp_of_ty target; sexp_of_term inner ]
 
@@ -251,7 +249,6 @@ let rec subst_term (sub : substitution) (t : term) : term =
     | Variant (ty_name, ctor, args) -> Variant (ty_name, ctor, List.map args ~f:subst)
     | Match (scrutinee, cases) ->
       Match (subst scrutinee, List.map cases ~f:(fun (pat, body) -> pat, subst body))
-    | Promote t -> Promote (subst t)
     | Coerce (target, inner) -> Coerce (subst_ty sub target, subst inner)
   in
   { t with desc; ty = subst_ty sub t.ty }

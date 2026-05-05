@@ -148,7 +148,6 @@ let rec fold_term ~(f : 'a -> Typecheck.term -> 'a) (acc : 'a) (t : Typecheck.te
   | Match (scrutinee, cases) ->
     let acc = fold acc scrutinee in
     List.fold cases ~init:acc ~f:(fun acc (_, body) -> fold acc body)
-  | Promote inner -> fold acc inner
   | Coerce (_, inner) -> fold acc inner
 ;;
 
@@ -378,7 +377,6 @@ let rec rewrite_term
       Variant (new_ty_name, ctor, List.map args ~f:rewrite)
     | Match (scrutinee, cases) ->
       Match (rewrite scrutinee, List.map cases ~f:(fun (pat, body) -> pat, rewrite body))
-    | Promote inner -> Promote (rewrite inner)
     | Coerce (target, inner) -> Coerce (rewrite_ty ~type_poly_env target, rewrite inner)
   in
   { t with ty; desc }
@@ -482,7 +480,6 @@ let rec subst_var
     | Variant (ty_name, ctor, args) -> Variant (ty_name, ctor, List.map args ~f:subst)
     | Match (scrutinee, cases) ->
       Match (subst scrutinee, map_cases_capture_avoiding ~var:name ~f:subst cases)
-    | Promote inner -> Promote (subst inner)
     | Coerce (target, inner) -> Coerce (target, subst inner)
   in
   { t with desc }
@@ -700,9 +697,6 @@ and rewrite_refs (env : env) (acc : acc) (t : Typecheck.term)
       in
       let%map acc, args = rewrite_list env acc args in
       acc, Variant (ty_name, ctor, args)
-    | Promote inner ->
-      let%map acc, inner = rewrite_refs env acc inner in
-      acc, Promote inner
     | Coerce (target, inner) ->
       let target = rewrite_ty ~type_poly_env:env.type_poly_env target in
       let%map acc, inner = rewrite_refs env acc inner in
@@ -808,27 +802,17 @@ and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Compiler_error.t =
       |> Compiler_error.all
     in
     Ok (Match (scrutinee, cases))
-  | Promote inner ->
-    (* Promote is materialized typecheck-time evidence of a coercion; for the
-       sole runtime-relevant case (TyInt -> TyFloat scalar) lower to float(). *)
-    let%map inner = term_of_tc inner in
-    Builtin (Float, [ inner ])
   | Coerce (target, inner) ->
-    (* Since we already monomorphized and re-materialzied, only valid case is a residual
-       that [lower_coerce] kept because both sides equal, or scalar [int->float] left over.
-
-       TODO: Currently lowers like Promote where applicable, but should be handled later? *)
-    (match target, inner.ty with
-     | TyFloat, TyInt ->
-       let%map inner = term_of_tc inner in
-       Builtin (Float, [ inner ])
-     | _ when Typecheck.equal_ty target inner.ty ->
-       let%map inner = term_of_tc inner in
-       inner.desc
-     | _ ->
-       Err.fail
-         "unexpected unresolved Coerce after monomorphize"
-         ~d:[%message (d : Typecheck.term_desc)])
+    (* materialize_coerce re-runs after monomorphize, so the only Coerce that can
+       reach here is a residual where both sides ended up equal. *)
+    if Typecheck.equal_ty target inner.ty
+    then (
+      let%map inner = term_of_tc inner in
+      inner.desc)
+    else
+      Err.fail
+        "unexpected unresolved Coerce after monomorphize"
+        ~d:[%message (d : Typecheck.term_desc)]
 ;;
 
 let top_of_tc (t : Typecheck.top) : top Compiler_error.t =
