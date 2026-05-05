@@ -4,13 +4,10 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 
 ## Tasks / Bugs
 
-- Shorten names of function outputs on monomorphization with long types
 - Allow binary operations and pipes to be used as curried functions
 - Nested destructing, removing mat pattern case
 - User defined constraints for broadcasting/others, eg: `let f (x : a) (y : b) : c where (a b +> c) = x + y`
-- Sanity check that mats are truly vec of vecs!
 - Type annotations for arbitrary terms
-- Promotion with ints/floats (true coercion enforced rather than constraint)
 - Type aliases with parameters
 - Curried builtin functions for partial application
 - Auto lift `f : float -> float` to work over vecs?
