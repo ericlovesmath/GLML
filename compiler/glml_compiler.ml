@@ -9,7 +9,7 @@ module Passes = struct
       | Desugar
       | Uniquify
       | Typecheck
-      | Materialize_coerce
+      | Promote_ints
       | Monomorphize
       | Uncurry
       | Lambda_lift
@@ -43,8 +43,8 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   trace Uniquify (Desugar.sexp_of_t t);
   let%bind t = Typecheck.typecheck t in
   trace Typecheck (Typecheck.sexp_of_t t);
-  let t = Materialize_coerce.materialize t in
-  trace Materialize_coerce (Typecheck.sexp_of_t t);
+  let t = Promote_ints.materialize t in
+  trace Promote_ints (Typecheck.sexp_of_t t);
   let%bind t = Monomorphize.monomorphize t in
   trace Monomorphize (Monomorphize.sexp_of_t t);
   let t = Uncurry.uncurry t in

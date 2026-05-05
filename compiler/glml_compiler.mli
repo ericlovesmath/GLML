@@ -8,7 +8,7 @@ module Passes : sig
     | Desugar
     | Uniquify
     | Typecheck
-    | Materialize_coerce
+    | Promote_ints
     | Monomorphize
     | Uncurry
     | Lambda_lift

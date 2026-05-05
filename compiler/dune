@@ -14,7 +14,7 @@
    desugar
    uniquify
    typecheck
-   materialize_coerce
+   promote_ints
    monomorphize
    uncurry
    defunctionalize

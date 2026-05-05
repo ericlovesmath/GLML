@@ -560,7 +560,7 @@ let rec resolve_spec (env : env) (acc : acc) (name : string) (concrete_ty : Type
     let%bind acc, body = rewrite_refs env acc body in
     let concrete_ty = rewrite_ty ~type_poly_env:env.type_poly_env concrete_ty in
     (* [TyVar]s that blocked [Coerce] lowering at typecheck-time are now concrete *)
-    let body = Materialize_coerce.rewrite body in
+    let body = Promote_ints.rewrite body in
     let top : Typecheck.top =
       { desc = Define (entry.poly_recur, spec_name, body)
       ; ty = concrete_ty
@@ -643,7 +643,7 @@ and rewrite_refs (env : env) (acc : acc) (t : Typecheck.term)
                 | Rec _ -> rename_var v spec_name spec_bind
                 | Nonrec -> spec_bind
               in
-              let spec_bind = Materialize_coerce.rewrite spec_bind in
+              let spec_bind = Promote_ints.rewrite spec_bind in
               acc, (spec_name, spec_bind, concrete_ty) :: specs_rev)
         in
         let specs = List.rev specs_rev in
