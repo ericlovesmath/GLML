@@ -28,8 +28,8 @@ let%expect_test "int promotion edge cases" =
     out vec4 fragColor;
     vec3 main_pure(vec2 coord_0) {
         int n_1 = 2;
-        float pf_3 = float(n_1);
-        return vec3(pf_3, 0., 0.);
+        float anf_3 = float(n_1);
+        return vec3(anf_3, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -255,8 +255,8 @@ let%expect_test "regression - polymorphic struct type in function" =
         } else {
             b_4 = 2;
         }
-        float pf_24 = float(b_4);
-        return vec3(a_3, pf_24, 0.);
+        float anf_24 = float(b_4);
+        return vec3(a_3, anf_24, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -416,8 +416,8 @@ let%expect_test "field access in let binding (unannotated)" =
         } else {
             y_5 = 2;
         }
-        float pf_25 = float(y_5);
-        return vec3(x_4, pf_25, 0.);
+        float anf_25 = float(y_5);
+        return vec3(x_4, anf_25, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -725,8 +725,8 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
     }
     vec3 main_pure(vec2 uv_3) {
         int anf_20 = dapply_15(inc_0_int_to_int_11, 1);
-        float pf_21 = float(anf_20);
-        return vec3(pf_21, 1., 1.);
+        float anf_21 = float(anf_20);
+        return vec3(anf_21, 1., 1.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

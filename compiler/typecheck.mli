@@ -59,6 +59,7 @@ type term_desc =
   | Field of term * string
   | Variant of string * string * term list
   | Match of term * (Frontend.pat * term) list
+  | Promote of term
 [@@deriving sexp_of]
 
 and term =

@@ -1045,10 +1045,10 @@ let%expect_test "promotion of ints to floats" =
     out vec4 fragColor;
     vec3 main_pure(vec2 u_0) {
         int b_1 = (1 + 2);
-        float pf_6 = float(b_1);
-        float a_2 = (pf_6 + 2.);
         float pf_7 = float(b_1);
-        return vec3(pf_7, a_2, 3.);
+        float a_2 = (pf_7 + 2.);
+        float anf_6 = float(b_1);
+        return vec3(anf_6, a_2, 3.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1683,8 +1683,8 @@ let%expect_test "parametrized variants" =
         int Some_0;
     };
     int unwrap_0(v_option_int opt_1, int default_2) {
-        int _lv_tag_29 = opt_1.tag;
-        switch (_lv_tag_29) {
+        int _lv_tag_32 = opt_1.tag;
+        switch (_lv_tag_32) {
             case 0: {
                 int x_3 = opt_1.Some_0;
                 return x_3;
@@ -1703,10 +1703,10 @@ let%expect_test "parametrized variants" =
         int b_6 = unwrap_0(anf_27, 5);
         v_option_int anf_28 = v_option_int(1, 0);
         int c_7 = unwrap_0(anf_28, 5);
-        float pf_30 = float(a_5);
-        float pf_31 = float(b_6);
-        float pf_32 = float(c_7);
-        return vec3(pf_30, pf_31, pf_32);
+        float anf_29 = float(a_5);
+        float anf_30 = float(b_6);
+        float anf_31 = float(c_7);
+        return vec3(anf_29, anf_30, anf_31);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1881,8 +1881,8 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
         } else {
             b_5 = 2;
         }
-        float pf_22 = float(b_5);
-        return vec3(a_4, pf_22, 0.);
+        float anf_22 = float(b_5);
+        return vec3(a_4, anf_22, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2794,8 +2794,8 @@ let%expect_test "ints in float contexts" =
         } else {
             r_1 = 2;
         }
-        float pf_4 = float(r_1);
-        return vec3(pf_4, 0., 0.);
+        float anf_4 = float(r_1);
+        return vec3(anf_4, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2897,8 +2897,8 @@ let%expect_test "function keyword desugaring" =
         float Some_0;
     };
     float f_0(v_option_float _fn_arg_1) {
-        int _lv_tag_52 = _fn_arg_1.tag;
-        switch (_lv_tag_52) {
+        int _lv_tag_53 = _fn_arg_1.tag;
+        switch (_lv_tag_53) {
             case 0: {
                 float x_2 = _fn_arg_1.Some_0;
                 return (x_2 + 1.);
@@ -2917,8 +2917,8 @@ let%expect_test "function keyword desugaring" =
         float anf_49 = f_0(anf_48);
         float anf_50 = g_3(true);
         int anf_51 = dapply_40(h_9, true);
-        float pf_53 = float(anf_51);
-        return vec3(anf_49, anf_50, pf_53);
+        float anf_52 = float(anf_51);
+        return vec3(anf_49, anf_50, anf_52);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

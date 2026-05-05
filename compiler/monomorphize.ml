@@ -148,6 +148,7 @@ let rec fold_term ~(f : 'a -> Typecheck.term -> 'a) (acc : 'a) (t : Typecheck.te
   | Match (scrutinee, cases) ->
     let acc = fold acc scrutinee in
     List.fold cases ~init:acc ~f:(fun acc (_, body) -> fold acc body)
+  | Promote inner -> fold acc inner
 ;;
 
 let rec mangle_ty (ty : Typecheck.ty) : string =
@@ -376,6 +377,7 @@ let rec rewrite_term
       Variant (new_ty_name, ctor, List.map args ~f:rewrite)
     | Match (scrutinee, cases) ->
       Match (rewrite scrutinee, List.map cases ~f:(fun (pat, body) -> pat, rewrite body))
+    | Promote inner -> Promote (rewrite inner)
   in
   { t with ty; desc }
 ;;
@@ -478,6 +480,7 @@ let rec subst_var
     | Variant (ty_name, ctor, args) -> Variant (ty_name, ctor, List.map args ~f:subst)
     | Match (scrutinee, cases) ->
       Match (subst scrutinee, map_cases_capture_avoiding ~var:name ~f:subst cases)
+    | Promote inner -> Promote (subst inner)
   in
   { t with desc }
 ;;
@@ -691,6 +694,9 @@ and rewrite_refs (env : env) (acc : acc) (t : Typecheck.term)
       in
       let%map acc, args = rewrite_list env acc args in
       acc, Variant (ty_name, ctor, args)
+    | Promote inner ->
+      let%map acc, inner = rewrite_refs env acc inner in
+      acc, Promote inner
     | Match (scrutinee, cases) ->
       let%bind acc, scrutinee = rewrite_refs env acc scrutinee in
       let%bind acc, cases_rev =
@@ -792,6 +798,11 @@ and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Compiler_error.t =
       |> Compiler_error.all
     in
     Ok (Match (scrutinee, cases))
+  | Promote inner ->
+    (* Promote is materialized typecheck-time evidence of a coercion; for the
+       sole runtime-relevant case (TyInt -> TyFloat scalar) lower to float(). *)
+    let%map inner = term_of_tc inner in
+    Builtin (Float, [ inner ])
 ;;
 
 let top_of_tc (t : Typecheck.top) : top Compiler_error.t =
