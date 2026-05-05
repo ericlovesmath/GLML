@@ -17,7 +17,6 @@ module Passes = struct
       | Anf
       | Tail_call
       | Lower_variants
-      | Promote_ints
       | Remove_placeholder
       | Lift_consts
       | Translate
@@ -60,8 +59,6 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   trace Tail_call (Tail_call.sexp_of_t t);
   let%bind t = Lower_variants.lower t in
   trace Lower_variants (Lower_variants.sexp_of_t t);
-  let t = Promote_ints.promote t in
-  trace Promote_ints (Lower_variants.sexp_of_t t);
   let t = Remove_placeholder.remove t in
   trace Remove_placeholder (Remove_placeholder.sexp_of_t t);
   let t = Lift_consts.lift t in

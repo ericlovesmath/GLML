@@ -16,7 +16,6 @@ module Passes : sig
     | Anf
     | Tail_call
     | Lower_variants
-    | Promote_ints
     | Remove_placeholder
     | Lift_consts
     | Translate

@@ -848,6 +848,57 @@ let top_of_tc (t : Typecheck.top) : top Compiler_error.t =
   Ok { desc; ty; loc = t.loc }
 ;;
 
+(* GLSL has no ivec, so any [TyVe c(_, TyInt)] annotation that survived monomorphization
+   has to be rewritten by the previous pass, this just makes the type annotations agree.
+
+   TODO: This is here because is must run after specialization is complete since doing it
+   earlier would mess with the [TyVar] case but I probably want to move it to the previous pass... *)
+let promote_int_vecs : t -> t =
+  let rec promote_ty = function
+    | TyVec (n, TyInt) -> TyVec (n, TyFloat)
+    | TyVec (n, inner) -> TyVec (n, promote_ty inner)
+    | TyArrow (a, b) -> TyArrow (promote_ty a, promote_ty b)
+    | (TyFloat | TyInt | TyBool | TyRecord _ | TyVariant _) as ty -> ty
+  in
+  let rec promote_term (t : term) : term =
+    let ty = promote_ty t.ty in
+    let desc =
+      match t.desc with
+      | Var _ | Float _ | Int _ | Bool _ -> t.desc
+      | Vec (n, ts) -> Vec (n, List.map ts ~f:promote_term)
+      | Lam (v, body) -> Lam (v, promote_term body)
+      | App (f, x) -> App (promote_term f, promote_term x)
+      | Let (recur, v, bind, body) -> Let (recur, v, promote_term bind, promote_term body)
+      | If (c, tt, e) -> If (promote_term c, promote_term tt, promote_term e)
+      | Bop (op, l, r) -> Bop (op, promote_term l, promote_term r)
+      | Index (inner, i) -> Index (promote_term inner, i)
+      | Builtin (b, ts) -> Builtin (b, List.map ts ~f:promote_term)
+      | Record (s, ts) -> Record (s, List.map ts ~f:promote_term)
+      | Field (inner, f) -> Field (promote_term inner, f)
+      | Variant (t, ctor, args) -> Variant (t, ctor, List.map args ~f:promote_term)
+      | Match (scrut, cases) ->
+        Match (promote_term scrut, List.map cases ~f:(Tuple2.map_snd ~f:promote_term))
+    in
+    { t with desc; ty }
+  in
+  let promote_top (top : top) : top =
+    let ty = promote_ty top.ty in
+    let desc =
+      match top.desc with
+      | Define (recur, v, bind) -> Define (recur, v, promote_term bind)
+      | Extern _ -> top.desc
+      | TypeDef (name, RecordDecl fields) ->
+        let fields = List.map fields ~f:(fun (f, ty) -> f, promote_ty ty) in
+        TypeDef (name, RecordDecl fields)
+      | TypeDef (name, VariantDecl ctors) ->
+        let ctors = List.map ctors ~f:(fun (c, tys) -> c, List.map tys ~f:promote_ty) in
+        TypeDef (name, VariantDecl ctors)
+    in
+    { top with desc; ty }
+  in
+  fun (Program tops) -> Program (List.map tops ~f:promote_top)
+;;
+
 let monomorphize (program : Typecheck.t) : t Compiler_error.t =
   let (Program tops) = program in
   (* Build read-only env *)
@@ -981,5 +1032,5 @@ let monomorphize (program : Typecheck.t) : t Compiler_error.t =
   (* Assemble all tops and lower types *)
   let all_tops_tc = spec_type_tops @ List.rev acc.all_tops_rev in
   let%map tops = Compiler_error.all (List.map all_tops_tc ~f:top_of_tc) in
-  Program tops
+  promote_int_vecs (Program tops)
 ;;
