@@ -7,11 +7,11 @@ let%expect_test "simple tests for compile_stlc" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord_0) {
-        float x_1 = 2.;
-        float anf_5 = (12. * x_1);
-        float anf_6 = (anf_5 + 10.);
-        return vec3(anf_6, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        float x = 2.;
+        float anf = (12. * x);
+        float anf_0 = (anf + 10.);
+        return vec3(anf_0, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -24,9 +24,9 @@ let%expect_test "simple tests for compile_stlc" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord_0) {
-        bool anf_5 = (true && false);
-        if (anf_5) {
+    vec3 main_pure(vec2 coord) {
+        bool anf = (true && false);
+        if (anf) {
             return vec3(1., 0., 0.);
         } else {
             return vec3(0., 0., 0.);
@@ -49,12 +49,12 @@ let%expect_test "simple tests for compile_stlc" =
     precision highp float;
     out vec4 fragColor;
     uniform float n;
-    float f_0(float x_1) {
-        return (x_1 + n);
+    float f(float x) {
+        return (x + n);
     }
-    vec3 main_pure(vec2 u_2) {
-        float anf_7 = f_0(10.);
-        return vec3(anf_7, 0., 0.);
+    vec3 main_pure(vec2 u) {
+        float anf = f(10.);
+        return vec3(anf, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -73,12 +73,12 @@ let%expect_test "simple tests for compile_stlc" =
     precision highp float;
     out vec4 fragColor;
     uniform float n;
-    float f_0(float x_1) {
-        return (x_1 + n);
+    float f(float x) {
+        return (x + n);
     }
-    vec3 main_pure(vec2 u_2) {
-        float anf_7 = f_0(10.);
-        return vec3(anf_7, 0., 0.);
+    vec3 main_pure(vec2 u) {
+        float anf = f(10.);
+        return vec3(anf, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -101,16 +101,16 @@ let%expect_test "generic vectors and matrices" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 u_0) {
-        vec3 anf_14 = vec3(1., 0., 0.);
-        vec3 anf_15 = vec3(0., 1., 0.);
-        vec3 anf_16 = vec3(0., 0., 1.);
-        mat3 m_1 = mat3(anf_14, anf_15, anf_16);
-        vec2 anf_17 = vec2(1., 2.);
-        vec2 anf_18 = vec2(3., 4.);
-        vec2 anf_19 = vec2(5., 6.);
-        mat3x2 m_2 = mat3x2(anf_17, anf_18, anf_19);
-        vec2 v_3 = vec2(1., 2.);
+    vec3 main_pure(vec2 u) {
+        vec3 anf = vec3(1., 0., 0.);
+        vec3 anf_0 = vec3(0., 1., 0.);
+        vec3 anf_1 = vec3(0., 0., 1.);
+        mat3 m = mat3(anf, anf_0, anf_1);
+        vec2 anf_2 = vec2(1., 2.);
+        vec2 anf_3 = vec2(3., 4.);
+        vec2 anf_4 = vec2(5., 6.);
+        mat3x2 m_0 = mat3x2(anf_2, anf_3, anf_4);
+        vec2 v = vec2(1., 2.);
         return vec3(1., 0., 0.);
     }
     void main() {
@@ -127,10 +127,10 @@ let%expect_test "indexing" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord_0) {
-        vec3 v_1 = vec3(1., 2., 3.);
-        float anf_5 = v_1[0];
-        return vec3(anf_5, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        vec3 v = vec3(1., 2., 3.);
+        float anf = v[0];
+        return vec3(anf, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -148,16 +148,16 @@ let%expect_test "indexing" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord_0) {
-        vec3 anf_12 = vec3(1., 0., 0.);
-        vec3 anf_13 = vec3(0., 1., 0.);
-        vec3 anf_14 = vec3(0., 0., 1.);
-        mat3 m_1 = mat3(anf_12, anf_13, anf_14);
-        vec3 c_2 = m_1[0];
-        float anf_15 = c_2[0];
-        float anf_16 = c_2[1];
-        float anf_17 = c_2[2];
-        return vec3(anf_15, anf_16, anf_17);
+    vec3 main_pure(vec2 coord) {
+        vec3 anf = vec3(1., 0., 0.);
+        vec3 anf_0 = vec3(0., 1., 0.);
+        vec3 anf_1 = vec3(0., 0., 1.);
+        mat3 m = mat3(anf, anf_0, anf_1);
+        vec3 c = m[0];
+        float anf_2 = c[0];
+        float anf_3 = c[1];
+        float anf_4 = c[2];
+        return vec3(anf_2, anf_3, anf_4);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -183,12 +183,12 @@ let%expect_test "builtins" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord_0) {
-        vec3 v_1 = vec3(1., 2., 3.);
-        float anf_10 = sin(1.);
-        float anf_11 = dot(v_1, v_1);
-        float anf_12 = length(v_1);
-        return vec3(anf_10, anf_11, anf_12);
+    vec3 main_pure(vec2 coord) {
+        vec3 v = vec3(1., 2., 3.);
+        float anf = sin(1.);
+        float anf_0 = dot(v, v);
+        float anf_1 = length(v);
+        return vec3(anf, anf_0, anf_1);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -201,10 +201,10 @@ let%expect_test "builtins" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord_0) {
-        vec3 anf_4 = vec3(1., 2., 3.);
-        vec3 anf_5 = vec3(0., 2., 5.);
-        return cross(anf_4, anf_5);
+    vec3 main_pure(vec2 coord) {
+        vec3 anf = vec3(1., 2., 3.);
+        vec3 anf_0 = vec3(0., 2., 5.);
+        return cross(anf, anf_0);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -215,7 +215,7 @@ let%expect_test "builtins" =
   [%expect
     {|
     [typecheck] at 1:27-1:61: type mismatch
-      ty: (vec 2 'v_1)
+      ty: (vec 2 'v)
       ty': (vec 3 float)
       |
     1 | let main (coord : vec2) = #cross([ 1.0, 1.0 ], [ 0.0, 0.0 ])
@@ -235,16 +235,16 @@ let%expect_test "multi argument functions / lambdas" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float f_0(float x_1, float y_2) {
-        return (x_1 + y_2);
+    float f(float x, float y) {
+        return (x + y);
     }
-    float g_3(float x_4, float y_5) {
-        return (x_4 - y_5);
+    float g(float x_0, float y_0) {
+        return (x_0 - y_0);
     }
-    vec3 main_pure(vec2 u_6) {
-        float anf_18 = f_0(10., 5.);
-        float anf_19 = g_3(0., 0.);
-        return vec3(anf_18, anf_19, 0.);
+    vec3 main_pure(vec2 u) {
+        float anf = f(10., 5.);
+        float anf_0 = g(0., 0.);
+        return vec3(anf, anf_0, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -267,15 +267,15 @@ let%expect_test "lambda lifting" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float add_3_10(float x_1, float y_2, float z_4) {
-        float anf_11 = (x_1 + y_2);
-        return (anf_11 + z_4);
+    float add_0(float x, float y, float z) {
+        float anf = (x + y);
+        return (anf + z);
     }
-    vec3 main_pure(vec2 u_0) {
-        float x_1 = 10.;
-        float y_2 = 5.;
-        float anf_12 = add_3_10(x_1, y_2, 1.);
-        return vec3(anf_12, 0., 0.);
+    vec3 main_pure(vec2 u) {
+        float x = 10.;
+        float y = 5.;
+        float anf_0 = add_0(x, y, 1.);
+        return vec3(anf_0, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -296,15 +296,15 @@ let%expect_test "lambda lifting" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float g_3_12(float x_2, float y_4) {
-        return (x_2 + y_4);
+    float g_0(float x, float y) {
+        return (x + y);
     }
-    vec3 f_1_11(float x_2) {
-        float anf_13 = g_3_12(x_2, 1.);
-        return vec3(anf_13, 0., 0.);
+    vec3 f_0(float x) {
+        float anf = g_0(x, 1.);
+        return vec3(anf, 0., 0.);
     }
-    vec3 main_pure(vec2 u_0) {
-        return f_1_11(10.);
+    vec3 main_pure(vec2 u) {
+        return f_0(10.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -338,22 +338,22 @@ let%expect_test "lambda lifting" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_16 {
+    struct DFn {
         int tag;
     };
-    float lam_14(float x_4) {
-        return (x_4 + 1.);
+    float lam(float x_0) {
+        return (x_0 + 1.);
     }
-    float dapply_15(DFn_16 dfn_18, float da_19) {
-        return lam_14(da_19);
+    float dapply(DFn dfn, float da) {
+        return lam(da);
     }
-    float apply_f_0(DFn_16 f_1, float x_2) {
-        return dapply_15(f_1, x_2);
+    float apply_f(DFn f, float x) {
+        return dapply(f, x);
     }
-    vec3 main_pure(vec2 u_3) {
-        DFn_16 anf_20 = DFn_16(0);
-        float anf_21 = apply_f_0(anf_20, 10.);
-        return vec3(anf_21, 0., 0.);
+    vec3 main_pure(vec2 u) {
+        DFn anf = DFn(0);
+        float anf_0 = apply_f(anf, 10.);
+        return vec3(anf_0, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -377,26 +377,26 @@ let%expect_test "recursive functions" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    int fact_0(int n_1, int acc_2) {
-        int _iter_23 = 0;
-        while ((_iter_23 < 1000)) {
-            bool anf_20 = (n_1 == 0);
-            if (anf_20) {
-                return acc_2;
+    int fact(int n, int acc) {
+        int _iter = 0;
+        while ((_iter < 1000)) {
+            bool anf = (n == 0);
+            if (anf) {
+                return acc;
             } else {
-                int anf_21 = (n_1 - 1);
-                int anf_22 = (acc_2 * n_1);
-                n_1 = anf_21;
-                acc_2 = anf_22;
-                int _iter_inc_24 = (_iter_23 + 1);
-                _iter_23 = _iter_inc_24;
+                int anf_0 = (n - 1);
+                int anf_1 = (acc * n);
+                n = anf_0;
+                acc = anf_1;
+                int _iter_inc = (_iter + 1);
+                _iter = _iter_inc;
                 continue;
             }
         }
         return 0;
     }
-    vec3 main_pure(vec2 u_3) {
-        int num_4 = fact_0(5, 1);
+    vec3 main_pure(vec2 u) {
+        int num = fact(5, 1);
         return vec3(0., 0., 0.);
     }
     void main() {
@@ -435,17 +435,17 @@ let%expect_test "structs" =
         float x;
         float y;
     };
-    color make_red_0(point p_1) {
-        float p_y_2 = p_1.y;
-        return color(p_y_2, 0., 0.);
+    color make_red(point p) {
+        float p_y = p.y;
+        return color(p_y, 0., 0.);
     }
-    vec3 main_pure(vec2 u_3) {
-        point p_4 = point(1., 2.);
-        color c_5 = make_red_0(p_4);
-        float anf_18 = c_5.r;
-        float anf_19 = c_5.g;
-        float anf_20 = c_5.b;
-        return vec3(anf_18, anf_19, anf_20);
+    vec3 main_pure(vec2 u) {
+        point p_0 = point(1., 2.);
+        color c = make_red(p_0);
+        float anf = c.r;
+        float anf_0 = c.g;
+        float anf_1 = c.b;
+        return vec3(anf, anf_0, anf_1);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -485,22 +485,22 @@ let%expect_test "structs" =
         float x;
         float y;
     };
-    color make_red_0(point p_1) {
-        color col_2;
+    color make_red(point p) {
+        color col;
         if (true) {
-            col_2 = color(1., 0., 0.);
+            col = color(1., 0., 0.);
         } else {
-            col_2 = color(0., 0., 1.);
+            col = color(0., 0., 1.);
         }
-        return col_2;
+        return col;
     }
-    vec3 main_pure(vec2 u_3) {
-        point p_4 = point(1., 2.);
-        color c_5 = make_red_0(p_4);
-        float anf_21 = c_5.r;
-        float anf_22 = c_5.g;
-        float anf_23 = c_5.b;
-        return vec3(anf_21, anf_22, anf_23);
+    vec3 main_pure(vec2 u) {
+        point p_0 = point(1., 2.);
+        color c = make_red(p_0);
+        float anf = c.r;
+        float anf_0 = c.g;
+        float anf_1 = c.b;
+        return vec3(anf, anf_0, anf_1);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -560,24 +560,24 @@ let%expect_test "nested structs" =
         point start;
         point end;
     };
-    segment make_seg_0(float u_1) {
-        segment s_2;
+    segment make_seg(float u) {
+        segment s;
         if (true) {
-            point anf_20 = point(0., 0.);
-            point anf_21 = point(1., 1.);
-            s_2 = segment(anf_20, anf_21);
+            point anf = point(0., 0.);
+            point anf_0 = point(1., 1.);
+            s = segment(anf, anf_0);
         } else {
-            point anf_22 = point(1., 1.);
-            point anf_23 = point(0., 0.);
-            s_2 = segment(anf_22, anf_23);
+            point anf_1 = point(1., 1.);
+            point anf_2 = point(0., 0.);
+            s = segment(anf_1, anf_2);
         }
-        return s_2;
+        return s;
     }
-    vec3 main_pure(vec2 u_3) {
-        segment seg_4 = make_seg_0(1.);
-        point anf_24 = seg_4.end;
-        float c_5 = anf_24.x;
-        return vec3(c_5, c_5, c_5);
+    vec3 main_pure(vec2 u_0) {
+        segment seg = make_seg(1.);
+        point anf_3 = seg.end;
+        float c = anf_3.x;
+        return vec3(c, c, c);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -600,17 +600,17 @@ let%expect_test "monomorphization tests" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    bool id_0_bool_to_bool_15(bool x_1) {
-        return x_1;
+    bool id_m(bool x) {
+        return x;
     }
-    float id_0_float_to_float_16(float x_1) {
-        return x_1;
+    float id_m_0(float x) {
+        return x;
     }
-    vec3 main_pure(vec2 coord_2) {
-        float a_3 = id_0_float_to_float_16(1.);
-        bool b_4 = id_0_bool_to_bool_15(true);
-        if (b_4) {
-            return vec3(a_3, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        float a = id_m_0(1.);
+        bool b = id_m(true);
+        if (b) {
+            return vec3(a, 0., 0.);
         } else {
             return vec3(0., 0., 0.);
         }
@@ -633,17 +633,17 @@ let%expect_test "monomorphization tests" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    bool id_1_bool_to_bool_15_17(bool x_2) {
-        return x_2;
+    float id_m_0_0(float x) {
+        return x;
     }
-    float id_1_float_to_float_16_18(float x_2) {
-        return x_2;
+    bool id_m_1(bool x) {
+        return x;
     }
-    vec3 main_pure(vec2 coord_0) {
-        float a_3 = id_1_float_to_float_16_18(1.);
-        bool b_4 = id_1_bool_to_bool_15_17(true);
-        if (b_4) {
-            return vec3(a_3, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        float a = id_m_0_0(1.);
+        bool b = id_m_1(true);
+        if (b) {
+            return vec3(a, 0., 0.);
         } else {
             return vec3(0., 0., 0.);
         }
@@ -664,14 +664,14 @@ let%expect_test "monomorphization tests" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord_2) {
+    vec3 main_pure(vec2 coord) {
         return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
     }
-  |}];
+    |}];
   (* Validate no duplication of polymorphic function *)
   test
     {|
@@ -686,13 +686,13 @@ let%expect_test "monomorphization tests" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float id_1_float_to_float_13_14(float x_2) {
-        return x_2;
+    float id_m_0(float x) {
+        return x;
     }
-    vec3 main_pure(vec2 coord_0) {
-        float a_3 = id_1_float_to_float_13_14(1.);
-        float b_4 = id_1_float_to_float_13_14(2.);
-        return vec3(a_3, b_4, 0.);
+    vec3 main_pure(vec2 coord) {
+        float a = id_m_0(1.);
+        float b = id_m_0(2.);
+        return vec3(a, b, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -716,16 +716,16 @@ let%expect_test "advanced monomorphization example" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float const_2_float_to_bool_to_float_21(float x_3, bool y_4) {
-        return x_3;
+    float const_0_m(float x_0, bool y) {
+        return x_0;
     }
-    float id_0_float_to_float_22(float x_1) {
-        return x_1;
+    float id_m(float x) {
+        return x;
     }
-    vec3 main_pure(vec2 coord_5) {
-        float a_6 = id_0_float_to_float_22(1.);
-        float b_7 = const_2_float_to_bool_to_float_21(2., true);
-        return vec3(a_6, b_7, 0.);
+    vec3 main_pure(vec2 coord) {
+        float a = id_m(1.);
+        float b = const_0_m(2., true);
+        return vec3(a, b, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -745,12 +745,12 @@ let%expect_test "constrained polymorphism tests" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float f_0_float_to_float_to_float_15(float x_1, float y_2) {
-        return (x_1 * y_2);
+    float f_m(float x, float y) {
+        return (x * y);
     }
-    vec3 main_pure(vec2 coord_3) {
-        float anf_16 = f_0_float_to_float_to_float_15(1., 2.);
-        return vec3(anf_16, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        float anf = f_m(1., 2.);
+        return vec3(anf, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -770,21 +770,21 @@ let%expect_test "constrained polymorphism tests" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float scale_0_float_to_float_23(float x_1) {
-        float anf_27 = (x_1 * 2.);
-        return (anf_27 - 1.);
+    float scale_m(float x) {
+        float anf = (x * 2.);
+        return (anf - 1.);
     }
-    vec2 scale_0_vec2_to_vec2_24(vec2 x_1) {
-        vec2 anf_28 = (x_1 * 2.);
-        return (anf_28 - 1.);
+    vec2 scale_m_0(vec2 x) {
+        vec2 anf_0 = (x * 2.);
+        return (anf_0 - 1.);
     }
-    vec3 main_pure(vec2 coord_2) {
-        float anf_29 = scale_0_float_to_float_23(1.);
-        vec2 anf_30 = vec2(anf_29, 2.);
-        vec2 v_3 = scale_0_vec2_to_vec2_24(anf_30);
-        float anf_31 = v_3[0];
-        float anf_32 = v_3[1];
-        return vec3(anf_31, anf_32, 0.);
+    vec3 main_pure(vec2 coord) {
+        float anf_1 = scale_m(1.);
+        vec2 anf_2 = vec2(anf_1, 2.);
+        vec2 v = scale_m_0(anf_2);
+        float anf_3 = v[0];
+        float anf_4 = v[1];
+        return vec3(anf_3, anf_4, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -805,22 +805,22 @@ let%expect_test "constrained polymorphism tests" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float f_0_vec2_to_float_32(vec2 v_1) {
-        vec2 anf_35 = floor(v_1);
-        vec2 anf_36 = (v_1 - anf_35);
-        return anf_36[0];
+    float f_m(vec3 v) {
+        vec3 anf = floor(v);
+        vec3 anf_0 = (v - anf);
+        return anf_0[0];
     }
-    float f_0_vec3_to_float_29(vec3 v_1) {
-        vec3 anf_37 = floor(v_1);
-        vec3 anf_38 = (v_1 - anf_37);
-        return anf_38[0];
+    float f_m_0(vec2 v) {
+        vec2 anf_1 = floor(v);
+        vec2 anf_2 = (v - anf_1);
+        return anf_2[0];
     }
-    vec3 main_pure(vec2 coord_2) {
-        vec2 anf_39 = vec2(0.5, 1.5);
-        float a_3 = f_0_vec2_to_float_32(anf_39);
-        vec3 anf_40 = vec3(0.5, 1.5, 2.5);
-        float b_4 = f_0_vec3_to_float_29(anf_40);
-        return vec3(a_3, b_4, 0.);
+    vec3 main_pure(vec2 coord) {
+        vec2 anf_3 = vec2(0.5, 1.5);
+        float a = f_m_0(anf_3);
+        vec3 anf_4 = vec3(0.5, 1.5, 2.5);
+        float b = f_m(anf_4);
+        return vec3(a, b, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -860,19 +860,19 @@ let%expect_test "variants and matching" =
         float Rect_0;
         float Rect_1;
     };
-    float area_0(shape s_1) {
-        int _lv_tag_27 = s_1.tag;
-        switch (_lv_tag_27) {
+    float area(shape s) {
+        int _lv_tag = s.tag;
+        switch (_lv_tag) {
             case 0: {
-                float r_2 = s_1.Circle_0;
-                float anf_23 = (3.14159 * r_2);
-                return (anf_23 * r_2);
+                float r = s.Circle_0;
+                float anf = (3.14159 * r);
+                return (anf * r);
                 break;
             }
             case 1: {
-                float w_3 = s_1.Rect_0;
-                float h_4 = s_1.Rect_1;
-                return (w_3 * h_4);
+                float w = s.Rect_0;
+                float h = s.Rect_1;
+                return (w * h);
                 break;
             }
             default: {
@@ -881,14 +881,14 @@ let%expect_test "variants and matching" =
             }
         }
     }
-    vec3 main_pure(vec2 coord_5) {
-        shape anf_24 = shape(0, 2., 0., 0.);
-        float a_6 = area_0(anf_24);
-        shape anf_25 = shape(1, 0., 3., 4.);
-        float b_7 = area_0(anf_25);
-        shape anf_26 = shape(2, 0., 0., 0.);
-        float c_8 = area_0(anf_26);
-        return vec3(a_6, b_7, c_8);
+    vec3 main_pure(vec2 coord) {
+        shape anf_0 = shape(0, 2., 0., 0.);
+        float a = area(anf_0);
+        shape anf_1 = shape(1, 0., 3., 4.);
+        float b = area(anf_1);
+        shape anf_2 = shape(2, 0., 0., 0.);
+        float c = area(anf_2);
+        return vec3(a, b, c);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -921,22 +921,22 @@ let%expect_test "variant match in let binding" =
         int tag;
         float Some_0;
     };
-    vec3 main_pure(vec2 coord_0) {
-        opt x_1 = opt(0, 5.);
-        int _lv_tag_7 = x_1.tag;
-        float v_2;
-        switch (_lv_tag_7) {
+    vec3 main_pure(vec2 coord) {
+        opt x = opt(0, 5.);
+        int _lv_tag = x.tag;
+        float v;
+        switch (_lv_tag) {
             case 0: {
-                float f_3 = x_1.Some_0;
-                v_2 = f_3;
+                float f = x.Some_0;
+                v = f;
                 break;
             }
             default: {
-                v_2 = 0.;
+                v = 0.;
                 break;
             }
         }
-        return vec3(v_2, v_2, v_2);
+        return vec3(v, v, v);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -999,9 +999,9 @@ let%expect_test "toplevel constant (atomic only)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    const float pi_0 = 3.14159;
-    vec3 main_pure(vec2 u_1) {
-        return vec3(pi_0, pi_0, pi_0);
+    const float pi = 3.14159;
+    vec3 main_pure(vec2 u) {
+        return vec3(pi, pi, pi);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1019,9 +1019,9 @@ let%expect_test "toplevel constant (atomic only)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    const float x_0 = (sin(1.) + cos(2.));
-    vec3 main_pure(vec2 u_1) {
-        return vec3(x_0, x_0, x_0);
+    const float x = (sin(1.) + cos(2.));
+    vec3 main_pure(vec2 u) {
+        return vec3(x, x, x);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1043,12 +1043,12 @@ let%expect_test "promotion of ints to floats" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 u_0) {
-        int b_1 = (1 + 2);
-        float anf_6 = float(b_1);
-        float a_2 = (anf_6 + 2.);
-        float anf_7 = float(b_1);
-        return vec3(anf_7, a_2, 3.);
+    vec3 main_pure(vec2 u) {
+        int b = (1 + 2);
+        float anf = float(b);
+        float a = (anf + 2.);
+        float anf_0 = float(b);
+        return vec3(anf_0, a, 3.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1065,11 +1065,11 @@ let%expect_test "int broadcasting with vecs and builtins" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord_0) {
-        int n_1 = 2;
-        float anf_5 = float(n_1);
-        vec3 anf_6 = vec3(0.5, 0.5, 0.5);
-        return (anf_5 * anf_6);
+    vec3 main_pure(vec2 coord) {
+        int n = 2;
+        float anf = float(n);
+        vec3 anf_0 = vec3(0.5, 0.5, 0.5);
+        return (anf * anf_0);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1088,10 +1088,10 @@ let%expect_test "int broadcasting with vecs and builtins" =
     precision highp float;
     out vec4 fragColor;
     uniform int n;
-    vec3 main_pure(vec2 u_0) {
-        float anf_4 = float(n);
-        vec3 anf_5 = vec3(0.5, 0.5, 0.5);
-        return (anf_4 * anf_5);
+    vec3 main_pure(vec2 u) {
+        float anf = float(n);
+        vec3 anf_0 = vec3(0.5, 0.5, 0.5);
+        return (anf * anf_0);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1104,11 +1104,11 @@ let%expect_test "int broadcasting with vecs and builtins" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord_0) {
-        int n_1 = 2;
-        float anf_5 = float(n_1);
-        vec3 anf_6 = vec3(0.1, 0.2, 0.3);
-        return (anf_5 + anf_6);
+    vec3 main_pure(vec2 coord) {
+        int n = 2;
+        float anf = float(n);
+        vec3 anf_0 = vec3(0.1, 0.2, 0.3);
+        return (anf + anf_0);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1129,10 +1129,10 @@ let%expect_test "int broadcasting with vecs and builtins" =
     precision highp float;
     out vec4 fragColor;
     uniform int n;
-    vec3 main_pure(vec2 u_0) {
-        float anf_5 = float(n);
-        float r_1 = sin(anf_5);
-        return vec3(r_1, r_1, r_1);
+    vec3 main_pure(vec2 u) {
+        float anf = float(n);
+        float r = sin(anf);
+        return vec3(r, r, r);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1145,9 +1145,9 @@ let%expect_test "int broadcasting with vecs and builtins" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord_0) {
-        float r_1 = abs(5.);
-        return vec3(r_1, r_1, r_1);
+    vec3 main_pure(vec2 coord) {
+        float r = abs(5.);
+        return vec3(r, r, r);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1160,9 +1160,9 @@ let%expect_test "int broadcasting with vecs and builtins" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord_0) {
-        float r_1 = min(1., 2.);
-        return vec3(r_1, r_1, r_1);
+    vec3 main_pure(vec2 coord) {
+        float r = min(1., 2.);
+        return vec3(r, r, r);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1186,7 +1186,7 @@ let%expect_test "bool match" =
     precision highp float;
     out vec4 fragColor;
     uniform bool b;
-    vec3 main_pure(vec2 coord_0) {
+    vec3 main_pure(vec2 coord) {
         if (b) {
             return vec3(1., 0., 0.);
         } else {
@@ -1250,14 +1250,14 @@ let%expect_test "bool match" =
     precision highp float;
     out vec4 fragColor;
     uniform bool b;
-    vec3 main_pure(vec2 coord_0) {
-        float x_1;
+    vec3 main_pure(vec2 coord) {
+        float x;
         if (b) {
-            x_1 = 0.;
+            x = 0.;
         } else {
-            x_1 = 1.;
+            x = 1.;
         }
-        return vec3(x_1, 0., 0.);
+        return vec3(x, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1283,24 +1283,24 @@ let%expect_test "int match" =
     precision highp float;
     out vec4 fragColor;
     uniform int n;
-    vec3 main_pure(vec2 coord_0) {
-        float x_1;
+    vec3 main_pure(vec2 coord) {
+        float x;
         switch (n) {
             case 0: {
-                x_1 = 0.;
+                x = 0.;
                 break;
             }
             case 1: {
-                x_1 = 1.;
+                x = 1.;
                 break;
             }
             default: {
-                int _wc_4 = n;
-                x_1 = 2.;
+                int _wc = n;
+                x = 2.;
                 break;
             }
         }
-        return vec3(x_1, 0., 0.);
+        return vec3(x, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1365,21 +1365,21 @@ let%expect_test "float match" =
     precision highp float;
     out vec4 fragColor;
     uniform float x;
-    vec3 main_pure(vec2 coord_0) {
-        bool _lv_cmp_6 = (x == 1.);
-        float c_1;
-        if (_lv_cmp_6) {
-            c_1 = 0.;
+    vec3 main_pure(vec2 coord) {
+        bool _lv_cmp_0 = (x == 1.);
+        float c;
+        if (_lv_cmp_0) {
+            c = 0.;
         } else {
-            bool _lv_cmp_5 = (x == 2.5);
-            if (_lv_cmp_5) {
-                c_1 = 1.;
+            bool _lv_cmp = (x == 2.5);
+            if (_lv_cmp) {
+                c = 1.;
             } else {
-                float _wc_4 = x;
-                c_1 = 2.;
+                float _wc = x;
+                c = 2.;
             }
         }
-        return vec3(c_1, 0., 0.);
+        return vec3(c, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1402,16 +1402,16 @@ let%expect_test "float match" =
     precision highp float;
     out vec4 fragColor;
     uniform float x;
-    vec3 main_pure(vec2 coord_0) {
-        bool _lv_cmp_7 = (x == 0.);
-        if (_lv_cmp_7) {
+    vec3 main_pure(vec2 coord) {
+        bool _lv_cmp_0 = (x == 0.);
+        if (_lv_cmp_0) {
             return vec3(1., 0., 0.);
         } else {
-            bool _lv_cmp_6 = (x == 1.);
-            if (_lv_cmp_6) {
+            bool _lv_cmp = (x == 1.);
+            if (_lv_cmp) {
                 return vec3(0., 1., 0.);
             } else {
-                float _wc_5 = x;
+                float _wc = x;
                 return vec3(0., 0., 1.);
             }
         }
@@ -1493,16 +1493,16 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct r_box_float {
+    struct r_box_f {
         float value;
     };
-    float f_0(r_box_float b_1) {
-        return b_1.value;
+    float f(r_box_f b) {
+        return b.value;
     }
-    vec3 main_pure(vec2 coord_2) {
-        r_box_float anf_8 = r_box_float(1.);
-        float anf_9 = f_0(anf_8);
-        return vec3(anf_9, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        r_box_f anf = r_box_f(1.);
+        float anf_0 = f(anf);
+        return vec3(anf_0, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1523,17 +1523,17 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct r_pair_float_int {
+    struct r_pair_f_i {
         float fst;
         int snd;
     };
-    float get_fst_0(r_pair_float_int p_1) {
-        return p_1.fst;
+    float get_fst(r_pair_f_i p) {
+        return p.fst;
     }
-    vec3 main_pure(vec2 coord_2) {
-        r_pair_float_int p_3 = r_pair_float_int(1., 0);
-        float anf_10 = get_fst_0(p_3);
-        return vec3(anf_10, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        r_pair_f_i p_0 = r_pair_f_i(1., 0);
+        float anf = get_fst(p_0);
+        return vec3(anf, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1553,13 +1553,13 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct r_box_float {
+    struct r_box_f {
         float value;
     };
-    vec3 main_pure(vec2 coord_0) {
-        r_box_float b_1 = r_box_float(1.);
-        float anf_5 = b_1.value;
-        return vec3(anf_5, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        r_box_f b = r_box_f(1.);
+        float anf = b.value;
+        return vec3(anf, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1580,22 +1580,22 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct r_box_float {
+    struct r_box_f {
         float value;
     };
-    float get1_0(r_box_float b_1) {
-        return b_1.value;
+    float get1(r_box_f b) {
+        return b.value;
     }
-    float get2_2(r_box_float b_3) {
-        return b_3.value;
+    float get2(r_box_f b_0) {
+        return b_0.value;
     }
-    vec3 main_pure(vec2 coord_4) {
-        r_box_float anf_15 = r_box_float(1.);
-        float anf_16 = get1_0(anf_15);
-        r_box_float anf_17 = r_box_float(2.);
-        float anf_18 = get2_2(anf_17);
-        float anf_19 = (anf_16 + anf_18);
-        return vec3(anf_19, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        r_box_f anf = r_box_f(1.);
+        float anf_0 = get1(anf);
+        r_box_f anf_1 = r_box_f(2.);
+        float anf_2 = get2(anf_1);
+        float anf_3 = (anf_0 + anf_2);
+        return vec3(anf_3, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1630,25 +1630,25 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct r_box_float {
+    struct r_box_f {
         float value;
     };
-    struct r_box_r_box_float {
-        r_box_float value;
+    struct r_box_r_box_f {
+        r_box_f value;
     };
-    struct r_point_r_box_float_r_box_float {
-        r_box_r_box_float x;
-        r_box_float y;
+    struct r_point_r_box_f_r_box_f {
+        r_box_r_box_f x;
+        r_box_f y;
     };
-    vec3 main_pure(vec2 coord_0) {
-        r_box_float anf_11 = r_box_float(1.);
-        r_box_r_box_float anf_12 = r_box_r_box_float(anf_11);
-        r_box_float anf_13 = r_box_float(2.);
-        r_point_r_box_float_r_box_float b_1 = r_point_r_box_float_r_box_float(anf_12, anf_13);
-        r_box_r_box_float anf_14 = b_1.x;
-        r_box_float anf_15 = anf_14.value;
-        float anf_16 = anf_15.value;
-        return vec3(anf_16, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        r_box_f anf = r_box_f(1.);
+        r_box_r_box_f anf_0 = r_box_r_box_f(anf);
+        r_box_f anf_1 = r_box_f(2.);
+        r_point_r_box_f_r_box_f b = r_point_r_box_f_r_box_f(anf_0, anf_1);
+        r_box_r_box_f anf_2 = b.x;
+        r_box_f anf_3 = anf_2.value;
+        float anf_4 = anf_3.value;
+        return vec3(anf_4, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1678,35 +1678,35 @@ let%expect_test "parametrized variants" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct v_option_int {
+    struct v_option_i {
         int tag;
         int Some_0;
     };
-    int unwrap_0(v_option_int opt_1, int default_2) {
-        int _lv_tag_32 = opt_1.tag;
-        switch (_lv_tag_32) {
+    int unwrap(v_option_i opt, int default_0) {
+        int _lv_tag = opt.tag;
+        switch (_lv_tag) {
             case 0: {
-                int x_3 = opt_1.Some_0;
-                return x_3;
+                int x = opt.Some_0;
+                return x;
                 break;
             }
             default: {
-                return default_2;
+                return default_0;
                 break;
             }
         }
     }
-    vec3 main_pure(vec2 uv_4) {
-        v_option_int anf_26 = v_option_int(0, 10);
-        int a_5 = unwrap_0(anf_26, 10);
-        v_option_int anf_27 = v_option_int(1, 0);
-        int b_6 = unwrap_0(anf_27, 5);
-        v_option_int anf_28 = v_option_int(1, 0);
-        int c_7 = unwrap_0(anf_28, 5);
-        float anf_29 = float(a_5);
-        float anf_30 = float(b_6);
-        float anf_31 = float(c_7);
-        return vec3(anf_29, anf_30, anf_31);
+    vec3 main_pure(vec2 uv) {
+        v_option_i anf = v_option_i(0, 10);
+        int a = unwrap(anf, 10);
+        v_option_i anf_0 = v_option_i(1, 0);
+        int b = unwrap(anf_0, 5);
+        v_option_i anf_1 = v_option_i(1, 0);
+        int c = unwrap(anf_1, 5);
+        float anf_2 = float(a);
+        float anf_3 = float(b);
+        float anf_4 = float(c);
+        return vec3(anf_2, anf_3, anf_4);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1732,33 +1732,33 @@ let%expect_test "parametrized variants" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct v_result_float_int {
+    struct v_result_f_i {
         int tag;
         float Ok_0;
         int Err_0;
     };
-    float unwrap_0(v_result_float_int r_1, float default_2) {
-        int _lv_tag_28 = r_1.tag;
-        switch (_lv_tag_28) {
+    float unwrap(v_result_f_i r, float default_0) {
+        int _lv_tag = r.tag;
+        switch (_lv_tag) {
             case 0: {
-                float x_3 = r_1.Ok_0;
-                return x_3;
+                float x = r.Ok_0;
+                return x;
                 break;
             }
             default: {
-                int _wc_4 = r_1.Err_0;
-                return default_2;
+                int _wc = r.Err_0;
+                return default_0;
                 break;
             }
         }
     }
-    vec3 main_pure(vec2 uv_5) {
-        v_result_float_int anf_25 = v_result_float_int(0, 5.4, 0);
-        float a_6 = unwrap_0(anf_25, 5.);
-        v_result_float_int anf_26 = v_result_float_int(1, 0., 2);
-        float b_7 = unwrap_0(anf_26, 2.3);
-        float anf_27 = uv_5[0];
-        return vec3(anf_27, a_6, b_7);
+    vec3 main_pure(vec2 uv) {
+        v_result_f_i anf = v_result_f_i(0, 5.4, 0);
+        float a = unwrap(anf, 5.);
+        v_result_f_i anf_0 = v_result_f_i(1, 0., 2);
+        float b = unwrap(anf_0, 2.3);
+        float anf_1 = uv[0];
+        return vec3(anf_1, a, b);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1790,47 +1790,47 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct v_option_bool {
+    struct v_option_b {
         int tag;
         bool Some_0;
     };
-    bool unwrap_0_v_option_bool_to_bool_to_bool_29(v_option_bool opt_1, bool default_2) {
-        int _lv_tag_32 = opt_1.tag;
-        switch (_lv_tag_32) {
+    bool unwrap_m_0(v_option_b opt, bool default_0) {
+        int _lv_tag = opt.tag;
+        switch (_lv_tag) {
             case 0: {
-                bool x_3 = opt_1.Some_0;
-                return x_3;
+                bool x = opt.Some_0;
+                return x;
                 break;
             }
             default: {
-                return default_2;
+                return default_0;
                 break;
             }
         }
     }
-    struct v_option_int {
+    struct v_option_i {
         int tag;
         int Some_0;
     };
-    int unwrap_0_v_option_int_to_int_to_int_28(v_option_int opt_1, int default_2) {
-        int _lv_tag_33 = opt_1.tag;
-        switch (_lv_tag_33) {
+    int unwrap_m(v_option_i opt, int default_0) {
+        int _lv_tag_0 = opt.tag;
+        switch (_lv_tag_0) {
             case 0: {
-                int x_3 = opt_1.Some_0;
-                return x_3;
+                int x = opt.Some_0;
+                return x;
                 break;
             }
             default: {
-                return default_2;
+                return default_0;
                 break;
             }
         }
     }
-    vec3 main_pure(vec2 coord_4) {
-        v_option_bool anf_30 = v_option_bool(0, true);
-        bool x_5 = unwrap_0_v_option_bool_to_bool_to_bool_29(anf_30, false);
-        v_option_int anf_31 = v_option_int(0, 5);
-        int y_6 = unwrap_0_v_option_int_to_int_to_int_28(anf_31, 5);
+    vec3 main_pure(vec2 coord) {
+        v_option_b anf = v_option_b(0, true);
+        bool x_0 = unwrap_m_0(anf, false);
+        v_option_i anf_0 = v_option_i(0, 5);
+        int y = unwrap_m(anf_0, 5);
         return vec3(0., 0., 0.);
     }
     uniform vec2 u_resolution;
@@ -1856,33 +1856,33 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct r_box_bool {
+    struct r_box_b {
         bool value;
     };
-    bool f_0_r_box_bool_to_bool_17(r_box_bool b_1) {
-        bool a_2 = b_1.value;
-        return a_2;
+    bool f_m(r_box_b b) {
+        bool a = b.value;
+        return a;
     }
-    struct r_box_float {
+    struct r_box_f {
         float value;
     };
-    float f_0_r_box_float_to_float_18(r_box_float b_1) {
-        float a_2 = b_1.value;
-        return a_2;
+    float f_m_0(r_box_f b) {
+        float a = b.value;
+        return a;
     }
-    vec3 main_pure(vec2 coord_3) {
-        r_box_float anf_19 = r_box_float(1.);
-        float a_4 = f_0_r_box_float_to_float_18(anf_19);
-        r_box_bool anf_20 = r_box_bool(true);
-        bool anf_21 = f_0_r_box_bool_to_bool_17(anf_20);
-        int b_5;
-        if (anf_21) {
-            b_5 = 1;
+    vec3 main_pure(vec2 coord) {
+        r_box_f anf = r_box_f(1.);
+        float a_0 = f_m_0(anf);
+        r_box_b anf_0 = r_box_b(true);
+        bool anf_1 = f_m(anf_0);
+        int b_0;
+        if (anf_1) {
+            b_0 = 1;
         } else {
-            b_5 = 2;
+            b_0 = 2;
         }
-        float anf_22 = float(b_5);
-        return vec3(a_4, anf_22, 0.);
+        float anf_2 = float(b_0);
+        return vec3(a_0, anf_2, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1930,23 +1930,23 @@ let%expect_test "defunctionalization" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_27 {
+    struct DFn {
         int tag;
     };
-    float double_3_float_to_float_24(float n_4) {
-        return (n_4 * 2.);
+    float double_0_m(float n) {
+        return (n * 2.);
     }
-    float dapply_26(DFn_27 dfn_29, float da_30) {
-        return double_3_float_to_float_24(da_30);
+    float dapply(DFn dfn, float da) {
+        return double_0_m(da);
     }
-    float apply_0_float_to_float_to_float_to_float_25(DFn_27 f_1, float x_2) {
-        return dapply_26(f_1, x_2);
+    float apply_m(DFn f, float x) {
+        return dapply(f, x);
     }
-    vec3 main_pure(vec2 pos_5) {
-        DFn_27 anf_31 = DFn_27(0);
-        float anf_32 = pos_5[0];
-        float r_6 = apply_0_float_to_float_to_float_to_float_25(anf_31, anf_32);
-        return vec3(r_6, r_6, r_6);
+    vec3 main_pure(vec2 pos) {
+        DFn anf = DFn(0);
+        float anf_0 = pos[0];
+        float r = apply_m(anf, anf_0);
+        return vec3(r, r, r);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1966,23 +1966,23 @@ let%expect_test "defunctionalization" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_24 {
+    struct DFn {
         int tag;
     };
-    float lam_22(float y_5) {
-        return (y_5 + 1.);
+    float lam(float y) {
+        return (y + 1.);
     }
-    float dapply_23(DFn_24 dfn_26, float da_27) {
-        return lam_22(da_27);
+    float dapply(DFn dfn, float da) {
+        return lam(da);
     }
-    float apply_0_float_to_float_to_float_to_float_21(DFn_24 f_1, float x_2) {
-        return dapply_23(f_1, x_2);
+    float apply_m(DFn f, float x) {
+        return dapply(f, x);
     }
-    vec3 main_pure(vec2 pos_3) {
-        DFn_24 anf_28 = DFn_24(0);
-        float anf_29 = pos_3[0];
-        float r_4 = apply_0_float_to_float_to_float_to_float_21(anf_28, anf_29);
-        return vec3(r_4, r_4, r_4);
+    vec3 main_pure(vec2 pos) {
+        DFn anf = DFn(0);
+        float anf_0 = pos[0];
+        float r = apply_m(anf, anf_0);
+        return vec3(r, r, r);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2003,26 +2003,26 @@ let%expect_test "defunctionalization" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_26 {
+    struct DFn {
         int tag;
-        float lctor_29_0;
+        float lctor_0;
     };
-    float lam_24(float px_4, float y_6) {
-        return (px_4 + y_6);
+    float lam(float px, float y) {
+        return (px + y);
     }
-    float dapply_25(DFn_26 dfn_30, float da_31) {
-        float ca_28 = dfn_30.lctor_29_0;
-        return lam_24(ca_28, da_31);
+    float dapply(DFn dfn, float da) {
+        float ca = dfn.lctor_0;
+        return lam(ca, da);
     }
-    float apply_0_float_to_float_to_float_to_float_23(DFn_26 f_1, float x_2) {
-        return dapply_25(f_1, x_2);
+    float apply_m(DFn f, float x) {
+        return dapply(f, x);
     }
-    vec3 main_pure(vec2 pos_3) {
-        float px_4 = pos_3[0];
-        DFn_26 anf_32 = DFn_26(0, px_4);
-        float anf_33 = pos_3[1];
-        float r_5 = apply_0_float_to_float_to_float_to_float_23(anf_32, anf_33);
-        return vec3(r_5, r_5, r_5);
+    vec3 main_pure(vec2 pos) {
+        float px = pos[0];
+        DFn anf = DFn(0, px);
+        float anf_0 = pos[1];
+        float r = apply_m(anf, anf_0);
+        return vec3(r, r, r);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2043,26 +2043,26 @@ let%expect_test "defunctionalization" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_19 {
+    struct DFn {
         int tag;
-        vec2 lctor_22_0;
+        vec2 lctor_0;
     };
-    float scale_4_17(vec2 pos_3, float y_5) {
-        float anf_25 = pos_3[0];
-        return (y_5 * anf_25);
+    float scale_0(vec2 pos, float y) {
+        float anf = pos[0];
+        return (y * anf);
     }
-    float dapply_18(DFn_19 dfn_23, float da_24) {
-        vec2 ca_21 = dfn_23.lctor_22_0;
-        return scale_4_17(ca_21, da_24);
+    float dapply(DFn dfn, float da) {
+        vec2 ca = dfn.lctor_0;
+        return scale_0(ca, da);
     }
-    float apply_0(DFn_19 f_1, float x_2) {
-        return dapply_18(f_1, x_2);
+    float apply(DFn f, float x) {
+        return dapply(f, x);
     }
-    vec3 main_pure(vec2 pos_3) {
-        DFn_19 anf_26 = DFn_19(0, pos_3);
-        float anf_27 = pos_3[1];
-        float r_6 = apply_0(anf_26, anf_27);
-        return vec3(r_6, r_6, r_6);
+    vec3 main_pure(vec2 pos) {
+        DFn anf_0 = DFn(0, pos);
+        float anf_1 = pos[1];
+        float r = apply(anf_0, anf_1);
+        return vec3(r, r, r);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2087,49 +2087,49 @@ let%expect_test "defunctionalization" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_47 {
+    struct DFn {
         int tag;
     };
-    float double_3_float_to_float_45(float n_4) {
-        return (n_4 * 2.);
+    float double_0_m(float n) {
+        return (n * 2.);
     }
-    float quadruple_7_float_to_float_43(float n_8) {
-        return (n_8 * 4.);
+    float quadruple_m(float n_1) {
+        return (n_1 * 4.);
     }
-    float triple_5_float_to_float_44(float n_6) {
-        return (n_6 * 3.);
+    float triple_m(float n_0) {
+        return (n_0 * 3.);
     }
-    float dapply_46(DFn_47 dfn_51, float da_52) {
-        int _lv_tag_59 = dfn_51.tag;
-        switch (_lv_tag_59) {
+    float dapply(DFn dfn, float da) {
+        int _lv_tag = dfn.tag;
+        switch (_lv_tag) {
             case 0: {
-                return double_3_float_to_float_45(da_52);
+                return double_0_m(da);
                 break;
             }
             case 1: {
-                return triple_5_float_to_float_44(da_52);
+                return triple_m(da);
                 break;
             }
             default: {
-                return quadruple_7_float_to_float_43(da_52);
+                return quadruple_m(da);
                 break;
             }
         }
     }
-    float apply_0(DFn_47 f_1, float x_2) {
-        return dapply_46(f_1, x_2);
+    float apply(DFn f, float x) {
+        return dapply(f, x);
     }
-    vec3 main_pure(vec2 pos_9) {
-        DFn_47 anf_53 = DFn_47(0);
-        float anf_54 = pos_9[0];
-        float a_10 = apply_0(anf_53, anf_54);
-        DFn_47 anf_55 = DFn_47(1);
-        float anf_56 = pos_9[1];
-        float b_11 = apply_0(anf_55, anf_56);
-        DFn_47 anf_57 = DFn_47(2);
-        float anf_58 = pos_9[0];
-        float c_12 = apply_0(anf_57, anf_58);
-        return vec3(a_10, b_11, c_12);
+    vec3 main_pure(vec2 pos) {
+        DFn anf = DFn(0);
+        float anf_0 = pos[0];
+        float a = apply(anf, anf_0);
+        DFn anf_1 = DFn(1);
+        float anf_2 = pos[1];
+        float b = apply(anf_1, anf_2);
+        DFn anf_3 = DFn(2);
+        float anf_4 = pos[0];
+        float c = apply(anf_3, anf_4);
+        return vec3(a, b, c);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2150,24 +2150,24 @@ let%expect_test "defunctionalization" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_39 {
+    struct DFn {
         int tag;
     };
-    float add_4_float_to_float_to_float_36(float a_5, float b_6) {
-        return (a_5 + b_6);
+    float add_m(float a, float b) {
+        return (a + b);
     }
-    float dapply_38(DFn_39 dfn_41, float da_42, float da_43) {
-        return add_4_float_to_float_to_float_36(da_42, da_43);
+    float dapply(DFn dfn, float da, float da_0) {
+        return add_m(da, da_0);
     }
-    float apply2_0_float_to_float_to_float_to_float_to_float_to_float_37(DFn_39 f_1, float x_2, float y_3) {
-        return dapply_38(f_1, x_2, y_3);
+    float apply2_m(DFn f, float x, float y) {
+        return dapply(f, x, y);
     }
-    vec3 main_pure(vec2 pos_7) {
-        DFn_39 anf_44 = DFn_39(0);
-        float anf_45 = pos_7[0];
-        float anf_46 = pos_7[1];
-        float r_8 = apply2_0_float_to_float_to_float_to_float_to_float_to_float_37(anf_44, anf_45, anf_46);
-        return vec3(r_8, r_8, r_8);
+    vec3 main_pure(vec2 pos) {
+        DFn anf = DFn(0);
+        float anf_0 = pos[0];
+        float anf_1 = pos[1];
+        float r = apply2_m(anf, anf_0, anf_1);
+        return vec3(r, r, r);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2187,28 +2187,28 @@ let%expect_test "defunctionalization" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_36 {
+    struct DFn {
         int tag;
     };
-    float lam_34(float x_5) {
-        return (x_5 * 2.);
+    float lam(float x) {
+        return (x * 2.);
     }
-    float dapply_35(DFn_36 dfn_38, float da_39) {
-        return lam_34(da_39);
+    float dapply(DFn dfn, float da) {
+        return lam(da);
     }
-    vec3 map_0_float_to_float_to_vec3_to_vec3_33(DFn_36 f_1, vec3 v_2) {
-        float anf_40 = v_2[0];
-        float anf_41 = dapply_35(f_1, anf_40);
-        float anf_42 = v_2[1];
-        float anf_43 = dapply_35(f_1, anf_42);
-        float anf_44 = v_2[2];
-        float anf_45 = dapply_35(f_1, anf_44);
-        return vec3(anf_41, anf_43, anf_45);
+    vec3 map_m(DFn f, vec3 v) {
+        float anf = v[0];
+        float anf_0 = dapply(f, anf);
+        float anf_1 = v[1];
+        float anf_2 = dapply(f, anf_1);
+        float anf_3 = v[2];
+        float anf_4 = dapply(f, anf_3);
+        return vec3(anf_0, anf_2, anf_4);
     }
-    vec3 main_pure(vec2 uv_3) {
-        DFn_36 anf_46 = DFn_36(0);
-        vec3 anf_47 = vec3(0., 1., 2.);
-        vec3 color_4 = map_0_float_to_float_to_vec3_to_vec3_33(anf_46, anf_47);
+    vec3 main_pure(vec2 uv) {
+        DFn anf_5 = DFn(0);
+        vec3 anf_6 = vec3(0., 1., 2.);
+        vec3 color = map_m(anf_5, anf_6);
         return vec3(0., 0., 0.);
     }
     void main() {
@@ -2233,24 +2233,24 @@ let%expect_test "defunctionalization - returning closures" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_22 {
+    struct DFn {
         int tag;
-        float lctor_23_0;
+        float lctor_0;
     };
-    float add_0(float x_1, float y_2) {
-        return (x_1 + y_2);
+    float add(float x, float y) {
+        return (x + y);
     }
-    float addn_3(float n_4, float x_5) {
-        return add_0(n_4, x_5);
+    float addn(float n, float x_0) {
+        return add(n, x_0);
     }
-    float dapply_21(DFn_22 dfn_24, float da_25) {
-        float ca_20 = dfn_24.lctor_23_0;
-        return addn_3(ca_20, da_25);
+    float dapply(DFn dfn, float da) {
+        float ca = dfn.lctor_0;
+        return addn(ca, da);
     }
-    vec3 main_pure(vec2 coord_6) {
-        DFn_22 f_7 = DFn_22(0, 0.);
-        float r_8 = dapply_21(f_7, 1.);
-        return vec3(r_8, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        DFn f = DFn(0, 0.);
+        float r = dapply(f, 1.);
+        return vec3(r, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2270,21 +2270,21 @@ let%expect_test "defunctionalization - returning closures" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_16 {
+    struct DFn {
         int tag;
-        float lctor_17_0;
+        float lctor_0;
     };
-    float addn_1_12(float n_2, float x_3) {
-        return (n_2 + x_3);
+    float addn_0(float n, float x) {
+        return (n + x);
     }
-    float dapply_15(DFn_16 dfn_18, float da_19) {
-        float ca_14 = dfn_18.lctor_17_0;
-        return addn_1_12(ca_14, da_19);
+    float dapply(DFn dfn, float da) {
+        float ca = dfn.lctor_0;
+        return addn_0(ca, da);
     }
-    vec3 main_pure(vec2 coord_0) {
-        DFn_16 f_4 = DFn_16(0, 0.);
-        float r_5 = dapply_15(f_4, 1.);
-        return vec3(r_5, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        DFn f = DFn(0, 0.);
+        float r = dapply(f, 1.);
+        return vec3(r, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2305,22 +2305,22 @@ let%expect_test "defunctionalization - returning closures" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_16 {
+    struct DFn {
         int tag;
-        float lctor_17_0;
+        float lctor_0;
     };
-    float addn_0(float n_1, float x_2) {
-        return (n_1 + x_2);
+    float addn(float n, float x) {
+        return (n + x);
     }
-    float dapply_15(DFn_16 dfn_18, float da_19) {
-        float ca_14 = dfn_18.lctor_17_0;
-        return addn_0(ca_14, da_19);
+    float dapply(DFn dfn, float da) {
+        float ca = dfn.lctor_0;
+        return addn(ca, da);
     }
-    vec3 main_pure(vec2 coord_3) {
-        DFn_16 f_4 = DFn_16(0, 1.);
-        DFn_16 g_5 = f_4;
-        float r_6 = dapply_15(g_5, 2.);
-        return vec3(r_6, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        DFn f = DFn(0, 1.);
+        DFn g = f;
+        float r = dapply(g, 2.);
+        return vec3(r, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2345,32 +2345,32 @@ let%expect_test "defunctionalization - partial application of first-class functi
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_17 {
+    struct DFn {
         int tag;
     };
-    struct DFn_23 {
+    struct DFn_0 {
         int tag;
-        DFn_17 lctor_24_0;
-        float lctor_24_1;
+        DFn lctor_0;
+        float lctor_1;
     };
-    float add_1_15(float a_2, float b_3) {
-        return (a_2 + b_3);
+    float add_0(float a, float b) {
+        return (a + b);
     }
-    float dapply_16(DFn_17 dfn_25, float da_26, float da_27) {
-        return add_1_15(da_26, da_27);
+    float dapply(DFn dfn, float da, float da_0) {
+        return add_0(da, da_0);
     }
-    float dapply_22(DFn_23 dfn_28, float da_29) {
-        DFn_17 ca_19 = dfn_28.lctor_24_0;
-        float ca_20 = dfn_28.lctor_24_1;
-        return dapply_16(ca_19, ca_20, da_29);
+    float dapply_0(DFn_0 dfn_0, float da_1) {
+        DFn ca = dfn_0.lctor_0;
+        float ca_0 = dfn_0.lctor_1;
+        return dapply(ca, ca_0, da_1);
     }
-    vec3 main_pure(vec2 pos_0) {
-        DFn_17 f_4 = DFn_17(0);
-        float anf_30 = pos_0[0];
-        DFn_23 g_5 = DFn_23(0, f_4, anf_30);
-        float anf_31 = pos_0[1];
-        float r_6 = dapply_22(g_5, anf_31);
-        return vec3(r_6, r_6, r_6);
+    vec3 main_pure(vec2 pos) {
+        DFn f = DFn(0);
+        float anf = pos[0];
+        DFn_0 g = DFn_0(0, f, anf);
+        float anf_0 = pos[1];
+        float r = dapply_0(g, anf_0);
+        return vec3(r, r, r);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2393,43 +2393,43 @@ let%expect_test "defunctionalization - partial application of first-class functi
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_20 {
+    struct DFn {
         int tag;
     };
-    struct DFn_27 {
+    struct DFn_0 {
         int tag;
-        DFn_20 lctor_28_0;
-        float lctor_28_1;
+        DFn lctor_0;
+        float lctor_1;
     };
-    struct DFn_33 {
+    struct DFn_1 {
         int tag;
-        DFn_27 lctor_34_0;
-        float lctor_34_1;
+        DFn_0 lctor_0_0;
+        float lctor_0_1;
     };
-    float add3_0(float a_1, float b_2, float c_3) {
-        float anf_44 = (a_1 + b_2);
-        return (anf_44 + c_3);
+    float add3(float a, float b, float c) {
+        float anf = (a + b);
+        return (anf + c);
     }
-    float dapply_19(DFn_20 dfn_35, float da_36, float da_37, float da_38) {
-        return add3_0(da_36, da_37, da_38);
+    float dapply(DFn dfn, float da, float da_0, float da_1) {
+        return add3(da, da_0, da_1);
     }
-    float dapply_26(DFn_27 dfn_39, float da_40, float da_41) {
-        DFn_20 ca_22 = dfn_39.lctor_28_0;
-        float ca_23 = dfn_39.lctor_28_1;
-        return dapply_19(ca_22, ca_23, da_40, da_41);
+    float dapply_0(DFn_0 dfn_0, float da_2, float da_3) {
+        DFn ca = dfn_0.lctor_0;
+        float ca_0 = dfn_0.lctor_1;
+        return dapply(ca, ca_0, da_2, da_3);
     }
-    float dapply_32(DFn_33 dfn_42, float da_43) {
-        DFn_27 ca_29 = dfn_42.lctor_34_0;
-        float ca_30 = dfn_42.lctor_34_1;
-        return dapply_26(ca_29, ca_30, da_43);
+    float dapply_1(DFn_1 dfn_1, float da_4) {
+        DFn_0 ca_1 = dfn_1.lctor_0_0;
+        float ca_2 = dfn_1.lctor_0_1;
+        return dapply_0(ca_1, ca_2, da_4);
     }
-    vec3 main_pure(vec2 pos_4) {
-        DFn_20 f_5 = DFn_20(0);
-        DFn_27 g_6 = DFn_27(0, f_5, 1.);
-        DFn_33 h_7 = DFn_33(0, g_6, 2.);
-        float anf_45 = pos_4[0];
-        float r_8 = dapply_32(h_7, anf_45);
-        return vec3(r_8, r_8, r_8);
+    vec3 main_pure(vec2 pos) {
+        DFn f = DFn(0);
+        DFn_0 g = DFn_0(0, f, 1.);
+        DFn_1 h = DFn_1(0, g, 2.);
+        float anf_0 = pos[0];
+        float r = dapply_1(h, anf_0);
+        return vec3(r, r, r);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2451,35 +2451,35 @@ let%expect_test "defunctionalization - partial application of first-class functi
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_30 {
+    struct DFn_0 {
         int tag;
     };
-    struct DFn_28 {
+    struct DFn {
         int tag;
-        DFn_30 lctor_35_0;
-        float lctor_35_1;
+        DFn_0 lctor_0;
+        float lctor_1;
     };
-    float add_3(float a_4, float b_5) {
-        return (a_4 + b_5);
+    float add(float a, float b) {
+        return (a + b);
     }
-    float dapply_29(DFn_30 dfn_38, float da_39, float da_40) {
-        return add_3(da_39, da_40);
+    float dapply_0(DFn_0 dfn_0, float da_0, float da_1) {
+        return add(da_0, da_1);
     }
-    float dapply_27(DFn_28 dfn_36, float da_37) {
-        DFn_30 ca_32 = dfn_36.lctor_35_0;
-        float ca_33 = dfn_36.lctor_35_1;
-        return dapply_29(ca_32, ca_33, da_37);
+    float dapply(DFn dfn, float da) {
+        DFn_0 ca = dfn.lctor_0;
+        float ca_0 = dfn.lctor_1;
+        return dapply_0(ca, ca_0, da);
     }
-    float apply_0_float_to_float_to_float_to_float_26(DFn_28 f_1, float x_2) {
-        return dapply_27(f_1, x_2);
+    float apply_m(DFn f, float x) {
+        return dapply(f, x);
     }
-    vec3 main_pure(vec2 pos_6) {
-        DFn_30 add_as_value_7 = DFn_30(0);
-        float anf_41 = pos_6[0];
-        DFn_28 anf_42 = DFn_28(0, add_as_value_7, anf_41);
-        float anf_43 = pos_6[1];
-        float r_8 = apply_0_float_to_float_to_float_to_float_26(anf_42, anf_43);
-        return vec3(r_8, r_8, r_8);
+    vec3 main_pure(vec2 pos) {
+        DFn_0 add_as_value = DFn_0(0);
+        float anf = pos[0];
+        DFn anf_0 = DFn(0, add_as_value, anf);
+        float anf_1 = pos[1];
+        float r = apply_m(anf_0, anf_1);
+        return vec3(r, r, r);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2501,27 +2501,27 @@ let%expect_test "defunctionalization - partial application of first-class functi
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_27 {
+    struct DFn {
         int tag;
-        int lctor_28_0;
+        int lctor_0;
     };
-    int lam_23(int x_2, int y_3) {
-        return (x_2 + y_3);
+    int lam(int x, int y) {
+        return (x + y);
     }
-    int dapply_26(DFn_27 dfn_29, int da_30) {
-        int ca_25 = dfn_29.lctor_28_0;
-        return lam_23(ca_25, da_30);
+    int dapply(DFn dfn, int da) {
+        int ca = dfn.lctor_0;
+        return lam(ca, da);
     }
-    DFn_27 mkinc_0_int_to_int_to_int_22(int n_1) {
-        int x_2 = 1;
-        return DFn_27(0, x_2);
+    DFn mkinc_m(int n) {
+        int x = 1;
+        return DFn(0, x);
     }
-    vec3 main_pure(vec2 uv_4) {
-        DFn_27 inc_5_int_to_int_21 = mkinc_0_int_to_int_to_int_22(0);
-        int anf_31 = dapply_26(inc_5_int_to_int_21, 2);
-        float anf_32 = float(anf_31);
-        vec3 anf_33 = vec3(1., 1., 1.);
-        return (anf_32 * anf_33);
+    vec3 main_pure(vec2 uv) {
+        DFn inc_m = mkinc_m(0);
+        int anf = dapply(inc_m, 2);
+        float anf_0 = float(anf);
+        vec3 anf_1 = vec3(1., 1., 1.);
+        return (anf_0 * anf_1);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2545,10 +2545,10 @@ let%expect_test "non-parametrized type aliases" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    int f_0(int n_1) {
-        return n_1;
+    int f(int n) {
+        return n;
     }
-    vec3 main_pure(vec2 u_2) {
+    vec3 main_pure(vec2 u) {
         return vec3(0., 0., 0.);
     }
     void main() {
@@ -2570,14 +2570,14 @@ let%expect_test "non-parametrized type aliases" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct v_option_int {
+    struct v_option_i {
         int tag;
         int Some_0;
     };
-    v_option_int f_0(v_option_int n_1) {
-        return n_1;
+    v_option_i f(v_option_i n) {
+        return n;
     }
-    vec3 main_pure(vec2 u_2) {
+    vec3 main_pure(vec2 u) {
         return vec3(0., 0., 0.);
     }
     void main() {
@@ -2600,12 +2600,12 @@ let%expect_test "toplevel complex consts / promotion to zero-arg functions" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    const float pi_1 = 3.14159;
-    vec3 main_pure(vec2 coord_2) {
-        return vec3(pi_1, pi_1, pi_1);
+    const float pi = 3.14159;
+    vec3 main_pure(vec2 coord) {
+        return vec3(pi, pi, pi);
     }
     uniform float u_scale;
-    float scale_0() {
+    float scale() {
         return u_scale;
     }
     void main() {
@@ -2625,13 +2625,13 @@ let%expect_test "toplevel complex consts / promotion to zero-arg functions" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    const float base_0 = (2. + 1.);
+    const float base = (2. + 1.);
     struct v {
         float a;
     };
-    const float derived_1 = v((base_0 * 2.)).a;
-    vec3 main_pure(vec2 coord_2) {
-        return vec3(derived_1, 0., 0.);
+    const float derived = v((base * 2.)).a;
+    vec3 main_pure(vec2 coord) {
+        return vec3(derived, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2650,16 +2650,16 @@ let%expect_test "toplevel complex consts / promotion to zero-arg functions" =
     precision highp float;
     out vec4 fragColor;
     uniform bool u_flag;
-    float chosen_0() {
+    float chosen() {
         if (u_flag) {
             return 1.;
         } else {
             return 0.;
         }
     }
-    vec3 main_pure(vec2 coord_1) {
-        float _lc_4 = chosen_0();
-        return vec3(_lc_4, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        float _lc = chosen();
+        return vec3(_lc, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2676,12 +2676,12 @@ let%expect_test "ints in float contexts" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float f_1_7(float x_2) {
-        return (x_2 * 2.);
+    float f_0(float x) {
+        return (x * 2.);
     }
-    vec3 main_pure(vec2 coord_0) {
-        float anf_8 = f_1_7(3.);
-        return vec3(anf_8, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        float anf = f_0(3.);
+        return vec3(anf, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2695,9 +2695,9 @@ let%expect_test "ints in float contexts" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord_0) {
-        float x_1 = (1. + 2.);
-        return vec3(x_1, x_1, x_1);
+    vec3 main_pure(vec2 coord) {
+        float x = (1. + 2.);
+        return vec3(x, x, x);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2711,14 +2711,14 @@ let%expect_test "ints in float contexts" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float f_2_8(float x_3) {
-        return (x_3 + 1.);
+    float f_0(float x) {
+        return (x + 1.);
     }
-    vec3 main_pure(vec2 coord_0) {
-        int n_1 = 4;
-        float anf_9 = float(n_1);
-        float anf_10 = f_2_8(anf_9);
-        return vec3(anf_10, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        int n = 4;
+        float anf = float(n);
+        float anf_0 = f_0(anf);
+        return vec3(anf_0, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2732,7 +2732,7 @@ let%expect_test "ints in float contexts" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord_0) {
+    vec3 main_pure(vec2 coord) {
         return vec3(1., 2., 3.);
     }
     void main() {
@@ -2747,11 +2747,11 @@ let%expect_test "ints in float contexts" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord_0) {
-        vec3 v_1 = vec3(1., 2., 3.);
-        float anf_6 = v_1[0];
-        float anf_7 = (2. * anf_6);
-        return vec3(anf_7, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        vec3 v = vec3(1., 2., 3.);
+        float anf = v[0];
+        float anf_0 = (2. * anf);
+        return vec3(anf_0, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2770,10 +2770,10 @@ let%expect_test "ints in float contexts" =
     precision highp float;
     out vec4 fragColor;
     uniform int n;
-    vec3 main_pure(vec2 u_0) {
-        float anf_3 = float(n);
-        float anf_4 = (anf_3 + 1.);
-        return vec3(anf_4, 0., 0.);
+    vec3 main_pure(vec2 u) {
+        float anf = float(n);
+        float anf_0 = (anf + 1.);
+        return vec3(anf_0, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2787,15 +2787,15 @@ let%expect_test "ints in float contexts" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord_0) {
-        int r_1;
+    vec3 main_pure(vec2 coord) {
+        int r;
         if (true) {
-            r_1 = 1;
+            r = 1;
         } else {
-            r_1 = 2;
+            r = 2;
         }
-        float anf_4 = float(r_1);
-        return vec3(anf_4, 0., 0.);
+        float anf = float(r);
+        return vec3(anf, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2809,9 +2809,9 @@ let%expect_test "ints in float contexts" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord_0) {
-        float s_1 = sin(0.);
-        return vec3(s_1, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        float s = sin(0.);
+        return vec3(s, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2825,12 +2825,12 @@ let%expect_test "ints in float contexts" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float f_1_10(float x_2, float y_3) {
-        return (x_2 + y_3);
+    float f_0(float x, float y) {
+        return (x + y);
     }
-    vec3 main_pure(vec2 coord_0) {
-        float anf_11 = f_1_10(1., 2.);
-        return vec3(anf_11, 0., 0.);
+    vec3 main_pure(vec2 coord) {
+        float anf = f_0(1., 2.);
+        return vec3(anf, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2861,47 +2861,47 @@ let%expect_test "function keyword desugaring" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_36 {
+    struct DFn {
         int tag;
     };
-    struct DFn_41 {
+    struct DFn_0 {
         int tag;
-        DFn_36 lctor_42_0;
+        DFn lctor_0;
     };
-    float g_3(bool _fn_arg_4) {
-        if (_fn_arg_4) {
+    float g(bool _fn_arg_0) {
+        if (_fn_arg_0) {
             return 1.;
         } else {
             return 0.;
         }
     }
-    int lam_34(bool _fn_arg_10) {
-        if (_fn_arg_10) {
+    int lam(bool _fn_arg_1) {
+        if (_fn_arg_1) {
             return 1;
         } else {
             return 0;
         }
     }
-    int dapply_35(DFn_36 dfn_43, bool da_44) {
-        return lam_34(da_44);
+    int dapply(DFn dfn, bool da) {
+        return lam(da);
     }
-    int apply_fn_5_bool_to_int_to_bool_to_int_33(DFn_36 f_6, bool x_7) {
-        return dapply_35(f_6, x_7);
+    int apply_fn_m(DFn f_0, bool x_0) {
+        return dapply(f_0, x_0);
     }
-    int dapply_40(DFn_41 dfn_45, bool da_46) {
-        DFn_36 ca_39 = dfn_45.lctor_42_0;
-        return apply_fn_5_bool_to_int_to_bool_to_int_33(ca_39, da_46);
+    int dapply_0(DFn_0 dfn_0, bool da_0) {
+        DFn ca = dfn_0.lctor_0;
+        return apply_fn_m(ca, da_0);
     }
-    struct v_option_float {
+    struct v_option_f {
         int tag;
         float Some_0;
     };
-    float f_0(v_option_float _fn_arg_1) {
-        int _lv_tag_53 = _fn_arg_1.tag;
-        switch (_lv_tag_53) {
+    float f(v_option_f _fn_arg) {
+        int _lv_tag = _fn_arg.tag;
+        switch (_lv_tag) {
             case 0: {
-                float x_2 = _fn_arg_1.Some_0;
-                return (x_2 + 1.);
+                float x = _fn_arg.Some_0;
+                return (x + 1.);
                 break;
             }
             default: {
@@ -2910,15 +2910,15 @@ let%expect_test "function keyword desugaring" =
             }
         }
     }
-    vec3 main_pure(vec2 u_8) {
-        DFn_36 anf_47 = DFn_36(0);
-        DFn_41 h_9 = DFn_41(0, anf_47);
-        v_option_float anf_48 = v_option_float(0, 5.);
-        float anf_49 = f_0(anf_48);
-        float anf_50 = g_3(true);
-        int anf_51 = dapply_40(h_9, true);
-        float anf_52 = float(anf_51);
-        return vec3(anf_49, anf_50, anf_52);
+    vec3 main_pure(vec2 u) {
+        DFn anf = DFn(0);
+        DFn_0 h = DFn_0(0, anf);
+        v_option_f anf_0 = v_option_f(0, 5.);
+        float anf_1 = f(anf_0);
+        float anf_2 = g(true);
+        int anf_3 = dapply_0(h, true);
+        float anf_4 = float(anf_3);
+        return vec3(anf_1, anf_2, anf_4);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2941,20 +2941,20 @@ let%expect_test "pipe operator" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float f_0(float x_1) {
-        return (x_1 + 1.);
+    float f(float x) {
+        return (x + 1.);
     }
-    float g_2(float x_3) {
-        return (x_3 * 2.);
+    float g(float x_0) {
+        return (x_0 * 2.);
     }
-    float lam_18(float x_6) {
-        return (x_6 * 2.);
+    float lam(float x_1) {
+        return (x_1 * 2.);
     }
-    vec3 main_pure(vec2 u_4) {
-        float n_5 = lam_18(1.);
-        float anf_19 = f_0(2.);
-        float anf_20 = g_2(anf_19);
-        return vec3(anf_20, n_5, 0.);
+    vec3 main_pure(vec2 u) {
+        float n = lam(1.);
+        float anf = f(2.);
+        float anf_0 = g(anf);
+        return vec3(anf_0, n, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2985,36 +2985,36 @@ let%expect_test "bracket pattern matching" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float f_0(vec3 _fn_arg_1) {
-        float x_2 = _fn_arg_1[0];
-        float z_3 = _fn_arg_1[2];
-        return (x_2 + z_3);
+    float f(vec3 _fn_arg) {
+        float x = _fn_arg[0];
+        float z = _fn_arg[2];
+        return (x + z);
     }
-    float g_4(mat2 _fn_arg_5) {
-        vec2 _lv_col_46 = _fn_arg_5[0];
-        float a_6 = _lv_col_46[0];
-        float b_7 = _lv_col_46[1];
-        vec2 _lv_col_45 = _fn_arg_5[1];
-        float c_8 = _lv_col_45[0];
-        float d_9 = _lv_col_45[1];
-        return (a_6 + d_9);
+    float g(mat2 _fn_arg_0) {
+        vec2 _lv_col_0 = _fn_arg_0[0];
+        float a = _lv_col_0[0];
+        float b = _lv_col_0[1];
+        vec2 _lv_col = _fn_arg_0[1];
+        float c = _lv_col[0];
+        float d = _lv_col[1];
+        return (a + d);
     }
-    float h_10(vec2 v_11) {
-        float x_12 = v_11[0];
-        float y_13 = v_11[1];
-        return (x_12 + y_13);
+    float h(vec2 v) {
+        float x_0 = v[0];
+        float y = v[1];
+        return (x_0 + y);
     }
-    vec3 main_pure(vec2 coord_14) {
-        float anf_39 = coord_14[0];
-        float anf_40 = coord_14[1];
-        vec3 anf_41 = vec3(anf_39, anf_40, 0.);
-        float a_15 = f_0(anf_41);
-        vec2 anf_42 = vec2(1., 0.);
-        vec2 anf_43 = vec2(0., 1.);
-        mat2 anf_44 = mat2(anf_42, anf_43);
-        float b_16 = g_4(anf_44);
-        float c_17 = h_10(coord_14);
-        return vec3(a_15, b_16, c_17);
+    vec3 main_pure(vec2 coord) {
+        float anf = coord[0];
+        float anf_0 = coord[1];
+        vec3 anf_1 = vec3(anf, anf_0, 0.);
+        float a_0 = f(anf_1);
+        vec2 anf_2 = vec2(1., 0.);
+        vec2 anf_3 = vec2(0., 1.);
+        mat2 anf_4 = mat2(anf_2, anf_3);
+        float b_0 = g(anf_4);
+        float c_0 = h(coord);
+        return vec3(a_0, b_0, c_0);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -3047,19 +3047,19 @@ let%expect_test "let pattern binding" =
         int tag;
         float Wrap_0;
     };
-    float f_0(wrapper w_1) {
-        float v_2 = w_1.Wrap_0;
-        float v_prime_3 = w_1.Wrap_0;
-        return (v_2 + v_prime_3);
+    float f(wrapper w) {
+        float v = w.Wrap_0;
+        float v_prime = w.Wrap_0;
+        return (v + v_prime);
     }
-    vec3 main_pure(vec2 uv_4) {
-        float x_5 = 2.;
-        float u_6 = uv_4[0];
-        float v_7 = uv_4[1];
-        wrapper anf_18 = wrapper(0, 1.);
-        float anf_19 = f_0(anf_18);
-        float anf_20 = (u_6 + v_7);
-        return vec3(x_5, anf_19, anf_20);
+    vec3 main_pure(vec2 uv) {
+        float x = 2.;
+        float u = uv[0];
+        float v_0 = uv[1];
+        wrapper anf = wrapper(0, 1.);
+        float anf_0 = f(anf);
+        float anf_1 = (u + v_0);
+        return vec3(x, anf_0, anf_1);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -3083,24 +3083,24 @@ let%expect_test "functions in records / structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_12 {
+    struct DFn {
         int tag;
     };
     struct fn_box {
-        DFn_12 fn;
+        DFn fn;
     };
-    float lam_10(float x_2) {
-        return (x_2 * 2.);
+    float lam(float x) {
+        return (x * 2.);
     }
-    float dapply_11(DFn_12 dfn_14, float da_15) {
-        return lam_10(da_15);
+    float dapply(DFn dfn, float da) {
+        return lam(da);
     }
-    vec3 main_pure(vec2 pos_0) {
-        DFn_12 anf_16 = DFn_12(0);
-        fn_box b_1 = fn_box(anf_16);
-        DFn_12 anf_17 = b_1.fn;
-        float r_3 = dapply_11(anf_17, 3.);
-        return vec3(r_3, 0., 0.);
+    vec3 main_pure(vec2 pos) {
+        DFn anf = DFn(0);
+        fn_box b = fn_box(anf);
+        DFn anf_0 = b.fn;
+        float r = dapply(anf_0, 3.);
+        return vec3(r, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -3123,27 +3123,27 @@ let%expect_test "functions in records / structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_19 {
+    struct DFn {
         int tag;
     };
     struct fn_box {
-        DFn_19 fn;
+        DFn fn;
     };
-    float lam_17(float x_5) {
-        return (x_5 * 3.);
+    float lam(float x_0) {
+        return (x_0 * 3.);
     }
-    float dapply_18(DFn_19 dfn_21, float da_22) {
-        return lam_17(da_22);
+    float dapply(DFn dfn, float da) {
+        return lam(da);
     }
-    float apply_0(DFn_19 f_1, float x_2) {
-        return dapply_18(f_1, x_2);
+    float apply(DFn f, float x) {
+        return dapply(f, x);
     }
-    vec3 main_pure(vec2 pos_3) {
-        DFn_19 anf_23 = DFn_19(0);
-        fn_box b_4 = fn_box(anf_23);
-        DFn_19 anf_24 = b_4.fn;
-        float r_6 = apply_0(anf_24, 4.);
-        return vec3(r_6, 0., 0.);
+    vec3 main_pure(vec2 pos) {
+        DFn anf = DFn(0);
+        fn_box b = fn_box(anf);
+        DFn anf_0 = b.fn;
+        float r = apply(anf_0, 4.);
+        return vec3(r, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -3169,39 +3169,39 @@ let%expect_test "functions in records / structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_20 {
+    struct DFn {
         int tag;
     };
     struct callback {
         int tag;
-        DFn_20 CB_0;
+        DFn CB_0;
     };
-    float lam_18(float x_5) {
-        return (x_5 * 2.);
+    float lam(float x_0) {
+        return (x_0 * 2.);
     }
-    float dapply_19(DFn_20 dfn_22, float da_23) {
-        return lam_18(da_23);
+    float dapply(DFn dfn, float da) {
+        return lam(da);
     }
-    float apply_0(DFn_20 f_1, float x_2) {
-        return dapply_19(f_1, x_2);
+    float apply(DFn f, float x) {
+        return dapply(f, x);
     }
-    vec3 main_pure(vec2 pos_3) {
-        DFn_20 anf_24 = DFn_20(0);
-        callback cb_4 = callback(0, anf_24);
-        int _lv_tag_25 = cb_4.tag;
-        float r_6;
-        switch (_lv_tag_25) {
+    vec3 main_pure(vec2 pos) {
+        DFn anf = DFn(0);
+        callback cb = callback(0, anf);
+        int _lv_tag = cb.tag;
+        float r;
+        switch (_lv_tag) {
             case 0: {
-                DFn_20 f_7 = cb_4.CB_0;
-                r_6 = apply_0(f_7, 6.);
+                DFn f_0 = cb.CB_0;
+                r = apply(f_0, 6.);
                 break;
             }
             default: {
-                r_6 = 0.;
+                r = 0.;
                 break;
             }
         }
-        return vec3(r_6, 0., 0.);
+        return vec3(r, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -3228,11 +3228,11 @@ let%expect_test "struct pattern matching" =
         float x;
         float y;
     };
-    vec3 main_pure(vec2 uv_0) {
-        point anf_7 = point(1., 2.);
-        float a_1 = anf_7.x;
-        float b_2 = anf_7.y;
-        return vec3(a_1, b_2, 0.);
+    vec3 main_pure(vec2 uv) {
+        point anf = point(1., 2.);
+        float a = anf.x;
+        float b = anf.y;
+        return vec3(a, b, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -3259,10 +3259,10 @@ let%expect_test "struct pattern matching" =
         float g;
         float b;
     };
-    vec3 main_pure(vec2 uv_0) {
-        rgb c_1 = rgb(1., 0.5, 0.);
-        float red_2 = c_1.r;
-        return vec3(red_2, 0., 0.);
+    vec3 main_pure(vec2 uv) {
+        rgb c = rgb(1., 0.5, 0.);
+        float red = c.r;
+        return vec3(red, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -3283,13 +3283,13 @@ let%expect_test "struct pattern matching" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct r_box_float {
+    struct r_box_f {
         float value;
     };
-    vec3 main_pure(vec2 uv_0) {
-        r_box_float b_1 = r_box_float(1.5);
-        float v_2 = b_1.value;
-        return vec3(v_2, 0., 0.);
+    vec3 main_pure(vec2 uv) {
+        r_box_f b = r_box_f(1.5);
+        float v = b.value;
+        return vec3(v, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -3370,11 +3370,11 @@ let%expect_test "struct pattern matching" =
         float x;
         float y;
     };
-    vec3 main_pure(vec2 uv_0) {
-        point anf_7 = point(1., 2.);
-        float a_1 = anf_7.x;
-        float y_2 = anf_7.y;
-        return vec3(a_1, y_2, 0.);
+    vec3 main_pure(vec2 uv) {
+        point anf = point(1., 2.);
+        float a = anf.x;
+        float y = anf.y;
+        return vec3(a, y, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

@@ -153,9 +153,9 @@ let rec fold_term ~(f : 'a -> Typecheck.term -> 'a) (acc : 'a) (t : Typecheck.te
 
 let rec mangle_ty (ty : Typecheck.ty) : string =
   match ty with
-  | TyFloat -> "float"
-  | TyInt -> "int"
-  | TyBool -> "bool"
+  | TyFloat -> "f"
+  | TyInt -> "i"
+  | TyBool -> "b"
   | TyVec (n, TyFloat) -> "vec" ^ Int.to_string n
   | TyVec (n, TyVec (m, TyFloat)) ->
     if n = m
@@ -167,7 +167,7 @@ let rec mangle_ty (ty : Typecheck.ty) : string =
   | TyVariant (s, []) -> s
   | TyVariant (s, args) -> "v_" ^ String.concat ~sep:"_" (s :: List.map args ~f:mangle_ty)
   | TyVar v -> "tv" ^ v
-  | TyArrow (a, b) -> mangle_ty a ^ "_to_" ^ mangle_ty b
+  | TyArrow (a, b) -> mangle_ty a ^ "to" ^ mangle_ty b
 ;;
 
 let rec is_concrete (ty : Typecheck.ty) : bool =
@@ -530,7 +530,7 @@ let rec resolve_spec (env : env) (acc : acc) (name : string) (concrete_ty : Type
   | Some spec_name -> Ok (acc, spec_name)
   | None ->
     let entry = Map.find_exn env.poly_fn_env name in
-    let spec_name = Utils.fresh (name ^ "_" ^ mangle_ty concrete_ty) in
+    let spec_name = Utils.fresh (name ^ "_m") in
     (* Register in spec_map FIRST as cycle guard for recursive functions *)
     let acc = { acc with spec_map = add_spec acc.spec_map name concrete_ty spec_name } in
     let sub = subst ~poly:entry.poly_type ~concrete:concrete_ty in
@@ -636,7 +636,7 @@ and rewrite_refs (env : env) (acc : acc) (t : Typecheck.term)
                   ~poly_names:env.poly_names
                   spec_bind
               in
-              let spec_name = Utils.fresh (v ^ "_" ^ mangle_ty concrete_ty) in
+              let spec_name = Utils.fresh (v ^ "_m") in
               let%map acc, spec_bind = rewrite_refs env acc spec_bind in
               let spec_bind =
                 match recur with
