@@ -1045,10 +1045,10 @@ let%expect_test "promotion of ints to floats" =
     out vec4 fragColor;
     vec3 main_pure(vec2 u_0) {
         int b_1 = (1 + 2);
-        float pf_7 = float(b_1);
-        float a_2 = (pf_7 + 2.);
         float anf_6 = float(b_1);
-        return vec3(anf_6, a_2, 3.);
+        float a_2 = (anf_6 + 2.);
+        float anf_7 = float(b_1);
+        return vec3(anf_7, a_2, 3.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1067,9 +1067,9 @@ let%expect_test "int broadcasting with vecs and builtins" =
     out vec4 fragColor;
     vec3 main_pure(vec2 coord_0) {
         int n_1 = 2;
-        vec3 anf_5 = vec3(0.5, 0.5, 0.5);
-        float pf_6 = float(n_1);
-        return (pf_6 * anf_5);
+        float anf_5 = float(n_1);
+        vec3 anf_6 = vec3(0.5, 0.5, 0.5);
+        return (anf_5 * anf_6);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1089,9 +1089,9 @@ let%expect_test "int broadcasting with vecs and builtins" =
     out vec4 fragColor;
     uniform int n;
     vec3 main_pure(vec2 u_0) {
-        vec3 anf_4 = vec3(0.5, 0.5, 0.5);
-        float pf_5 = float(n);
-        return (pf_5 * anf_4);
+        float anf_4 = float(n);
+        vec3 anf_5 = vec3(0.5, 0.5, 0.5);
+        return (anf_4 * anf_5);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1106,9 +1106,9 @@ let%expect_test "int broadcasting with vecs and builtins" =
     out vec4 fragColor;
     vec3 main_pure(vec2 coord_0) {
         int n_1 = 2;
-        vec3 anf_5 = vec3(0.1, 0.2, 0.3);
-        float pf_6 = float(n_1);
-        return (pf_6 + anf_5);
+        float anf_5 = float(n_1);
+        vec3 anf_6 = vec3(0.1, 0.2, 0.3);
+        return (anf_5 + anf_6);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1130,8 +1130,8 @@ let%expect_test "int broadcasting with vecs and builtins" =
     out vec4 fragColor;
     uniform int n;
     vec3 main_pure(vec2 u_0) {
-        float pf_5 = float(n);
-        float r_1 = sin(pf_5);
+        float anf_5 = float(n);
+        float r_1 = sin(anf_5);
         return vec3(r_1, r_1, r_1);
     }
     void main() {
@@ -2519,9 +2519,9 @@ let%expect_test "defunctionalization - partial application of first-class functi
     vec3 main_pure(vec2 uv_4) {
         DFn_27 inc_5_int_to_int_21 = mkinc_0_int_to_int_to_int_22(0);
         int anf_31 = dapply_26(inc_5_int_to_int_21, 2);
-        vec3 anf_32 = vec3(1., 1., 1.);
-        float pf_33 = float(anf_31);
-        return (pf_33 * anf_32);
+        float anf_32 = float(anf_31);
+        vec3 anf_33 = vec3(1., 1., 1.);
+        return (anf_32 * anf_33);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2716,9 +2716,9 @@ let%expect_test "ints in float contexts" =
     }
     vec3 main_pure(vec2 coord_0) {
         int n_1 = 4;
-        float pf_10 = float(n_1);
-        float anf_9 = f_2_8(pf_10);
-        return vec3(anf_9, 0., 0.);
+        float anf_9 = float(n_1);
+        float anf_10 = f_2_8(anf_9);
+        return vec3(anf_10, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2771,9 +2771,9 @@ let%expect_test "ints in float contexts" =
     out vec4 fragColor;
     uniform int n;
     vec3 main_pure(vec2 u_0) {
-        float pf_4 = float(n);
-        float anf_3 = (pf_4 + 1.);
-        return vec3(anf_3, 0., 0.);
+        float anf_3 = float(n);
+        float anf_4 = (anf_3 + 1.);
+        return vec3(anf_4, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

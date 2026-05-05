@@ -60,6 +60,7 @@ type term_desc =
   | Variant of string * string * term list
   | Match of term * (Frontend.pat * term) list
   | Promote of term
+  | Coerce of ty * term
 [@@deriving sexp_of]
 
 and term =

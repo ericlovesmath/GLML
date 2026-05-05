@@ -469,21 +469,21 @@ let%expect_test "compile examples" =
     uniform float u_time;
     vec3 main_pure(vec2 coord_5) {
         vec2 uv_6 = get_uv_1_vec2_to_vec2_49(coord_5);
-        float pf_66 = float(size_0);
-        vec2 anf_56 = (uv_6 * pf_66);
-        float anf_57 = (2. * u_time);
-        vec2 anf_58 = vec2(anf_57, 0.);
-        vec2 anf_59 = (anf_56 + anf_58);
-        vec2 c_7 = floor(anf_59);
-        float anf_60 = c_7[0];
-        float anf_61 = c_7[1];
-        float checker_sum_8 = (anf_60 + anf_61);
-        float anf_62 = (checker_sum_8 / 2.);
-        float anf_63 = floor(anf_62);
-        float anf_64 = (anf_63 * 2.);
-        float is_even_9 = (checker_sum_8 - anf_64);
-        bool anf_65 = (is_even_9 < 0.5);
-        if (anf_65) {
+        float anf_56 = float(size_0);
+        vec2 anf_57 = (uv_6 * anf_56);
+        float anf_58 = (2. * u_time);
+        vec2 anf_59 = vec2(anf_58, 0.);
+        vec2 anf_60 = (anf_57 + anf_59);
+        vec2 c_7 = floor(anf_60);
+        float anf_61 = c_7[0];
+        float anf_62 = c_7[1];
+        float checker_sum_8 = (anf_61 + anf_62);
+        float anf_63 = (checker_sum_8 / 2.);
+        float anf_64 = floor(anf_63);
+        float anf_65 = (anf_64 * 2.);
+        float is_even_9 = (checker_sum_8 - anf_65);
+        bool anf_66 = (is_even_9 < 0.5);
+        if (anf_66) {
             return vec3(0.2, 0.2, 0.2);
         } else {
             return vec3(0.8, 0.8, 0.8);
@@ -507,8 +507,8 @@ let%expect_test "compile examples" =
         float Some_0;
     };
     v_option_float mandel_2_115(vec2 c_1, vec2 z_3, int i_4) {
-        int _iter_150 = 0;
-        while ((_iter_150 < 1000)) {
+        int _iter_151 = 0;
+        while ((_iter_151 < 1000)) {
             bool anf_116 = (i_4 > 150);
             if (anf_116) {
                 return v_option_float(1, 0.);
@@ -519,30 +519,30 @@ let%expect_test "compile examples" =
                     float anf_119 = length(z_3);
                     float anf_120 = log2(anf_119);
                     float nu_5 = log2(anf_120);
-                    float pf_153 = float(i_4);
-                    float anf_121 = (pf_153 - nu_5);
-                    float anf_122 = (anf_121 / 150.);
-                    return v_option_float(0, anf_122);
+                    float anf_121 = float(i_4);
+                    float anf_122 = (anf_121 - nu_5);
+                    float anf_123 = (anf_122 / 150.);
+                    return v_option_float(0, anf_123);
                 } else {
-                    float anf_123 = z_3[0];
                     float anf_124 = z_3[0];
-                    float anf_125 = (anf_123 * anf_124);
-                    float anf_126 = z_3[1];
+                    float anf_125 = z_3[0];
+                    float anf_126 = (anf_124 * anf_125);
                     float anf_127 = z_3[1];
-                    float anf_128 = (anf_126 * anf_127);
-                    float zx_6 = (anf_125 - anf_128);
-                    float anf_129 = z_3[0];
-                    float anf_130 = (2. * anf_129);
-                    float anf_131 = z_3[1];
-                    float zy_7 = (anf_130 * anf_131);
-                    vec2 anf_132 = vec2(zx_6, zy_7);
-                    vec2 z_prime_8 = (anf_132 + c_1);
-                    int anf_133 = (i_4 + 1);
+                    float anf_128 = z_3[1];
+                    float anf_129 = (anf_127 * anf_128);
+                    float zx_6 = (anf_126 - anf_129);
+                    float anf_130 = z_3[0];
+                    float anf_131 = (2. * anf_130);
+                    float anf_132 = z_3[1];
+                    float zy_7 = (anf_131 * anf_132);
+                    vec2 anf_133 = vec2(zx_6, zy_7);
+                    vec2 z_prime_8 = (anf_133 + c_1);
+                    int anf_134 = (i_4 + 1);
                     c_1 = c_1;
                     z_3 = z_prime_8;
-                    i_4 = anf_133;
-                    int _iter_inc_151 = (_iter_150 + 1);
-                    _iter_150 = _iter_inc_151;
+                    i_4 = anf_134;
+                    int _iter_inc_152 = (_iter_151 + 1);
+                    _iter_151 = _iter_inc_152;
                     continue;
                 }
             }
@@ -551,39 +551,39 @@ let%expect_test "compile examples" =
         return _tmp_154;
     }
     v_option_float mandelbrot_0_vec2_to_v_option_float_113(vec2 c_1) {
-        vec2 anf_134 = vec2(0., 0.);
-        return mandel_2_115(c_1, anf_134, 0);
+        vec2 anf_135 = vec2(0., 0.);
+        return mandel_2_115(c_1, anf_135, 0);
     }
     vec3 main_pure(vec2 coord_9) {
-        vec2 anf_135 = (2. * coord_9);
-        vec2 top_11 = (anf_135 - u_resolution);
-        float anf_136 = u_resolution[0];
-        float anf_137 = u_resolution[1];
-        float bot_12 = min(anf_136, anf_137);
+        vec2 anf_136 = (2. * coord_9);
+        vec2 top_11 = (anf_136 - u_resolution);
+        float anf_137 = u_resolution[0];
+        float anf_138 = u_resolution[1];
+        float bot_12 = min(anf_137, anf_138);
         vec2 uv_10 = (top_11 / bot_12);
-        float anf_138 = (u_time * 0.4);
-        float anf_139 = sin(anf_138);
-        float anf_140 = (anf_139 * 4.5);
-        float anf_141 = (anf_140 + 3.5);
-        float zoom_13 = exp(anf_141);
-        vec2 anf_142 = vec2(-0.7453, 0.1127);
-        vec2 anf_143 = (uv_10 / zoom_13);
-        vec2 seahorse_valley_14 = (anf_142 + anf_143);
-        v_option_float anf_144 = mandelbrot_0_vec2_to_v_option_float_113(seahorse_valley_14);
-        int _lv_tag_152 = anf_144.tag;
-        switch (_lv_tag_152) {
+        float anf_139 = (u_time * 0.4);
+        float anf_140 = sin(anf_139);
+        float anf_141 = (anf_140 * 4.5);
+        float anf_142 = (anf_141 + 3.5);
+        float zoom_13 = exp(anf_142);
+        vec2 anf_143 = vec2(-0.7453, 0.1127);
+        vec2 anf_144 = (uv_10 / zoom_13);
+        vec2 seahorse_valley_14 = (anf_143 + anf_144);
+        v_option_float anf_145 = mandelbrot_0_vec2_to_v_option_float_113(seahorse_valley_14);
+        int _lv_tag_153 = anf_145.tag;
+        switch (_lv_tag_153) {
             case 1: {
                 return vec3(0., 0., 0.);
                 break;
             }
             default: {
-                float n_15 = anf_144.Some_0;
-                vec3 anf_145 = vec3(10., 20., 30.);
-                vec3 anf_146 = (n_15 * anf_145);
-                vec3 anf_147 = (anf_146 + u_time);
-                vec3 anf_148 = sin(anf_147);
-                vec3 anf_149 = (anf_148 * 0.5);
-                return (anf_149 + 0.5);
+                float n_15 = anf_145.Some_0;
+                vec3 anf_146 = vec3(10., 20., 30.);
+                vec3 anf_147 = (n_15 * anf_146);
+                vec3 anf_148 = (anf_147 + u_time);
+                vec3 anf_149 = sin(anf_148);
+                vec3 anf_150 = (anf_149 * 0.5);
+                return (anf_150 + 0.5);
                 break;
             }
         }

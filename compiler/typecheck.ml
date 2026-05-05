@@ -83,6 +83,7 @@ type term_desc =
   | Variant of string * string * term list
   | Match of term * (Frontend.pat * term) list
   | Promote of term
+  | Coerce of ty * term
 
 and term =
   { desc : term_desc
@@ -146,6 +147,8 @@ let rec sexp_of_term_desc = function
     let sexp_of_case (pat, body) = List [ Frontend.sexp_of_pat pat; sexp_of_term body ] in
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
   | Promote t -> List [ Atom "promote"; sexp_of_term t ]
+  | Coerce (target, inner) ->
+    List [ Atom "coerce"; sexp_of_ty target; sexp_of_term inner ]
 
 and sexp_of_term t = List [ sexp_of_term_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
 
@@ -249,6 +252,7 @@ let rec subst_term (sub : substitution) (t : term) : term =
     | Match (scrutinee, cases) ->
       Match (subst scrutinee, List.map cases ~f:(fun (pat, body) -> pat, subst body))
     | Promote t -> Promote (subst t)
+    | Coerce (target, inner) -> Coerce (subst_ty sub target, subst inner)
   in
   { t with desc; ty = subst_ty sub t.ty }
 ;;
@@ -971,95 +975,8 @@ let check_match_exhaustiveness
       | _ -> Err.fail "expected variant scrutinee type for exhaustiveness check" ~loc)
 ;;
 
-(** Walk a typed term with an [expected] type derived from each parent and rewrite
-    [.ty] annotations / insert [Promote] wrappers to materialize the [Coerce]
-    constraints the solver discharged silently. After this, every term's [.ty]
-    matches what its parent expects. *)
-let rec has_tyvar_ty = function
-  | TyVar _ -> true
-  | TyFloat | TyInt | TyBool -> false
-  | TyVec (_, t) -> has_tyvar_ty t
-  | TyArrow (a, b) -> has_tyvar_ty a || has_tyvar_ty b
-  | TyRecord (_, args) | TyVariant (_, args) -> List.exists args ~f:has_tyvar_ty
-;;
-
-let rec coercible_ty (from_ty : ty) (to_ty : ty) : bool =
-  if equal_ty from_ty to_ty
-  then true
-  else (
-    match from_ty, to_ty with
-    | TyInt, TyFloat -> true
-    | TyArrow (p, r), TyArrow (p', r') -> coercible_ty p' p && coercible_ty r r'
-    | TyVec (n, t), TyVec (n', t') when n = n' -> coercible_ty t t'
-    | TyRecord (s, args), TyRecord (s', args')
-    | TyVariant (s, args), TyVariant (s', args')
-      when String.equal s s' && List.length args = List.length args' ->
-      List.for_all2_exn args args' ~f:coercible_ty
-    | _ -> false)
-;;
-
-let rec materialize_term ?(expected : ty option) (t : term) : term =
-  let target = Option.value expected ~default:t.ty in
-  let t =
-    if equal_ty t.ty target || has_tyvar_ty t.ty || has_tyvar_ty target
-    then t
-    else if coercible_ty t.ty target
-    then (
-      match t.ty, target, t.desc with
-      | TyInt, TyFloat, Int i ->
-        { desc = Float (Float.of_int i); ty = TyFloat; loc = t.loc }
-      | TyInt, TyFloat, _ ->
-        let inner = { t with ty = TyInt } in
-        { desc = Promote inner; ty = TyFloat; loc = t.loc }
-      | _ -> { t with ty = target })
-    else t
-  in
-  let target_ty = t.ty in
-  let rmap = materialize_term in
-  let none = materialize_term ?expected:None in
-  let desc : term_desc =
-    match t.desc with
-    | Var _ | Float _ | Int _ | Bool _ -> t.desc
-    | Vec (n, ts) ->
-      let elem_exp =
-        match target_ty with
-        | TyVec (_, e) -> Some e
-        | _ -> None
-      in
-      Vec (n, List.map ts ~f:(fun t -> rmap ?expected:elem_exp t))
-    | Lam (v, body) ->
-      let body_exp =
-        match target_ty with
-        | TyArrow (_, ret) -> Some ret
-        | _ -> None
-      in
-      Lam (v, rmap ?expected:body_exp body)
-    | App (f, x) ->
-      let f' = none f in
-      let arg_exp =
-        match f'.ty with
-        | TyArrow (a, _) -> Some a
-        | _ -> None
-      in
-      let x' = rmap ?expected:arg_exp x in
-      App (f', x')
-    | Let (recur, v, constrs, bind, body) ->
-      Let (recur, v, constrs, none bind, rmap ~expected:target_ty body)
-    | If (c, t1, e) ->
-      If (rmap ~expected:TyBool c, rmap ~expected:target_ty t1, rmap ~expected:target_ty e)
-    | Bop (op, l, rt) -> Bop (op, none l, none rt)
-    | Index (t, i) -> Index (none t, i)
-    | Builtin (b, ts) -> Builtin (b, List.map ts ~f:none)
-    | Record (s, ts) -> Record (s, List.map ts ~f:none)
-    | Field (t, f) -> Field (none t, f)
-    | Variant (tn, ctor, args) -> Variant (tn, ctor, List.map args ~f:none)
-    | Match (scrut, cases) ->
-      Match
-        ( none scrut
-        , List.map cases ~f:(fun (pat, body) -> pat, rmap ~expected:target_ty body) )
-    | Promote inner -> Promote (none inner)
-  in
-  { t with desc }
+let coerce_term loc (target : ty) (t : term) : term =
+  { desc = Coerce (target, t); ty = target; loc }
 ;;
 
 let coerce_arg_to_ty loc (arg : term) (expected_ty : ty) : term * constr list =
@@ -1067,9 +984,9 @@ let coerce_arg_to_ty loc (arg : term) (expected_ty : ty) : term * constr list =
   match expected_ty with
   | TyFloat ->
     let coerce_ty = fresh_tyvar () in
-    ( { arg with ty = coerce_ty }
+    ( coerce_term loc coerce_ty arg
     , [ c (HasClass (Comparable, arg.ty)); c (Broadcast (arg.ty, TyFloat, coerce_ty)) ] )
-  | _ -> arg, [ c (Coerce (arg.ty, expected_ty)) ]
+  | _ -> coerce_term loc expected_ty arg, [ c (Coerce (arg.ty, expected_ty)) ]
 ;;
 
 let rec infer_binding
@@ -1110,19 +1027,14 @@ let rec infer_binding
     | Nonrec, Some full_ty -> constr (Coerce (bind.ty, full_ty)) :: rec_constrs
     | _ -> rec_constrs
   in
+  let bind =
+    match recur, return_ty with
+    | Nonrec, Some full_ty -> coerce_term bind.loc full_ty bind
+    | _ -> bind
+  in
   let%bind sub_bind, deferred = solve env.structs constrs in
   let ty_bind = subst_ty sub_bind bind.ty in
   let bind = subst_term sub_bind bind in
-  (* Materialize coercions using the user's annotated return type when present;
-     this ensures the binding's inner term [.ty]s reflect the annotation rather
-     than the inferred-but-coerced type, so downstream passes can use [.ty] as
-     identity. *)
-  let bind =
-    match return_ty with
-    | Some full_ty -> materialize_term ~expected:full_ty bind
-    | None -> materialize_term ~expected:ty_bind bind
-  in
-  let ty_bind = bind.ty in
   let ctx = subst_context sub_bind (subst_context term_sub env.ctx) in
   let deferred = subst_constraints sub_bind deferred in
   let returns_fn =
@@ -1180,7 +1092,7 @@ and gen_term (env : env) (t : Desugar.term)
       @ constrs_x
       @ [ constr (Coerce (x.ty, arg_ty)) ]
     in
-    let x = { x with ty = arg_ty } in
+    let x = coerce_term x.loc arg_ty x in
     let composed = compose_sub sub_x sub_f in
     Ok ({ desc = App (f, x); ty = ret_ty; loc }, constrs, composed)
   | Let (recur, v, return_ty, bind_stlc, body_stlc) ->
@@ -1207,6 +1119,8 @@ and gen_term (env : env) (t : Desugar.term)
       :: constr (Coerce (e.ty, join_ty))
       :: (constrs_c @ constrs_t @ constrs_e)
     in
+    let t = coerce_term t.loc join_ty t in
+    let e = coerce_term e.loc join_ty e in
     let composed = compose_sub sub_e (compose_sub sub_t sub_c) in
     Ok ({ desc = If (c, t, e); ty = join_ty; loc }, constrs, composed)
   | Bop (op, l, r) ->
@@ -1379,8 +1293,9 @@ and gen_term (env : env) (t : Desugar.term)
         ~init:([], [], [])
         ~f:(fun (acc_args, acc_constrs, acc_sub) arg ->
           let%bind arg, constrs, sub = gen_term env arg in
+          let coerced = coerce_term arg.loc elem_ty arg in
           return
-            ( arg :: acc_args
+            ( coerced :: acc_args
             , (constr (Coerce (arg.ty, elem_ty)) :: constrs) @ acc_constrs
             , compose_sub sub acc_sub ))
     in
@@ -1571,8 +1486,9 @@ and gen_term (env : env) (t : Desugar.term)
         ~f:(fun (acc_cases, acc_constrs, acc_sub) (pat, body) ->
           let%bind ctx = check_pat env loc scrutinee_ty pat in
           let%bind body, constrs_body, body_sub = gen_term { env with ctx } body in
+          let body_wrapped = coerce_term body.loc ret_ty body in
           return
-            ( (pat, body) :: acc_cases
+            ( (pat, body_wrapped) :: acc_cases
             , (constr (Coerce (body.ty, ret_ty)) :: constrs_body) @ acc_constrs
             , compose_sub body_sub acc_sub ))
     in
@@ -1592,7 +1508,7 @@ let enforce_main_type env bind ty loc v =
     match solve env.structs [ main_constr ] with
     | Ok (sub, []) ->
       let bind = subst_term sub bind in
-      let bind = materialize_term ~expected bind in
+      let bind = coerce_term bind.loc expected bind in
       Ok (bind, bind.ty)
     | _ -> Err.fail "main must have type vec2 -> vec3" ~loc ~d:[%message (ty : ty)])
 ;;

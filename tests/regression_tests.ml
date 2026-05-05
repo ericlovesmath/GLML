@@ -10,8 +10,8 @@ let%expect_test "int promotion edge cases" =
     out vec4 fragColor;
     vec3 main_pure(vec2 coord_0) {
         int x_1 = 5;
-        float pf_5 = float(x_1);
-        float y_2 = (pf_5 + 3.);
+        float anf_5 = float(x_1);
+        float y_2 = (anf_5 + 3.);
         return vec3(y_2, y_2, y_2);
     }
     void main() {
@@ -50,9 +50,9 @@ let%expect_test "int promotion edge cases" =
     out vec4 fragColor;
     uniform int n;
     vec3 main_pure(vec2 u_0) {
-        float pf_7 = float(n);
-        bool anf_6 = (pf_7 < 0.5);
-        if (anf_6) {
+        float anf_6 = float(n);
+        bool anf_7 = (anf_6 < 0.5);
+        if (anf_7) {
             return vec3(1., 0., 0.);
         } else {
             return vec3(0., 0., 0.);
@@ -111,11 +111,11 @@ let%expect_test "int promotion edge cases" =
     };
     vec3 main_pure(vec2 u_0) {
         int a_1 = 3;
-        float pf_10 = float(a_1);
-        point p_2 = point(pf_10, 0.);
-        float anf_8 = p_2.x;
-        float anf_9 = p_2.y;
-        return vec3(anf_8, anf_9, 0.);
+        float anf_8 = float(a_1);
+        point p_2 = point(anf_8, 0.);
+        float anf_9 = p_2.x;
+        float anf_10 = p_2.y;
+        return vec3(anf_9, anf_10, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -753,16 +753,16 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
     };
     const DFn_16 inc_0_float_to_float_11 = DFn_16(0, 1);
     float lam_12(int x_1, float y_2) {
-        float pf_21 = float(x_1);
-        return (pf_21 + y_2);
+        float anf_20 = float(x_1);
+        return (anf_20 + y_2);
     }
     float dapply_15(DFn_16 dfn_18, float da_19) {
         int ca_14 = dfn_18.lctor_17_0;
         return lam_12(ca_14, da_19);
     }
     vec3 main_pure(vec2 uv_3) {
-        float anf_20 = dapply_15(inc_0_float_to_float_11, 1.);
-        return vec3(anf_20, 0., 0.);
+        float anf_21 = dapply_15(inc_0_float_to_float_11, 1.);
+        return vec3(anf_21, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -793,15 +793,15 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
     };
     const DFn_27 add_one_0_float_to_float_20 = DFn_27(0, 1, 0.);
     float lam_22(int k_1, float x_2) {
-        float pf_37 = float(k_1);
-        return (x_2 + pf_37);
+        float anf_34 = float(k_1);
+        return (x_2 + anf_34);
     }
     float lam_23(float s_4, float x_5) {
         return (x_5 * s_4);
     }
     float dapply_26(DFn_27 dfn_32, float da_33) {
-        int _lv_tag_36 = dfn_32.tag;
-        switch (_lv_tag_36) {
+        int _lv_tag_37 = dfn_32.tag;
+        switch (_lv_tag_37) {
             case 0: {
                 int ca_25 = dfn_32.lctor_28_0;
                 return lam_22(ca_25, da_33);
@@ -816,9 +816,9 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
     }
     const DFn_27 scale_3_float_to_float_21 = DFn_27(1, 0, 2.);
     vec3 main_pure(vec2 uv_6) {
-        float anf_34 = dapply_26(add_one_0_float_to_float_20, 3.);
-        float anf_35 = dapply_26(scale_3_float_to_float_21, anf_34);
-        return vec3(anf_35, 0., 0.);
+        float anf_35 = dapply_26(add_one_0_float_to_float_20, 3.);
+        float anf_36 = dapply_26(scale_3_float_to_float_21, anf_35);
+        return vec3(anf_36, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -846,9 +846,9 @@ let%expect_test "regression - partial application stored as top level value" =
         vec3 lctor_35_0;
     };
     vec3 palette_0_vec3_to_int_to_vec3_28(vec3 a_1, int t_2) {
-        float pf_41 = float(t_2);
-        vec3 anf_38 = (a_1 * pf_41);
-        return cos(anf_38);
+        float anf_38 = float(t_2);
+        vec3 anf_39 = (a_1 * anf_38);
+        return cos(anf_39);
     }
     vec3 dapply_33(DFn_34 dfn_36, int da_37) {
         vec3 ca_32 = dfn_36.lctor_35_0;
@@ -856,8 +856,8 @@ let%expect_test "regression - partial application stored as top level value" =
     }
     const DFn_34 warm_3_int_to_vec3_25 = DFn_34(0, vec3(0.5, 0.3, 0.1));
     vec3 main_pure(vec2 coord_4) {
-        vec3 anf_40 = dapply_33(warm_3_int_to_vec3_25, 2);
-        float a_5 = anf_40[0];
+        vec3 anf_41 = dapply_33(warm_3_int_to_vec3_25, 2);
+        float a_5 = anf_41[0];
         return vec3(a_5, 0., 0.);
     }
     void main() {
@@ -1002,8 +1002,8 @@ let%expect_test "regression - int promotion through closures / partial applicati
     }
     vec3 main_pure(vec2 coord_6) {
         int n_7 = 5;
-        float pf_27 = float(n_7);
-        DFn_23 f_8 = DFn_23(0, pf_27);
+        float anf_27 = float(n_7);
+        DFn_23 f_8 = DFn_23(0, anf_27);
         float r_9 = dapply_22(f_8, 1.);
         return vec3(r_9, 0., 0.);
     }
@@ -1050,9 +1050,9 @@ let%expect_test "regression - inferred type in higher-order local function" =
     vec2 func_0_int_to_vec2_int_27(int t_1) {
         DFn_31 anf_35 = DFn_31(0);
         int x_4 = app_t_2_28(t_1, anf_35);
-        float pf_36 = float(x_4);
-        float pf_37 = float(x_4);
-        return vec2(pf_36, pf_37);
+        float anf_36 = float(x_4);
+        float anf_37 = float(x_4);
+        return vec2(anf_36, anf_37);
     }
     vec3 main_pure(vec2 uv_6) {
         vec2 result_7 = func_0_int_to_vec2_int_27(0);
