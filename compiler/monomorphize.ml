@@ -19,15 +19,12 @@ type poly_def =
 
 type spec_map = (Type_system.ty * string) list String.Map.t
 
-(* TODO: We can probably redo the code so env/acc is merged now *)
-(* Read-only context. Built once before processing *)
-type env = { poly_fn_env : poly_def String.Map.t }
+(** NOTE: [poly_fn_env] is populated once up front and treated as read-only.
 
-(* Write accumulator. [all_tops_rev] holds both specializations and
-   concrete tops in reverse program order, so that [List.rev all_tops_rev]
-   gives the correct declaration order. *)
-type acc =
-  { spec_map : spec_map
+   [all_tops_rev] holds both specializations and concrete tops in reverse *)
+type state =
+  { poly_fn_env : poly_def String.Map.t
+  ; spec_map : spec_map
   ; all_tops_rev : Typecheck.top list
   }
 
@@ -255,7 +252,28 @@ let rename_var (src : string) (dst : string) =
   subst_var ~name:src ~new_name:dst ~pred:(Fun.const true)
 ;;
 
-(* ==== Env and Acc ==== *)
+(* ==== State threading ==== *)
+
+(** [List.fold_left] over [Compiler_error] monad. *)
+let fold_state (st : state) xs ~f : state Compiler_error.t =
+  List.fold_left xs ~init:(Ok st) ~f:(fun st_r x ->
+    let%bind st = st_r in
+    f st x)
+;;
+
+(** [List.map] but threading [state] through and collecting output values *)
+let fold_map_state (st : state) xs ~f =
+  let%map st, rev =
+    List.fold_left
+      xs
+      ~init:(Ok (st, []))
+      ~f:(fun st_r x ->
+        let%bind st, rev = st_r in
+        let%map st, y = f st x in
+        st, y :: rev)
+  in
+  st, List.rev rev
+;;
 
 let collect_poly_refs (poly_fn_env : poly_def String.Map.t) (t : Typecheck.term)
   : (string * Type_system.ty) list
@@ -289,20 +307,16 @@ let add_spec (env : spec_map) (name : string) (ty : Type_system.ty) (spec_name :
   Map.set env ~key:name ~data:((ty, spec_name) :: specs)
 ;;
 
-let rec resolve_spec
-          (env : env)
-          (acc : acc)
-          (name : string)
-          (concrete_ty : Type_system.ty)
-  : (acc * string) Compiler_error.t
+let rec resolve_spec (st : state) (name : string) (concrete_ty : Type_system.ty)
+  : (state * string) Compiler_error.t
   =
-  match find_spec acc.spec_map name concrete_ty with
-  | Some spec_name -> Ok (acc, spec_name)
+  match find_spec st.spec_map name concrete_ty with
+  | Some spec_name -> Ok (st, spec_name)
   | None ->
-    let entry = Map.find_exn env.poly_fn_env name in
+    let entry = Map.find_exn st.poly_fn_env name in
     let spec_name = Utils.fresh (name ^ "_m") in
     (* Register in spec_map FIRST as cycle guard for recursive functions *)
-    let acc = { acc with spec_map = add_spec acc.spec_map name concrete_ty spec_name } in
+    let st = { st with spec_map = add_spec st.spec_map name concrete_ty spec_name } in
     let sub = subst ~poly:entry.poly_type ~concrete:concrete_ty in
     let extra_constrs = collect_poly_let_eqs entry.poly_bind in
     let%bind body =
@@ -313,14 +327,12 @@ let rec resolve_spec
       | Rec _ -> rename_var name spec_name body
       | Nonrec -> body
     in
-    let refs = collect_poly_refs env.poly_fn_env body in
-    let%bind acc =
-      List.fold_left refs ~init:(Ok acc) ~f:(fun acc_r (dep_name, dep_ty) ->
-        let%bind acc = acc_r in
-        let%bind acc, _ = resolve_spec env acc dep_name dep_ty in
-        return acc)
+    let refs = collect_poly_refs st.poly_fn_env body in
+    let%bind st =
+      fold_state st refs ~f:(fun st (dep_name, dep_ty) ->
+        resolve_spec st dep_name dep_ty >>| fst)
     in
-    let%bind acc, body = rewrite_refs env acc body in
+    let%bind st, body = rewrite_refs st body in
     (* [TyVar]s that blocked [Coerce] lowering at typecheck-time are now concrete *)
     let body = Promote_ints.rewrite body in
     let top : Typecheck.top =
@@ -330,72 +342,53 @@ let rec resolve_spec
       ; scheme_constrs = []
       }
     in
-    Ok ({ acc with all_tops_rev = top :: acc.all_tops_rev }, spec_name)
+    Ok ({ st with all_tops_rev = top :: st.all_tops_rev }, spec_name)
 
-and rewrite_list (env : env) (acc : acc) (ts : Typecheck.term list)
-  : (acc * Typecheck.term list) Compiler_error.t
+and rewrite_refs (st : state) (t : Typecheck.term)
+  : (state * Typecheck.term) Compiler_error.t
   =
-  let%map acc, rev =
-    List.fold_left
-      ts
-      ~init:(Ok (acc, []))
-      ~f:(fun acc_r t ->
-        let%bind acc, rev = acc_r in
-        let%bind acc, t = rewrite_refs env acc t in
-        return (acc, t :: rev))
-  in
-  acc, List.rev rev
-
-and rewrite_refs (env : env) (acc : acc) (t : Typecheck.term)
-  : (acc * Typecheck.term) Compiler_error.t
-  =
-  let inner : (acc * Typecheck.term_desc) Compiler_error.t =
+  let inner : (state * Typecheck.term_desc) Compiler_error.t =
     let open Typecheck in
     match t.desc with
     | Var v ->
-      (match Map.find env.poly_fn_env v with
+      (match Map.find st.poly_fn_env v with
        | Some _ when is_concrete t.ty ->
-         let%map acc, spec_name = resolve_spec env acc v t.ty in
-         acc, Var spec_name
-       | _ -> Ok (acc, t.desc))
-    | Float _ | Int _ | Bool _ -> Ok (acc, t.desc)
+         let%map st, spec_name = resolve_spec st v t.ty in
+         st, Var spec_name
+       | _ -> Ok (st, t.desc))
+    | Float _ | Int _ | Bool _ -> Ok (st, t.desc)
     | Vec (n, ts) ->
-      let%map acc, ts = rewrite_list env acc ts in
-      acc, Vec (n, ts)
+      let%map st, ts = fold_map_state ~f:rewrite_refs st ts in
+      st, Vec (n, ts)
     | Lam (v, body) ->
-      let%map acc, body = rewrite_refs env acc body in
-      acc, Lam (v, body)
+      let%map st, body = rewrite_refs st body in
+      st, Lam (v, body)
     | App (f, x) ->
-      let%bind acc, f = rewrite_refs env acc f in
-      let%bind acc, x = rewrite_refs env acc x in
-      Ok (acc, App (f, x))
+      let%bind st, f = rewrite_refs st f in
+      let%bind st, x = rewrite_refs st x in
+      Ok (st, App (f, x))
     | Let (recur, v, constrs, bind, body) when not (is_concrete bind.ty) ->
       (* Specialization for inner polymorphic lets *)
       let usages = collect_var_usages v body in
       if List.is_empty usages
       then (
-        let%map acc, body = rewrite_refs env acc body in
-        acc, body.desc)
+        let%map st, body = rewrite_refs st body in
+        st, body.desc)
       else (
-        let%bind acc, specs_rev =
-          List.fold_left
-            usages
-            ~init:(Ok (acc, []))
-            ~f:(fun acc_r concrete_ty ->
-              let%bind acc, specs_rev = acc_r in
-              let sub = subst ~poly:bind.ty ~concrete:concrete_ty in
-              let%bind spec_bind = instantiate_scheme constrs bind sub in
-              let spec_name = Utils.fresh (v ^ "_m") in
-              let%map acc, spec_bind = rewrite_refs env acc spec_bind in
-              let spec_bind =
-                match recur with
-                | Rec _ -> rename_var v spec_name spec_bind
-                | Nonrec -> spec_bind
-              in
-              let spec_bind = Promote_ints.rewrite spec_bind in
-              acc, (spec_name, spec_bind, concrete_ty) :: specs_rev)
+        let%bind st, specs =
+          fold_map_state st usages ~f:(fun st concrete_ty ->
+            let sub = subst ~poly:bind.ty ~concrete:concrete_ty in
+            let%bind spec_bind = instantiate_scheme constrs bind sub in
+            let spec_name = Utils.fresh (v ^ "_m") in
+            let%map st, spec_bind = rewrite_refs st spec_bind in
+            let spec_bind =
+              match recur with
+              | Rec _ -> rename_var v spec_name spec_bind
+              | Nonrec -> spec_bind
+            in
+            let spec_bind = Promote_ints.rewrite spec_bind in
+            st, (spec_name, spec_bind, concrete_ty))
         in
-        let specs = List.rev specs_rev in
         let body =
           List.fold specs ~init:body ~f:(fun b (spec_name, _, concrete_ty) ->
             subst_var
@@ -404,8 +397,8 @@ and rewrite_refs (env : env) (acc : acc) (t : Typecheck.term)
               ~pred:(fun t -> Type_system.equal_ty t.ty concrete_ty)
               b)
         in
-        let%map acc, body = rewrite_refs env acc body in
-        ( acc
+        let%map st, body = rewrite_refs st body in
+        ( st
         , (List.fold_right specs ~init:body ~f:(fun (spec_name, spec_bind, _) acc ->
              { desc = Let (recur, spec_name, [], spec_bind, acc)
              ; ty = acc.ty
@@ -415,57 +408,50 @@ and rewrite_refs (env : env) (acc : acc) (t : Typecheck.term)
     | Let (recur, v, _, bind, body) ->
       (* NOTE: Now that inner lets may be resolved early with concrete types,
          their scheme constraints are already consumed, so we can ignore them *)
-      let%bind acc, bind = rewrite_refs env acc bind in
-      let%bind acc, body = rewrite_refs env acc body in
-      Ok (acc, Let (recur, v, [], bind, body))
+      let%bind st, bind = rewrite_refs st bind in
+      let%bind st, body = rewrite_refs st body in
+      Ok (st, Let (recur, v, [], bind, body))
     | If (c, t, e) ->
-      let%bind acc, c = rewrite_refs env acc c in
-      let%bind acc, t = rewrite_refs env acc t in
-      let%bind acc, e = rewrite_refs env acc e in
-      Ok (acc, If (c, t, e))
+      let%bind st, c = rewrite_refs st c in
+      let%bind st, t = rewrite_refs st t in
+      let%bind st, e = rewrite_refs st e in
+      Ok (st, If (c, t, e))
     | Bop (op, l, r) ->
-      let%bind acc, l = rewrite_refs env acc l in
-      let%bind acc, r = rewrite_refs env acc r in
-      Ok (acc, Bop (op, l, r))
+      let%bind st, l = rewrite_refs st l in
+      let%bind st, r = rewrite_refs st r in
+      Ok (st, Bop (op, l, r))
     | Index (t, i) ->
-      let%map acc, t = rewrite_refs env acc t in
-      acc, Index (t, i)
+      let%map st, t = rewrite_refs st t in
+      st, Index (t, i)
     | Builtin (b, ts) ->
-      let%map acc, ts = rewrite_list env acc ts in
-      acc, Builtin (b, ts)
+      let%map st, ts = fold_map_state ~f:rewrite_refs st ts in
+      st, Builtin (b, ts)
     | Record ts ->
-      let%map acc, ts = rewrite_list env acc ts in
-      acc, Record ts
+      let%map st, ts = fold_map_state ~f:rewrite_refs st ts in
+      st, Record ts
     | Field (t, f) ->
-      let%map acc, t = rewrite_refs env acc t in
-      acc, Field (t, f)
+      let%map st, t = rewrite_refs st t in
+      st, Field (t, f)
     | Variant (ctor, args) ->
-      let%map acc, args = rewrite_list env acc args in
-      acc, Variant (ctor, args)
+      let%map st, args = fold_map_state ~f:rewrite_refs st args in
+      st, Variant (ctor, args)
     | Coerce (target, inner) ->
-      let%map acc, inner = rewrite_refs env acc inner in
-      acc, Coerce (target, inner)
+      let%map st, inner = rewrite_refs st inner in
+      st, Coerce (target, inner)
     | Match (scrutinee, cases) ->
-      let%bind acc, scrutinee = rewrite_refs env acc scrutinee in
-      let%bind acc, cases_rev =
-        List.fold_left
-          cases
-          ~init:(Ok (acc, []))
-          ~f:(fun acc_r (pat, body) ->
-            let%bind acc, cases_rev = acc_r in
-            let%bind acc, body = rewrite_refs env acc body in
-            Ok (acc, (pat, body) :: cases_rev))
+      let%bind st, scrutinee = rewrite_refs st scrutinee in
+      let%map st, cases =
+        fold_map_state st cases ~f:(fun st (pat, body) ->
+          let%map st, body = rewrite_refs st body in
+          st, (pat, body))
       in
-      Ok (acc, Match (scrutinee, List.rev cases_rev))
+      st, Match (scrutinee, cases)
   in
-  let%map acc, desc = inner in
-  acc, { t with desc }
+  let%map st, desc = inner in
+  st, { t with desc }
 ;;
 
-(* ===== Conversion from Typecheck types =====
-   [shape_to_name] is the single source of truth for nominal names. Both
-   [shape_to_typedef] (emission) and [ty_of] / term-name rewriting go through
-   it, so usage-site names always match the emitted struct names. *)
+(* ===== Conversion from Typecheck types ===== *)
 
 let rec ty_of (t : Type_system.ty) : ty Compiler_error.t =
   match t with
@@ -650,27 +636,20 @@ let assign_names ~(typedef_loc : Lexer.loc) (tops : Typecheck.top list)
   : Typecheck.top list
   =
   let open Type_system in
+  (* [equal_ty] already ignores the hint string at every level (see
+     [@equal.ignore] in [Type_system.ty]), so we don't have to canonicalize
+     hints to compare shapes - we just thread hints alongside as metadata. *)
   let hint_of = function
-    | TyRecord (h, _) | TyVariant (h, _) -> h
-    | _ -> ""
+    | (TyRecord (h, _) | TyVariant (h, _)) when not (String.is_empty h) -> Some h
+    | _ -> None
   in
-  let canon = function
-    | TyRecord (_, fs) -> TyRecord ("", fs)
-    | TyVariant (_, cs) -> TyVariant ("", cs)
-    | t -> t
+  let rec upsert_shape acc ty h =
+    match acc with
+    | [] -> [ ty, h ]
+    | (k, eh) :: rest when equal_ty k ty -> (k, Option.first_some eh h) :: rest
+    | entry :: rest -> entry :: upsert_shape rest ty h
   in
-  let record acc ty =
-    if not (is_concrete ty)
-    then acc
-    else (
-      let key = canon ty in
-      let h = hint_of ty in
-      let found, updated =
-        List.fold_map acc ~init:false ~f:(fun seen (k, eh) ->
-          if equal_ty k key then true, (k, merge_hint eh h) else seen, (k, eh))
-      in
-      if found then updated else acc @ [ key, h ])
-  in
+  let record acc ty = if is_concrete ty then upsert_shape acc ty (hint_of ty) else acc in
   let rec walk_ty acc ty =
     match ty with
     | TyFloat | TyInt | TyBool | TyVar _ -> acc
@@ -694,18 +673,19 @@ let assign_names ~(typedef_loc : Lexer.loc) (tops : Typecheck.top list)
     | TypeDef (_, VariantDecl (_, ctors)) ->
       List.fold ctors ~init:acc ~f:(fun a (_, ts) -> List.fold ts ~init:a ~f:walk_ty)
   in
+  let prefix_for ty hint =
+    match hint with
+    | Some h -> h
+    | None ->
+      (match ty with
+       | TyVariant _ -> "var"
+       | _ -> "rec")
+  in
   let assignments =
     List.fold tops ~init:[] ~f:walk_top
-    |> List.map ~f:(fun (ty, h) ->
-      let prefix =
-        match h, ty with
-        | "", TyVariant _ -> "var"
-        | "", _ -> "rec"
-        | h, _ -> h
-      in
-      ty, Utils.fresh prefix)
+    |> List.map ~f:(fun (ty, h) -> ty, Utils.fresh (prefix_for ty h))
   in
-  let lookup ty = List.Assoc.find assignments ~equal:equal_ty (canon ty) in
+  let lookup_ty ty = List.Assoc.find assignments ~equal:equal_ty ty in
   let rec rty ty =
     match ty with
     | TyFloat | TyInt | TyBool | TyVar _ -> ty
@@ -713,10 +693,10 @@ let assign_names ~(typedef_loc : Lexer.loc) (tops : Typecheck.top list)
     | TyArrow (a, b) -> TyArrow (rty a, rty b)
     | TyRecord (h, fields) ->
       let fields = List.map fields ~f:(fun (n, t) -> n, rty t) in
-      TyRecord (Option.value (lookup (TyRecord ("", fields))) ~default:h, fields)
+      TyRecord (Option.value (lookup_ty (TyRecord (h, fields))) ~default:h, fields)
     | TyVariant (h, ctors) ->
       let ctors = List.map ctors ~f:(fun (n, ts) -> n, List.map ts ~f:rty) in
-      TyVariant (Option.value (lookup (TyVariant ("", ctors))) ~default:h, ctors)
+      TyVariant (Option.value (lookup_ty (TyVariant (h, ctors))) ~default:h, ctors)
   in
   let rec rterm (t : Typecheck.term) : Typecheck.term =
     let desc : Typecheck.term_desc =
@@ -790,32 +770,29 @@ let monomorphize (program : Typecheck.t) : t Compiler_error.t =
       | _ -> None)
     |> String.Map.of_alist_exn
   in
-  let env = { poly_fn_env } in
   (* Process Defines + Externs. TypeDefs are dropped here - they'll be
      re-emitted from collected shapes after specialization is complete. *)
-  let%bind acc =
-    let init = Ok { spec_map = String.Map.empty; all_tops_rev = [] } in
-    List.fold_left tops ~init ~f:(fun acc_r top ->
-      let%bind acc = acc_r in
+  let init_state = { poly_fn_env; spec_map = String.Map.empty; all_tops_rev = [] } in
+  let%bind st =
+    fold_state init_state tops ~f:(fun st top ->
       match top.desc with
-      | TypeDef _ -> Ok acc
-      | Extern _ -> Ok { acc with all_tops_rev = top :: acc.all_tops_rev }
+      | TypeDef _ -> Ok st
+      | Extern _ -> Ok { st with all_tops_rev = top :: st.all_tops_rev }
       | Define _ when not (is_concrete top.ty) ->
         (* Skip poly defines (already in [poly_fn_env]) *)
-        Ok acc
+        Ok st
       | Define (recur, v, bind) ->
-        let refs = collect_poly_refs env.poly_fn_env bind in
-        let%bind acc =
-          List.fold_left refs ~init:(Ok acc) ~f:(fun acc_r (name, ty) ->
-            let%bind acc = acc_r in
-            let%bind acc, _ = resolve_spec env acc name ty in
-            Ok acc)
+        let refs = collect_poly_refs st.poly_fn_env bind in
+        let%bind st =
+          fold_state st refs ~f:(fun st (name, ty) ->
+            let%map st, _ = resolve_spec st name ty in
+            st)
         in
-        let%bind acc, bind = rewrite_refs env acc bind in
+        let%map st, bind = rewrite_refs st bind in
         let top = { top with desc = Define (recur, v, bind) } in
-        Ok { acc with all_tops_rev = top :: acc.all_tops_rev })
+        { st with all_tops_rev = top :: st.all_tops_rev })
   in
-  let final_value_tops = List.rev acc.all_tops_rev in
+  let final_value_tops = List.rev st.all_tops_rev in
   let typedef_loc = (List.hd_exn tops).loc in
   (* Every concrete TyRecord/TyVariant in the program gets a fresh, hint-derived name *)
   let all_tops_tc = assign_names ~typedef_loc final_value_tops in
