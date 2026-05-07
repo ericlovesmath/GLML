@@ -4,66 +4,11 @@
 open Core
 open Sexplib.Sexp
 open Compiler_error.Let_syntax
+open Type_system
 
 module Err = Compiler_error.Pass (struct
     let name = "typecheck"
   end)
-
-type ty =
-  | TyFloat
-  | TyInt
-  | TyBool
-  | TyVec of int * ty
-  | TyArrow of ty * ty
-  | TyRecord of string * ty list
-  | TyVariant of string * ty list
-  | TyVar of string
-[@@deriving equal, compare]
-
-let rec sexp_of_ty = function
-  | TyFloat -> Atom "float"
-  | TyInt -> Atom "int"
-  | TyBool -> Atom "bool"
-  | TyVec (i, t) -> List [ Atom "vec"; Atom (Int.to_string i); sexp_of_ty t ]
-  | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
-  | TyRecord (s, []) -> Atom s
-  | TyRecord (s, args) -> List (Atom s :: List.map args ~f:sexp_of_ty)
-  | TyVariant (s, []) -> Atom s
-  | TyVariant (s, args) -> List (Atom s :: List.map args ~f:sexp_of_ty)
-  | TyVar v -> Atom ("'" ^ v)
-;;
-
-type type_decl =
-  | RecordDecl of string list * (string * ty) list
-  | VariantDecl of string list * (string * ty list) list
-[@@deriving sexp_of]
-
-(** Internal typeclasses grouping GLSL types by their supported operations
-    Most of the typeclasses are borrowed directly from GLSL *)
-type type_class =
-  | GenType
-  | GenBType
-  | GenIType
-  | MatType
-  | Numeric
-  | Comparable
-  | Equatable
-[@@deriving sexp_of]
-
-(** Constraints emitted during type inference. *)
-type constr_desc =
-  | Eq of ty * ty (** Standard equality constraint *)
-  | HasClass of type_class * ty (** Membership in a GLSL typeclass *)
-  | Broadcast of ty * ty * ty (** Scalar-vector broadcasting (e.g. float + vec3) *)
-  | MulBroadcast of ty * ty * ty (** Matrix multiplication rules *)
-  | IndexAccess of ty * int * ty (** Vector/Matrix indexing *)
-  | FieldAccess of ty * string * ty (** Field access on a record *)
-  | Coerce of ty * ty (** Coercion: first type is coercible to second (int -> float) *)
-
-type constr =
-  { desc : constr_desc
-  ; loc : Lexer.loc
-  }
 
 type term_desc =
   | Var of string
@@ -89,23 +34,6 @@ and term =
   ; ty : ty
   ; loc : Lexer.loc
   }
-
-let sexp_of_constr_desc = function
-  | Eq (l, r) -> List [ sexp_of_ty l; Atom "~"; sexp_of_ty r ]
-  | HasClass (cls, ty) -> List [ sexp_of_type_class cls; sexp_of_ty ty ]
-  | Broadcast (l, r, ret) ->
-    List [ Atom "Broadcast"; sexp_of_ty l; sexp_of_ty r; sexp_of_ty ret ]
-  | MulBroadcast (l, r, ret) ->
-    List [ Atom "MulBroadcast"; sexp_of_ty l; sexp_of_ty r; sexp_of_ty ret ]
-  | IndexAccess (t, i, ret) ->
-    List [ Atom "IndexAccess"; sexp_of_ty t; Atom (Int.to_string i); sexp_of_ty ret ]
-  | FieldAccess (t, f, ret) ->
-    List [ Atom "FieldAccess"; sexp_of_ty t; Atom f; sexp_of_ty ret ]
-  | Coerce (from_ty, to_ty) ->
-    List [ Atom "Coerce"; sexp_of_ty from_ty; sexp_of_ty to_ty ]
-;;
-
-let sexp_of_constr (c : constr) = sexp_of_constr_desc c.desc
 
 let sexp_of_forall_ty constrs ty =
   if List.is_empty constrs
@@ -169,9 +97,6 @@ let sexp_of_top t =
 
 type t = Program of top list [@@deriving sexp_of]
 
-(** Map from type variable names to their resolved types *)
-type substitution = (string * ty) list [@@deriving sexp_of]
-
 (** Represents polymorphic [forall 'vars. constrs => ty] *)
 type type_scheme = string list * constr list * ty [@@deriving sexp_of]
 
@@ -186,47 +111,12 @@ type env =
   ; ctx : context
   }
 
-let fresh_tyvar () = TyVar (Utils.fresh "v")
-
-let rec subst_ty (sub : substitution) (ty : ty) : ty =
-  match ty with
-  | TyVar v -> List.Assoc.find ~equal:String.equal sub v |> Option.value ~default:ty
-  | TyFloat | TyInt | TyBool -> ty
-  | TyVec (n, t) -> TyVec (n, subst_ty sub t)
-  | TyVariant (s, args) -> TyVariant (s, List.map args ~f:(subst_ty sub))
-  | TyRecord (s, args) -> TyRecord (s, List.map args ~f:(subst_ty sub))
-  | TyArrow (f, x) -> TyArrow (subst_ty sub f, subst_ty sub x)
-;;
-
-let subst_constraints (sub : substitution) (con : constr list) : constr list =
-  List.map con ~f:(fun c ->
-    let desc =
-      match c.desc with
-      | Eq (l, r) -> Eq (subst_ty sub l, subst_ty sub r)
-      | HasClass (cls, ty) -> HasClass (cls, subst_ty sub ty)
-      | Broadcast (l, r, ret) ->
-        Broadcast (subst_ty sub l, subst_ty sub r, subst_ty sub ret)
-      | MulBroadcast (l, r, ret) ->
-        MulBroadcast (subst_ty sub l, subst_ty sub r, subst_ty sub ret)
-      | IndexAccess (t, i, ret) -> IndexAccess (subst_ty sub t, i, subst_ty sub ret)
-      | FieldAccess (t, f, ret) -> FieldAccess (subst_ty sub t, f, subst_ty sub ret)
-      | Coerce (from_ty, to_ty) -> Coerce (subst_ty sub from_ty, subst_ty sub to_ty)
-    in
-    { c with desc })
-;;
-
 let subst_context (sub : substitution) (ctx : context) : type_scheme String.Map.t =
   Map.map ctx ~f:(fun (vars, constrs, ty) ->
     let sub =
       List.filter sub ~f:(fun (v, _) -> not (List.mem vars v ~equal:String.equal))
     in
     vars, subst_constraints sub constrs, subst_ty sub ty)
-;;
-
-let compose_sub (s : substitution) (s' : substitution) : substitution =
-  List.map s' ~f:(fun (v, ty) -> v, subst_ty s ty)
-  @ List.filter s ~f:(fun (v, _) ->
-    not (List.exists s' ~f:(fun (v', _) -> String.equal v v')))
 ;;
 
 (** Apply substitution to term *)
@@ -252,26 +142,6 @@ let rec subst_term (sub : substitution) (t : term) : term =
     | Coerce (target, inner) -> Coerce (subst_ty sub target, subst inner)
   in
   { t with desc; ty = subst_ty sub t.ty }
-;;
-
-let rec ftv_of_ty = function
-  | TyVar v -> String.Set.singleton v
-  | TyFloat | TyInt | TyBool -> String.Set.empty
-  | TyVec (_, t) -> ftv_of_ty t
-  | TyVariant (_, args) | TyRecord (_, args) ->
-    String.Set.union_list (List.map args ~f:ftv_of_ty)
-  | TyArrow (t1, t2) -> Set.union (ftv_of_ty t1) (ftv_of_ty t2)
-;;
-
-let ftv_of_constraint (c : constr) : String.Set.t =
-  match c.desc with
-  | Eq (l, r) -> Set.union (ftv_of_ty l) (ftv_of_ty r)
-  | HasClass (_, ty) -> ftv_of_ty ty
-  | Broadcast (l, r, ret) | MulBroadcast (l, r, ret) ->
-    String.Set.union_list [ ftv_of_ty l; ftv_of_ty r; ftv_of_ty ret ]
-  | IndexAccess (t, _, ret) | FieldAccess (t, _, ret) ->
-    Set.union (ftv_of_ty t) (ftv_of_ty ret)
-  | Coerce (from_ty, to_ty) -> Set.union (ftv_of_ty from_ty) (ftv_of_ty to_ty)
 ;;
 
 let ftv_of_context (ctx : context) : String.Set.t =
@@ -316,388 +186,10 @@ let generalize (ctx : context) (deferred : constr list) (ty : ty)
   (Set.to_list generalizable, scheme_constrs, ty), remaining
 ;;
 
-(** Unify two types into a substitution *)
-let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t =
-  match con with
-  | [] -> return []
-  | (loc, TyVar v, ty) :: con | (loc, ty, TyVar v) :: con ->
-    let rec occurs_in = function
-      | TyVar v' -> String.equal v v'
-      | TyFloat | TyInt | TyBool -> false
-      | TyVec (_, t) -> occurs_in t
-      | TyVariant (_, args) | TyRecord (_, args) -> List.exists args ~f:occurs_in
-      | TyArrow (ty, ty') -> occurs_in ty || occurs_in ty'
-    in
-    if equal_ty (TyVar v) ty
-    then unify con
-    else if occurs_in ty
-    then Err.fail "recursive unification" ~loc ~d:[%message (v : string) (ty : ty)]
-    else (
-      let%bind sub =
-        unify
-          (List.map con ~f:(fun (l, t, t') ->
-             l, subst_ty [ v, ty ] t, subst_ty [ v, ty ] t'))
-      in
-      return ((v, subst_ty sub ty) :: sub))
-  | (loc, TyArrow (f, x), TyArrow (f', x')) :: con ->
-    unify ((loc, f, f') :: (loc, x, x') :: con)
-  | (loc, TyVec (n, t), TyVec (n', t')) :: con when n = n' -> unify ((loc, t, t') :: con)
-  | (loc, TyRecord (s, args), TyRecord (s', args')) :: con
-    when String.equal s s' && List.length args = List.length args' ->
-    unify (List.map2_exn args args' ~f:(Tuple3.create loc) @ con)
-  | (loc, TyVariant (s, args), TyVariant (s', args')) :: con
-    when String.equal s s' && List.length args = List.length args' ->
-    unify (List.map2_exn args args' ~f:(Tuple3.create loc) @ con)
-  | (loc, ty, ty') :: con ->
-    if equal_ty ty ty'
-    then unify con
-    else Err.fail "type mismatch" ~loc ~d:[%message (ty : ty) (ty' : ty)]
-;;
-
-(* TODO: Centralize more of that [TyFloat | TyInt] logic here *)
-(** int <: float subtyping to make canonical type *)
-let rec widen_numeric = function
-  | TyInt -> TyFloat
-  | TyVec (n, t) -> TyVec (n, widen_numeric t)
-  | TyRecord (s, args) -> TyRecord (s, List.map args ~f:widen_numeric)
-  | TyVariant (s, args) -> TyVariant (s, List.map args ~f:widen_numeric)
-  | TyArrow (a, b) -> TyArrow (widen_numeric a, widen_numeric b)
-  | t -> t
-;;
-
-let is_scalar = function
-  | TyFloat | TyInt -> true
-  | _ -> false
-;;
-
-(** Validate if a concrete type belongs to a GLSL typeclass. Numeric classes
-    accept ints anywhere a float is expected, so we widen first and the patterns
-    only need to mention TyFloat.
-
-    [GenIType]/[GenBType] are int and bool specific so we skip widening. *)
-let check_class (cls : type_class) (ty : ty) : bool =
-  let ty =
-    match cls with
-    | GenIType | GenBType -> ty
-    | _ -> widen_numeric ty
-  in
-  match cls, ty with
-  | GenType, TyFloat
-  | GenType, TyVec (_, TyFloat)
-  | GenBType, TyBool
-  | GenIType, TyInt
-  | MatType, TyVec (_, TyVec (_, TyFloat))
-  | Numeric, TyFloat
-  | Numeric, TyVec (_, TyFloat)
-  | Numeric, TyVec (_, TyVec (_, TyFloat))
-  | Comparable, TyFloat
-  | Equatable, (TyFloat | TyBool)
-  | Equatable, TyVec (_, TyFloat)
-  | Equatable, TyVec (_, TyVec (_, TyFloat)) -> true
-  | _, _ -> false
-;;
-
-(** Resolve GLSL overloading constraints using concrete types. *)
-let resolve_constraints structs (constrs : constr list)
-  : (constr list * (Lexer.loc * ty * ty) list) Compiler_error.t
-  =
-  let rec aux deferred eqs (constrs : constr list) =
-    match constrs with
-    | [] -> return (List.rev deferred, List.rev eqs)
-    | { desc = Eq (l, r); loc } :: rest -> aux deferred ((loc, l, r) :: eqs) rest
-    | ({ desc = HasClass (cls, ty); loc } as c) :: rest ->
-      if not (Set.is_empty (ftv_of_ty ty))
-      then aux (c :: deferred) eqs rest
-      else if check_class cls ty
-      then aux deferred eqs rest
-      else
-        Err.fail "class constraint failed" ~loc ~d:[%message (cls : type_class) (ty : ty)]
-    | ({ desc = Broadcast (l, r, ret); loc } as c) :: rest ->
-      let mk desc = { desc; loc } in
-      let broadcast_vec_scalar n t s =
-        let bt = fresh_tyvar () in
-        aux deferred ((loc, ret, TyVec (n, bt)) :: eqs) (mk (Broadcast (s, t, bt)) :: rest)
-      in
-      let coerce_pair a b =
-        aux deferred eqs (mk (Coerce (a, ret)) :: mk (Coerce (b, ret)) :: rest)
-      in
-      (match l, r with
-       | TyVar a, TyVar b when String.equal a b ->
-         aux (c :: deferred) ((loc, ret, l) :: eqs) rest
-       | TyVec (n, t), TyVec (n', t') when n = n' ->
-         let bt = fresh_tyvar () in
-         aux
-           deferred
-           ((loc, ret, TyVec (n, bt)) :: eqs)
-           (mk (Broadcast (t, t', bt)) :: rest)
-       | TyVec (n, t), s when is_scalar s -> broadcast_vec_scalar n t s
-       | s, TyVec (n, t) when is_scalar s -> broadcast_vec_scalar n t s
-       | _, _ when is_scalar l && is_scalar r -> coerce_pair l r
-       | (TyVar _ as v), s
-         when is_scalar s && Set.is_empty (ftv_of_ty ret) && is_scalar ret ->
-         coerce_pair v s
-       | s, (TyVar _ as v)
-         when is_scalar s && Set.is_empty (ftv_of_ty ret) && is_scalar ret ->
-         coerce_pair s v
-       | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
-       | _ -> Err.fail "invalid broadcast" ~loc ~d:[%message (l : ty) (r : ty)])
-    | ({ desc = MulBroadcast (l, r, ret); loc } as c) :: rest ->
-      let mk desc = { desc; loc } in
-      let mul_mat_scalar n m t s =
-        let bt = fresh_tyvar () in
-        aux
-          deferred
-          ((loc, ret, TyVec (n, TyVec (m, bt))) :: eqs)
-          (mk (MulBroadcast (s, t, bt)) :: rest)
-      in
-      let mul_vec_scalar n t s =
-        let bt = fresh_tyvar () in
-        aux
-          deferred
-          ((loc, ret, TyVec (n, bt)) :: eqs)
-          (mk (MulBroadcast (s, t, bt)) :: rest)
-      in
-      let coerce_pair a b =
-        aux deferred eqs (mk (Coerce (a, ret)) :: mk (Coerce (b, ret)) :: rest)
-      in
-      (match l, r with
-       | TyVar a, TyVar b when String.equal a b ->
-         aux (c :: deferred) ((loc, ret, l) :: eqs) rest
-       | TyVec (n, TyVec (m, t)), TyVec (n', TyVec (m', t')) when n = n' && m = m' ->
-         let bt = fresh_tyvar () in
-         aux
-           deferred
-           ((loc, ret, TyVec (n, TyVec (m, bt))) :: eqs)
-           (mk (MulBroadcast (t, t', bt)) :: rest)
-       | TyVec (n, TyVec (m, t)), s when is_scalar s -> mul_mat_scalar n m t s
-       | s, TyVec (n, TyVec (m, t)) when is_scalar s -> mul_mat_scalar n m t s
-       | TyVec (cols, TyVec (rows, t)), TyVec (rows', t') when rows = rows' ->
-         let bt = fresh_tyvar () in
-         aux
-           deferred
-           ((loc, ret, TyVec (cols, bt)) :: eqs)
-           (mk (MulBroadcast (t, t', bt)) :: rest)
-       | TyVec (cols, t), TyVec (cols', TyVec (rows, t')) when cols = cols' ->
-         let bt = fresh_tyvar () in
-         aux
-           deferred
-           ((loc, ret, TyVec (rows, bt)) :: eqs)
-           (mk (MulBroadcast (t, t', bt)) :: rest)
-       | TyVec (n, t), TyVec (n', t') when n = n' ->
-         let bt = fresh_tyvar () in
-         aux
-           deferred
-           ((loc, ret, TyVec (n, bt)) :: eqs)
-           (mk (MulBroadcast (t, t', bt)) :: rest)
-       | TyVec (n, t), s when is_scalar s -> mul_vec_scalar n t s
-       | s, TyVec (n, t) when is_scalar s -> mul_vec_scalar n t s
-       | _, _ when is_scalar l && is_scalar r -> coerce_pair l r
-       | (TyVar _ as v), s
-         when is_scalar s && Set.is_empty (ftv_of_ty ret) && is_scalar ret ->
-         coerce_pair v s
-       | s, (TyVar _ as v)
-         when is_scalar s && Set.is_empty (ftv_of_ty ret) && is_scalar ret ->
-         coerce_pair s v
-       | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
-       | _ -> Err.fail "invalid mul/div broadcast" ~loc ~d:[%message (l : ty) (r : ty)])
-    | ({ desc = IndexAccess (t, i, ret); loc } as c) :: rest ->
-      (match t with
-       | TyVec (n, elem_ty) ->
-         let scalar_ty = widen_numeric elem_ty in
-         if 0 <= i && i < n
-         then aux deferred ((loc, ret, scalar_ty) :: eqs) rest
-         else Err.fail "vec index out of bounds" ~loc ~d:[%message (n : int) (i : int)]
-       | TyVar _ -> aux (c :: deferred) eqs rest
-       | ty -> Err.fail "expected vec" ~loc ~d:[%message (ty : ty)])
-    | ({ desc = FieldAccess (ty, f, ret); loc } as c) :: rest ->
-      (match ty with
-       | TyVar _ -> aux (c :: deferred) eqs rest
-       | TyRecord (struct_name, type_args) ->
-         (match Map.find structs struct_name with
-          | None -> Err.fail "unknown struct" ~loc ~d:[%message (struct_name : string)]
-          | Some (params, fields) ->
-            if List.length params <> List.length type_args
-            then
-              Err.fail
-                "wrong number of type args for struct"
-                ~loc
-                ~d:[%message (struct_name : string)]
-            else (
-              let sub = List.zip_exn params type_args in
-              match List.Assoc.find fields ~equal:String.equal f with
-              | None ->
-                Err.fail
-                  "field not found in struct"
-                  ~loc
-                  ~d:[%message (f : string) (struct_name : string)]
-              | Some field_ty ->
-                let field_ty = subst_ty sub field_ty in
-                aux deferred ((loc, ret, field_ty) :: eqs) rest))
-       | ty -> Err.fail "field access on non-record type" ~loc ~d:[%message (ty : ty)])
-    | ({ desc = Coerce (from_ty, to_ty); loc } as c) :: rest ->
-      let mk desc = { desc; loc } in
-      if equal_ty from_ty to_ty
-      then aux deferred eqs rest
-      else (
-        let coerce_type_args s args s' args' =
-          if String.equal s s' && List.length args = List.length args'
-          then
-            aux
-              deferred
-              eqs
-              (List.map2_exn args args' ~f:(fun a b -> mk (Coerce (a, b))) @ rest)
-          else aux deferred ((loc, from_ty, to_ty) :: eqs) rest
-        in
-        match from_ty, to_ty with
-        | TyInt, TyFloat -> aux deferred eqs rest
-        | TyArrow (p, r), TyArrow (p', r') ->
-          aux deferred eqs (mk (Coerce (p', p)) :: mk (Coerce (r, r')) :: rest)
-        | TyVec (n, t), TyVec (n', t') when n = n' ->
-          aux deferred eqs (mk (Coerce (t, t')) :: rest)
-        | TyRecord (s, args), TyRecord (s', args') -> coerce_type_args s args s' args'
-        | TyVariant (s, args), TyVariant (s', args') -> coerce_type_args s args s' args'
-        | TyVar _, _ | _, TyVar _ ->
-          (* NOTE: When we have a [TyVar], defer for the LUB-resolution phase.
-             We SHOULD NOT eagerly unify here, premature unification can lock
-             a [var] to [int] when it later needs to be [float]. *)
-          aux (c :: deferred) eqs rest
-        | _ -> aux deferred ((loc, from_ty, to_ty) :: eqs) rest)
-  in
-  aux [] [] constrs
-;;
-
-(** Join concrete types under int <: float lattice *)
-let rec join_ty (a : ty) (b : ty) : ty option =
-  if equal_ty a b
-  then Some a
-  else (
-    let join_nominal mk s args s' args' =
-      if String.equal s s' && List.length args = List.length args'
-      then List.map2_exn args args' ~f:join_ty |> Option.all |> Option.map ~f:(mk s)
-      else None
-    in
-    match a, b with
-    | TyInt, TyFloat | TyFloat, TyInt -> Some TyFloat
-    | TyVec (n, t), TyVec (n', t') when n = n' ->
-      Option.map (join_ty t t') ~f:(fun t -> TyVec (n, t))
-    | TyRecord (s, args), TyRecord (s', args') ->
-      join_nominal (fun s ts -> TyRecord (s, ts)) s args s' args'
-    | TyVariant (s, args), TyVariant (s', args') ->
-      join_nominal (fun s ts -> TyVariant (s, ts)) s args s' args'
-    | _ -> None)
-;;
-
-let lub_of (tys : ty list) : ty option =
-  match tys with
-  | [] -> None
-  | t :: rest ->
-    List.fold_right rest ~init:(Some t) ~f:(fun t -> Option.bind ~f:(join_ty t))
-;;
-
-(** Look at the deferred [Coerce] constraints and try to resolve any tyvar
-    whose lower bounds are all concrete: bind it to the LUB of its lowers.
-    A tyvar with only concrete upper bounds is bound to its single upper. *)
-let resolve_subtype_bounds (deferred : constr list) : substitution =
-  let add_to map v t = Map.update map v ~f:(fun e -> t :: Option.value e ~default:[]) in
-  let add_edge map ~from_v ~to_v =
-    Map.update map to_v ~f:(fun e ->
-      Set.add (Option.value e ~default:String.Set.empty) from_v)
-  in
-  (* edges_into[b] = set of a such that a <: b. Concrete lowers of a flow to b. *)
-  let lowers, uppers, edges_into =
-    List.fold
-      deferred
-      ~init:(String.Map.empty, String.Map.empty, String.Map.empty)
-      ~f:(fun ((l, u, e) as acc) c ->
-        match c.desc with
-        | Coerce (TyVar a, TyVar b) -> l, u, add_edge e ~from_v:a ~to_v:b
-        | Coerce (t, TyVar a) when Set.is_empty (ftv_of_ty t) -> add_to l a t, u, e
-        | Coerce (TyVar a, t) when Set.is_empty (ftv_of_ty t) -> l, add_to u a t, e
-        | _ -> acc)
-  in
-  (* Propagate concrete lowers along subtype edges to fixed point. *)
-  let step lowers =
-    Map.fold edges_into ~init:lowers ~f:(fun ~key:to_v ~data:froms acc ->
-      Set.fold froms ~init:acc ~f:(fun acc from_v ->
-        match Map.find acc from_v with
-        | None -> acc
-        | Some lows ->
-          let existing = Map.find acc to_v |> Option.value ~default:[] in
-          let new_lows =
-            List.filter lows ~f:(fun l -> not (List.exists existing ~f:(equal_ty l)))
-          in
-          if List.is_empty new_lows
-          then acc
-          else Map.set acc ~key:to_v ~data:(new_lows @ existing)))
-  in
-  let rec fix lowers =
-    let lowers' = step lowers in
-    let equal_lowers = String.Map.equal (List.equal equal_ty) in
-    if equal_lowers lowers lowers' then lowers else fix lowers'
-  in
-  let lowers = fix lowers in
-  Set.union (Map.key_set lowers) (Map.key_set uppers)
-  |> Set.to_list
-  |> List.filter_map ~f:(fun v ->
-    match Map.find lowers v, Map.find uppers v with
-    | Some lows, _ ->
-      let promote_vec_lb = function
-        | TyVec (n, t) -> TyVec (n, widen_numeric t)
-        | t -> t
-      in
-      let lows = List.map lows ~f:promote_vec_lb in
-      (* NOTE: IF lows have a clean LUB, pick it, otherwise pick an arbitrary
-         lower bound. The conflicting [Coerce] constraints will then
-         substitute into incompatible concrete pairs and fail in [unify]. *)
-      (match lub_of lows with
-       | Some t -> Some (v, t)
-       | None -> List.hd lows |> Option.map ~f:(fun t -> v, t))
-    | None, Some us ->
-      us
-      |> List.dedup_and_sort ~compare:compare_ty
-      |> List.hd
-      |> Option.map ~f:(Tuple2.create v)
-    | None, _ -> None)
-;;
-
-(** Solve a set of constraints to produce a substitution and deferred constraints. *)
-let solve structs (constrs : constr list) : (substitution * constr list) Compiler_error.t =
-  let apply_sub sub new_sub deferred =
-    let sub = List.map sub ~f:(fun (v, t) -> v, subst_ty new_sub t) @ new_sub in
-    let deferred = subst_constraints new_sub deferred in
-    sub, deferred
-  in
-  let rec go sub constrs =
-    let%bind deferred, eqs = resolve_constraints structs constrs in
-    let%bind new_sub = if List.is_empty eqs then return [] else unify eqs in
-    if List.is_empty new_sub
-    then (
-      (* Try to resolve deferred [Coerce]s by picking the LUB of each
-         tyvar's concrete lower bounds... dubious *)
-      let lub_sub = resolve_subtype_bounds deferred in
-      if List.is_empty lub_sub
-      then return (sub, deferred)
-      else (
-        let sub, deferred = apply_sub sub lub_sub deferred in
-        go sub deferred))
-    else (
-      let sub, deferred = apply_sub sub new_sub deferred in
-      go sub deferred)
-  in
-  go [] constrs
-;;
-
-(** Solve scheme constraints given an initial substitution from monomorphization.
-    Applies the sub to constraints, solves, and combines substitutions, then applies *)
+(** Solve scheme constraints under [sub], then apply the resulting substitution
+    to the polymorphic term. Used by [Monomorphize] to specialize bindings. *)
 let instantiate_scheme ?(structs = String.Map.empty) constrs term sub =
-  let%map sub =
-    if List.is_empty constrs
-    then return sub
-    else (
-      let constrs = subst_constraints sub constrs in
-      let%map sub', _ = solve structs constrs in
-      List.map sub ~f:(fun (v, t) -> v, subst_ty sub' t) @ sub')
-  in
+  let%map sub = Constraint_solver.solve_scheme ~structs constrs sub in
   subst_term sub term
 ;;
 
@@ -986,6 +478,7 @@ let coerce_arg_to_ty loc (arg : term) (expected_ty : ty) : term * constr list =
   | _ -> coerce_term loc expected_ty arg, [ c (Coerce (arg.ty, expected_ty)) ]
 ;;
 
+(** Typecheck a [let] binding, returns the enclosing scope needs to continue inference: *)
 let rec infer_binding
           (env : env)
           (loc : Lexer.loc)
@@ -1029,7 +522,7 @@ let rec infer_binding
     | Nonrec, Some full_ty -> coerce_term bind.loc full_ty bind
     | _ -> bind
   in
-  let%bind sub_bind, deferred = solve env.structs constrs in
+  let%bind sub_bind, deferred = Constraint_solver.solve env.structs constrs in
   let ty_bind = subst_ty sub_bind bind.ty in
   let bind = subst_term sub_bind bind in
   let ctx = subst_context sub_bind (subst_context term_sub env.ctx) in
@@ -1049,6 +542,7 @@ let rec infer_binding
   let env = { env with ctx } in
   Ok (bind, ty_bind, env, scheme_constrs, remaining, sub_bind)
 
+(** Generate the typed term and constraint set for a term *)
 and gen_term (env : env) (t : Desugar.term)
   : (term * constr list * substitution) Compiler_error.t
   =
@@ -1165,123 +659,7 @@ and gen_term (env : env) (t : Desugar.term)
       ( { desc = Index (t, i); ty = ret_ty; loc }
       , constr (IndexAccess (t.ty, i, ret_ty)) :: constrs_t
       , sub_t )
-  | Builtin (b, args) ->
-    let%bind args, constrs_args, sub_args =
-      List.fold_result
-        args
-        ~init:([], [], [])
-        ~f:(fun (acc_args, acc_constrs, acc_sub) arg ->
-          let%bind arg', constrs, sub = gen_term env arg in
-          return (arg' :: acc_args, constrs @ acc_constrs, compose_sub sub acc_sub))
-    in
-    let args = List.rev args in
-    let ty = fresh_tyvar () in
-    let arg_tys = List.map args ~f:(fun a -> a.ty) in
-    let%bind builtin_constrs =
-      match b, arg_tys with
-      | Float, [ t ] ->
-        Ok [ constr (HasClass (Comparable, t)); constr (Eq (ty, TyFloat)) ]
-      | ( ( Sin
-          | Cos
-          | Tan
-          | Asin
-          | Acos
-          | Atan
-          | Exp
-          | Log
-          | Exp2
-          | Log2
-          | Sqrt
-          | Abs
-          | Sign
-          | Floor
-          | Ceil )
-        , [ t ] ) ->
-        let bt = fresh_tyvar () in
-        Ok
-          [ constr (Broadcast (t, TyFloat, bt))
-          ; constr (HasClass (GenType, bt))
-          ; constr (Eq (ty, bt))
-          ]
-      | (Min | Max | Pow), [ t; t' ] ->
-        let bt = fresh_tyvar () in
-        Ok
-          [ constr (Broadcast (t, t', bt))
-          ; constr (Broadcast (bt, TyFloat, ty))
-          ; constr (HasClass (GenType, ty))
-          ]
-      | Clamp, [ t; t'; t'' ] ->
-        let tmp = fresh_tyvar () in
-        let bt = fresh_tyvar () in
-        Ok
-          [ constr (Broadcast (t', t'', tmp))
-          ; constr (Broadcast (t, tmp, bt))
-          ; constr (Broadcast (bt, TyFloat, ty))
-          ; constr (HasClass (GenType, ty))
-          ]
-      | Mix, [ t; t'; t'' ] ->
-        let tmp = fresh_tyvar () in
-        let bt = fresh_tyvar () in
-        Ok
-          [ constr (Broadcast (t, t', tmp))
-          ; constr (Broadcast (tmp, t'', bt))
-          ; constr (Broadcast (bt, TyFloat, ty))
-          ; constr (HasClass (GenType, ty))
-          ]
-      | Length, [ t ] ->
-        let bt = fresh_tyvar () in
-        Ok
-          [ constr (Broadcast (t, TyFloat, bt))
-          ; constr (HasClass (GenType, bt))
-          ; constr (Eq (ty, TyFloat))
-          ]
-      | (Distance | Dot), [ t; t' ] ->
-        Ok
-          [ constr (HasClass (GenType, t))
-          ; constr (Eq (t, t'))
-          ; constr (Eq (ty, TyFloat))
-          ]
-      | Cross, [ t; t' ] ->
-        Ok
-          [ constr (Eq (t, TyVec (3, TyFloat)))
-          ; constr (Eq (t', TyVec (3, TyFloat)))
-          ; constr (Eq (ty, TyVec (3, TyFloat)))
-          ]
-      | Normalize, [ t ] ->
-        let bt = fresh_tyvar () in
-        Ok
-          [ constr (Broadcast (t, TyFloat, bt))
-          ; constr (HasClass (GenType, bt))
-          ; constr (Eq (ty, bt))
-          ]
-      | Fract, [ t ] ->
-        let bt = fresh_tyvar () in
-        Ok
-          [ constr (Broadcast (t, TyFloat, bt))
-          ; constr (HasClass (GenType, bt))
-          ; constr (Eq (ty, bt))
-          ]
-      | Step, [ t; t' ] ->
-        let bt = fresh_tyvar () in
-        Ok
-          [ constr (Broadcast (t, t', bt))
-          ; constr (Broadcast (bt, TyFloat, ty))
-          ; constr (HasClass (GenType, ty))
-          ]
-      | Reflect, [ t; t' ] ->
-        Ok [ constr (HasClass (GenType, t)); constr (Eq (t, t')); constr (Eq (ty, t)) ]
-      | Smoothstep, [ t; t'; t'' ] ->
-        let tmp = fresh_tyvar () in
-        let bt = fresh_tyvar () in
-        Ok
-          [ constr (Broadcast (t, t', tmp))
-          ; constr (Broadcast (tmp, t'', bt))
-          ; constr (Broadcast (bt, TyFloat, ty))
-          ; constr (HasClass (GenType, ty))
-          ]
-      | _ -> Err.fail "invalid builtin arguments" ~loc ~d:[%message (b : Glsl.builtin)]
-    in
-    Ok ({ desc = Builtin (b, args); ty; loc }, builtin_constrs @ constrs_args, sub_args)
+  | Builtin (b, args) -> gen_builtin env loc b args
   | Vec (n, args) ->
     let elem_ty = fresh_tyvar () in
     let%bind args, constrs_args, sub_args =
@@ -1301,53 +679,7 @@ and gen_term (env : env) (t : Desugar.term)
     then
       Ok ({ desc = Vec (n, args); ty = TyVec (n, elem_ty); loc }, constrs_args, sub_args)
     else Err.fail "vec size mismatch" ~loc ~d:[%message (n : int)]
-  | Record fields ->
-    let provided_fields = String.Set.of_list (List.map fields ~f:fst) in
-    let candidates =
-      Map.filter env.structs ~f:(fun (_, struct_fields) ->
-        struct_fields
-        |> List.map ~f:fst
-        |> String.Set.of_list
-        |> Set.equal provided_fields)
-    in
-    (match Map.to_alist candidates with
-     | [] ->
-       Err.fail
-         "record does not match any known struct"
-         ~loc
-         ~d:[%message (provided_fields : String.Set.t)]
-     | _ :: _ :: _ ->
-       Err.fail
-         "record is ambiguous, matches multiple structs"
-         ~loc
-         ~d:[%message (provided_fields : String.Set.t)]
-     | [ (struct_name, (params, struct_fields)) ] ->
-       let sub = List.map params ~f:(fun p -> p, fresh_tyvar ()) in
-       let inst_fields = List.map struct_fields ~f:(fun (n, ty) -> n, subst_ty sub ty) in
-       let type_args = List.map sub ~f:snd in
-       let%bind args, constrs_args, sub_rec =
-         List.fold_result
-           inst_fields
-           ~init:([], [], [])
-           ~f:(fun (acc, acc_constrs, acc_sub) (name, ty) ->
-             match List.Assoc.find fields ~equal:String.equal name with
-             | Some arg ->
-               let%bind arg, constrs, sub = gen_term env arg in
-               let arg, field_constrs = coerce_arg_to_ty loc arg ty in
-               return
-                 ( arg :: acc
-                 , field_constrs @ constrs @ acc_constrs
-                 , compose_sub sub acc_sub )
-             | None ->
-               Err.fail "(unreachable) missing field" ~loc ~d:[%message (name : string)])
-       in
-       Ok
-         ( { desc = Record (struct_name, List.rev args)
-           ; ty = TyRecord (struct_name, type_args)
-           ; loc
-           }
-         , constrs_args
-         , sub_rec ))
+  | Record fields -> gen_record env loc fields
   | Field (t, f) ->
     let%bind t, constrs_t, sub_t = gen_term env t in
     let ret_ty = fresh_tyvar () in
@@ -1355,145 +687,298 @@ and gen_term (env : env) (t : Desugar.term)
       ( { desc = Field (t, f); ty = ret_ty; loc }
       , constr (FieldAccess (t.ty, f, ret_ty)) :: constrs_t
       , sub_t )
-  | Variant (ctor, args) ->
-    let%bind variant_name, params, ctor_arg_tys =
-      let found =
-        Map.fold env.variants ~init:[] ~f:(fun ~key:vname ~data:(params, ctors) acc ->
-          match List.find ctors ~f:(fun (c, _) -> String.equal c ctor) with
-          | Some (_, arg_tys) -> (vname, params, arg_tys) :: acc
-          | None -> acc)
-      in
-      match found with
-      | [ x ] -> Ok x
-      | [] -> Err.fail "unknown constructor" ~loc ~d:[%message (ctor : string)]
-      | _ -> Err.fail "ambiguous constructor" ~loc ~d:[%message (ctor : string)]
-    in
-    let param_sub = List.map params ~f:(fun p -> p, fresh_tyvar ()) in
-    let expected_arg_tys = List.map ctor_arg_tys ~f:(subst_ty param_sub) in
-    let type_args = List.map param_sub ~f:snd in
-    if List.length args <> List.length expected_arg_tys
-    then Err.fail "wrong number of args to constructor" ~loc ~d:[%message (ctor : string)]
-    else (
-      let%bind args, constrs_args, sub_var =
-        List.fold_result
-          (List.zip_exn args expected_arg_tys)
-          ~init:([], [], [])
-          ~f:(fun (acc_args, acc_constrs, acc_sub) (arg, expected_ty) ->
-            let%bind arg, constrs, sub = gen_term env arg in
-            let arg, arg_constrs = coerce_arg_to_ty loc arg expected_ty in
-            return
-              ( arg :: acc_args
-              , arg_constrs @ constrs @ acc_constrs
-              , compose_sub sub acc_sub ))
-      in
+  | Variant (ctor, args) -> gen_variant env loc ctor args
+  | Match (scrutinee, cases) -> gen_match env loc scrutinee cases
+
+and gen_builtin
+      (env : env)
+      (loc : Lexer.loc)
+      (b : Glsl.builtin)
+      (args : Desugar.term list)
+  : (term * constr list * substitution) Compiler_error.t
+  =
+  let constr desc = { desc; loc } in
+  let%bind args, constrs_args, sub_args =
+    List.fold_result
+      args
+      ~init:([], [], [])
+      ~f:(fun (acc_args, acc_constrs, acc_sub) arg ->
+        let%bind arg', constrs, sub = gen_term env arg in
+        return (arg' :: acc_args, constrs @ acc_constrs, compose_sub sub acc_sub))
+  in
+  let args = List.rev args in
+  let ty = fresh_tyvar () in
+  let arg_tys = List.map args ~f:(fun a -> a.ty) in
+  let%bind builtin_constrs =
+    match b, arg_tys with
+    | Float, [ t ] -> Ok [ constr (HasClass (Comparable, t)); constr (Eq (ty, TyFloat)) ]
+    | ( ( Sin | Cos | Tan | Asin | Acos | Atan | Exp | Log |
+          Exp2 | Log2 | Sqrt | Abs | Sign | Floor | Ceil )
+          [@ocamlformat "disable"]
+      , [ t ] ) ->
+      let bt = fresh_tyvar () in
       Ok
-        ( { desc = Variant (variant_name, ctor, List.rev args)
-          ; ty = TyVariant (variant_name, type_args)
-          ; loc
-          }
-        , constrs_args
-        , sub_var ))
-  | Match (scrutinee, cases) ->
-    let%bind scrutinee, constrs_s, sub_s = gen_term env scrutinee in
-    let ret_ty = fresh_tyvar () in
-    let has_catchall =
-      List.exists cases ~f:(fun (pat, _) ->
-        match pat with
-        | Frontend.PatWildcard | Frontend.PatVar _ -> true
-        | _ -> false)
-    in
-    let is_catchall = function
-      | Frontend.PatWildcard | Frontend.PatVar _ -> true
-      | _ -> false
-    in
-    let same_family p q =
-      match p, q with
-      | Frontend.PatCtor _, Frontend.PatCtor _
-      | PatLitBool _, PatLitBool _
-      | PatLitInt _, PatLitInt _
-      | PatLitFloat _, PatLitFloat _
-      | PatBracket _, PatBracket _
-      | PatRecord _, PatRecord _
-      | PatWildcard, PatWildcard -> true
-      | _ -> false
-    in
-    let first_pat =
-      List.find_map cases ~f:(fun (p, _) -> if is_catchall p then None else Some p)
-    in
-    let%bind () =
-      List.fold_result cases ~init:() ~f:(fun () (pat, _) ->
-        if is_catchall pat || Option.exists first_pat ~f:(same_family pat)
-        then Ok ()
-        else Err.fail "mixed pattern kinds in match" ~loc)
-    in
-    let%bind scrutinee_ty =
-      resolve_match_scrutinee_ty env loc scrutinee.ty first_pat cases
-    in
-    let%bind () =
-      check_match_exhaustiveness env loc ~has_catchall first_pat scrutinee_ty cases
-    in
-    let check_dup_pats ~extract ~equal ~err_msg ~sexp_of_dup =
-      let pats = List.filter_map cases ~f:(fun (p, _) -> extract p) in
-      List.fold_result pats ~init:[] ~f:(fun seen k ->
-        if List.exists seen ~f:(equal k)
-        then Err.fail err_msg ~loc ~d:(sexp_of_dup k)
-        else Ok (k :: seen))
-      |> Result.ignore_m
-    in
-    let%bind () =
-      match first_pat with
-      | Some (Frontend.PatLitBool _) ->
-        check_dup_pats
-          ~extract:(function
-            | Frontend.PatLitBool b -> Some b
-            | _ -> None)
-          ~equal:Bool.equal
-          ~err_msg:"duplicate bool pattern"
-          ~sexp_of_dup:(fun b -> [%message (b : bool)])
-      | Some (PatLitInt _) ->
-        check_dup_pats
-          ~extract:(function
-            | Frontend.PatLitInt n -> Some n
-            | _ -> None)
-          ~equal:Int.equal
-          ~err_msg:"duplicate int pattern"
-          ~sexp_of_dup:(fun n -> [%message (n : int)])
-      | Some (PatLitFloat _) ->
-        check_dup_pats
-          ~extract:(function
-            | Frontend.PatLitFloat f -> Some f
-            | _ -> None)
-          ~equal:Float.equal
-          ~err_msg:"duplicate float pattern"
-          ~sexp_of_dup:(fun f -> [%message (f : float)])
-      | Some (PatCtor _) ->
-        check_dup_pats
-          ~extract:(function
-            | Frontend.PatCtor (c, _) -> Some c
-            | _ -> None)
-          ~equal:String.equal
-          ~err_msg:"duplicate match case"
-          ~sexp_of_dup:(fun ctor -> [%message (ctor : string)])
-      | _ -> Ok ()
-    in
-    let%bind cases, constrs_cases, sub_cases =
+        [ constr (Broadcast (t, TyFloat, bt))
+        ; constr (HasClass (GenType, bt))
+        ; constr (Eq (ty, bt))
+        ]
+    | (Min | Max | Pow), [ t; t' ] ->
+      let bt = fresh_tyvar () in
+      Ok
+        [ constr (Broadcast (t, t', bt))
+        ; constr (Broadcast (bt, TyFloat, ty))
+        ; constr (HasClass (GenType, ty))
+        ]
+    | Clamp, [ t; t'; t'' ] ->
+      let tmp = fresh_tyvar () in
+      let bt = fresh_tyvar () in
+      Ok
+        [ constr (Broadcast (t', t'', tmp))
+        ; constr (Broadcast (t, tmp, bt))
+        ; constr (Broadcast (bt, TyFloat, ty))
+        ; constr (HasClass (GenType, ty))
+        ]
+    | Mix, [ t; t'; t'' ] ->
+      let tmp = fresh_tyvar () in
+      let bt = fresh_tyvar () in
+      Ok
+        [ constr (Broadcast (t, t', tmp))
+        ; constr (Broadcast (tmp, t'', bt))
+        ; constr (Broadcast (bt, TyFloat, ty))
+        ; constr (HasClass (GenType, ty))
+        ]
+    | Length, [ t ] ->
+      let bt = fresh_tyvar () in
+      Ok
+        [ constr (Broadcast (t, TyFloat, bt))
+        ; constr (HasClass (GenType, bt))
+        ; constr (Eq (ty, TyFloat))
+        ]
+    | (Distance | Dot), [ t; t' ] ->
+      Ok
+        [ constr (HasClass (GenType, t)); constr (Eq (t, t')); constr (Eq (ty, TyFloat)) ]
+    | Cross, [ t; t' ] ->
+      Ok
+        [ constr (Eq (t, TyVec (3, TyFloat)))
+        ; constr (Eq (t', TyVec (3, TyFloat)))
+        ; constr (Eq (ty, TyVec (3, TyFloat)))
+        ]
+    | Normalize, [ t ] | Fract, [ t ] ->
+      let bt = fresh_tyvar () in
+      Ok
+        [ constr (Broadcast (t, TyFloat, bt))
+        ; constr (HasClass (GenType, bt))
+        ; constr (Eq (ty, bt))
+        ]
+    | Step, [ t; t' ] ->
+      let bt = fresh_tyvar () in
+      Ok
+        [ constr (Broadcast (t, t', bt))
+        ; constr (Broadcast (bt, TyFloat, ty))
+        ; constr (HasClass (GenType, ty))
+        ]
+    | Reflect, [ t; t' ] ->
+      Ok [ constr (HasClass (GenType, t)); constr (Eq (t, t')); constr (Eq (ty, t)) ]
+    | Smoothstep, [ t; t'; t'' ] ->
+      let tmp = fresh_tyvar () in
+      let bt = fresh_tyvar () in
+      Ok
+        [ constr (Broadcast (t, t', tmp))
+        ; constr (Broadcast (tmp, t'', bt))
+        ; constr (Broadcast (bt, TyFloat, ty))
+        ; constr (HasClass (GenType, ty))
+        ]
+    | _ -> Err.fail "invalid builtin arguments" ~loc ~d:[%message (b : Glsl.builtin)]
+  in
+  Ok ({ desc = Builtin (b, args); ty; loc }, builtin_constrs @ constrs_args, sub_args)
+
+and gen_record (env : env) (loc : Lexer.loc) (fields : (string * Desugar.term) list)
+  : (term * constr list * substitution) Compiler_error.t
+  =
+  let provided_fields = String.Set.of_list (List.map fields ~f:fst) in
+  let candidates =
+    Map.filter env.structs ~f:(fun (_, struct_fields) ->
+      struct_fields |> List.map ~f:fst |> String.Set.of_list |> Set.equal provided_fields)
+  in
+  match Map.to_alist candidates with
+  | [] ->
+    Err.fail
+      "record does not match any known struct"
+      ~loc
+      ~d:[%message (provided_fields : String.Set.t)]
+  | _ :: _ :: _ ->
+    Err.fail
+      "record is ambiguous, matches multiple structs"
+      ~loc
+      ~d:[%message (provided_fields : String.Set.t)]
+  | [ (struct_name, (params, struct_fields)) ] ->
+    let sub = List.map params ~f:(fun p -> p, fresh_tyvar ()) in
+    let inst_fields = List.map struct_fields ~f:(fun (n, ty) -> n, subst_ty sub ty) in
+    let type_args = List.map sub ~f:snd in
+    let%bind args, constrs_args, sub_rec =
       List.fold_result
-        cases
+        inst_fields
         ~init:([], [], [])
-        ~f:(fun (acc_cases, acc_constrs, acc_sub) (pat, body) ->
-          let%bind ctx = check_pat env loc scrutinee_ty pat in
-          let%bind body, constrs_body, body_sub = gen_term { env with ctx } body in
-          let body_wrapped = coerce_term body.loc ret_ty body in
-          return
-            ( (pat, body_wrapped) :: acc_cases
-            , (constr (Coerce (body.ty, ret_ty)) :: constrs_body) @ acc_constrs
-            , compose_sub body_sub acc_sub ))
+        ~f:(fun (acc, acc_constrs, acc_sub) (name, ty) ->
+          match List.Assoc.find fields ~equal:String.equal name with
+          | Some arg ->
+            let%bind arg, constrs, sub = gen_term env arg in
+            let arg, field_constrs = coerce_arg_to_ty loc arg ty in
+            return
+              (arg :: acc, field_constrs @ constrs @ acc_constrs, compose_sub sub acc_sub)
+          | None ->
+            Err.fail "(unreachable) missing field" ~loc ~d:[%message (name : string)])
     in
-    let composed = compose_sub sub_cases sub_s in
     Ok
-      ( { desc = Match (scrutinee, List.rev cases); ty = ret_ty; loc }
-      , (constr (Eq (scrutinee.ty, scrutinee_ty)) :: constrs_s) @ constrs_cases
-      , composed )
+      ( { desc = Record (struct_name, List.rev args)
+        ; ty = TyRecord (struct_name, type_args)
+        ; loc
+        }
+      , constrs_args
+      , sub_rec )
+
+and gen_variant (env : env) (loc : Lexer.loc) (ctor : string) (args : Desugar.term list)
+  : (term * constr list * substitution) Compiler_error.t
+  =
+  let%bind variant_name, params, ctor_arg_tys =
+    let found =
+      Map.fold env.variants ~init:[] ~f:(fun ~key:vname ~data:(params, ctors) acc ->
+        match List.find ctors ~f:(fun (c, _) -> String.equal c ctor) with
+        | Some (_, arg_tys) -> (vname, params, arg_tys) :: acc
+        | None -> acc)
+    in
+    match found with
+    | [ x ] -> Ok x
+    | [] -> Err.fail "unknown constructor" ~loc ~d:[%message (ctor : string)]
+    | _ -> Err.fail "ambiguous constructor" ~loc ~d:[%message (ctor : string)]
+  in
+  let param_sub = List.map params ~f:(fun p -> p, fresh_tyvar ()) in
+  let expected_arg_tys = List.map ctor_arg_tys ~f:(subst_ty param_sub) in
+  let type_args = List.map param_sub ~f:snd in
+  if List.length args <> List.length expected_arg_tys
+  then Err.fail "wrong number of args to constructor" ~loc ~d:[%message (ctor : string)]
+  else (
+    let%bind args, constrs_args, sub_var =
+      List.fold_result
+        (List.zip_exn args expected_arg_tys)
+        ~init:([], [], [])
+        ~f:(fun (acc_args, acc_constrs, acc_sub) (arg, expected_ty) ->
+          let%bind arg, constrs, sub = gen_term env arg in
+          let arg, arg_constrs = coerce_arg_to_ty loc arg expected_ty in
+          return
+            (arg :: acc_args, arg_constrs @ constrs @ acc_constrs, compose_sub sub acc_sub))
+    in
+    Ok
+      ( { desc = Variant (variant_name, ctor, List.rev args)
+        ; ty = TyVariant (variant_name, type_args)
+        ; loc
+        }
+      , constrs_args
+      , sub_var ))
+
+and gen_match
+      (env : env)
+      (loc : Lexer.loc)
+      (scrutinee_stlc : Desugar.term)
+      (cases : (Frontend.pat * Desugar.term) list)
+  : (term * constr list * substitution) Compiler_error.t
+  =
+  let constr desc = { desc; loc } in
+  let%bind scrutinee, constrs_s, sub_s = gen_term env scrutinee_stlc in
+  let ret_ty = fresh_tyvar () in
+  let is_catchall = function
+    | Frontend.PatWildcard | Frontend.PatVar _ -> true
+    | _ -> false
+  in
+  let has_catchall = List.exists cases ~f:(fun (pat, _) -> is_catchall pat) in
+  let same_family p q =
+    match p, q with
+    | Frontend.PatCtor _, Frontend.PatCtor _
+    | PatLitBool _, PatLitBool _
+    | PatLitInt _, PatLitInt _
+    | PatLitFloat _, PatLitFloat _
+    | PatBracket _, PatBracket _
+    | PatRecord _, PatRecord _
+    | PatWildcard, PatWildcard -> true
+    | _ -> false
+  in
+  let first_pat =
+    List.find_map cases ~f:(fun (p, _) -> if is_catchall p then None else Some p)
+  in
+  let%bind () =
+    List.fold_result cases ~init:() ~f:(fun () (pat, _) ->
+      if is_catchall pat || Option.exists first_pat ~f:(same_family pat)
+      then Ok ()
+      else Err.fail "mixed pattern kinds in match" ~loc)
+  in
+  let%bind scrutinee_ty =
+    resolve_match_scrutinee_ty env loc scrutinee.ty first_pat cases
+  in
+  let%bind () =
+    check_match_exhaustiveness env loc ~has_catchall first_pat scrutinee_ty cases
+  in
+  let check_dup_pats ~extract ~equal ~err_msg ~sexp_of_dup =
+    let pats = List.filter_map cases ~f:(fun (p, _) -> extract p) in
+    List.fold_result pats ~init:[] ~f:(fun seen k ->
+      if List.exists seen ~f:(equal k)
+      then Err.fail err_msg ~loc ~d:(sexp_of_dup k)
+      else Ok (k :: seen))
+    |> Result.ignore_m
+  in
+  let%bind () =
+    match first_pat with
+    | Some (Frontend.PatLitBool _) ->
+      check_dup_pats
+        ~extract:(function
+          | Frontend.PatLitBool b -> Some b
+          | _ -> None)
+        ~equal:Bool.equal
+        ~err_msg:"duplicate bool pattern"
+        ~sexp_of_dup:(fun b -> [%message (b : bool)])
+    | Some (PatLitInt _) ->
+      check_dup_pats
+        ~extract:(function
+          | Frontend.PatLitInt n -> Some n
+          | _ -> None)
+        ~equal:Int.equal
+        ~err_msg:"duplicate int pattern"
+        ~sexp_of_dup:(fun n -> [%message (n : int)])
+    | Some (PatLitFloat _) ->
+      check_dup_pats
+        ~extract:(function
+          | Frontend.PatLitFloat f -> Some f
+          | _ -> None)
+        ~equal:Float.equal
+        ~err_msg:"duplicate float pattern"
+        ~sexp_of_dup:(fun f -> [%message (f : float)])
+    | Some (PatCtor _) ->
+      check_dup_pats
+        ~extract:(function
+          | Frontend.PatCtor (c, _) -> Some c
+          | _ -> None)
+        ~equal:String.equal
+        ~err_msg:"duplicate match case"
+        ~sexp_of_dup:(fun ctor -> [%message (ctor : string)])
+    | _ -> Ok ()
+  in
+  let%bind cases, constrs_cases, sub_cases =
+    List.fold_result
+      cases
+      ~init:([], [], [])
+      ~f:(fun (acc_cases, acc_constrs, acc_sub) (pat, body) ->
+        let%bind ctx = check_pat env loc scrutinee_ty pat in
+        let%bind body, constrs_body, body_sub = gen_term { env with ctx } body in
+        let body_wrapped = coerce_term body.loc ret_ty body in
+        return
+          ( (pat, body_wrapped) :: acc_cases
+          , (constr (Coerce (body.ty, ret_ty)) :: constrs_body) @ acc_constrs
+          , compose_sub body_sub acc_sub ))
+  in
+  let composed = compose_sub sub_cases sub_s in
+  Ok
+    ( { desc = Match (scrutinee, List.rev cases); ty = ret_ty; loc }
+    , (constr (Eq (scrutinee.ty, scrutinee_ty)) :: constrs_s) @ constrs_cases
+    , composed )
 ;;
 
 let enforce_main_type env bind ty loc v =
@@ -1502,7 +987,7 @@ let enforce_main_type env bind ty loc v =
   else (
     let expected = TyArrow (TyVec (2, TyFloat), TyVec (3, TyFloat)) in
     let main_constr = { desc = Coerce (ty, expected); loc } in
-    match solve env.structs [ main_constr ] with
+    match Constraint_solver.solve env.structs [ main_constr ] with
     | Ok (sub, []) ->
       let bind = subst_term sub bind in
       let bind = coerce_term bind.loc expected bind in

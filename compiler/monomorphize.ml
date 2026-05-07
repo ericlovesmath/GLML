@@ -9,19 +9,19 @@ module Err = Compiler_error.Pass (struct
 (* ===== Helper types ===== *)
 
 type poly_def =
-  { poly_type : Typecheck.ty
+  { poly_type : Type_system.ty
   ; poly_bind : Typecheck.term
   ; poly_recur : Frontend.recur
   ; poly_loc : Lexer.loc
-  ; poly_constrs : Typecheck.constr list
+  ; poly_constrs : Type_system.constr list
   }
 
-type spec_map = (Typecheck.ty * string) list String.Map.t
+type spec_map = (Type_system.ty * string) list String.Map.t
 
 (* Read-only context. Built once before processing *)
 type env =
-  { type_poly_env : Typecheck.type_decl String.Map.t
-  ; structs_for_constrs : (string list * (string * Typecheck.ty) list) String.Map.t
+  { type_poly_env : Type_system.type_decl String.Map.t
+  ; structs_for_constrs : (string list * (string * Type_system.ty) list) String.Map.t
   ; poly_names : String.Set.t
   ; poly_fn_env : poly_def String.Map.t
   }
@@ -151,7 +151,7 @@ let rec fold_term ~(f : 'a -> Typecheck.term -> 'a) (acc : 'a) (t : Typecheck.te
   | Coerce (_, inner) -> fold acc inner
 ;;
 
-let rec mangle_ty (ty : Typecheck.ty) : string =
+let rec mangle_ty (ty : Type_system.ty) : string =
   match ty with
   | TyFloat -> "f"
   | TyInt -> "i"
@@ -170,7 +170,7 @@ let rec mangle_ty (ty : Typecheck.ty) : string =
   | TyArrow (a, b) -> mangle_ty a ^ "to" ^ mangle_ty b
 ;;
 
-let rec is_concrete (ty : Typecheck.ty) : bool =
+let rec is_concrete (ty : Type_system.ty) : bool =
   match ty with
   | TyVar _ -> false
   | TyFloat | TyInt | TyBool -> true
@@ -181,11 +181,12 @@ let rec is_concrete (ty : Typecheck.ty) : bool =
 ;;
 
 (** Tagged parametrized instances, where [name * [Left of record | Right of struct]] *)
-type param = string * (Typecheck.ty list, Typecheck.ty list) Either.t [@@deriving compare]
+type param = string * (Type_system.ty list, Type_system.ty list) Either.t
+[@@deriving compare]
 
 let rec collect_from_ty
-          ~(type_poly_env : Typecheck.type_decl String.Map.t)
-          (ty : Typecheck.ty)
+          ~(type_poly_env : Type_system.type_decl String.Map.t)
+          (ty : Type_system.ty)
   : param list
   =
   match ty with
@@ -202,7 +203,7 @@ let rec collect_from_ty
       | Some (RecordDecl (params, fields)) ->
         let sub = List.zip_exn params args in
         List.concat_map fields ~f:(fun (_, fty) ->
-          collect_from_ty ~type_poly_env (Typecheck.subst_ty sub fty))
+          collect_from_ty ~type_poly_env (Type_system.subst_ty sub fty))
       | _ -> []
     in
     deps_from_args @ deps_from_fields @ [ name, First args ]
@@ -214,14 +215,14 @@ let rec collect_from_ty
         let sub = List.zip_exn params args in
         List.concat_map ctors ~f:(fun (_, tys) ->
           List.concat_map tys ~f:(fun fty ->
-            collect_from_ty ~type_poly_env (Typecheck.subst_ty sub fty)))
+            collect_from_ty ~type_poly_env (Type_system.subst_ty sub fty)))
       | _ -> []
     in
     deps_from_args @ deps_from_ctors @ [ name, Second args ]
 ;;
 
 let collect_from_term
-      ~(type_poly_env : Typecheck.type_decl String.Map.t)
+      ~(type_poly_env : Type_system.type_decl String.Map.t)
       (t : Typecheck.term)
   : param list
   =
@@ -229,7 +230,7 @@ let collect_from_term
 ;;
 
 let collect_from_top
-      ~(type_poly_env : Typecheck.type_decl String.Map.t)
+      ~(type_poly_env : Type_system.type_decl String.Map.t)
       (top : Typecheck.top)
   : param list
   =
@@ -247,10 +248,10 @@ let collect_from_top
 ;;
 
 let specialize_struct
-      ~(type_poly_env : Typecheck.type_decl String.Map.t)
+      ~(type_poly_env : Type_system.type_decl String.Map.t)
       ~(loc : Lexer.loc)
       (name : string)
-      (args : Typecheck.ty list)
+      (args : Type_system.ty list)
   : Typecheck.top
   =
   let params, fields =
@@ -260,7 +261,7 @@ let specialize_struct
   in
   let sub = List.zip_exn params args in
   let specialized_fields =
-    List.map fields ~f:(Tuple2.map_snd ~f:(Typecheck.subst_ty sub))
+    List.map fields ~f:(Tuple2.map_snd ~f:(Type_system.subst_ty sub))
   in
   let mangled = mangle_ty (TyRecord (name, args)) in
   { desc = TypeDef (mangled, RecordDecl ([], specialized_fields))
@@ -271,10 +272,10 @@ let specialize_struct
 ;;
 
 let specialize_variant
-      ~(type_poly_env : Typecheck.type_decl String.Map.t)
+      ~(type_poly_env : Type_system.type_decl String.Map.t)
       ~(loc : Lexer.loc)
       (name : string)
-      (args : Typecheck.ty list)
+      (args : Type_system.ty list)
   : Typecheck.top
   =
   let params, ctors =
@@ -284,7 +285,7 @@ let specialize_variant
   in
   let sub = List.zip_exn params args in
   let specialized_ctors =
-    List.map ctors ~f:(Tuple2.map_snd ~f:(List.map ~f:(Typecheck.subst_ty sub)))
+    List.map ctors ~f:(Tuple2.map_snd ~f:(List.map ~f:(Type_system.subst_ty sub)))
   in
   let mangled = mangle_ty (TyVariant (name, args)) in
   { desc = TypeDef (mangled, VariantDecl ([], specialized_ctors))
@@ -294,8 +295,10 @@ let specialize_variant
   }
 ;;
 
-let rec rewrite_ty ~(type_poly_env : Typecheck.type_decl String.Map.t) (ty : Typecheck.ty)
-  : Typecheck.ty
+let rec rewrite_ty
+          ~(type_poly_env : Type_system.type_decl String.Map.t)
+          (ty : Type_system.ty)
+  : Type_system.ty
   =
   match ty with
   | TyFloat | TyInt | TyBool | TyVar _ -> ty
@@ -321,9 +324,9 @@ let rec rewrite_ty ~(type_poly_env : Typecheck.type_decl String.Map.t) (ty : Typ
 ;;
 
 let maybe_mangle_name
-      ~(type_poly_env : Typecheck.type_decl String.Map.t)
+      ~(type_poly_env : Type_system.type_decl String.Map.t)
       ~fallback
-      (ty : Typecheck.ty)
+      (ty : Type_system.ty)
   : string
   =
   match ty with
@@ -345,7 +348,7 @@ let maybe_mangle_name
 ;;
 
 let rec rewrite_term
-          ~(type_poly_env : Typecheck.type_decl String.Map.t)
+          ~(type_poly_env : Type_system.type_decl String.Map.t)
           ?(poly_names = String.Set.empty)
           (t : Typecheck.term)
   : Typecheck.term
@@ -384,8 +387,8 @@ let rec rewrite_term
 
 (* ===== Monomorphize-specific helpers ===== *)
 
-let rec subst ~(poly : Typecheck.ty) ~(concrete : Typecheck.ty)
-  : (string * Typecheck.ty) list
+let rec subst ~(poly : Type_system.ty) ~(concrete : Type_system.ty)
+  : (string * Type_system.ty) list
   =
   match poly, concrete with
   | TyVar v, _ -> [ v, concrete ]
@@ -403,7 +406,7 @@ let rec subst ~(poly : Typecheck.ty) ~(concrete : Typecheck.ty)
   | _, _ -> []
 ;;
 
-let collect_var_usages (name : string) (t : Typecheck.term) : Typecheck.ty list =
+let collect_var_usages (name : string) (t : Typecheck.term) : Type_system.ty list =
   fold_term
     ~f:(fun acc t ->
       match t.desc with
@@ -411,7 +414,7 @@ let collect_var_usages (name : string) (t : Typecheck.term) : Typecheck.ty list 
       | _ -> acc)
     []
     t
-  |> List.stable_dedup ~compare:(fun a b -> if Typecheck.equal_ty a b then 0 else 1)
+  |> List.stable_dedup ~compare:(fun a b -> if Type_system.equal_ty a b then 0 else 1)
 ;;
 
 (** For each polymorphic Let binding in [t], collect Eq constraints between
@@ -419,7 +422,7 @@ let collect_var_usages (name : string) (t : Typecheck.term) : Typecheck.ty list 
     These encode equality information that was solved away inside infer_binding
     but not propagated to the outer term's type, allowing [instantiate_scheme] to
     resolve "orphan" constraint variables. *)
-let collect_poly_let_eqs (t : Typecheck.term) : Typecheck.constr list =
+let collect_poly_let_eqs (t : Typecheck.term) : Type_system.constr list =
   fold_term
     ~f:(fun acc t ->
       match t.desc with
@@ -427,9 +430,9 @@ let collect_poly_let_eqs (t : Typecheck.term) : Typecheck.constr list =
         let usages = collect_var_usages v body in
         let eq_constrs =
           List.filter_map usages ~f:(fun usage_ty ->
-            if Typecheck.equal_ty bind.ty usage_ty
+            if Type_system.equal_ty bind.ty usage_ty
             then None
-            else Some { Typecheck.desc = Eq (bind.ty, usage_ty); loc = t.loc })
+            else Some { Type_system.desc = Eq (bind.ty, usage_ty); loc = t.loc })
         in
         (* Also include the inner let's scheme constraints so that any variables
            introduced by those constraints (like return-type vars) also get resolved
@@ -492,7 +495,7 @@ let rename_var (src : string) (dst : string) =
 (* ==== Env and Acc ==== *)
 
 let collect_poly_refs (poly_fn_env : poly_def String.Map.t) (t : Typecheck.term)
-  : (string * Typecheck.ty) list
+  : (string * Type_system.ty) list
   =
   let refs =
     fold_term
@@ -505,25 +508,29 @@ let collect_poly_refs (poly_fn_env : poly_def String.Map.t) (t : Typecheck.term)
   in
   List.stable_dedup refs ~compare:(fun (n1, t1) (n2, t2) ->
     let c = String.compare n1 n2 in
-    if c <> 0 then c else if Typecheck.equal_ty t1 t2 then 0 else 1)
+    if c <> 0 then c else if Type_system.equal_ty t1 t2 then 0 else 1)
 ;;
 
-let find_spec (env : spec_map) (name : string) (ty : Typecheck.ty) : string option =
+let find_spec (env : spec_map) (name : string) (ty : Type_system.ty) : string option =
   Map.find env name
   |> Option.bind
        ~f:
          (List.find_map ~f:(fun (t, n) ->
-            if Typecheck.equal_ty t ty then Some n else None))
+            if Type_system.equal_ty t ty then Some n else None))
 ;;
 
-let add_spec (env : spec_map) (name : string) (ty : Typecheck.ty) (spec_name : string)
+let add_spec (env : spec_map) (name : string) (ty : Type_system.ty) (spec_name : string)
   : spec_map
   =
   let specs = Option.value (Map.find env name) ~default:[] in
   Map.set env ~key:name ~data:((ty, spec_name) :: specs)
 ;;
 
-let rec resolve_spec (env : env) (acc : acc) (name : string) (concrete_ty : Typecheck.ty)
+let rec resolve_spec
+          (env : env)
+          (acc : acc)
+          (name : string)
+          (concrete_ty : Type_system.ty)
   : (acc * string) Compiler_error.t
   =
   match find_spec acc.spec_map name concrete_ty with
@@ -652,7 +659,7 @@ and rewrite_refs (env : env) (acc : acc) (t : Typecheck.term)
             subst_var
               ~name:v
               ~new_name:spec_name
-              ~pred:(fun t -> Typecheck.equal_ty t.ty concrete_ty)
+              ~pred:(fun t -> Type_system.equal_ty t.ty concrete_ty)
               b)
         in
         let%map acc, body = rewrite_refs env acc body in
@@ -720,7 +727,7 @@ and rewrite_refs (env : env) (acc : acc) (t : Typecheck.term)
 
 (* ===== Conversion from Typecheck types ===== *)
 
-let rec ty_of (t : Typecheck.ty) : ty Compiler_error.t =
+let rec ty_of (t : Type_system.ty) : ty Compiler_error.t =
   match t with
   | TyVar _ -> Err.fail "unexpected TyVar after monomorphization"
   | TyFloat -> Ok TyFloat
@@ -805,7 +812,7 @@ and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Compiler_error.t =
   | Coerce (target, inner) ->
     (* materialize_coerce re-runs after monomorphize, so the only Coerce that can
        reach here is a residual where both sides ended up equal. *)
-    if Typecheck.equal_ty target inner.ty
+    if Type_system.equal_ty target inner.ty
     then (
       let%map inner = term_of_tc inner in
       inner.desc)

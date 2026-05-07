@@ -167,7 +167,7 @@ let%expect_test "indexing" =
   test_term "[0.0, 0.0, 0.0].4";
   [%expect
     {|
-    [typecheck] at 1:27-1:44: vec index out of bounds
+    [constraint solver] at 1:27-1:44: vec index out of bounds
       n: 3
       i: 4
       |
@@ -214,7 +214,7 @@ let%expect_test "builtins" =
   test_term "#cross([ 1.0, 1.0 ], [ 0.0, 0.0 ])";
   [%expect
     {|
-    [typecheck] at 1:27-1:61: type mismatch
+    [constraint solver] at 1:27-1:61: type mismatch
       ty: (vec 2 'v)
       ty': (vec 3 float)
       |
@@ -1611,12 +1611,12 @@ let%expect_test "parametrized structs" =
     |};
   [%expect
     {|
-    [typecheck] at 3:42-3:49: wrong number of type args for struct
+    [constraint solver] at 3:42-3:49: wrong number of type args for struct
       struct_name: box
       |
     3 |     let f (b: box[float, int]) : float = b.value
       |                                          ^^^^^^^
-  |}];
+    |}];
   test
     {|
     type box['a] = { value: 'a }
@@ -1906,7 +1906,7 @@ let%expect_test "phantom parameters, sort of" =
     |};
   [%expect
     {|
-    [typecheck] at 9:15-9:20: type mismatch
+    [constraint solver] at 9:15-9:20: type mismatch
       ty: int
       ty': bool
       |

@@ -1,29 +1,39 @@
 (library
  (name glml_compiler)
  (modules
+   ; General Utilities and Entry Point
    utils
    compiler_error
    glml_compiler
 
-   ; Compiler Passes
+   ; Frontend
    lexer
    chomp
    parser
-
    frontend
    desugar
    uniquify
+
+   ; Typechecking
+   type_system
+   constraint_solver
    typecheck
    promote_ints
    monomorphize
+
+   ; Transformation
    uncurry
    defunctionalize
    lambda_lift
+
+   ; ANF Form
    anf
    tail_call
    lower_variants
    remove_placeholder
    lift_consts
+
+   ; GLSL Passes
    translate
    patch_main
    glsl)

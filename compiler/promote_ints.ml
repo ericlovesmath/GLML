@@ -1,5 +1,6 @@
 open Core
 open Typecheck
+open Type_system
 
 let rec has_tyvar = function
   | TyVar _ -> true
