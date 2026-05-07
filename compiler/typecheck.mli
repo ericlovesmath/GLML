@@ -3,7 +3,6 @@
     surface AST), runs inference, and emits a typed AST where every term and
     top-level binding carries its resolved type and any deferred scheme constraints. *)
 
-open Core
 open Type_system
 
 type term_desc =
@@ -51,19 +50,7 @@ type top =
 
 type t = Program of top list [@@deriving sexp_of]
 
-(* TODO: Move [term] def to [Type_system] so this can live in [monomorphize] *)
-
-(** Instantiates a polymorphic scheme at a concrete type.
-    Given a polymorphic term, its deferred scheme constraints, and a substitution
-    mapping its type variables to concrete types, validates the constraints then
-    applies the substitution to all type annotations in the term.
-    Used by [Monomorphize] to specialize polymorphic bindings. *)
-val instantiate_scheme
-  :  ?structs:(string list * (string * ty) list) String.Map.t
-  -> constr list
-  -> term
-  -> substitution
-  -> term Compiler_error.t
+val subst_term : substitution -> term -> term
 
 (** Typechecker for GLML *)
 val typecheck : Desugar.t -> t Compiler_error.t

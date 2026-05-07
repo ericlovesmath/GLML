@@ -186,13 +186,6 @@ let generalize (ctx : context) (deferred : constr list) (ty : ty)
   (Set.to_list generalizable, scheme_constrs, ty), remaining
 ;;
 
-(** Solve scheme constraints under [sub], then apply the resulting substitution
-    to the polymorphic term. Used by [Monomorphize] to specialize bindings. *)
-let instantiate_scheme ?(structs = String.Map.empty) constrs term sub =
-  let%map sub = Constraint_solver.solve_scheme ~structs constrs sub in
-  subst_term sub term
-;;
-
 (** Value restriction check for generalization. *)
 let rec is_value (t : Desugar.term) : bool =
   match t.desc with

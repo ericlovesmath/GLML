@@ -417,6 +417,13 @@ let collect_var_usages (name : string) (t : Typecheck.term) : Type_system.ty lis
   |> List.stable_dedup ~compare:(fun a b -> if Type_system.equal_ty a b then 0 else 1)
 ;;
 
+(** Solve scheme constraints under [sub], then apply the resulting substitution
+    to the polymorphic term. Used by [Monomorphize] to specialize bindings. *)
+let instantiate_scheme ~structs constrs term sub =
+  let%map sub = Constraint_solver.solve_scheme ~structs constrs sub in
+  Typecheck.subst_term sub term
+;;
+
 (** For each polymorphic Let binding in [t], collect Eq constraints between
     the binding's definition type and each usage type in the continuation.
     These encode equality information that was solved away inside infer_binding
@@ -543,7 +550,7 @@ let rec resolve_spec
     let sub = subst ~poly:entry.poly_type ~concrete:concrete_ty in
     let extra_constrs = collect_poly_let_eqs entry.poly_bind in
     let%bind body =
-      Typecheck.instantiate_scheme
+      instantiate_scheme
         ~structs:env.structs_for_constrs
         (entry.poly_constrs @ extra_constrs)
         entry.poly_bind
@@ -631,11 +638,7 @@ and rewrite_refs (env : env) (acc : acc) (t : Typecheck.term)
               let%bind acc, specs_rev = acc_r in
               let sub = subst ~poly:bind.ty ~concrete:concrete_ty in
               let%bind spec_bind =
-                Typecheck.instantiate_scheme
-                  ~structs:env.structs_for_constrs
-                  constrs
-                  bind
-                  sub
+                instantiate_scheme ~structs:env.structs_for_constrs constrs bind sub
               in
               let spec_bind =
                 rewrite_term
