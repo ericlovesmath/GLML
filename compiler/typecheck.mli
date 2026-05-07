@@ -20,9 +20,9 @@ type term_desc =
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
   | Builtin of Glsl.builtin * term list
-  | Record of string * term list
+  | Record of term list
   | Field of term * string
-  | Variant of string * string * term list
+  | Variant of string * term list
   | Match of term * (Frontend.pat * term) list
   | Coerce of ty * term
 [@@deriving sexp_of]
@@ -51,6 +51,9 @@ type top =
 type t = Program of top list [@@deriving sexp_of]
 
 val subst_term : substitution -> term -> term
+
+(** Pre-order fold over every subterm of [t]. *)
+val fold_term : f:('a -> term -> 'a) -> 'a -> term -> 'a
 
 (** Typechecker for GLML *)
 val typecheck : Desugar.t -> t Compiler_error.t

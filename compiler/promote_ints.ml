@@ -7,7 +7,9 @@ let rec has_tyvar = function
   | TyFloat | TyInt | TyBool -> false
   | TyVec (_, t) -> has_tyvar t
   | TyArrow (a, b) -> has_tyvar a || has_tyvar b
-  | TyRecord (_, args) | TyVariant (_, args) -> List.exists args ~f:has_tyvar
+  | TyRecord (_, fields) -> List.exists fields ~f:(fun (_, t) -> has_tyvar t)
+  | TyVariant (_, ctors) ->
+    List.exists ctors ~f:(fun (_, ts) -> List.exists ts ~f:has_tyvar)
 ;;
 
 let rec coercible (from_ty : ty) (to_ty : ty) : bool =
@@ -18,10 +20,11 @@ let rec coercible (from_ty : ty) (to_ty : ty) : bool =
     | TyInt, TyFloat -> true
     | TyArrow (p, r), TyArrow (p', r') -> coercible p' p && coercible r r'
     | TyVec (n, t), TyVec (n', t') when n = n' -> coercible t t'
-    | TyRecord (s, args), TyRecord (s', args')
-    | TyVariant (s, args), TyVariant (s', args')
-      when String.equal s s' && List.length args = List.length args' ->
-      List.for_all2_exn args args' ~f:coercible
+    | TyRecord (_, fs), TyRecord (_, fs') when List.length fs = List.length fs' ->
+      List.for_all2_exn fs fs' ~f:(fun (_, a) (_, b) -> coercible a b)
+    | TyVariant (_, cs), TyVariant (_, cs') when List.length cs = List.length cs' ->
+      List.for_all2_exn cs cs' ~f:(fun (_, ts) (_, ts') ->
+        List.length ts = List.length ts' && List.for_all2_exn ts ts' ~f:coercible)
     | _ -> false)
 ;;
 
@@ -97,10 +100,9 @@ let rec rewrite (t : term) : term =
     { t with desc = Let (recur, v, constrs, rewrite bind, rewrite body) }
   | If (c, t1, e) -> { t with desc = If (rewrite c, rewrite t1, rewrite e) }
   | Index (inner, i) -> { t with desc = Index (rewrite inner, i) }
-  | Record (s, ts) -> { t with desc = Record (s, List.map ts ~f:rewrite) }
+  | Record ts -> { t with desc = Record (List.map ts ~f:rewrite) }
   | Field (inner, f) -> { t with desc = Field (rewrite inner, f) }
-  | Variant (tn, ctor, args) ->
-    { t with desc = Variant (tn, ctor, List.map args ~f:rewrite) }
+  | Variant (ctor, args) -> { t with desc = Variant (ctor, List.map args ~f:rewrite) }
   | Match (scrut, cases) ->
     { t with desc = Match (rewrite scrut, List.map cases ~f:(Tuple2.map_snd ~f:rewrite)) }
 ;;

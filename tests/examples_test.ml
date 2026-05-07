@@ -500,18 +500,16 @@ let%expect_test "compile examples" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    uniform vec2 u_resolution;
-    uniform float u_time;
-    struct v_option_f {
+    struct option {
         int tag;
         float Some_0;
     };
-    v_option_f mandel_0(vec2 c, vec2 z, int i) {
+    option mandel_0(vec2 c, vec2 z, int i) {
         int _iter = 0;
         while ((_iter < 1000)) {
             bool anf = (i > 150);
             if (anf) {
-                return v_option_f(1, 0.);
+                return option(1, 0.);
             } else {
                 float anf_0 = length(z);
                 bool anf_1 = (anf_0 > 4.);
@@ -522,7 +520,7 @@ let%expect_test "compile examples" =
                     float anf_4 = float(i);
                     float anf_5 = (anf_4 - nu);
                     float anf_6 = (anf_5 / 150.);
-                    return v_option_f(0, anf_6);
+                    return option(0, anf_6);
                 } else {
                     float anf_7 = z[0];
                     float anf_8 = z[0];
@@ -547,13 +545,15 @@ let%expect_test "compile examples" =
                 }
             }
         }
-        v_option_f _tmp;
+        option _tmp;
         return _tmp;
     }
-    v_option_f mandelbrot_m(vec2 c) {
+    option mandelbrot_m(vec2 c) {
         vec2 anf_18 = vec2(0., 0.);
         return mandel_0(c, anf_18, 0);
     }
+    uniform vec2 u_resolution;
+    uniform float u_time;
     vec3 main_pure(vec2 coord) {
         vec2 anf_19 = (2. * coord);
         vec2 top = (anf_19 - u_resolution);
@@ -569,7 +569,7 @@ let%expect_test "compile examples" =
         vec2 anf_26 = vec2(-0.7453, 0.1127);
         vec2 anf_27 = (uv / zoom);
         vec2 seahorse_valley = (anf_26 + anf_27);
-        v_option_f anf_28 = mandelbrot_m(seahorse_valley);
+        option anf_28 = mandelbrot_m(seahorse_valley);
         int _lv_tag = anf_28.tag;
         switch (_lv_tag) {
             case 1: {
@@ -714,6 +714,10 @@ let%expect_test "compile examples" =
         float anf_43 = (anf_42 * 0.03125);
         return (anf_40 + anf_43);
     }
+    struct option {
+        int tag;
+        float Some_0;
+    };
     vec2 rotate(vec2 p, float angle) {
         float s = sin(angle);
         float c = cos(angle);
@@ -784,30 +788,23 @@ let%expect_test "compile examples" =
         vec3 anf_82 = vec3(dx, dy, dz);
         return normalize(anf_82);
     }
-    const vec3 snowColor = vec3(0.85, 0.85, 0.9);
-    uniform vec2 u_mouse;
-    uniform vec2 u_resolution;
-    struct v_option_f {
-        int tag;
-        float Some_0;
-    };
-    v_option_f march_0_0(vec3 rd, vec3 ro, float t, int steps) {
+    option march_0_0(vec3 rd, vec3 ro, float t, int steps) {
         int _iter = 0;
         while ((_iter < 1000)) {
             bool anf_83 = (steps > 120);
             if (anf_83) {
-                return v_option_f(1, 0.);
+                return option(1, 0.);
             } else {
                 vec3 anf_84 = (rd * t);
                 vec3 anf_85 = (ro + anf_84);
                 float d_1 = map(anf_85);
                 bool anf_86 = (d_1 < 0.0005);
                 if (anf_86) {
-                    return v_option_f(0, t);
+                    return option(0, t);
                 } else {
                     bool anf_87 = (t > 50.);
                     if (anf_87) {
-                        return v_option_f(1, 0.);
+                        return option(1, 0.);
                     } else {
                         float anf_88 = (d_1 * 0.8);
                         float anf_89 = (t + anf_88);
@@ -823,12 +820,15 @@ let%expect_test "compile examples" =
                 }
             }
         }
-        v_option_f _tmp;
+        option _tmp;
         return _tmp;
     }
-    v_option_f march(vec3 ro, vec3 rd) {
+    option march(vec3 ro, vec3 rd) {
         return march_0_0(rd, ro, 0., 0);
     }
+    const vec3 snowColor = vec3(0.85, 0.85, 0.9);
+    uniform vec2 u_mouse;
+    uniform vec2 u_resolution;
     vec3 main_pure(vec2 coord) {
         float anf_91 = u_resolution[0];
         float anf_92 = u_resolution[1];
@@ -846,7 +846,7 @@ let%expect_test "compile examples" =
         vec3 anf_100 = vec3(anf_98, anf_99, 1.5);
         vec3 anf_101 = normalize(anf_100);
         vec3 rd_0 = rotate_by_mouse_m_0(mouseUV, anf_101);
-        v_option_f t_0 = march(ro_0, rd_0);
+        option t_0 = march(ro_0, rd_0);
         int _lv_tag = t_0.tag;
         switch (_lv_tag) {
             case 1: {
@@ -952,6 +952,10 @@ let%expect_test "compile examples" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
+    struct option {
+        int tag;
+        float Some_0;
+    };
     vec3 palette(float t) {
         vec3 cfg = vec3(0.3, 0.416, 0.557);
         vec3 anf = (cfg + t);
@@ -1028,27 +1032,23 @@ let%expect_test "compile examples" =
         float anf_45 = sdTorus(p_1, anf_44);
         return sMin(anf_43, anf_45);
     }
-    struct v_option_f {
-        int tag;
-        float Some_0;
-    };
-    v_option_f march_0_0(vec3 rd, vec3 ro, float t_1, int steps) {
+    option march_0_0(vec3 rd, vec3 ro, float t_1, int steps) {
         int _iter = 0;
         while ((_iter < 1000)) {
             bool anf_46 = (steps > 80);
             if (anf_46) {
-                return v_option_f(1, 0.);
+                return option(1, 0.);
             } else {
                 vec3 anf_47 = (rd * t_1);
                 vec3 anf_48 = (ro + anf_47);
                 float d = map(anf_48);
                 bool anf_49 = (d < 0.001);
                 if (anf_49) {
-                    return v_option_f(0, t_1);
+                    return option(0, t_1);
                 } else {
                     bool anf_50 = (t_1 > 100.);
                     if (anf_50) {
-                        return v_option_f(1, 0.);
+                        return option(1, 0.);
                     } else {
                         float anf_51 = (t_1 + d);
                         int anf_52 = (steps + 1);
@@ -1063,10 +1063,10 @@ let%expect_test "compile examples" =
                 }
             }
         }
-        v_option_f _tmp;
+        option _tmp;
         return _tmp;
     }
-    v_option_f march(vec3 ro, vec3 rd) {
+    option march(vec3 ro, vec3 rd) {
         return march_0_0(rd, ro, 0., 0);
     }
     vec3 main_pure(vec2 coord) {
@@ -1120,7 +1120,7 @@ let%expect_test "compile examples" =
         float anf_86 = rd_0[1];
         float anf_87 = rd_xz[1];
         vec3 rd_1 = vec3(anf_85, anf_86, anf_87);
-        v_option_f anf_88 = march(ro_1, rd_1);
+        option anf_88 = march(ro_1, rd_1);
         int _lv_tag = anf_88.tag;
         vec3 col;
         switch (_lv_tag) {

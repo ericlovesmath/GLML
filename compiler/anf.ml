@@ -32,9 +32,9 @@ type term_desc =
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list
   | If of atom * anf * anf
-  | Record of string * atom list
+  | Record of atom list
   | Field of atom * string
-  | Variant of string * string * atom list
+  | Variant of string * atom list
   | Match of atom * (Frontend.pat * anf) list
 
 and term =
@@ -63,10 +63,10 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_atom)
   | App (f, args) -> List (Atom f :: List.map args ~f:sexp_of_atom)
   | If (c, t, e) -> List [ Atom "if"; sexp_of_atom c; sexp_of_anf t; sexp_of_anf e ]
-  | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_atom)
+  | Record ts -> List (Atom "record" :: List.map ts ~f:sexp_of_atom)
   | Field (t, f) -> List [ Atom "."; sexp_of_atom t; Atom f ]
-  | Variant (ty_name, ctor, args) ->
-    List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_atom)
+  | Variant (ctor, args) ->
+    List (Atom "Variant" :: Atom ctor :: List.map args ~f:sexp_of_atom)
   | Match (scrutinee, cases) ->
     let sexp_of_case (pat, body) = List [ Frontend.sexp_of_pat pat; sexp_of_anf body ] in
     List (Atom "match" :: sexp_of_atom scrutinee :: List.map cases ~f:sexp_of_case)
@@ -160,10 +160,9 @@ let rec normalize (expr : Lambda_lift.term) : anf =
       let t_anf = normalize t in
       let e_anf = normalize e in
       pure (If (c_atom, t_anf, e_anf)))
-  | Record (s, ts) -> atomize_list ts (fun args -> pure (Record (s, args)))
+  | Record ts -> atomize_list ts (fun args -> pure (Record args))
   | Field (t, f) -> atomize t (fun a -> pure (Field (a, f)))
-  | Variant (ty_name, ctor, args) ->
-    atomize_list args (fun args -> pure (Variant (ty_name, ctor, args)))
+  | Variant (ctor, args) -> atomize_list args (fun args -> pure (Variant (ctor, args)))
   | Match (scrutinee, cases) ->
     atomize scrutinee (fun s ->
       let cases = List.map cases ~f:(Tuple2.map_snd ~f:normalize) in

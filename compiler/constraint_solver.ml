@@ -15,7 +15,9 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t
       | TyVar v' -> String.equal v v'
       | TyFloat | TyInt | TyBool -> false
       | TyVec (_, t) -> occurs_in t
-      | TyVariant (_, args) | TyRecord (_, args) -> List.exists args ~f:occurs_in
+      | TyRecord (_, fields) -> List.exists fields ~f:(fun (_, t) -> occurs_in t)
+      | TyVariant (_, ctors) ->
+        List.exists ctors ~f:(fun (_, ts) -> List.exists ts ~f:occurs_in)
       | TyArrow (ty, ty') -> occurs_in ty || occurs_in ty'
     in
     if equal_ty (TyVar v) ty
@@ -32,12 +34,17 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t
   | (loc, TyArrow (f, x), TyArrow (f', x')) :: con ->
     unify ((loc, f, f') :: (loc, x, x') :: con)
   | (loc, TyVec (n, t), TyVec (n', t')) :: con when n = n' -> unify ((loc, t, t') :: con)
-  | (loc, TyRecord (s, args), TyRecord (s', args')) :: con
-    when String.equal s s' && List.length args = List.length args' ->
-    unify (List.map2_exn args args' ~f:(Tuple3.create loc) @ con)
-  | (loc, TyVariant (s, args), TyVariant (s', args')) :: con
-    when String.equal s s' && List.length args = List.length args' ->
-    unify (List.map2_exn args args' ~f:(Tuple3.create loc) @ con)
+  | (loc, TyRecord (_, fs), TyRecord (_, fs')) :: con
+    when List.length fs = List.length fs' ->
+    unify (List.map2_exn fs fs' ~f:(fun (_, t) (_, t') -> loc, t, t') @ con)
+  | (loc, TyVariant (_, cs), TyVariant (_, cs')) :: con
+    when List.length cs = List.length cs' ->
+    let pairs =
+      List.map2_exn cs cs' ~f:(fun (_, ts) (_, ts') ->
+        List.map2_exn ts ts' ~f:(Tuple3.create loc))
+      |> List.concat
+    in
+    unify (pairs @ con)
   | (loc, ty, ty') :: con ->
     if equal_ty ty ty'
     then unify con
@@ -48,8 +55,10 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t
 let rec widen_numeric = function
   | TyInt -> TyFloat
   | TyVec (n, t) -> TyVec (n, widen_numeric t)
-  | TyRecord (s, args) -> TyRecord (s, List.map args ~f:widen_numeric)
-  | TyVariant (s, args) -> TyVariant (s, List.map args ~f:widen_numeric)
+  | TyRecord (hint, fields) ->
+    TyRecord (hint, List.map fields ~f:(fun (n, t) -> n, widen_numeric t))
+  | TyVariant (hint, ctors) ->
+    TyVariant (hint, List.map ctors ~f:(fun (n, ts) -> n, List.map ts ~f:widen_numeric))
   | TyArrow (a, b) -> TyArrow (widen_numeric a, widen_numeric b)
   | t -> t
 ;;
@@ -87,7 +96,7 @@ let check_class (cls : type_class) (ty : ty) : bool =
 ;;
 
 (** Resolve GLSL overloading constraints using concrete types. *)
-let resolve_constraints structs (constrs : constr list)
+let resolve_constraints (constrs : constr list)
   : (constr list * (Lexer.loc * ty * ty) list) Compiler_error.t
   =
   let rec aux deferred eqs (constrs : constr list) =
@@ -201,50 +210,36 @@ let resolve_constraints structs (constrs : constr list)
     | ({ desc = FieldAccess (ty, f, ret); loc } as c) :: rest ->
       (match ty with
        | TyVar _ -> aux (c :: deferred) eqs rest
-       | TyRecord (struct_name, type_args) ->
-         (match Map.find structs struct_name with
-          | None -> Err.fail "unknown struct" ~loc ~d:[%message (struct_name : string)]
-          | Some (params, fields) ->
-            if List.length params <> List.length type_args
-            then
-              Err.fail
-                "wrong number of type args for struct"
-                ~loc
-                ~d:[%message (struct_name : string)]
-            else (
-              let sub = List.zip_exn params type_args in
-              match List.Assoc.find fields ~equal:String.equal f with
-              | None ->
-                Err.fail
-                  "field not found in struct"
-                  ~loc
-                  ~d:[%message (f : string) (struct_name : string)]
-              | Some field_ty ->
-                let field_ty = subst_ty sub field_ty in
-                aux deferred ((loc, ret, field_ty) :: eqs) rest))
+       | TyRecord (_, fields) ->
+         (match List.Assoc.find fields ~equal:String.equal f with
+          | None -> Err.fail "field not found in record" ~loc ~d:[%message (f : string)]
+          | Some field_ty -> aux deferred ((loc, ret, field_ty) :: eqs) rest)
        | ty -> Err.fail "field access on non-record type" ~loc ~d:[%message (ty : ty)])
     | ({ desc = Coerce (from_ty, to_ty); loc } as c) :: rest ->
       let mk desc = { desc; loc } in
       if equal_ty from_ty to_ty
       then aux deferred eqs rest
       else (
-        let coerce_type_args s args s' args' =
-          if String.equal s s' && List.length args = List.length args'
-          then
-            aux
-              deferred
-              eqs
-              (List.map2_exn args args' ~f:(fun a b -> mk (Coerce (a, b))) @ rest)
-          else aux deferred ((loc, from_ty, to_ty) :: eqs) rest
-        in
         match from_ty, to_ty with
         | TyInt, TyFloat -> aux deferred eqs rest
         | TyArrow (p, r), TyArrow (p', r') ->
           aux deferred eqs (mk (Coerce (p', p)) :: mk (Coerce (r, r')) :: rest)
         | TyVec (n, t), TyVec (n', t') when n = n' ->
           aux deferred eqs (mk (Coerce (t, t')) :: rest)
-        | TyRecord (s, args), TyRecord (s', args') -> coerce_type_args s args s' args'
-        | TyVariant (s, args), TyVariant (s', args') -> coerce_type_args s args s' args'
+        | TyRecord (_, fs), TyRecord (_, fs') when List.length fs = List.length fs' ->
+          aux
+            deferred
+            eqs
+            (List.map2_exn fs fs' ~f:(fun (_, a) (_, b) -> mk (Coerce (a, b))) @ rest)
+        | TyVariant (_, cs), TyVariant (_, cs') when List.length cs = List.length cs' ->
+          let coerces =
+            List.map2_exn cs cs' ~f:(fun (_, ts) (_, ts') ->
+              List.map2_exn ts ts' ~f:(fun a b -> mk (Coerce (a, b))))
+            |> List.concat
+          in
+          aux deferred eqs (coerces @ rest)
+        | (TyRecord _ | TyVariant _), (TyRecord _ | TyVariant _) ->
+          aux deferred ((loc, from_ty, to_ty) :: eqs) rest
         | TyVar _, _ | _, TyVar _ ->
           (* NOTE: When we have a [TyVar], defer for the LUB-resolution phase.
              We SHOULD NOT eagerly unify here, premature unification can lock
@@ -260,19 +255,23 @@ let rec join_ty (a : ty) (b : ty) : ty option =
   if equal_ty a b
   then Some a
   else (
-    let join_nominal mk s args s' args' =
-      if String.equal s s' && List.length args = List.length args'
-      then List.map2_exn args args' ~f:join_ty |> Option.all |> Option.map ~f:(mk s)
-      else None
-    in
     match a, b with
     | TyInt, TyFloat | TyFloat, TyInt -> Some TyFloat
     | TyVec (n, t), TyVec (n', t') when n = n' ->
       Option.map (join_ty t t') ~f:(fun t -> TyVec (n, t))
-    | TyRecord (s, args), TyRecord (s', args') ->
-      join_nominal (fun s ts -> TyRecord (s, ts)) s args s' args'
-    | TyVariant (s, args), TyVariant (s', args') ->
-      join_nominal (fun s ts -> TyVariant (s, ts)) s args s' args'
+    | TyRecord (h1, fs), TyRecord (h2, fs') when List.length fs = List.length fs' ->
+      List.map2_exn fs fs' ~f:(fun (n, t) (_, t') ->
+        Option.map (join_ty t t') ~f:(fun jt -> n, jt))
+      |> Option.all
+      |> Option.map ~f:(fun fields -> TyRecord (merge_hint h1 h2, fields))
+    | TyVariant (h1, cs), TyVariant (h2, cs') when List.length cs = List.length cs' ->
+      List.map2_exn cs cs' ~f:(fun (n, ts) (_, ts') ->
+        if List.length ts <> List.length ts'
+        then None
+        else
+          List.map2_exn ts ts' ~f:join_ty |> Option.all |> Option.map ~f:(fun ts -> n, ts))
+      |> Option.all
+      |> Option.map ~f:(fun ctors -> TyVariant (merge_hint h1 h2, ctors))
     | _ -> None)
 ;;
 
@@ -346,14 +345,14 @@ let resolve_subtype_bounds (deferred : constr list) : substitution =
 ;;
 
 (** Solve a set of constraints to produce a substitution and deferred constraints. *)
-let solve structs (constrs : constr list) : (substitution * constr list) Compiler_error.t =
+let solve (constrs : constr list) : (substitution * constr list) Compiler_error.t =
   let apply_sub sub new_sub deferred =
     let sub = List.map sub ~f:(fun (v, t) -> v, subst_ty new_sub t) @ new_sub in
     let deferred = subst_constraints new_sub deferred in
     sub, deferred
   in
   let rec go sub constrs =
-    let%bind deferred, eqs = resolve_constraints structs constrs in
+    let%bind deferred, eqs = resolve_constraints constrs in
     let%bind new_sub = if List.is_empty eqs then return [] else unify eqs in
     if List.is_empty new_sub
     then (
@@ -370,11 +369,11 @@ let solve structs (constrs : constr list) : (substitution * constr list) Compile
   go [] constrs
 ;;
 
-let solve_scheme ?(structs = String.Map.empty) constrs sub =
+let solve_scheme constrs sub =
   if List.is_empty constrs
   then return sub
   else (
     let constrs = subst_constraints sub constrs in
-    let%map sub', _ = solve structs constrs in
+    let%map sub', _ = solve constrs in
     List.map sub ~f:(fun (v, t) -> v, subst_ty sub' t) @ sub')
 ;;

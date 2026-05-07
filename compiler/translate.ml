@@ -42,7 +42,10 @@ let to_glsl_term (t : Remove_placeholder.term) : term Compiler_error.t =
     Ok (App (ctor, List.map ~f:to_glsl_atom ts))
   | Index (t, i) -> Ok (Index (to_glsl_atom t, i))
   | Builtin (f, args) -> Ok (Builtin (f, List.map args ~f:to_glsl_atom))
-  | Record (s, args) -> Ok (App (s, List.map args ~f:to_glsl_atom))
+  | Record args ->
+    (match t.ty with
+     | TyRecord s -> Ok (App (s, List.map args ~f:to_glsl_atom))
+     | _ -> Err.fail "Record term does not have type [record]")
   | Field (a, f) -> Ok (Swizzle (to_glsl_atom a, f))
   | App (f, args) -> Ok (App (f, List.map args ~f:to_glsl_atom))
   | If _ ->
@@ -186,7 +189,12 @@ let build_const_term body =
       in
       Some (App (ctor, List.map ~f:sa ts))
     | Builtin (f, ts) -> Some (Builtin (f, List.map ts ~f:sa))
-    | Record (s, ts) -> Some (App (s, List.map ts ~f:sa))
+    | Record ts ->
+      (match t.ty with
+       | TyRecord s -> Some (App (s, List.map ts ~f:sa))
+       | _ ->
+         (* TODO: Refactor to use [Err.fail] *)
+         failwith "Record term does not have type [record]")
     | Index (a, i) -> Some (Index (sa a, i))
     | Field (a, f) -> Some (Swizzle (sa a, f))
     | App _ | If _ | Switch _ -> None

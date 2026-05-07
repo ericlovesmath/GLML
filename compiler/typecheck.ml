@@ -23,9 +23,9 @@ type term_desc =
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
   | Builtin of Glsl.builtin * term list
-  | Record of string * term list
+  | Record of term list
   | Field of term * string
-  | Variant of string * string * term list
+  | Variant of string * term list
   | Match of term * (Frontend.pat * term) list
   | Coerce of ty * term
 
@@ -66,10 +66,10 @@ let rec sexp_of_term_desc = function
   | Index (t, i) -> List [ Atom "index"; sexp_of_term t; Atom (Int.to_string i) ]
   | Builtin (b, ts) ->
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
-  | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_term)
+  | Record ts -> List (Atom "record" :: List.map ts ~f:sexp_of_term)
   | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
-  | Variant (ty_name, ctor, args) ->
-    List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_term)
+  | Variant (ctor, args) ->
+    List (Atom "Variant" :: Atom ctor :: List.map args ~f:sexp_of_term)
   | Match (scrutinee, cases) ->
     let sexp_of_case (pat, body) = List [ Frontend.sexp_of_pat pat; sexp_of_term body ] in
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
@@ -119,6 +119,27 @@ let subst_context (sub : substitution) (ctx : context) : type_scheme String.Map.
     vars, subst_constraints sub constrs, subst_ty sub ty)
 ;;
 
+(** Pre-order fold over every subterm of [t]. *)
+let rec fold_term ~(f : 'a -> term -> 'a) (acc : 'a) (t : term) : 'a =
+  let fold = fold_term ~f in
+  let acc = f acc t in
+  match t.desc with
+  | Var _ | Float _ | Int _ | Bool _ -> acc
+  | Vec (_, ts) | Builtin (_, ts) -> List.fold ts ~init:acc ~f:fold
+  | Record ts -> List.fold ts ~init:acc ~f:fold
+  | Lam (_, body) -> fold acc body
+  | App (fn, x) -> fold (fold acc fn) x
+  | Let (_, _, _, bind, body) -> fold (fold acc bind) body
+  | If (c, t, e) -> fold (fold (fold acc c) t) e
+  | Bop (_, l, r) -> fold (fold acc l) r
+  | Index (t, _) | Field (t, _) -> fold acc t
+  | Variant (_, args) -> List.fold args ~init:acc ~f:fold
+  | Match (scrutinee, cases) ->
+    let acc = fold acc scrutinee in
+    List.fold cases ~init:acc ~f:(fun acc (_, body) -> fold acc body)
+  | Coerce (_, inner) -> fold acc inner
+;;
+
 (** Apply substitution to term *)
 let rec subst_term (sub : substitution) (t : term) : term =
   let subst = subst_term sub in
@@ -134,9 +155,9 @@ let rec subst_term (sub : substitution) (t : term) : term =
     | Bop (op, l, r) -> Bop (op, subst l, subst r)
     | Index (t, i) -> Index (subst t, i)
     | Builtin (b, args) -> Builtin (b, List.map args ~f:subst)
-    | Record (name, args) -> Record (name, List.map args ~f:subst)
+    | Record args -> Record (List.map args ~f:subst)
     | Field (t, f) -> Field (subst t, f)
-    | Variant (ty_name, ctor, args) -> Variant (ty_name, ctor, List.map args ~f:subst)
+    | Variant (ctor, args) -> Variant (ctor, List.map args ~f:subst)
     | Match (scrutinee, cases) ->
       Match (subst scrutinee, List.map cases ~f:(fun (pat, body) -> pat, subst body))
     | Coerce (target, inner) -> Coerce (subst_ty sub target, subst inner)
@@ -198,14 +219,28 @@ let rec is_value (t : Desugar.term) : bool =
   | App _ | If _ | Bop _ | Builtin _ | Match _ -> false
 ;;
 
-let rec resolve_stlc_ty (env : env) (t : Frontend.ty) : ty Compiler_error.t =
-  let resolve = resolve_stlc_ty env in
+let rec resolve_stlc_ty ~(loc : Lexer.loc) (env : env) (t : Frontend.ty)
+  : ty Compiler_error.t
+  =
+  let resolve = resolve_stlc_ty ~loc env in
   let resolve_variant_or_struct name args =
-    if Map.mem env.variants name
-    then Ok (TyVariant (name, args))
-    else if Map.mem env.structs name
-    then Ok (TyRecord (name, args))
-    else Err.fail "type not a variant or record" ~d:[%message (t : Frontend.ty)]
+    match Map.find env.variants name, Map.find env.structs name with
+    | Some (params, ctors), _ ->
+      if List.length params <> List.length args
+      then Err.fail "wrong number of type args" ~loc ~d:[%message (name : string)]
+      else (
+        let sub = List.zip_exn params args in
+        let ctors = List.map ctors ~f:(fun (n, ts) -> n, List.map ts ~f:(subst_ty sub)) in
+        Ok (TyVariant (name, ctors)))
+    | _, Some (params, fields) ->
+      if List.length params <> List.length args
+      then Err.fail "wrong number of type args" ~loc ~d:[%message (name : string)]
+      else (
+        let sub = List.zip_exn params args in
+        let fields = List.map fields ~f:(fun (n, t) -> n, subst_ty sub t) in
+        Ok (TyRecord (name, fields)))
+    | None, None ->
+      Err.fail "type not a variant or record" ~loc ~d:[%message (t : Frontend.ty)]
   in
   match t with
   | TyName name ->
@@ -215,7 +250,7 @@ let rec resolve_stlc_ty (env : env) (t : Frontend.ty) : ty Compiler_error.t =
   | TyApp (name, args) ->
     (match Map.find env.aliases name with
      | Some (TyName name) -> resolve (TyApp (name, args))
-     | Some _ -> Err.fail "alias expected to be a typename for parametrized"
+     | Some _ -> Err.fail "alias expected to be a typename for parametrized" ~loc
      | None ->
        let%bind args = Compiler_error.all (List.map args ~f:resolve) in
        resolve_variant_or_struct name args)
@@ -260,57 +295,46 @@ let check_pat (env : env) loc (scrutinee_ty : ty) (pat : Frontend.pat)
               | PatVar v -> Ok (bind_var ctx v inner_elem_ty)
               | _ -> Err.fail "inner vec element pattern must be a variable" ~loc)
         | _ -> Err.fail "vec element pattern must be a variable or bracket" ~loc)
-  | PatCtor (ctor, vars), TyVariant (variant_name, type_args) ->
-    (match Map.find env.variants variant_name with
-     | None -> Err.fail "unknown variant" ~loc ~d:[%message (variant_name : string)]
-     | Some (params, ctors) ->
-       let param_sub = List.zip_exn params type_args in
-       (match List.find ctors ~f:(fun (c, _) -> String.equal c ctor) with
-        | None ->
-          Err.fail "unknown constructor in match" ~loc ~d:[%message (ctor : string)]
-        | Some (_, ctor_arg_tys) ->
-          let expected_arg_tys = List.map ctor_arg_tys ~f:(subst_ty param_sub) in
-          if List.length vars <> List.length expected_arg_tys
-          then (
-            let expected = List.length expected_arg_tys in
-            let got = List.length vars in
-            Err.fail
-              "wrong number of bindings in match case"
-              ~loc
-              ~d:[%message (ctor : string) (expected : int) (got : int)])
-          else
-            Ok
-              (List.fold2_exn vars expected_arg_tys ~init:env.ctx ~f:(fun ctx v ty ->
-                 Map.set ctx ~key:v ~data:([], [], ty)))))
-  | PatRecord (fields, is_partial), TyRecord (struct_name, type_args) ->
-    (match Map.find env.structs struct_name with
-     | None -> Err.fail "unknown struct" ~loc ~d:[%message (struct_name : string)]
-     | Some (params, struct_fields) ->
-       let param_sub = List.zip_exn params type_args in
-       let all_field_names = List.map struct_fields ~f:fst |> String.Set.of_list in
-       let%bind ctx, seen =
-         List.fold_result
-           fields
-           ~init:(env.ctx, String.Set.empty)
-           ~f:(fun (ctx, seen) (fname, fpat) ->
-             if Set.mem seen fname
-             then Err.fail "duplicate field" ~loc ~d:[%message (fname : string)]
-             else (
-               match List.Assoc.find struct_fields ~equal:String.equal fname with
-               | None -> Err.fail "unknown field" ~loc ~d:[%message (fname : string)]
-               | Some ty ->
-                 let field_ty = subst_ty param_sub ty in
-                 let%map ctx =
-                   match fpat with
-                   | Frontend.PatWildcard -> Ok ctx
-                   | Frontend.PatVar v -> Ok (bind_var ctx v field_ty)
-                   | _ -> Err.fail "record field pattern must be a variable" ~loc
-                 in
-                 ctx, Set.add seen fname))
-       in
-       if is_partial || Set.is_empty (Set.diff all_field_names seen)
-       then Ok ctx
-       else Err.fail "non-exhaustive record pat (use _ to ignore fields)" ~loc)
+  | PatCtor (ctor, vars), TyVariant (_, ctors) ->
+    (match List.find ctors ~f:(fun (c, _) -> String.equal c ctor) with
+     | None -> Err.fail "unknown constructor in match" ~loc ~d:[%message (ctor : string)]
+     | Some (_, expected_arg_tys) ->
+       if List.length vars <> List.length expected_arg_tys
+       then (
+         let expected = List.length expected_arg_tys in
+         let got = List.length vars in
+         Err.fail
+           "wrong number of bindings in match case"
+           ~loc
+           ~d:[%message (ctor : string) (expected : int) (got : int)])
+       else
+         Ok
+           (List.fold2_exn vars expected_arg_tys ~init:env.ctx ~f:(fun ctx v ty ->
+              Map.set ctx ~key:v ~data:([], [], ty))))
+  | PatRecord (fields, is_partial), TyRecord (_, struct_fields) ->
+    let all_field_names = List.map struct_fields ~f:fst |> String.Set.of_list in
+    let%bind ctx, seen =
+      List.fold_result
+        fields
+        ~init:(env.ctx, String.Set.empty)
+        ~f:(fun (ctx, seen) (fname, fpat) ->
+          if Set.mem seen fname
+          then Err.fail "duplicate field" ~loc ~d:[%message (fname : string)]
+          else (
+            match List.Assoc.find struct_fields ~equal:String.equal fname with
+            | None -> Err.fail "unknown field" ~loc ~d:[%message (fname : string)]
+            | Some field_ty ->
+              let%map ctx =
+                match fpat with
+                | Frontend.PatWildcard -> Ok ctx
+                | Frontend.PatVar v -> Ok (bind_var ctx v field_ty)
+                | _ -> Err.fail "record field pattern must be a variable" ~loc
+              in
+              ctx, Set.add seen fname))
+    in
+    if is_partial || Set.is_empty (Set.diff all_field_names seen)
+    then Ok ctx
+    else Err.fail "non-exhaustive record pat (use _ to ignore fields)" ~loc
   | _ ->
     Err.fail
       "unexpected pattern for scrutinee type"
@@ -326,24 +350,21 @@ let resolve_match_scrutinee_ty
       (cases : (Frontend.pat * _) list)
   : ty Compiler_error.t
   =
-  let infer_nominal_type ~get_name ~env ~extract_keys =
-    match get_name inferred_ty with
-    | Some (name, params, decl) -> Ok (name, params, decl)
-    | None ->
-      let keys =
-        List.filter_map cases ~f:(fun (pat, _) -> extract_keys pat)
-        |> List.concat
-        |> List.dedup_and_sort ~compare:String.compare
-      in
-      let candidates =
-        Map.filter env ~f:(fun (_, decl) ->
-          List.for_all keys ~f:(fun k ->
-            List.exists decl ~f:(fun (f, _) -> String.equal f k)))
-      in
-      (match Map.to_alist candidates with
-       | [ (name, (params, decl)) ] -> Ok (name, params, decl)
-       | [] -> Err.fail "pattern does not match with any known type" ~loc
-       | _ -> Err.fail "pattern match is ambiguous" ~loc)
+  let lookup_decl_by_pattern ~env ~extract_keys =
+    let keys =
+      List.filter_map cases ~f:(fun (pat, _) -> extract_keys pat)
+      |> List.concat
+      |> List.dedup_and_sort ~compare:String.compare
+    in
+    let candidates =
+      Map.filter env ~f:(fun (_, decl) ->
+        List.for_all keys ~f:(fun k ->
+          List.exists decl ~f:(fun (f, _) -> String.equal f k)))
+    in
+    match Map.to_alist candidates with
+    | [ (name, (params, decl)) ] -> Ok (name, params, decl)
+    | [] -> Err.fail "pattern does not match with any known type" ~loc
+    | _ -> Err.fail "pattern match is ambiguous" ~loc
   in
   match first_pat with
   | None -> Ok inferred_ty
@@ -368,40 +389,35 @@ let resolve_match_scrutinee_ty
        |> Compiler_error.join
      | _ -> Err.fail "bracket pattern requires vec scrutinee" ~loc)
   | Some (PatCtor _) ->
-    let%bind variant_name, variant_params, _ =
-      infer_nominal_type
-        ~get_name:(function
-          | TyVariant (name, _) ->
-            Option.map (Map.find env.variants name) ~f:(fun (p, c) -> name, p, c)
-          | _ -> None)
-        ~env:env.variants
-        ~extract_keys:(function
-          | Frontend.PatCtor (c, _) -> Some [ c ]
-          | _ -> None)
-    in
-    let param_sub = List.map variant_params ~f:(fun p -> p, fresh_tyvar ()) in
-    let type_args = List.map param_sub ~f:snd in
-    Ok (TyVariant (variant_name, type_args))
+    (match inferred_ty with
+     | TyVariant _ -> Ok inferred_ty
+     | _ ->
+       let%map name, params, ctors =
+         lookup_decl_by_pattern ~env:env.variants ~extract_keys:(function
+           | Frontend.PatCtor (c, _) -> Some [ c ]
+           | _ -> None)
+       in
+       let param_sub = List.map params ~f:(fun p -> p, fresh_tyvar ()) in
+       let inst_ctors =
+         List.map ctors ~f:(fun (n, ts) -> n, List.map ts ~f:(subst_ty param_sub))
+       in
+       TyVariant (name, inst_ctors))
   | Some (PatRecord _) ->
-    let%bind struct_name, struct_params, _ =
-      infer_nominal_type
-        ~get_name:(function
-          | TyRecord (name, _) ->
-            Option.map (Map.find env.structs name) ~f:(fun (p, f) -> name, p, f)
-          | _ -> None)
-        ~env:env.structs
-        ~extract_keys:(function
-          | Frontend.PatRecord (fs, _) -> Some (List.map fs ~f:fst)
-          | _ -> None)
-    in
-    let param_sub = List.map struct_params ~f:(fun p -> p, fresh_tyvar ()) in
-    let type_args = List.map param_sub ~f:snd in
-    Ok (TyRecord (struct_name, type_args))
+    (match inferred_ty with
+     | TyRecord _ -> Ok inferred_ty
+     | _ ->
+       let%map name, params, fields =
+         lookup_decl_by_pattern ~env:env.structs ~extract_keys:(function
+           | Frontend.PatRecord (fs, _) -> Some (List.map fs ~f:fst)
+           | _ -> None)
+       in
+       let param_sub = List.map params ~f:(fun p -> p, fresh_tyvar ()) in
+       let inst_fields = List.map fields ~f:(fun (n, t) -> n, subst_ty param_sub t) in
+       TyRecord (name, inst_fields))
   | Some (PatWildcard | PatVar _) -> Ok inferred_ty
 ;;
 
 let check_match_exhaustiveness
-      (env : env)
       loc
       ~(has_catchall : bool)
       (first_pat : Frontend.pat option)
@@ -437,23 +453,19 @@ let check_match_exhaustiveness
     then Ok ()
     else (
       match scrutinee_ty with
-      | TyVariant (name, _) ->
-        (match Map.find env.variants name with
-         | None -> Err.fail "unknown variant" ~loc ~d:[%message (name : string)]
-         | Some (_, ctors) ->
-           let case_ctors =
-             List.filter_map cases ~f:(fun (pat, _) ->
-               match pat with
-               | Frontend.PatCtor (c, _) -> Some c
-               | _ -> None)
-             |> String.Set.of_list
-           in
-           let all_ctors = List.map ctors ~f:fst |> String.Set.of_list in
-           let missing = Set.diff all_ctors case_ctors in
-           if Set.is_empty missing
-           then Ok ()
-           else
-             Err.fail "non-exhaustive match" ~loc ~d:[%message (missing : String.Set.t)])
+      | TyVariant (_, ctors) ->
+        let case_ctors =
+          List.filter_map cases ~f:(fun (pat, _) ->
+            match pat with
+            | Frontend.PatCtor (c, _) -> Some c
+            | _ -> None)
+          |> String.Set.of_list
+        in
+        let all_ctors = List.map ctors ~f:fst |> String.Set.of_list in
+        let missing = Set.diff all_ctors case_ctors in
+        if Set.is_empty missing
+        then Ok ()
+        else Err.fail "non-exhaustive match" ~loc ~d:[%message (missing : String.Set.t)]
       | _ -> Err.fail "expected variant scrutinee type for exhaustiveness check" ~loc)
 ;;
 
@@ -485,7 +497,7 @@ let rec infer_binding
     match return_ty with
     | None -> Ok None
     | Some return_ty ->
-      let%map return_ty = resolve_stlc_ty env return_ty in
+      let%map return_ty = resolve_stlc_ty ~loc env return_ty in
       Some return_ty
   in
   let ty_v_opt =
@@ -515,7 +527,7 @@ let rec infer_binding
     | Nonrec, Some full_ty -> coerce_term bind.loc full_ty bind
     | _ -> bind
   in
-  let%bind sub_bind, deferred = Constraint_solver.solve env.structs constrs in
+  let%bind sub_bind, deferred = Constraint_solver.solve constrs in
   let ty_bind = subst_ty sub_bind bind.ty in
   let bind = subst_term sub_bind bind in
   let ctx = subst_context sub_bind (subst_context term_sub env.ctx) in
@@ -557,7 +569,7 @@ and gen_term (env : env) (t : Desugar.term)
   | Lam (v, ty_ann, body_stlc) ->
     let%bind ty_v =
       match ty_ann with
-      | Some t -> resolve_stlc_ty env t
+      | Some t -> resolve_stlc_ty ~loc env t
       | None -> Ok (fresh_tyvar ())
     in
     let env = { env with ctx = Map.set env.ctx ~key:v ~data:([], [], ty_v) } in
@@ -807,7 +819,6 @@ and gen_record (env : env) (loc : Lexer.loc) (fields : (string * Desugar.term) l
   | [ (struct_name, (params, struct_fields)) ] ->
     let sub = List.map params ~f:(fun p -> p, fresh_tyvar ()) in
     let inst_fields = List.map struct_fields ~f:(fun (n, ty) -> n, subst_ty sub ty) in
-    let type_args = List.map sub ~f:snd in
     let%bind args, constrs_args, sub_rec =
       List.fold_result
         inst_fields
@@ -823,22 +834,20 @@ and gen_record (env : env) (loc : Lexer.loc) (fields : (string * Desugar.term) l
             Err.fail "(unreachable) missing field" ~loc ~d:[%message (name : string)])
     in
     Ok
-      ( { desc = Record (struct_name, List.rev args)
-        ; ty = TyRecord (struct_name, type_args)
-        ; loc
-        }
+      ( { desc = Record (List.rev args); ty = TyRecord (struct_name, inst_fields); loc }
       , constrs_args
       , sub_rec )
 
 and gen_variant (env : env) (loc : Lexer.loc) (ctor : string) (args : Desugar.term list)
   : (term * constr list * substitution) Compiler_error.t
   =
-  let%bind variant_name, params, ctor_arg_tys =
+  let%bind variant_name, params, all_ctors =
     let found =
-      Map.fold env.variants ~init:[] ~f:(fun ~key:vname ~data:(params, ctors) acc ->
-        match List.find ctors ~f:(fun (c, _) -> String.equal c ctor) with
-        | Some (_, arg_tys) -> (vname, params, arg_tys) :: acc
-        | None -> acc)
+      (* TODO: Map.of_alist_exn? *)
+      Map.fold env.variants ~init:[] ~f:(fun ~key ~data:(params, ctors) acc ->
+        if List.exists ctors ~f:(fun (c, _) -> String.equal c ctor)
+        then (key, params, ctors) :: acc
+        else acc)
     in
     match found with
     | [ x ] -> Ok x
@@ -846,8 +855,10 @@ and gen_variant (env : env) (loc : Lexer.loc) (ctor : string) (args : Desugar.te
     | _ -> Err.fail "ambiguous constructor" ~loc ~d:[%message (ctor : string)]
   in
   let param_sub = List.map params ~f:(fun p -> p, fresh_tyvar ()) in
-  let expected_arg_tys = List.map ctor_arg_tys ~f:(subst_ty param_sub) in
-  let type_args = List.map param_sub ~f:snd in
+  let inst_ctors =
+    List.map all_ctors ~f:(fun (n, ts) -> n, List.map ts ~f:(subst_ty param_sub))
+  in
+  let expected_arg_tys = List.Assoc.find_exn inst_ctors ~equal:String.equal ctor in
   if List.length args <> List.length expected_arg_tys
   then Err.fail "wrong number of args to constructor" ~loc ~d:[%message (ctor : string)]
   else (
@@ -862,8 +873,8 @@ and gen_variant (env : env) (loc : Lexer.loc) (ctor : string) (args : Desugar.te
             (arg :: acc_args, arg_constrs @ constrs @ acc_constrs, compose_sub sub acc_sub))
     in
     Ok
-      ( { desc = Variant (variant_name, ctor, List.rev args)
-        ; ty = TyVariant (variant_name, type_args)
+      ( { desc = Variant (ctor, List.rev args)
+        ; ty = TyVariant (variant_name, inst_ctors)
         ; loc
         }
       , constrs_args
@@ -908,7 +919,7 @@ and gen_match
     resolve_match_scrutinee_ty env loc scrutinee.ty first_pat cases
   in
   let%bind () =
-    check_match_exhaustiveness env loc ~has_catchall first_pat scrutinee_ty cases
+    check_match_exhaustiveness loc ~has_catchall first_pat scrutinee_ty cases
   in
   let check_dup_pats ~extract ~equal ~err_msg ~sexp_of_dup =
     let pats = List.filter_map cases ~f:(fun (p, _) -> extract p) in
@@ -974,13 +985,13 @@ and gen_match
     , composed )
 ;;
 
-let enforce_main_type env bind ty loc v =
+let enforce_main_type _env bind ty loc v =
   if not (String.equal v "main")
   then Ok (bind, ty)
   else (
     let expected = TyArrow (TyVec (2, TyFloat), TyVec (3, TyFloat)) in
     let main_constr = { desc = Coerce (ty, expected); loc } in
-    match Constraint_solver.solve env.structs [ main_constr ] with
+    match Constraint_solver.solve [ main_constr ] with
     | Ok (sub, []) ->
       let bind = subst_term sub bind in
       let bind = coerce_term bind.loc expected bind in
@@ -1018,14 +1029,15 @@ let typecheck (Program terms : Desugar.t) : t Compiler_error.t =
             in
             Ok (env, top :: acc))
         | Extern (ty, v) ->
-          let%bind ty = resolve_stlc_ty env ty in
+          let%bind ty = resolve_stlc_ty ~loc:top.loc env ty in
           let env = { env with ctx = Map.set env.ctx ~key:v ~data:([], [], ty) } in
           let top = { desc = Extern v; ty; loc = top.loc; scheme_constrs = [] } in
           Ok (env, top :: acc)
         | TypeDef (name, params, RecordDecl fields) ->
           let%bind fields =
             fields
-            |> List.map ~f:(fun (f, ty) -> resolve_stlc_ty env ty >>| Tuple2.create f)
+            |> List.map ~f:(fun (f, ty) ->
+              resolve_stlc_ty ~loc:top.loc env ty >>| Tuple2.create f)
             |> Compiler_error.all
           in
           let env =
@@ -1033,7 +1045,7 @@ let typecheck (Program terms : Desugar.t) : t Compiler_error.t =
           in
           let top =
             { desc = TypeDef (name, RecordDecl (params, fields))
-            ; ty = TyRecord (name, [])
+            ; ty = TyRecord (name, fields)
             ; loc = top.loc
             ; scheme_constrs = []
             }
@@ -1042,17 +1054,18 @@ let typecheck (Program terms : Desugar.t) : t Compiler_error.t =
         | TypeDef (name, params, VariantDecl ctors) ->
           let%bind ctors =
             List.map ctors ~f:(fun (c, tys) ->
-              let%map tys = Compiler_error.all (List.map tys ~f:(resolve_stlc_ty env)) in
+              let%map tys =
+                Compiler_error.all (List.map tys ~f:(resolve_stlc_ty ~loc:top.loc env))
+              in
               c, tys)
             |> Compiler_error.all
           in
           let env =
             { env with variants = Map.set env.variants ~key:name ~data:(params, ctors) }
           in
-          let param_tyvars = List.map params ~f:(fun p -> TyVar p) in
           let top =
             { desc = TypeDef (name, VariantDecl (params, ctors))
-            ; ty = TyVariant (name, param_tyvars)
+            ; ty = TyVariant (name, ctors)
             ; loc = top.loc
             ; scheme_constrs = []
             }

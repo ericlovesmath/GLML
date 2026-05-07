@@ -116,9 +116,9 @@ let rec subst_vars (subs : (string * string) list) (t : Lambda_lift.term)
     | Bop (op, l, r) -> Bop (op, rw l, rw r)
     | Index (t, i) -> Index (rw t, i)
     | Builtin (b, ts) -> Builtin (b, List.map ts ~f:rw)
-    | Record (s, ts) -> Record (s, List.map ts ~f:rw)
+    | Record ts -> Record (List.map ts ~f:rw)
     | Field (t, f) -> Field (rw t, f)
-    | Variant (tn, c, args) -> Variant (tn, c, List.map args ~f:rw)
+    | Variant (c, args) -> Variant (c, List.map args ~f:rw)
     | Match (scrut, cases) ->
       let rw_case (pat, body) =
         let bound = Frontend.pat_bound_vars pat in
@@ -339,7 +339,7 @@ let rec rewrite_term
       | None when Map.mem ctx.globals v ->
         let reg, info, ctor_name = add_global_entry reg t.ty v t.loc in
         ( reg
-        , ({ desc = Variant (info.variant_name, ctor_name, [])
+        , ({ desc = Variant (ctor_name, [])
            ; ty = TyVariant info.variant_name
            ; loc = t.loc
            }
@@ -396,7 +396,7 @@ let rec rewrite_term
               add_lambda_entry reg t.ty remaining_params body captured_arg_vars t.loc
             in
             ( reg
-            , { desc = Variant (info.variant_name, ctor_name, args)
+            , { desc = Variant (ctor_name, args)
               ; ty = TyVariant info.variant_name
               ; loc = t.loc
               } ))
@@ -455,7 +455,7 @@ let rec rewrite_term
          in
          let payload = f :: args in
          ( reg
-         , { desc = Variant (result_info.variant_name, ctor_name, payload)
+         , { desc = Variant (ctor_name, payload)
            ; ty = TyVariant result_info.variant_name
            ; loc = t.loc
            } ))
@@ -497,9 +497,9 @@ let rec rewrite_term
   | Builtin (b, ts) ->
     let reg, ts = rw_list reg ts in
     reg, { t with desc = Builtin (b, ts) }
-  | Record (s, ts) ->
+  | Record ts ->
     let reg, ts = rw_list reg ts in
-    reg, { t with desc = Record (s, ts) }
+    reg, { t with desc = Record ts }
   | Field (tt, f) ->
     let reg, tt = rw reg tt in
     if (not call_head) && is_fn_ty t.ty
@@ -507,9 +507,9 @@ let rec rewrite_term
       let reg, info = get_or_create_info reg t.ty in
       reg, { t with desc = Field (tt, f); ty = TyVariant info.variant_name })
     else reg, { t with desc = Field (tt, f) }
-  | Variant (tn, c, args) ->
+  | Variant (c, args) ->
     let reg, args = rw_list reg args in
-    reg, { t with desc = Variant (tn, c, args) }
+    reg, { t with desc = Variant (c, args) }
   | Match (scrut, cases) ->
     let reg, scrut = rw reg scrut in
     let reg, cases =
@@ -580,7 +580,7 @@ let rec global_refs_of (globals : String.Set.t) (term : Lambda_lift.term) : Stri
   | Let (_, bind, body) -> Set.union (go bind) (go body)
   | If (c, t, e) -> union_many [ go c; go t; go e ]
   | Bop (_, l, r) -> Set.union (go l) (go r)
-  | Vec (_, ts) | Builtin (_, ts) | Record (_, ts) | Variant (_, _, ts) ->
+  | Vec (_, ts) | Builtin (_, ts) | Record ts | Variant (_, ts) ->
     union_many (List.map ts ~f:go)
   | Match (scrut, cases) ->
     union_many (go scrut :: List.map cases ~f:(fun (_, body) -> go body))
@@ -604,7 +604,7 @@ let rec term_ty_deps (t : Lambda_lift.term) : String.Set.t =
     | If (c, t, e) ->
       Set.union (Set.union (term_ty_deps c) (term_ty_deps t)) (term_ty_deps e)
     | Bop (_, t, t') -> Set.union (term_ty_deps t) (term_ty_deps t')
-    | Vec (_, ts) | Builtin (_, ts) | Record (_, ts) | Variant (_, _, ts) ->
+    | Vec (_, ts) | Builtin (_, ts) | Record ts | Variant (_, ts) ->
       String.Set.union_list (List.map ~f:term_ty_deps ts)
     | Index (t, _) | Field (t, _) -> term_ty_deps t
     | Match (scrut, cases) ->

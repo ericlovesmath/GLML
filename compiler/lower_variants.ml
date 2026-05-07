@@ -19,7 +19,7 @@ type term_desc =
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list
   | If of atom * anf * anf
-  | Record of string * atom list
+  | Record of atom list
   | Field of atom * string
   | Switch of atom * (Glsl.switch_case * anf) list
 
@@ -54,7 +54,7 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_atom)
   | App (f, args) -> List (Atom f :: List.map args ~f:sexp_of_atom)
   | If (c, t, e) -> List [ Atom "if"; sexp_of_atom c; sexp_of_anf t; sexp_of_anf e ]
-  | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_atom)
+  | Record ts -> List (Atom "record" :: List.map ts ~f:sexp_of_atom)
   | Field (t, f) -> List [ Atom "."; sexp_of_atom t; Atom f ]
   | Switch (tag, cases) ->
     let sexp_of_case (label, body) =
@@ -198,13 +198,22 @@ let rec lower_term (tenv : type_env) (term : Tail_call.term) : term Compiler_err
   | Index (t, i) -> pure (Index (t, i))
   | Builtin (b, ts) -> pure (Builtin (b, ts))
   | App (f, args) -> pure (App (f, args))
-  | Record (s, args) -> pure (Record (s, args))
+  | Record args -> pure (Record args)
   | Field (a, f) -> pure (Field (a, f))
   | If (c, t, e) ->
     let%bind t = lower_anf tenv t in
     let%bind e = lower_anf tenv e in
     pure (If (c, t, e))
-  | Variant (ty_name, ctor, args) ->
+  | Variant (ctor, args) ->
+    let%bind ty_name =
+      match term.ty with
+      | TyVariant n -> Ok n
+      | _ ->
+        Err.fail
+          "expected variant type"
+          ~loc:term.loc
+          ~d:[%message (term : Tail_call.term)]
+    in
     (match Map.find tenv ty_name with
      | Some (VariantDecl ctors) ->
        let%bind tag, _ =
@@ -224,9 +233,9 @@ let rec lower_term (tenv : type_env) (term : Tail_call.term) : term Compiler_err
          |> Compiler_error.all
        in
        let tag_atom : atom = { desc = Int tag; ty = TyInt; loc = term.loc } in
-       pure (Record (ty_name, tag_atom :: flat_atoms))
+       pure (Record (tag_atom :: flat_atoms))
      | Some (RecordDecl _) | None ->
-       Err.fail "unknown variant type" ~d:[%message (ty_name : string)])
+       Err.fail "unknown variant type" ~loc:term.loc ~d:[%message (ty_name : string)])
   | Match _ -> Err.fail "match should be handled in lower_anf"
 
 and lower_anf (tenv : type_env) (anf : Tail_call.anf) : anf Compiler_error.t =

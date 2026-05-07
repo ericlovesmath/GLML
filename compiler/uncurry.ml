@@ -14,9 +14,9 @@ type term_desc =
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
   | Builtin of Glsl.builtin * term list
-  | Record of string * term list
+  | Record of term list
   | Field of term * string
-  | Variant of string * string * term list
+  | Variant of string * term list
   | Match of term * (Frontend.pat * term) list
 
 and term =
@@ -48,10 +48,10 @@ let rec sexp_of_term_desc = function
   | Index (t, i) -> List [ Atom "index"; sexp_of_term t; Atom (Int.to_string i) ]
   | Builtin (b, ts) ->
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
-  | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_term)
+  | Record ts -> List (Atom "record" :: List.map ts ~f:sexp_of_term)
   | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
-  | Variant (ty_name, ctor, args) ->
-    List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_term)
+  | Variant (ctor, args) ->
+    List (Atom "Variant" :: Atom ctor :: List.map args ~f:sexp_of_term)
   | Match (scrutinee, cases) ->
     let sexp_of_case (pat, body) = List [ Frontend.sexp_of_pat pat; sexp_of_term body ] in
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
@@ -113,10 +113,9 @@ and uncurry_term (t : Monomorphize.term) : term =
     | Bop (op, l, r) -> Bop (op, uncurry_term l, uncurry_term r)
     | Index (t_sub, i) -> Index (uncurry_term t_sub, i)
     | Builtin (b, ts) -> Builtin (b, List.map ts ~f:uncurry_term)
-    | Record (s, ts) -> Record (s, List.map ts ~f:uncurry_term)
+    | Record ts -> Record (List.map ts ~f:uncurry_term)
     | Field (t, f) -> Field (uncurry_term t, f)
-    | Variant (ty_name, ctor, args) ->
-      Variant (ty_name, ctor, List.map args ~f:uncurry_term)
+    | Variant (ctor, args) -> Variant (ctor, List.map args ~f:uncurry_term)
     | Match (scrutinee, cases) ->
       Match (uncurry_term scrutinee, List.map cases ~f:(Tuple2.map_snd ~f:uncurry_term))
   in

@@ -8,10 +8,15 @@ type ty =
   | TyBool
   | TyVec of int * ty
   | TyArrow of ty * ty
-  | TyRecord of string * ty list
-  | TyVariant of string * ty list
+  (** NOTE: First arg [hint] on records/variants is a non-semantic name suggestion
+      used by later passes (monomorphize) to produce nicer GLSL struct names.
+      Do NOT use this for any other purpose. *)
+  | TyRecord of string * (string * ty) list
+  | TyVariant of string * (string * ty list) list
   | TyVar of string
 [@@deriving sexp_of, equal, compare]
+
+val merge_hint : string -> string -> string
 
 (** Top-level type declarations. The [string list] holds type parameter names
     (e.g. ["'a"; "'b"]) and comes first to mirror the surface syntax

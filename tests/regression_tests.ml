@@ -135,12 +135,12 @@ let%expect_test "int promotion edge cases" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct r_pair_b {
+    struct pair {
         bool fst;
         float snd;
     };
     vec3 main_pure(vec2 u) {
-        r_pair_b p = r_pair_b(true, 2.);
+        pair p = pair(true, 2.);
         float anf = p.snd;
         float anf_0 = p.snd;
         return vec3(anf, anf_0, 0.);
@@ -202,14 +202,14 @@ let%expect_test "regression - polymorphic struct type in function" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct r_box_f {
+    struct box {
         float value;
     };
-    float f_m(r_box_f b) {
+    float f_m(box b) {
         return b.value;
     }
     vec3 main_pure(vec2 coord) {
-        r_box_f anf = r_box_f(1.);
+        box anf = box(1.);
         float anf_0 = f_m(anf);
         return vec3(anf_0, 0., 0.);
     }
@@ -232,22 +232,22 @@ let%expect_test "regression - polymorphic struct type in function" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct r_box_b {
+    struct box {
         bool value;
     };
-    bool f_m(r_box_b b) {
-        return b.value;
-    }
-    struct r_box_f {
+    struct box_0 {
         float value;
     };
-    float f_m_0(r_box_f b) {
+    bool f_m(box b) {
+        return b.value;
+    }
+    float f_m_0(box_0 b) {
         return b.value;
     }
     vec3 main_pure(vec2 coord) {
-        r_box_f anf = r_box_f(1.);
+        box_0 anf = box_0(1.);
         float a = f_m_0(anf);
-        r_box_b anf_0 = r_box_b(true);
+        box anf_0 = box(true);
         bool anf_1 = f_m(anf_0);
         int b_0;
         if (anf_1) {
@@ -281,11 +281,11 @@ let%expect_test "regression - polymorphic variant type in function" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct v_option_f {
+    struct option {
         int tag;
         float Some_0;
     };
-    bool is_some_m(v_option_f o) {
+    bool is_some_m(option o) {
         int _lv_tag = o.tag;
         switch (_lv_tag) {
             case 0: {
@@ -300,7 +300,7 @@ let%expect_test "regression - polymorphic variant type in function" =
         }
     }
     vec3 main_pure(vec2 coord) {
-        v_option_f anf = v_option_f(0, 1.);
+        option anf = option(0, 1.);
         bool anf_0 = is_some_m(anf);
         float b;
         if (anf_0) {
@@ -359,15 +359,15 @@ let%expect_test "field access in let binding (unannotated)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct r_box_f {
+    struct box {
         float value;
     };
-    float f_m(r_box_f b) {
+    float f_m(box b) {
         float a = b.value;
         return a;
     }
     vec3 main_pure(vec2 coord) {
-        r_box_f anf = r_box_f(1.);
+        box anf = box(1.);
         float anf_0 = f_m(anf);
         return vec3(anf_0, 0., 0.);
     }
@@ -391,24 +391,24 @@ let%expect_test "field access in let binding (unannotated)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct r_box_b {
+    struct box {
         bool value;
     };
-    bool f_m(r_box_b b) {
+    struct box_0 {
+        float value;
+    };
+    bool f_m(box b) {
         bool a = b.value;
         return a;
     }
-    struct r_box_f {
-        float value;
-    };
-    float f_m_0(r_box_f b) {
+    float f_m_0(box_0 b) {
         float a = b.value;
         return a;
     }
     vec3 main_pure(vec2 coord) {
-        r_box_f anf = r_box_f(1.);
+        box_0 anf = box_0(1.);
         float x = f_m_0(anf);
-        r_box_b anf_0 = r_box_b(true);
+        box anf_0 = box(true);
         bool anf_1 = f_m(anf_0);
         int y;
         if (anf_1) {
@@ -436,15 +436,15 @@ let%expect_test "field access in let binding (unannotated)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct r_box_f {
+    struct box {
         float value;
     };
-    float scale_m(r_box_f b) {
+    float scale_m(box b) {
         float x = b.value;
         return (x * 2.);
     }
     vec3 main_pure(vec2 coord) {
-        r_box_f anf = r_box_f(1.);
+        box anf = box(1.);
         float anf_0 = scale_m(anf);
         return vec3(anf_0, 0., 0.);
     }
@@ -492,15 +492,15 @@ let%expect_test "regression - placeholder structs and variants in tail position"
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct r_box_vec3 {
+    struct box {
         vec3 v;
     };
-    r_box_vec3 f_0(bool x) {
+    box f_0(bool x) {
         int _iter = 0;
         while ((_iter < 1000)) {
             if (x) {
                 vec3 anf = vec3(1., 1., 1.);
-                return r_box_vec3(anf);
+                return box(anf);
             } else {
                 x = true;
                 int _iter_inc = (_iter + 1);
@@ -508,11 +508,11 @@ let%expect_test "regression - placeholder structs and variants in tail position"
                 continue;
             }
         }
-        r_box_vec3 _tmp;
+        box _tmp;
         return _tmp;
     }
     vec3 main_pure(vec2 coord) {
-        r_box_vec3 anf_0 = f_0(false);
+        box anf_0 = f_0(false);
         return anf_0.v;
     }
     void main() {
@@ -1219,15 +1219,15 @@ let%expect_test "struct pattern matching on non-concrete types" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct r_box_f {
+    struct box {
         float value;
     };
-    float unbox_m(r_box_f _fn_arg) {
+    float unbox_m(box _fn_arg) {
         float v = _fn_arg.value;
         return v;
     }
     vec3 main_pure(vec2 uv) {
-        r_box_f anf = r_box_f(1.5);
+        box anf = box(1.5);
         float n = unbox_m(anf);
         return vec3(n, 0., 0.);
     }

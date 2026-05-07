@@ -11,9 +11,9 @@ type term_desc =
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
   | Builtin of Glsl.builtin * term list
-  | Record of string * term list
+  | Record of term list
   | Field of term * string
-  | Variant of string * string * term list
+  | Variant of string * term list
   | Match of term * (Frontend.pat * term) list
 [@@deriving sexp_of]
 

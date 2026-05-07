@@ -33,7 +33,7 @@ type term_desc =
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list
   | If of atom * anf * anf
-  | Record of string * atom list
+  | Record of atom list
   | Field of atom * string
   | Switch of atom * (Glsl.switch_case * anf) list
 
@@ -67,7 +67,7 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_atom)
   | App (f, args) -> List (Atom f :: List.map args ~f:sexp_of_atom)
   | If (c, t, e) -> List [ Atom "if"; sexp_of_atom c; sexp_of_anf t; sexp_of_anf e ]
-  | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_atom)
+  | Record ts -> List (Atom "record" :: List.map ts ~f:sexp_of_atom)
   | Field (t, f) -> List [ Atom "."; sexp_of_atom t; Atom f ]
   | Switch (tag, cases) ->
     let sexp_of_case (label, body) =
@@ -215,9 +215,9 @@ and remove_term (term : Lower_variants.term) : term * bindings =
     let t = remove_anf t in
     let f = remove_anf f in
     pure (If (c, t, f)) binds
-  | Record (s, atoms) ->
+  | Record (atoms) ->
     let atoms, binds = remove_atoms atoms in
-    pure (Record (s, atoms)) binds
+    pure (Record (atoms)) binds
   | Field (a, s) ->
     let a, binds = remove_atom a in
     pure (Field (a, s)) binds

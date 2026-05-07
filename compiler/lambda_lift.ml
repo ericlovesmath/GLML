@@ -18,9 +18,9 @@ type term_desc =
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
   | Builtin of Glsl.builtin * term list
-  | Record of string * term list
+  | Record of term list
   | Field of term * string
-  | Variant of string * string * term list
+  | Variant of string * term list
   | Match of term * (Frontend.pat * term) list
 
 and term =
@@ -44,10 +44,10 @@ let rec sexp_of_term_desc = function
   | Index (t, i) -> List [ Atom "index"; sexp_of_term t; Atom (Int.to_string i) ]
   | Builtin (b, ts) ->
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
-  | Record (s, ts) -> List (Atom s :: List.map ts ~f:sexp_of_term)
+  | Record ts -> List (Atom "record" :: List.map ts ~f:sexp_of_term)
   | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
-  | Variant (ty_name, ctor, args) ->
-    List (Atom "Variant" :: Atom ty_name :: Atom ctor :: List.map args ~f:sexp_of_term)
+  | Variant (ctor, args) ->
+    List (Atom "Variant" :: Atom ctor :: List.map args ~f:sexp_of_term)
   | Match (scrutinee, cases) ->
     let sexp_of_case (pat, body) = List [ Frontend.sexp_of_pat pat; sexp_of_term body ] in
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
@@ -122,9 +122,9 @@ let free_vars (env : env) (t : Uncurry.term) : Monomorphize.ty String.Map.t =
     | If (c, t_true, e) -> union_list [ fv c; fv t_true; fv e ]
     | Bop (_, l, r) -> union (fv l) (fv r)
     | Index (t, _) -> fv t
-    | Record (_, ts) -> union_list (List.map ts ~f:fv)
+    | Record ts -> union_list (List.map ts ~f:fv)
     | Field (t, _) -> fv t
-    | Variant (_, _, args) -> union_list (List.map args ~f:fv)
+    | Variant (_, args) -> union_list (List.map args ~f:fv)
     | Match (scrutinee, cases) ->
       let fv_cases =
         List.map cases ~f:(fun (pat, body) ->
@@ -227,15 +227,15 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
   | Builtin (b, ts) ->
     let%bind ts, tops = lift_list ts in
     make (Builtin (b, ts)) tops
-  | Record (s, ts) ->
+  | Record ts ->
     let%bind ts, tops = lift_list ts in
-    make (Record (s, ts)) tops
+    make (Record ts) tops
   | Field (t, f) ->
     let%bind t, tops = lift t in
     make (Field (t, f)) tops
-  | Variant (ty_name, ctor, args) ->
+  | Variant (ctor, args) ->
     let%bind args, tops = lift_list args in
-    make (Variant (ty_name, ctor, args)) tops
+    make (Variant (ctor, args)) tops
   | Match (scrutinee, cases) ->
     let%bind scrutinee, s_tops = lift scrutinee in
     let%bind cases, c_tops =

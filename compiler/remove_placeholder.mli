@@ -20,7 +20,7 @@ type term_desc =
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list
   | If of atom * anf * anf
-  | Record of string * atom list
+  | Record of atom list
   | Field of atom * string
   | Switch of atom * (Glsl.switch_case * anf) list
 [@@deriving sexp_of]

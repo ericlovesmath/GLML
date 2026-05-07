@@ -7,10 +7,12 @@ type ty =
   | TyBool
   | TyVec of int * ty
   | TyArrow of ty * ty
-  | TyRecord of string * ty list
-  | TyVariant of string * ty list
+  | TyRecord of (string[@equal.ignore] [@compare.ignore]) * (string * ty) list
+  | TyVariant of (string[@equal.ignore] [@compare.ignore]) * (string * ty list) list
   | TyVar of string
 [@@deriving equal, compare]
+
+let merge_hint a b = if String.is_empty a then b else a
 
 let rec sexp_of_ty = function
   | TyFloat -> Atom "float"
@@ -18,10 +20,16 @@ let rec sexp_of_ty = function
   | TyBool -> Atom "bool"
   | TyVec (i, t) -> List [ Atom "vec"; Atom (Int.to_string i); sexp_of_ty t ]
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
-  | TyRecord (s, []) -> Atom s
-  | TyRecord (s, args) -> List (Atom s :: List.map args ~f:sexp_of_ty)
-  | TyVariant (s, []) -> Atom s
-  | TyVariant (s, args) -> List (Atom s :: List.map args ~f:sexp_of_ty)
+  | TyRecord (hint, fields) ->
+    List
+      (Atom "record"
+       :: Atom hint
+       :: List.map fields ~f:(fun (n, t) -> List [ Atom n; sexp_of_ty t ]))
+  | TyVariant (hint, ctors) ->
+    List
+      (Atom "variant"
+       :: Atom hint
+       :: List.map ctors ~f:(fun (n, ts) -> List (Atom n :: List.map ts ~f:sexp_of_ty)))
   | TyVar v -> Atom ("'" ^ v)
 ;;
 
@@ -80,8 +88,10 @@ let rec subst_ty (sub : substitution) (ty : ty) : ty =
   | TyVar v -> List.Assoc.find ~equal:String.equal sub v |> Option.value ~default:ty
   | TyFloat | TyInt | TyBool -> ty
   | TyVec (n, t) -> TyVec (n, subst_ty sub t)
-  | TyVariant (s, args) -> TyVariant (s, List.map args ~f:(subst_ty sub))
-  | TyRecord (s, args) -> TyRecord (s, List.map args ~f:(subst_ty sub))
+  | TyVariant (hint, ctors) ->
+    TyVariant (hint, List.map ctors ~f:(fun (n, ts) -> n, List.map ts ~f:(subst_ty sub)))
+  | TyRecord (hint, fields) ->
+    TyRecord (hint, List.map fields ~f:(fun (n, t) -> n, subst_ty sub t))
   | TyArrow (f, x) -> TyArrow (subst_ty sub f, subst_ty sub x)
 ;;
 
@@ -112,8 +122,11 @@ let rec ftv_of_ty = function
   | TyVar v -> String.Set.singleton v
   | TyFloat | TyInt | TyBool -> String.Set.empty
   | TyVec (_, t) -> ftv_of_ty t
-  | TyVariant (_, args) | TyRecord (_, args) ->
-    String.Set.union_list (List.map args ~f:ftv_of_ty)
+  | TyRecord (_, fields) ->
+    String.Set.union_list (List.map fields ~f:(fun (_, t) -> ftv_of_ty t))
+  | TyVariant (_, ctors) ->
+    String.Set.union_list
+      (List.concat_map ctors ~f:(fun (_, ts) -> List.map ts ~f:ftv_of_ty))
   | TyArrow (t1, t2) -> Set.union (ftv_of_ty t1) (ftv_of_ty t2)
 ;;
 
