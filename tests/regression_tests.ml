@@ -546,19 +546,6 @@ let%expect_test "regression - no recursive DFn structs from partial application"
         int tag;
         DFn lctor_0;
     };
-    vec3 f_0_m_0(float x) {
-        return vec3(x, x, x);
-    }
-    vec3 dapply(DFn dfn, float da) {
-        return f_0_m_0(da);
-    }
-    vec3 blend(DFn f, float w) {
-        return dapply(f, w);
-    }
-    vec3 dapply_0(DFn_0 dfn_0, float da_0) {
-        DFn ca = dfn_0.lctor_0;
-        return blend(ca, da_0);
-    }
     vec3 main_pure(vec2 coord) {
         DFn anf = DFn(0);
         DFn_0 a = DFn_0(0, anf);
@@ -1313,72 +1300,6 @@ let%expect_test "regression - wrong DFn return type" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_0 {
-        int tag;
-    };
-    struct DFn_1 {
-        int tag;
-    };
-    struct DFn {
-        int tag;
-        DFn_1 lctor_0;
-        float lctor_1;
-        DFn_1 lctor_0_0;
-        float lctor_0_1;
-    };
-    struct DFn_2 {
-        int tag;
-        DFn_0 lctor_1_0;
-        DFn lctor_1_1;
-        DFn lctor_1_2;
-    };
-    float constant(float r, vec2 p) {
-        return r;
-    }
-    float dapply_1(DFn_1 dfn_1, float da_3, vec2 da_4) {
-        return constant(da_3, da_4);
-    }
-    float dapply(DFn dfn, vec2 da) {
-        int _lv_tag = dfn.tag;
-        switch (_lv_tag) {
-            case 0: {
-                DFn_1 ca = dfn.lctor_0;
-                float ca_0 = dfn.lctor_1;
-                return dapply_1(ca, ca_0, da);
-                break;
-            }
-            default: {
-                DFn_1 ca_1 = dfn.lctor_0_0;
-                float ca_2 = dfn.lctor_0_1;
-                return dapply_1(ca_1, ca_2, da);
-                break;
-            }
-        }
-    }
-    DFn_2 dup_m(DFn_0 f_0, DFn_1 g, float x) {
-        DFn_1 _tmp;
-        DFn anf = DFn(0, g, x, _tmp, 0.);
-        DFn_1 _tmp_0;
-        DFn anf_0 = DFn(1, _tmp_0, 0., g, x);
-        return DFn_2(0, f_0, anf, anf_0);
-    }
-    DFn_2 scene() {
-        DFn_0 anf_1 = DFn_0(0);
-        DFn_1 anf_2 = DFn_1(0);
-        return dup_m(anf_1, anf_2, 0.3);
-    }
-    float union_0_m(DFn f, DFn _x, vec2 r_0) {
-        return dapply(f, r_0);
-    }
-    float dapply_0(DFn_0 dfn_0, DFn da_0, DFn da_1, vec2 da_2) {
-        return union_0_m(da_0, da_1, da_2);
-    }
-    float dapply_2(DFn_2 dfn_2, vec2 da_5) {
-        DFn_0 ca_3 = dfn_2.lctor_1_0;
-        DFn ca_4 = dfn_2.lctor_1_1;
-        DFn ca_5 = dfn_2.lctor_1_2;
-        return dapply_0(ca_3, ca_4, ca_5, da_5);
-    }
     vec3 main_pure(vec2 coord) {
         return vec3(0., 0., 0.);
     }
@@ -1427,44 +1348,6 @@ let%expect_test "defunctionalize unifies int/float arrow flavors" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        vec3 lctor_0;
-        float lctor_0_0;
-    };
-    vec3 add_noise(float strength, vec3 p_0) {
-        return vec3(0., 0., 0.);
-    }
-    vec3 make_waves(vec3 c, vec3 p) {
-        return c;
-    }
-    vec3 dapply(DFn dfn, vec3 da) {
-        int _lv_tag = dfn.tag;
-        switch (_lv_tag) {
-            case 0: {
-                vec3 ca = dfn.lctor_0;
-                return make_waves(ca, da);
-                break;
-            }
-            default: {
-                float ca_0 = dfn.lctor_0_0;
-                return add_noise(ca_0, da);
-                break;
-            }
-        }
-    }
-    struct material {
-        int tag;
-        DFn Phong_0;
-        float Phong_1;
-    };
-    material scene_mat(vec3 p_1) {
-        vec3 anf = vec3(1., 0.2, 0.5);
-        DFn waves = DFn(0, anf, 0.);
-        vec3 _tmp;
-        DFn noisy_waves = DFn(1, _tmp, 0.15);
-        return material(0, noisy_waves, 64.);
-    }
     vec3 main_pure(vec2 uv) {
         return vec3(0., 0., 0.);
     }
@@ -1624,14 +1507,59 @@ let%expect_test "unused HOF with fn-typed param emits empty DFn typedef" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
+    vec3 main_pure(vec2 coord) {
+        return vec3(0., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "HOF that applies param but is never called drops wrapper" =
+  test
+    {|
+    let test (f : vec3 -> vec3) =
+      fun p ->
+        let n = f p in
+        [0, 0, 0]
+
+    let main uv =
+      let f = test (fun a -> a) in
+      f [0, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
     struct DFn {
         int tag;
     };
-    vec3 add_noise(DFn f, vec3 p) {
+    struct DFn_0 {
+        int tag;
+        DFn lctor_0;
+    };
+    vec3 lam(vec3 a) {
+        return a;
+    }
+    vec3 dapply(DFn dfn, vec3 da) {
+        return lam(da);
+    }
+    vec3 test(DFn f, vec3 p) {
+        vec3 n = dapply(f, p);
         return vec3(0., 0., 0.);
     }
-    vec3 main_pure(vec2 coord) {
-        return vec3(0., 0., 0.);
+    vec3 dapply_0(DFn_0 dfn_0, vec3 da_0) {
+        DFn ca = dfn_0.lctor_0;
+        return test(ca, da_0);
+    }
+    vec3 main_pure(vec2 uv) {
+        DFn anf = DFn(0);
+        DFn_0 f_0 = DFn_0(0, anf);
+        vec3 anf_0 = vec3(0., 0., 0.);
+        return dapply_0(f_0, anf_0);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1655,11 +1583,6 @@ let%expect_test "dot accepts mixed int/float vec args" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 f(vec3 p) {
-        vec3 anf = vec3(0., 0., 0.);
-        float n = dot(p, anf);
-        return vec3(n, n, n);
-    }
     vec3 main_pure(vec2 uv) {
         return vec3(0., 0., 0.);
     }

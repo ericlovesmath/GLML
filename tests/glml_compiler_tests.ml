@@ -2514,7 +2514,7 @@ let%expect_test "non-parametrized type aliases" =
     type c = b
 
     let f (n : b) : c = n
-    let main (u : vec2) = [0, 0, 0]
+    let main (u : vec2) = [f 0, 0, 0]
     |};
   [%expect
     {|
@@ -2525,7 +2525,9 @@ let%expect_test "non-parametrized type aliases" =
         return n;
     }
     vec3 main_pure(vec2 u) {
-        return vec3(0., 0., 0.);
+        int anf = f(0);
+        float anf_0 = float(anf);
+        return vec3(anf_0, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -2546,13 +2548,6 @@ let%expect_test "non-parametrized type aliases" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct option {
-        int tag;
-        int Some_0;
-    };
-    option f(option n) {
-        return n;
-    }
     vec3 main_pure(vec2 u) {
         return vec3(0., 0., 0.);
     }
@@ -2581,9 +2576,6 @@ let%expect_test "toplevel complex consts / promotion to zero-arg functions" =
         return vec3(pi, pi, pi);
     }
     uniform float u_scale;
-    float scale() {
-        return u_scale;
-    }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);

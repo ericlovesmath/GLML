@@ -701,7 +701,25 @@ let topo_sort (all_tops : Lambda_lift.top list) : Lambda_lift.t =
     |> of_or_error
     |> ok_exn
   in
-  Program (List.filter_map ~f:(Map.find by_key) labels)
+  (* NOTE: DFS to drop unreachable params from [main] *)
+  let rec visit acc name =
+    if Set.mem acc name
+    then acc
+    else (
+      let acc = Set.add acc name in
+      match Map.find by_key name with
+      | None -> acc
+      | Some top -> Set.fold (deps_of top) ~init:acc ~f:visit)
+  in
+  let reachable =
+    List.fold all_tops ~init:String.Set.empty ~f:(fun acc top ->
+      match top.desc with
+      | Define { name = "main"; _ } | Extern _ -> visit acc (key_of top)
+      | _ -> acc)
+  in
+  Program
+    (List.filter_map labels ~f:(fun n ->
+       Map.find by_key n |> Option.filter ~f:(fun _ -> Set.mem reachable n)))
 ;;
 
 let defunctionalize (Program tops : Lambda_lift.t) : Lambda_lift.t Compiler_error.t =
@@ -722,11 +740,11 @@ let defunctionalize (Program tops : Lambda_lift.t) : Lambda_lift.t Compiler_erro
         in
         (reg, global_tys), top)
   in
+  let all_dfn_infos = Map.data reg.by_variant in
+  let nonempty_dfn_infos =
+    List.filter all_dfn_infos ~f:(fun i -> not (List.is_empty i.entries))
+  in
   let all_tops =
-    let all_dfn_infos = Map.data reg.by_variant in
-    let nonempty_dfn_infos =
-      List.filter all_dfn_infos ~f:(fun i -> not (List.is_empty i.entries))
-    in
     rewritten_tops
     @ List.map ~f:gen_typedef all_dfn_infos
     @ List.map nonempty_dfn_infos ~f:(gen_apply_fn reg)

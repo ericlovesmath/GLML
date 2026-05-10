@@ -432,19 +432,6 @@ let%expect_test "compile examples" =
         vec3 anf_167 = paint(hi_l2, wht, anf_166);
         return paint(hi_r2, wht, anf_167);
     }
-    const vec3 pink_dk = vec3(0.75, 0.42, 0.42);
-    float smax(float a_1, float b_1, float k_0) {
-        float anf_168 = (a_1 - b_1);
-        float anf_169 = abs(anf_168);
-        float anf_170 = (k_0 - anf_169);
-        float anf_171 = max(anf_170, 0.);
-        float h_0 = (anf_171 / k_0);
-        float anf_172 = max(a_1, b_1);
-        float anf_173 = (h_0 * h_0);
-        float anf_174 = (anf_173 * k_0);
-        float anf_175 = (anf_174 * 0.25);
-        return (anf_172 + anf_175);
-    }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
