@@ -53,7 +53,7 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   trace Lambda_lift (Lambda_lift.sexp_of_t t);
   let%bind t = Defunctionalize.defunctionalize t in
   trace Defunctionalize (Lambda_lift.sexp_of_t t);
-  let t = Anf.to_anf t in
+  let%bind t = Anf.to_anf t in
   trace Anf (Anf.sexp_of_t t);
   let%bind t = Tail_call.remove_rec t in
   trace Tail_call (Tail_call.sexp_of_t t);
@@ -67,5 +67,5 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   trace Translate (Glsl.sexp_of_t glsl);
   let%bind glsl = Patch_main.patch glsl in
   trace Patch_main (Glsl.sexp_of_t glsl);
-  return (Glsl.to_string glsl)
+  Ok (Glsl.to_string glsl)
 ;;

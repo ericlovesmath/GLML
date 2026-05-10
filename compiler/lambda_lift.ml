@@ -1,8 +1,7 @@
 open Core
 open Sexplib.Sexp
-open Compiler_error.Let_syntax
 
-module Err = Compiler_error.Pass (struct
+include Compiler_error.Pass (struct
     let name = "lambda_lift"
   end)
 
@@ -111,7 +110,8 @@ let free_vars (env : env) (t : Uncurry.term) : Monomorphize.ty String.Map.t =
     match t.desc with
     | Var v ->
       (match Map.find env v with
-       | Some (_, captured) -> String.Map.of_alist_exn captured
+       | Some (_, captured) ->
+         String.Map.of_alist_or_error captured |> of_or_error |> ok_exn
        | None -> String.Map.singleton v t.ty)
     | Float _ | Int _ | Bool _ -> String.Map.empty
     | Vec (_, ts) | Builtin (_, ts) -> union_list (List.map ts ~f:fv)
@@ -146,15 +146,15 @@ let unroll_arrow ty =
 ;;
 
 let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
-  : (term * top list) Compiler_error.t
+  : term * top list
   =
   let lift = lift_term globals env in
   let lift_list ts =
-    let%map pairs = Compiler_error.all (List.map ts ~f:lift) in
+    let pairs = List.map ts ~f:lift in
     let terms, tops = List.unzip pairs in
     terms, List.concat tops
   in
-  let make term fvs = return (({ desc = term; ty = t.ty; loc = t.loc } : term), fvs) in
+  let make term fvs = ({ desc = term; ty = t.ty; loc = t.loc } : term), fvs in
   match t.desc with
   | Var v ->
     (match Map.find env v with
@@ -171,10 +171,10 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
   | Int i -> make (Int i) []
   | Bool b -> make (Bool b) []
   | Vec (n, ts) ->
-    let%bind ts, tops = lift_list ts in
+    let ts, tops = lift_list ts in
     make (Vec (n, ts)) tops
   | App (f, args) ->
-    let%bind args, args_tops = lift_list args in
+    let args, args_tops = lift_list args in
     (match f.desc with
      | Var v ->
        let var_name, extra =
@@ -188,7 +188,7 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
        let fn : term = { desc = Var var_name; ty = f.ty; loc = f.loc } in
        make (App (fn, extra @ args)) args_tops
      | _ ->
-       let%bind f, f_tops = lift f in
+       let f, f_tops = lift f in
        make (App (f, args)) (f_tops @ args_tops))
   | Let (recur, v, { desc = Lam (args, body); ty; loc }, bind) ->
     (* NOTE: This is where the lambda lifting happens *)
@@ -200,50 +200,50 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
     in
     let name = Utils.fresh v in
     let env = Map.set env ~key:v ~data:(name, captured) in
-    let%bind body, body_tops = lift_term globals env body in
+    let body, body_tops = lift_term globals env body in
     let desc =
       Define { name; recur; args = captured @ args; body; ret_ty = unroll_arrow ty }
     in
     let lifted_fn : top = { desc; ty; loc } in
-    let%bind bind, bind_tops = lift_term globals env bind in
-    return (bind, body_tops @ [ lifted_fn ] @ bind_tops)
-  | Let (Rec _, _, _, _) -> Err.fail "rec tag on non-lambda" ~loc:t.loc
+    let bind, bind_tops = lift_term globals env bind in
+    bind, body_tops @ [ lifted_fn ] @ bind_tops
+  | Let (Rec _, _, _, _) -> raise "rec tag on non-lambda" ~loc:t.loc
   | Let (Nonrec, v, bind, body) ->
-    let%bind bind, bind_tops = lift bind in
-    let%bind body, body_tops = lift body in
+    let bind, bind_tops = lift bind in
+    let body, body_tops = lift body in
     make (Let (v, bind, body)) (bind_tops @ body_tops)
   | If (c, t, e) ->
-    let%bind c, c_tops = lift c in
-    let%bind t, t_tops = lift t in
-    let%bind e, e_tops = lift e in
+    let c, c_tops = lift c in
+    let t, t_tops = lift t in
+    let e, e_tops = lift e in
     make (If (c, t, e)) (c_tops @ t_tops @ e_tops)
   | Bop (op, l, r) ->
-    let%bind l, l_tops = lift l in
-    let%bind r, r_tops = lift r in
+    let l, l_tops = lift l in
+    let r, r_tops = lift r in
     make (Bop (op, l, r)) (l_tops @ r_tops)
   | Index (t, i) ->
-    let%bind t, t_tops = lift t in
+    let t, t_tops = lift t in
     make (Index (t, i)) t_tops
   | Builtin (b, ts) ->
-    let%bind ts, tops = lift_list ts in
+    let ts, tops = lift_list ts in
     make (Builtin (b, ts)) tops
   | Record ts ->
-    let%bind ts, tops = lift_list ts in
+    let ts, tops = lift_list ts in
     make (Record ts) tops
   | Field (t, f) ->
-    let%bind t, tops = lift t in
+    let t, tops = lift t in
     make (Field (t, f)) tops
   | Variant (ctor, args) ->
-    let%bind args, tops = lift_list args in
+    let args, tops = lift_list args in
     make (Variant (ctor, args)) tops
   | Match (scrutinee, cases) ->
-    let%bind scrutinee, s_tops = lift scrutinee in
-    let%bind cases, c_tops =
-      List.fold_result cases ~init:([], []) ~f:(fun (acc_cases, acc_tops) (pat, body) ->
-        let%map body, body_tops = lift body in
-        (pat, body) :: acc_cases, acc_tops @ body_tops)
+    let scrutinee, s_tops = lift scrutinee in
+    let c_tops, cases =
+      List.fold_map cases ~init:[] ~f:(fun acc (pat, body) ->
+        let body, tops = lift body in
+        List.rev_append tops acc, (pat, body))
     in
-    make (Match (scrutinee, List.rev cases)) (s_tops @ c_tops)
+    make (Match (scrutinee, cases)) (s_tops @ List.rev c_tops)
   | Lam (args, body) ->
     (* Inline lambda in value position: lift it to a global, return Var/App referencing it *)
     let captured =
@@ -252,7 +252,7 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
     in
     let name = Utils.fresh "lam" in
     let env = Map.set env ~key:name ~data:(name, captured) in
-    let%map body, body_tops = lift_term globals env body in
+    let body, body_tops = lift_term globals env body in
     let lifted_fn =
       let args = captured @ args in
       let ret_ty = unroll_arrow t.ty in
@@ -270,21 +270,22 @@ let rec lift_term (globals : String.Set.t) (env : env) (t : Uncurry.term)
       ({ desc = App (name, extra); ty = t.ty; loc = t.loc } : term), body)
 ;;
 
-let lift_top (globals : String.Set.t) (top : Uncurry.top) : top list Compiler_error.t =
+let lift_top (globals : String.Set.t) (top : Uncurry.top) : top list =
   let make desc = { desc; ty = top.ty; loc = top.loc } in
   let lift = lift_term globals String.Map.empty in
   match top.desc with
   | Define (recur, name, { desc = Lam (args, body); ty; loc = _ }) ->
-    let%map body, body_tops = lift body in
+    let body, body_tops = lift body in
     body_tops @ [ make (Define { name; recur; args; body; ret_ty = unroll_arrow ty }) ]
   | Define (_, name, term) ->
-    let%map term, term_tops = lift term in
+    let term, term_tops = lift term in
     term_tops @ [ make (Const (name, term)) ]
-  | Extern v -> return [ make (Extern v) ]
-  | TypeDef (name, decl) -> return [ make (TypeDef (name, decl)) ]
+  | Extern v -> [ make (Extern v) ]
+  | TypeDef (name, decl) -> [ make (TypeDef (name, decl)) ]
 ;;
 
-let lift (Program tops : Uncurry.t) : t Compiler_error.t =
+let lift_exn (t : Uncurry.t) : t =
+  let (Program tops) = t in
   let globals =
     tops
     |> List.filter_map ~f:(fun top ->
@@ -294,6 +295,8 @@ let lift (Program tops : Uncurry.t) : t Compiler_error.t =
       | TypeDef _ -> None)
     |> String.Set.of_list
   in
-  let%bind top_blocks = Compiler_error.all (List.map tops ~f:(lift_top globals)) in
-  return (Program (List.concat top_blocks))
+  let top_blocks = List.map tops ~f:(lift_top globals) in
+  Program (List.concat top_blocks)
 ;;
+
+let lift t = try_with (fun () -> lift_exn t)

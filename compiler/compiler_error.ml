@@ -92,8 +92,16 @@ let to_string_hum ?source { pass; loc; msg; details } =
     String.concat ~sep:"\n" (header_and_details :: gutter_blank :: context)
 ;;
 
+exception Compile_error of error
+
 type 'a t = ('a, error) Result.t
 
+let ok_exn = function
+  | Ok x -> x
+  | Error error -> raise (Compile_error error)
+;;
+
+let raise ~pass ?loc ?d msg = raise (Compile_error { pass; loc; msg; details = d })
 let return x = Ok x
 let fail ~pass ?loc ?d msg = Error { pass; loc; msg; details = d }
 
@@ -114,10 +122,12 @@ let to_or_error (r : 'a t) : 'a Or_error.t =
   | Error err -> Or_error.error_string (to_string_hum err)
 ;;
 
-let ok_exn (r : 'a t) : 'a =
-  match r with
-  | Ok x -> x
-  | Error _ -> to_or_error r |> Or_error.ok_exn
+let try_with (f : unit -> 'a) : 'a t =
+  try
+    let result = f () in
+    Ok result
+  with
+  | Compile_error error -> Error error
 ;;
 
 include Monad.Make (struct
@@ -134,10 +144,14 @@ include Monad.Make (struct
     let map = `Define_using_bind
   end)
 
+(* TODO: I kind of hate this but have no better idea *)
 module Pass (P : sig
     val name : string
   end) =
 struct
+  let raise ?loc ?d msg = raise ~pass:P.name ?loc ?d msg
+  let ok_exn = ok_exn
+  let try_with = try_with
   let fail ?loc ?d msg = fail ~pass:P.name ?loc ?d msg
   let of_option ?loc ?d msg x = of_option ~pass:P.name ?loc ?d msg x
   let of_or_error ?loc r = of_or_error ~pass:P.name ?loc r

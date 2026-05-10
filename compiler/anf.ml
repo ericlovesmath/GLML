@@ -148,7 +148,7 @@ let rec normalize (expr : Lambda_lift.term) : anf =
     atomize f (fun (f : atom) ->
       match f.desc with
       | Var v -> atomize_list args (fun args_atoms -> pure (App (v, args_atoms)))
-      | _ -> failwith "normalize: app function must be a variable for now")
+      | _ -> Compiler_error.raise ~pass:"anf" "app function must be a variable")
   | Bop (op, l, r) ->
     atomize l (fun l_atom -> atomize r (fun r_atom -> pure (Bop (op, l_atom, r_atom))))
   | Vec (n, ts) -> atomize_list ts (fun ts_atoms -> pure (Vec (n, ts_atoms)))
@@ -203,4 +203,6 @@ let normalize_top (t : Lambda_lift.top) : top =
   | TypeDef (name, decl) -> pure (TypeDef (name, decl))
 ;;
 
-let to_anf (Program terms : Lambda_lift.t) : t = Program (List.map terms ~f:normalize_top)
+let to_anf (Program terms : Lambda_lift.t) : t Compiler_error.t =
+  Compiler_error.try_with (fun () -> Program (List.map terms ~f:normalize_top))
+;;

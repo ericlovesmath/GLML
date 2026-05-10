@@ -1543,11 +1543,11 @@ let%expect_test "defunctionalize unifies int/float arrow flavors" =
     struct DFn {
         int tag;
     };
-    vec3 lam(vec3 p) {
+    vec3 lam(vec3 p_0) {
         return vec3(0., 0., 0.);
     }
-    vec3 lam_0(vec3 p_0) {
-        return p_0;
+    vec3 lam_0(vec3 p) {
+        return p;
     }
     vec3 dapply(DFn dfn, vec3 da) {
         int _lv_tag = dfn.tag;

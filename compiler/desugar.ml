@@ -1,13 +1,10 @@
 open Core
 open Sexplib.Sexp
 open Frontend
-open Compiler_error.Let_syntax
 
-module Err = Compiler_error.Pass (struct
+include Compiler_error.Pass (struct
     let name = "desugar"
   end)
-
-(* ===== Types ===== *)
 
 type type_decl =
   | RecordDecl of (string * ty) list
@@ -129,112 +126,58 @@ let desugar_type_decl (td : Frontend.type_decl) : type_decl =
   | AliasDecl t -> AliasDecl t
 ;;
 
-let rec desugar_term_desc (td : Frontend.term_desc) : term_desc Compiler_error.t =
+let rec desugar_term_desc (td : Frontend.term_desc) : term_desc =
   match td with
-  | Var v -> Ok (Var v)
-  | Float f -> Ok (Float f)
-  | Int n -> Ok (Int n)
-  | Bool b -> Ok (Bool b)
-  | Vec (n, ts) ->
-    let%map ts = Compiler_error.all (List.map ~f:desugar_term ts) in
-    Vec (n, ts)
-  | Lam (v, ty_opt, body) ->
-    let%map body = desugar_term body in
-    Lam (v, ty_opt, body)
-  | App (f, x) ->
-    let%bind f = desugar_term f in
-    let%bind x = desugar_term x in
-    return (App (f, x))
+  | Var v -> Var v
+  | Float f -> Float f
+  | Int n -> Int n
+  | Bool b -> Bool b
+  | Vec (n, ts) -> Vec (n, List.map ~f:desugar_term ts)
+  | Lam (v, ty_opt, body) -> Lam (v, ty_opt, desugar_term body)
+  | App (f, x) -> App (desugar_term f, desugar_term x)
   | Pipe (l, r) ->
     (* x |> f   =>   f x *)
-    let%bind l = desugar_term l in
-    let%bind r = desugar_term r in
-    return (App (r, l))
+    App (desugar_term r, desugar_term l)
   | Let (r, PatVar v, ty_opt, bind, body) ->
-    let%bind bind = desugar_term bind in
-    let%bind body = desugar_term body in
-    return (Let (r, v, ty_opt, bind, body))
-  | Let (Rec _, _, _, _, _) ->
-    Err.fail "recursive let binding requires a variable pattern"
+    Let (r, v, ty_opt, desugar_term bind, desugar_term body)
+  | Let (Rec _, _, _, _, _) -> raise "recursive let binding requires a variable pattern"
   | Let (Nonrec, pat, _, bind, body) ->
-    let%bind bind = desugar_term bind in
-    let%bind body = desugar_term body in
-    return (Match (bind, [ pat, body ]))
-  | If (c, t, e) ->
-    let%bind c = desugar_term c in
-    let%bind t = desugar_term t in
-    let%bind e = desugar_term e in
-    return (If (c, t, e))
-  | Bop (op, l, r) ->
-    let%bind l = desugar_term l in
-    let%bind r = desugar_term r in
-    return (Bop (op, l, r))
-  | Index (t, i) ->
-    let%map t = desugar_term t in
-    Index (t, i)
-  | Builtin (b, ts) ->
-    let%map ts = Compiler_error.all (List.map ~f:desugar_term ts) in
-    Builtin (b, ts)
-  | Record fields ->
-    let%map fields =
-      Compiler_error.all
-        (List.map fields ~f:(fun (s, t) ->
-           let%map t = desugar_term t in
-           s, t))
-    in
-    Record fields
-  | Field (t, f) ->
-    let%map t = desugar_term t in
-    Field (t, f)
-  | Variant (ctor, args) ->
-    let%map args = Compiler_error.all (List.map ~f:desugar_term args) in
-    Variant (ctor, args)
+    Match (desugar_term bind, [ pat, desugar_term body ])
+  | If (c, t, e) -> If (desugar_term c, desugar_term t, desugar_term e)
+  | Bop (op, l, r) -> Bop (op, desugar_term l, desugar_term r)
+  | Index (t, i) -> Index (desugar_term t, i)
+  | Builtin (b, ts) -> Builtin (b, List.map ~f:desugar_term ts)
+  | Record fields -> Record (List.map fields ~f:(fun (s, t) -> s, desugar_term t))
+  | Field (t, f) -> Field (desugar_term t, f)
+  | Variant (ctor, args) -> Variant (ctor, List.map ~f:desugar_term args)
   | Match (scrutinee, cases) ->
-    let%bind scrutinee = desugar_term scrutinee in
-    let%bind cases =
-      Compiler_error.all
-        (List.map cases ~f:(fun (p, t) ->
-           let%map t = desugar_term t in
-           p, t))
-    in
-    Ok (Match (scrutinee, cases))
+    let cases = List.map cases ~f:(fun (p, t) -> p, desugar_term t) in
+    Match (desugar_term scrutinee, cases)
   | Function cases ->
     (* function | pat -> e | pat' -> e'
        => fun _v -> match _v with | pat -> e | pat' -> e' *)
     let fresh_var = "_fn_arg" in
-    let%bind cases =
-      Compiler_error.all
-        (List.map cases ~f:(fun (p, t) ->
-           let%map t = desugar_term t in
-           p, t))
-    in
+    let cases = List.map cases ~f:(fun (p, t) -> p, desugar_term t) in
     let match_term : term =
       { desc = Match ({ desc = Var fresh_var; loc = Lexer.init_loc }, cases)
       ; loc = Lexer.init_loc
       }
     in
-    Ok (Lam (fresh_var, None, match_term))
+    Lam (fresh_var, None, match_term)
 
-and desugar_term (t : Frontend.term) : term Compiler_error.t =
-  let%map desc = desugar_term_desc t.desc in
-  ({ desc; loc = t.loc } : term)
+and desugar_term (t : Frontend.term) : term =
+  ({ desc = desugar_term_desc t.desc; loc = t.loc } : term)
 ;;
 
-let desugar_top_desc (td : Frontend.top_desc) : top_desc Compiler_error.t =
+let desugar_top_desc (td : Frontend.top_desc) : top_desc =
   match td with
-  | Define (r, v, ty_opt, t) ->
-    let%map t = desugar_term t in
-    Define (r, v, ty_opt, t)
-  | Extern (ty, v) -> Ok (Extern (ty, v))
-  | TypeDef (name, params, decl) -> Ok (TypeDef (name, params, desugar_type_decl decl))
+  | Define (r, v, ty_opt, t) -> Define (r, v, ty_opt, desugar_term t)
+  | Extern (ty, v) -> Extern (ty, v)
+  | TypeDef (name, params, decl) -> TypeDef (name, params, desugar_type_decl decl)
 ;;
 
-let desugar_top (t : Frontend.top) : top Compiler_error.t =
-  let%map desc = desugar_top_desc t.desc in
-  { desc; loc = t.loc }
-;;
+let desugar_top (t : Frontend.top) : top = { desc = desugar_top_desc t.desc; loc = t.loc }
 
 let desugar (Program tops : Frontend.t) : t Compiler_error.t =
-  let%map tops = Compiler_error.all (List.map ~f:desugar_top tops) in
-  Program tops
+  try_with (fun () -> Program (List.map ~f:desugar_top tops))
 ;;

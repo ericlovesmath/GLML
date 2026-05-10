@@ -1,15 +1,14 @@
 open Core
-open Compiler_error.Let_syntax
 open Type_system
 
-module Err = Compiler_error.Pass (struct
+include Compiler_error.Pass (struct
     let name = "constraint solver"
   end)
 
 (** Unify two types into a substitution *)
-let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t =
+let rec unify (con : (Lexer.loc * ty * ty) list) : substitution =
   match con with
-  | [] -> return []
+  | [] -> []
   | (loc, TyVar v, ty) :: con | (loc, ty, TyVar v) :: con ->
     let rec occurs_in = function
       | TyVar v' -> String.equal v v'
@@ -23,14 +22,13 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t
     if equal_ty (TyVar v) ty
     then unify con
     else if occurs_in ty
-    then Err.fail "recursive unification" ~loc ~d:[%message (v : string) (ty : ty)]
+    then raise "recursive unification" ~loc ~d:[%message (v : string) (ty : ty)]
     else (
-      let%bind sub =
-        unify
-          (List.map con ~f:(fun (l, t, t') ->
-             l, subst_ty [ v, ty ] t, subst_ty [ v, ty ] t'))
+      let sub =
+        let subst = subst_ty [ v, ty ] in
+        unify (List.map con ~f:(fun (l, t, t') -> l, subst t, subst t'))
       in
-      return ((v, subst_ty sub ty) :: sub))
+      (v, subst_ty sub ty) :: sub)
   | (loc, TyArrow (f, x), TyArrow (f', x')) :: con ->
     unify ((loc, f, f') :: (loc, x, x') :: con)
   | (loc, TyVec (n, t), TyVec (n', t')) :: con when n = n' -> unify ((loc, t, t') :: con)
@@ -48,7 +46,7 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution Compiler_error.t
   | (loc, ty, ty') :: con ->
     if equal_ty ty ty'
     then unify con
-    else Err.fail "type mismatch" ~loc ~d:[%message (ty : ty) (ty' : ty)]
+    else raise "type mismatch" ~loc ~d:[%message (ty : ty) (ty' : ty)]
 ;;
 
 (** int <: float subtyping to make canonical type *)
@@ -96,20 +94,18 @@ let check_class (cls : type_class) (ty : ty) : bool =
 ;;
 
 (** Resolve GLSL overloading constraints using concrete types. *)
-let resolve_constraints (constrs : constr list)
-  : (constr list * (Lexer.loc * ty * ty) list) Compiler_error.t
+let resolve_constraints (constrs : constr list) : constr list * (Lexer.loc * ty * ty) list
   =
   let rec aux deferred eqs (constrs : constr list) =
     match constrs with
-    | [] -> return (List.rev deferred, List.rev eqs)
+    | [] -> List.rev deferred, List.rev eqs
     | { desc = Eq (l, r); loc } :: rest -> aux deferred ((loc, l, r) :: eqs) rest
     | ({ desc = HasClass (cls, ty); loc } as c) :: rest ->
       if not (Set.is_empty (ftv_of_ty ty))
       then aux (c :: deferred) eqs rest
       else if check_class cls ty
       then aux deferred eqs rest
-      else
-        Err.fail "class constraint failed" ~loc ~d:[%message (cls : type_class) (ty : ty)]
+      else raise "class constraint failed" ~loc ~d:[%message (cls : type_class) (ty : ty)]
     | ({ desc = Broadcast (l, r, ret); loc } as c) :: rest ->
       let mk desc = { desc; loc } in
       let broadcast_vec_scalar n t s =
@@ -138,7 +134,7 @@ let resolve_constraints (constrs : constr list)
          when is_scalar s && Set.is_empty (ftv_of_ty ret) && is_scalar ret ->
          coerce_pair s v
        | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
-       | _ -> Err.fail "invalid broadcast" ~loc ~d:[%message (l : ty) (r : ty)])
+       | _ -> raise "invalid broadcast" ~loc ~d:[%message (l : ty) (r : ty)])
     | ({ desc = MulBroadcast (l, r, ret); loc } as c) :: rest ->
       let mk desc = { desc; loc } in
       let mul_mat_scalar n m t s =
@@ -197,24 +193,24 @@ let resolve_constraints (constrs : constr list)
          when is_scalar s && Set.is_empty (ftv_of_ty ret) && is_scalar ret ->
          coerce_pair s v
        | TyVar _, _ | _, TyVar _ -> aux (c :: deferred) eqs rest
-       | _ -> Err.fail "invalid mul/div broadcast" ~loc ~d:[%message (l : ty) (r : ty)])
+       | _ -> raise "invalid mul/div broadcast" ~loc ~d:[%message (l : ty) (r : ty)])
     | ({ desc = IndexAccess (t, i, ret); loc } as c) :: rest ->
       (match t with
        | TyVec (n, elem_ty) ->
          let scalar_ty = widen_numeric elem_ty in
          if 0 <= i && i < n
          then aux deferred ((loc, ret, scalar_ty) :: eqs) rest
-         else Err.fail "vec index out of bounds" ~loc ~d:[%message (n : int) (i : int)]
+         else raise "vec index out of bounds" ~loc ~d:[%message (n : int) (i : int)]
        | TyVar _ -> aux (c :: deferred) eqs rest
-       | ty -> Err.fail "expected vec" ~loc ~d:[%message (ty : ty)])
+       | ty -> raise "expected vec" ~loc ~d:[%message (ty : ty)])
     | ({ desc = FieldAccess (ty, f, ret); loc } as c) :: rest ->
       (match ty with
        | TyVar _ -> aux (c :: deferred) eqs rest
        | TyRecord (_, fields) ->
          (match List.Assoc.find fields ~equal:String.equal f with
-          | None -> Err.fail "field not found in record" ~loc ~d:[%message (f : string)]
+          | None -> raise "field not found in record" ~loc ~d:[%message (f : string)]
           | Some field_ty -> aux deferred ((loc, ret, field_ty) :: eqs) rest)
-       | ty -> Err.fail "field access on non-record type" ~loc ~d:[%message (ty : ty)])
+       | ty -> raise "field access on non-record type" ~loc ~d:[%message (ty : ty)])
     | ({ desc = Coerce (from_ty, to_ty); loc } as c) :: rest ->
       let mk desc = { desc; loc } in
       if equal_ty from_ty to_ty
@@ -345,20 +341,20 @@ let resolve_subtype_bounds (deferred : constr list) : substitution =
 ;;
 
 (** Solve a set of constraints to produce a substitution and deferred constraints. *)
-let solve (constrs : constr list) : (substitution * constr list) Compiler_error.t =
+let solve (constrs : constr list) : substitution * constr list =
   let apply_sub sub new_sub deferred =
     let sub = List.map sub ~f:(fun (v, t) -> v, subst_ty new_sub t) @ new_sub in
     let deferred = subst_constraints new_sub deferred in
     sub, deferred
   in
   let rec go sub constrs =
-    let%bind deferred, eqs = resolve_constraints constrs in
-    let%bind new_sub = if List.is_empty eqs then return [] else unify eqs in
+    let deferred, eqs = resolve_constraints constrs in
+    let new_sub = if List.is_empty eqs then [] else unify eqs in
     if List.is_empty new_sub
     then (
       let lub_sub = resolve_subtype_bounds deferred in
       if List.is_empty lub_sub
-      then return (sub, deferred)
+      then sub, deferred
       else (
         let sub, deferred = apply_sub sub lub_sub deferred in
         go sub deferred))
@@ -371,9 +367,9 @@ let solve (constrs : constr list) : (substitution * constr list) Compiler_error.
 
 let solve_scheme constrs sub =
   if List.is_empty constrs
-  then return sub
+  then sub
   else (
     let constrs = subst_constraints sub constrs in
-    let%map sub', _ = solve constrs in
+    let sub', _ = solve constrs in
     List.map sub ~f:(fun (v, t) -> v, subst_ty sub' t) @ sub')
 ;;

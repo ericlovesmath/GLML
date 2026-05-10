@@ -1,8 +1,8 @@
 open Core
+open Frontend
 open Desugar
-open Compiler_error.Let_syntax
 
-module Err = Compiler_error.Pass (struct
+include Compiler_error.Pass (struct
     let name = "uniquify"
   end)
 
@@ -14,82 +14,52 @@ let fresh v ctx =
   v', ctx
 ;;
 
-let rec uniquify_term (ctx : env) (t : term) : term Compiler_error.t =
-  let pure desc : term Compiler_error.t = Ok { desc; loc = t.loc } in
+let rec uniquify_term (ctx : env) (t : term) : term =
+  let pure desc : term = { desc; loc = t.loc } in
   let aux = uniquify_term ctx in
-  let aux_list ts = Compiler_error.all (List.map ~f:aux ts) in
+  let aux_list ts = List.map ~f:aux ts in
   match t.desc with
   | Float _ | Int _ | Bool _ -> pure t.desc
   | Var v ->
-    let%bind v =
+    let v =
       Map.find ctx v
-      |> Err.of_option "unbound variable" ~loc:t.loc ~d:[%message (v : string)]
+      |> of_option "unbound variable" ~loc:t.loc ~d:[%message (v : string)]
+      |> ok_exn
     in
     pure (Var v)
   | Lam (v, ty, body) ->
     let v, ctx = fresh v ctx in
-    let%bind body = uniquify_term ctx body in
-    pure (Lam (v, ty, body))
-  | App (f, x) ->
-    let%bind f = aux f in
-    let%bind x = aux x in
-    pure (App (f, x))
+    pure (Lam (v, ty, uniquify_term ctx body))
+  | App (f, x) -> pure (App (aux f, aux x))
   | Let (recur, v, return_ty, bind, body) ->
     let v, ctx' = fresh v ctx in
-    let%bind bind =
+    let bind =
       match recur with
       | Nonrec -> uniquify_term ctx bind
       | Rec _ -> uniquify_term ctx' bind
     in
-    let%bind body = uniquify_term ctx' body in
-    pure (Let (recur, v, return_ty, bind, body))
-  | If (c, t, f) ->
-    let%bind c = aux c in
-    let%bind t = aux t in
-    let%bind f = aux f in
-    pure (If (c, t, f))
-  | Vec (n, ts) ->
-    let%bind ts = aux_list ts in
-    pure (Vec (n, ts))
-  | Bop (op, t, t') ->
-    let%bind t = aux t in
-    let%bind t' = aux t' in
-    pure (Bop (op, t, t'))
-  | Index (t, i) ->
-    let%bind t = aux t in
-    pure (Index (t, i))
-  | Builtin (f, args) ->
-    let%bind args = aux_list args in
-    pure (Builtin (f, args))
-  | Record fields ->
-    let%bind fields =
-      fields
-      |> List.map ~f:(fun (f, t) ->
-        let%map t = aux t in
-        f, t)
-      |> Compiler_error.all
-    in
-    pure (Record fields)
-  | Field (t, f) ->
-    let%bind t = aux t in
-    pure (Field (t, f))
-  | Variant (ctor, args) ->
-    let%bind args = aux_list args in
-    pure (Variant (ctor, args))
+    pure (Let (recur, v, return_ty, bind, uniquify_term ctx' body))
+  | If (c, t, f) -> pure (If (aux c, aux t, aux f))
+  | Vec (n, ts) -> pure (Vec (n, aux_list ts))
+  | Bop (op, t, t') -> pure (Bop (op, aux t, aux t'))
+  | Index (t, i) -> pure (Index (aux t, i))
+  | Builtin (f, args) -> pure (Builtin (f, aux_list args))
+  | Record fields -> pure (Record (List.map fields ~f:(fun (f, t) -> f, aux t)))
+  | Field (t, f) -> pure (Field (aux t, f))
+  | Variant (ctor, args) -> pure (Variant (ctor, aux_list args))
   | Match (scrutinee, cases) ->
-    let%bind scrutinee = aux scrutinee in
-    let%bind cases =
-      cases
-      |> List.map ~f:(fun (pat, body) ->
+    let scrutinee = aux scrutinee in
+    let cases =
+      List.map cases ~f:(fun (pat, body) ->
         let pat, ctx =
           match pat with
           | PatCtor (ctor, vs) ->
-            let vs' = List.map vs ~f:Utils.fresh in
-            let ctx =
-              (* TODO: Evil evil exn that I'm too lazy to thread a [List.fold_result] *)
-              List.fold2_exn vs vs' ~init:ctx ~f:(fun c v v' -> Map.set c ~key:v ~data:v')
+            let ctx, vs' =
+              List.fold_map vs ~init:ctx ~f:(fun ctx v ->
+                let v' = Utils.fresh v in
+                Map.set ctx ~key:v ~data:v', v')
             in
-            Frontend.PatCtor (ctor, vs'), ctx
+            PatCtor (ctor, vs'), ctx
           | PatWildcard -> pat, ctx
           | PatVar v ->
             let v, ctx = fresh v ctx in
@@ -102,7 +72,7 @@ let rec uniquify_term (ctx : env) (t : term) : term Compiler_error.t =
                 | PatWildcard -> ctx, p
                 | PatVar v ->
                   let v, ctx = fresh v ctx in
-                  ctx, Frontend.PatVar v
+                  ctx, PatVar v
                 | PatBracket inner ->
                   let ctx, inner =
                     List.fold_map inner ~init:ctx ~f:(fun ctx p ->
@@ -110,51 +80,46 @@ let rec uniquify_term (ctx : env) (t : term) : term Compiler_error.t =
                       | PatWildcard -> ctx, p
                       | PatVar v ->
                         let v, ctx = fresh v ctx in
-                        ctx, Frontend.PatVar v
+                        ctx, PatVar v
                       | _ -> ctx, p)
                   in
                   ctx, PatBracket inner
                 | _ -> ctx, p)
             in
-            Frontend.PatBracket pats, ctx
+            PatBracket pats, ctx
           | PatRecord (fields, partial) ->
             let ctx, fields =
               List.fold_map fields ~init:ctx ~f:(fun ctx (fname, fpat) ->
                 match fpat with
                 | PatVar v ->
                   let v, ctx = fresh v ctx in
-                  ctx, (fname, Frontend.PatVar v)
+                  ctx, (fname, PatVar v)
                 | _ -> ctx, (fname, fpat))
             in
-            Frontend.PatRecord (fields, partial), ctx
+            PatRecord (fields, partial), ctx
         in
-        let%map body = uniquify_term ctx body in
-        pat, body)
-      |> Compiler_error.all
+        pat, uniquify_term ctx body)
     in
     pure (Match (scrutinee, cases))
 ;;
 
-let uniquify_top (ctx : env) (t : top) : (env * top) Compiler_error.t =
+let uniquify_top (ctx : env) (t : top) : env * top =
   match t.desc with
   | Define (recur, v, return_ty, bind) ->
     let v' = Utils.fresh v in
     let ctx' = Map.set ctx ~key:v ~data:v' in
-    let%map bind =
+    let bind =
       match recur with
       | Nonrec -> uniquify_term ctx bind
       | Rec _ -> uniquify_term ctx' bind
     in
     ctx', { desc = Define (recur, v', return_ty, bind); loc = t.loc }
-  | Extern (_, v) -> Ok (Map.set ctx ~key:v ~data:v, t)
-  | TypeDef _ -> Ok (ctx, t)
+  | Extern (_, v) -> Map.set ctx ~key:v ~data:v, t
+  | TypeDef _ -> ctx, t
 ;;
 
 let uniquify (Program tops) =
-  let folder (ctx, acc) top =
-    let%map ctx, top = uniquify_top ctx top in
-    ctx, top :: acc
-  in
-  let%map _, tops = List.fold_result tops ~init:(String.Map.empty, []) ~f:folder in
-  Program (List.rev tops)
+  try_with (fun () ->
+    let _, tops = List.fold_map tops ~init:String.Map.empty ~f:uniquify_top in
+    Program tops)
 ;;

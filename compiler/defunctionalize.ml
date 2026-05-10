@@ -2,7 +2,7 @@ open Core
 open Monomorphize
 open Lambda_lift
 
-module Err = Compiler_error.Pass (struct
+include Compiler_error.Pass (struct
     let name = "defunctionalize"
   end)
 
@@ -93,7 +93,9 @@ let collect_globals tops =
     | Const (name, _) -> Some (name, GlobalNonFn)
     | Extern name -> Some (name, GlobalNonFn)
     | TypeDef _ -> None)
-  |> String.Map.of_alist_exn
+  |> String.Map.of_alist_or_error
+  |> of_or_error
+  |> ok_exn
 ;;
 
 let rec subst_vars (subs : (string * string) list) (t : Lambda_lift.term)
@@ -166,10 +168,14 @@ let retype_params (reg : registry) params =
       else reg, (v, ty))
   in
   let env =
-    List.zip_exn params params'
+    (match List.zip params params' with
+     | Ok r -> r
+     | Unequal_lengths -> raise "(unreachable) retype_params length mismatch")
     |> List.filter_map ~f:(fun ((v, old_ty), (_, new_ty)) ->
       if equal_ty old_ty new_ty then None else Some (v, new_ty))
-    |> String.Map.of_alist_exn
+    |> String.Map.of_alist_or_error
+    |> of_or_error
+    |> ok_exn
   in
   reg, params', env
 ;;
@@ -265,12 +271,20 @@ let gen_apply_fn (reg : registry) info : Lambda_lift.top =
     List.map info.arg_tys ~f:(fun ty ->
       if is_fn_ty ty
       then (
-        let i = Map.find_exn reg.by_arrow (mangle_ty ty) in
+        let i =
+          Map.find reg.by_arrow (mangle_ty ty)
+          |> of_option "fn type not registered in dfn registry" ~d:[%message (ty : ty)]
+          |> ok_exn
+        in
         TyVariant i.variant_name)
       else ty)
   in
   let apply_params =
-    (fn_var, TyVariant info.variant_name) :: List.zip_exn arg_vars apply_arg_tys
+    (fn_var, TyVariant info.variant_name)
+    ::
+    (match List.zip arg_vars apply_arg_tys with
+     | Ok r -> r
+     | Unequal_lengths -> raise "(unreachable) gen_apply_fn arg/type length mismatch")
   in
   let match_cases =
     List.filter_map info.entries ~f:(fun entry ->
@@ -278,16 +292,26 @@ let gen_apply_fn (reg : registry) info : Lambda_lift.top =
       | LambdaEntry e ->
         let pat = Frontend.PatCtor (e.ctor_name, List.map e.captured ~f:fst) in
         let subs =
-          List.map2_exn (List.map e.params ~f:fst) arg_vars ~f:(fun old_v new_v ->
-            old_v, new_v)
+          match
+            List.map2 (List.map e.params ~f:fst) arg_vars ~f:(fun old_v new_v ->
+              old_v, new_v)
+          with
+          | Ok r -> r
+          | Unequal_lengths ->
+            raise "(unreachable) gen_apply_fn params/arg_vars length mismatch"
         in
         let body = subst_vars subs e.body in
         Some (pat, body)
       | GlobalEntry e ->
         let pat = Frontend.PatCtor (e.ctor_name, []) in
         let arg_terms =
-          List.map2_exn arg_vars apply_arg_tys ~f:(fun v ty ->
-            ({ desc = Var v; ty; loc = e.loc } : Lambda_lift.term))
+          match
+            List.map2 arg_vars apply_arg_tys ~f:(fun v ty ->
+              ({ desc = Var v; ty; loc = e.loc } : Lambda_lift.term))
+          with
+          | Ok r -> r
+          | Unequal_lengths ->
+            raise "(unreachable) gen_apply_fn arg_vars/types length mismatch"
         in
         let body : Lambda_lift.term =
           { desc =
@@ -379,7 +403,12 @@ let rec rewrite_term
             let remaining_arg_vars =
               List.map remaining_arg_tys ~f:(fun _ -> Utils.fresh "ra")
             in
-            let remaining_params = List.zip_exn remaining_arg_vars remaining_arg_tys in
+            let remaining_params =
+              match List.zip remaining_arg_vars remaining_arg_tys with
+              | Ok r -> r
+              | Unequal_lengths ->
+                raise "(unreachable) partial app remaining params length mismatch"
+            in
             let captured_arg_vars =
               List.map args ~f:(fun arg -> Utils.fresh "ca", arg.ty)
             in
@@ -427,7 +456,12 @@ let rec rewrite_term
          let cap_fn = cap_fn_var, f.ty in
          let cap_arg_vars = List.map args ~f:(fun arg -> Utils.fresh "ca", arg.ty) in
          let rem_arg_vars = List.map remaining_arg_tys ~f:(fun _ -> Utils.fresh "ra") in
-         let rem_params = List.zip_exn rem_arg_vars remaining_arg_tys in
+         let rem_params =
+           match List.zip rem_arg_vars remaining_arg_tys with
+           | Ok r -> r
+           | Unequal_lengths ->
+             raise "(unreachable) partial app closure rem_params length mismatch"
+         in
          let apply_ty = build_arrow_ty (f.ty :: info.arg_tys) info.ret_ty in
          let apply_var : Lambda_lift.term =
            { desc = Var actual_info.apply_name; ty = apply_ty; loc = f.loc }
@@ -623,8 +657,7 @@ let typedef_decl_deps = function
       List.fold tys ~init:acc ~f:(fun acc ty -> Set.union acc (ty_struct_deps ty)))
 ;;
 
-let topo_sort (all_tops : Lambda_lift.top list) : Lambda_lift.t Compiler_error.t =
-  let open Compiler_error.Let_syntax in
+let topo_sort (all_tops : Lambda_lift.top list) : Lambda_lift.t =
   let key_of (top : Lambda_lift.top) =
     match top.desc with
     | Define { name; _ } | Const (name, _) | Extern name | TypeDef (name, _) -> name
@@ -653,15 +686,18 @@ let topo_sort (all_tops : Lambda_lift.top list) : Lambda_lift.t Compiler_error.t
         then None
         else Some { Topological_sort.Edge.from = dep; to_ = name }))
   in
-  let%bind by_key =
+  let by_key =
     List.map all_tops ~f:(fun top -> key_of top, top)
     |> String.Map.of_alist_or_error
-    |> Err.of_or_error
+    |> of_or_error
+    |> ok_exn
   in
-  let%bind labels =
-    Topological_sort.sort (module String) ~what:Nodes ~nodes ~edges |> Err.of_or_error
+  let labels =
+    Topological_sort.sort (module String) ~what:Nodes ~nodes ~edges
+    |> of_or_error
+    |> ok_exn
   in
-  Ok (Program (List.filter_map ~f:(Map.find by_key) labels))
+  Program (List.filter_map ~f:(Map.find by_key) labels)
 ;;
 
 let defunctionalize (Program tops : Lambda_lift.t) : Lambda_lift.t Compiler_error.t =
@@ -690,5 +726,5 @@ let defunctionalize (Program tops : Lambda_lift.t) : Lambda_lift.t Compiler_erro
     @ List.map ~f:gen_typedef dfn_infos
     @ List.map dfn_infos ~f:(gen_apply_fn reg)
   in
-  topo_sort all_tops
+  Compiler_error.try_with (fun () -> topo_sort all_tops)
 ;;

@@ -1,9 +1,8 @@
 open Core
 open Sexplib.Sexp
 open Typecheck
-open Compiler_error.Let_syntax
 
-module Err = Compiler_error.Pass (struct
+include Compiler_error.Pass (struct
     let name = "monomorphize"
   end)
 
@@ -131,7 +130,9 @@ let rec subst ~(poly : Type_system.ty) ~(concrete : Type_system.ty)
   : (string * Type_system.ty) list
   =
   let pairwise xs ys ~f =
-    if List.length xs = List.length ys then List.concat (List.map2_exn xs ys ~f) else []
+    match List.map2 xs ys ~f with
+    | Ok results -> List.concat results
+    | Unequal_lengths -> []
   in
   match poly, concrete with
   | TyVar v, _ -> [ v, concrete ]
@@ -173,7 +174,7 @@ let collect_var_usages (name : string) (t : Typecheck.term) : Type_system.ty lis
 (** Solve scheme constraints under [sub], then apply the resulting substitution
     to the polymorphic term. Used by [Monomorphize] to specialize bindings. *)
 let instantiate_scheme constrs term sub =
-  let%map sub = Constraint_solver.solve_scheme constrs sub in
+  let sub = Constraint_solver.solve_scheme constrs sub in
   Typecheck.subst_term sub term
 ;;
 
@@ -254,27 +255,6 @@ let rename_var (src : string) (dst : string) =
 
 (* ==== State threading ==== *)
 
-(** [List.fold_left] over [Compiler_error] monad. *)
-let fold_state (st : state) xs ~f : state Compiler_error.t =
-  List.fold_left xs ~init:(Ok st) ~f:(fun st_r x ->
-    let%bind st = st_r in
-    f st x)
-;;
-
-(** [List.map] but threading [state] through and collecting output values *)
-let fold_map_state (st : state) xs ~f =
-  let%map st, rev =
-    List.fold_left
-      xs
-      ~init:(Ok (st, []))
-      ~f:(fun st_r x ->
-        let%bind st, rev = st_r in
-        let%map st, y = f st x in
-        st, y :: rev)
-  in
-  st, List.rev rev
-;;
-
 let collect_poly_refs (poly_fn_env : poly_def String.Map.t) (t : Typecheck.term)
   : (string * Type_system.ty) list
   =
@@ -308,18 +288,22 @@ let add_spec (env : spec_map) (name : string) (ty : Type_system.ty) (spec_name :
 ;;
 
 let rec resolve_spec (st : state) (name : string) (concrete_ty : Type_system.ty)
-  : (state * string) Compiler_error.t
+  : state * string
   =
   match find_spec st.spec_map name concrete_ty with
-  | Some spec_name -> Ok (st, spec_name)
+  | Some spec_name -> st, spec_name
   | None ->
-    let entry = Map.find_exn st.poly_fn_env name in
+    let entry =
+      Map.find st.poly_fn_env name
+      |> of_option "(unreachable) poly fn not found" ~d:[%message (name : string)]
+      |> ok_exn
+    in
     let spec_name = Utils.fresh (name ^ "_m") in
     (* Register in spec_map FIRST as cycle guard for recursive functions *)
     let st = { st with spec_map = add_spec st.spec_map name concrete_ty spec_name } in
     let sub = subst ~poly:entry.poly_type ~concrete:concrete_ty in
     let extra_constrs = collect_poly_let_eqs entry.poly_bind in
-    let%bind body =
+    let body =
       instantiate_scheme (entry.poly_constrs @ extra_constrs) entry.poly_bind sub
     in
     let body =
@@ -328,11 +312,11 @@ let rec resolve_spec (st : state) (name : string) (concrete_ty : Type_system.ty)
       | Nonrec -> body
     in
     let refs = collect_poly_refs st.poly_fn_env body in
-    let%bind st =
-      fold_state st refs ~f:(fun st (dep_name, dep_ty) ->
-        resolve_spec st dep_name dep_ty >>| fst)
+    let st =
+      List.fold_left refs ~init:st ~f:(fun st (dep_name, dep_ty) ->
+        fst (resolve_spec st dep_name dep_ty))
     in
-    let%bind st, body = rewrite_refs st body in
+    let st, body = rewrite_refs st body in
     (* [TyVar]s that blocked [Coerce] lowering at typecheck-time are now concrete *)
     let body = Promote_ints.rewrite body in
     let top : Typecheck.top =
@@ -342,45 +326,43 @@ let rec resolve_spec (st : state) (name : string) (concrete_ty : Type_system.ty)
       ; scheme_constrs = []
       }
     in
-    Ok ({ st with all_tops_rev = top :: st.all_tops_rev }, spec_name)
+    { st with all_tops_rev = top :: st.all_tops_rev }, spec_name
 
-and rewrite_refs (st : state) (t : Typecheck.term)
-  : (state * Typecheck.term) Compiler_error.t
-  =
-  let inner : (state * Typecheck.term_desc) Compiler_error.t =
+and rewrite_refs (st : state) (t : Typecheck.term) : state * Typecheck.term =
+  let st, desc =
     let open Typecheck in
     match t.desc with
     | Var v ->
       (match Map.find st.poly_fn_env v with
        | Some _ when is_concrete t.ty ->
-         let%map st, spec_name = resolve_spec st v t.ty in
+         let st, spec_name = resolve_spec st v t.ty in
          st, Var spec_name
-       | _ -> Ok (st, t.desc))
-    | Float _ | Int _ | Bool _ -> Ok (st, t.desc)
+       | _ -> st, t.desc)
+    | Float _ | Int _ | Bool _ -> st, t.desc
     | Vec (n, ts) ->
-      let%map st, ts = fold_map_state ~f:rewrite_refs st ts in
+      let st, ts = List.fold_map ~f:rewrite_refs ~init:st ts in
       st, Vec (n, ts)
     | Lam (v, body) ->
-      let%map st, body = rewrite_refs st body in
+      let st, body = rewrite_refs st body in
       st, Lam (v, body)
     | App (f, x) ->
-      let%bind st, f = rewrite_refs st f in
-      let%bind st, x = rewrite_refs st x in
-      Ok (st, App (f, x))
+      let st, f = rewrite_refs st f in
+      let st, x = rewrite_refs st x in
+      st, App (f, x)
     | Let (recur, v, constrs, bind, body) when not (is_concrete bind.ty) ->
       (* Specialization for inner polymorphic lets *)
       let usages = collect_var_usages v body in
       if List.is_empty usages
       then (
-        let%map st, body = rewrite_refs st body in
+        let st, body = rewrite_refs st body in
         st, body.desc)
       else (
-        let%bind st, specs =
-          fold_map_state st usages ~f:(fun st concrete_ty ->
+        let st, specs =
+          List.fold_map usages ~init:st ~f:(fun st concrete_ty ->
             let sub = subst ~poly:bind.ty ~concrete:concrete_ty in
-            let%bind spec_bind = instantiate_scheme constrs bind sub in
+            let spec_bind = instantiate_scheme constrs bind sub in
             let spec_name = Utils.fresh (v ^ "_m") in
-            let%map st, spec_bind = rewrite_refs st spec_bind in
+            let st, spec_bind = rewrite_refs st spec_bind in
             let spec_bind =
               match recur with
               | Rec _ -> rename_var v spec_name spec_bind
@@ -397,7 +379,7 @@ and rewrite_refs (st : state) (t : Typecheck.term)
               ~pred:(fun t -> Type_system.equal_ty t.ty concrete_ty)
               b)
         in
-        let%map st, body = rewrite_refs st body in
+        let st, body = rewrite_refs st body in
         ( st
         , (List.fold_right specs ~init:body ~f:(fun (spec_name, spec_bind, _) acc ->
              { desc = Let (recur, spec_name, [], spec_bind, acc)
@@ -406,175 +388,139 @@ and rewrite_refs (st : state) (t : Typecheck.term)
              }))
             .desc ))
     | Let (recur, v, _, bind, body) ->
-      (* NOTE: Now that inner lets may be resolved early with concrete types,
-         their scheme constraints are already consumed, so we can ignore them *)
-      let%bind st, bind = rewrite_refs st bind in
-      let%bind st, body = rewrite_refs st body in
-      Ok (st, Let (recur, v, [], bind, body))
+      let st, bind = rewrite_refs st bind in
+      let st, body = rewrite_refs st body in
+      st, Let (recur, v, [], bind, body)
     | If (c, t, e) ->
-      let%bind st, c = rewrite_refs st c in
-      let%bind st, t = rewrite_refs st t in
-      let%bind st, e = rewrite_refs st e in
-      Ok (st, If (c, t, e))
+      let st, c = rewrite_refs st c in
+      let st, t = rewrite_refs st t in
+      let st, e = rewrite_refs st e in
+      st, If (c, t, e)
     | Bop (op, l, r) ->
-      let%bind st, l = rewrite_refs st l in
-      let%bind st, r = rewrite_refs st r in
-      Ok (st, Bop (op, l, r))
+      let st, l = rewrite_refs st l in
+      let st, r = rewrite_refs st r in
+      st, Bop (op, l, r)
     | Index (t, i) ->
-      let%map st, t = rewrite_refs st t in
+      let st, t = rewrite_refs st t in
       st, Index (t, i)
     | Builtin (b, ts) ->
-      let%map st, ts = fold_map_state ~f:rewrite_refs st ts in
+      let st, ts = List.fold_map ~f:rewrite_refs ~init:st ts in
       st, Builtin (b, ts)
     | Record ts ->
-      let%map st, ts = fold_map_state ~f:rewrite_refs st ts in
+      let st, ts = List.fold_map ~f:rewrite_refs ~init:st ts in
       st, Record ts
     | Field (t, f) ->
-      let%map st, t = rewrite_refs st t in
+      let st, t = rewrite_refs st t in
       st, Field (t, f)
     | Variant (ctor, args) ->
-      let%map st, args = fold_map_state ~f:rewrite_refs st args in
+      let st, args = List.fold_map ~f:rewrite_refs ~init:st args in
       st, Variant (ctor, args)
     | Coerce (target, inner) ->
-      let%map st, inner = rewrite_refs st inner in
+      let st, inner = rewrite_refs st inner in
       st, Coerce (target, inner)
     | Match (scrutinee, cases) ->
-      let%bind st, scrutinee = rewrite_refs st scrutinee in
-      let%map st, cases =
-        fold_map_state st cases ~f:(fun st (pat, body) ->
-          let%map st, body = rewrite_refs st body in
+      let st, scrutinee = rewrite_refs st scrutinee in
+      let st, cases =
+        List.fold_map cases ~init:st ~f:(fun st (pat, body) ->
+          let st, body = rewrite_refs st body in
           st, (pat, body))
       in
       st, Match (scrutinee, cases)
   in
-  let%map st, desc = inner in
   st, { t with desc }
 ;;
 
 (* ===== Conversion from Typecheck types ===== *)
 
-let rec ty_of (t : Type_system.ty) : ty Compiler_error.t =
+let rec ty_of (t : Type_system.ty) : ty =
   match t with
-  | TyVar _ -> Err.fail "unexpected TyVar after monomorphization"
-  | TyFloat -> Ok TyFloat
-  | TyInt -> Ok TyInt
-  | TyBool -> Ok TyBool
-  | TyVec (n, t) ->
-    let%map t = ty_of t in
-    TyVec (n, t)
-  | TyRecord (n, _) -> Ok (TyRecord n)
-  | TyVariant (n, _) -> Ok (TyVariant n)
+  | TyVar _ -> raise "unexpected TyVar after monomorphization"
+  | TyFloat -> TyFloat
+  | TyInt -> TyInt
+  | TyBool -> TyBool
+  | TyVec (n, t) -> TyVec (n, ty_of t)
+  | TyRecord (n, _) -> TyRecord n
+  | TyVariant (n, _) -> TyVariant n
   | TyArrow (a, b) ->
-    let%bind a = ty_of a in
-    let%bind b = ty_of b in
-    Ok (TyArrow (a, b))
+    let a = ty_of a in
+    let b = ty_of b in
+    TyArrow (a, b)
 ;;
 
-let rec term_of_tc (t : Typecheck.term) : term Compiler_error.t =
-  let%bind ty = ty_of t.ty in
-  let%bind desc = term_desc_of_tc t.desc in
-  Ok ({ desc; ty; loc = t.loc } : term)
+let rec term_of_tc (t : Typecheck.term) : term =
+  let ty = ty_of t.ty in
+  let desc = term_desc_of_tc t.desc in
+  ({ desc; ty; loc = t.loc } : term)
 
-and term_desc_of_tc (d : Typecheck.term_desc) : term_desc Compiler_error.t =
+and term_desc_of_tc (d : Typecheck.term_desc) : term_desc =
   match d with
-  | Var v -> Ok (Var v)
-  | Float f -> Ok (Float f)
-  | Int i -> Ok (Int i)
-  | Bool b -> Ok (Bool b)
-  | Vec (n, ts) ->
-    let%map ts = Compiler_error.all (List.map ts ~f:term_of_tc) in
-    Vec (n, ts)
-  | Lam (v, body) ->
-    let%map body = term_of_tc body in
-    Lam (v, body)
+  | Var v -> Var v
+  | Float f -> Float f
+  | Int i -> Int i
+  | Bool b -> Bool b
+  | Vec (n, ts) -> Vec (n, List.map ts ~f:term_of_tc)
+  | Lam (v, body) -> Lam (v, term_of_tc body)
   | App (f, x) ->
-    let%bind f = term_of_tc f in
-    let%bind x = term_of_tc x in
-    Ok (App (f, x))
+    let f = term_of_tc f in
+    let x = term_of_tc x in
+    App (f, x)
   | Let (r, v, constrs, bind, body) ->
-    let%bind bind = term_of_tc bind in
-    let%bind body = term_of_tc body in
+    let bind = term_of_tc bind in
+    let body = term_of_tc body in
     if List.is_empty constrs
-    then Ok (Let (r, v, bind, body))
-    else Err.fail "Let has constraints" ~d:[%message (d : Typecheck.term_desc)]
+    then Let (r, v, bind, body)
+    else raise "Let has constraints" ~d:[%message (d : Typecheck.term_desc)]
   | If (c, t, e) ->
-    let%bind c = term_of_tc c in
-    let%bind t = term_of_tc t in
-    let%bind e = term_of_tc e in
-    Ok (If (c, t, e))
+    let c = term_of_tc c in
+    let t = term_of_tc t in
+    let e = term_of_tc e in
+    If (c, t, e)
   | Bop (op, l, r) ->
-    let%bind l = term_of_tc l in
-    let%bind r = term_of_tc r in
-    Ok (Bop (op, l, r))
-  | Index (t, i) ->
-    let%map t = term_of_tc t in
-    Index (t, i)
-  | Builtin (b, ts) ->
-    let%map ts = Compiler_error.all (List.map ts ~f:term_of_tc) in
-    Builtin (b, ts)
-  | Record ts ->
-    let%map ts = Compiler_error.all (List.map ts ~f:term_of_tc) in
-    Record ts
-  | Field (t, f) ->
-    let%map t = term_of_tc t in
-    Field (t, f)
-  | Variant (ctor, args) ->
-    let%map args = Compiler_error.all (List.map args ~f:term_of_tc) in
-    Variant (ctor, args)
+    let l = term_of_tc l in
+    let r = term_of_tc r in
+    Bop (op, l, r)
+  | Index (t, i) -> Index (term_of_tc t, i)
+  | Builtin (b, ts) -> Builtin (b, List.map ts ~f:term_of_tc)
+  | Record ts -> Record (List.map ts ~f:term_of_tc)
+  | Field (t, f) -> Field (term_of_tc t, f)
+  | Variant (ctor, args) -> Variant (ctor, List.map args ~f:term_of_tc)
   | Match (scrutinee, cases) ->
-    let%bind scrutinee = term_of_tc scrutinee in
-    let%bind cases =
-      cases
-      |> List.map ~f:(fun (pat, body) ->
-        let%map body = term_of_tc body in
-        pat, body)
-      |> Compiler_error.all
-    in
-    Ok (Match (scrutinee, cases))
+    let scrutinee = term_of_tc scrutinee in
+    let cases = List.map cases ~f:(fun (pat, body) -> pat, term_of_tc body) in
+    Match (scrutinee, cases)
   | Coerce (target, inner) ->
     (* materialize_coerce re-runs after monomorphize, so the only Coerce that can
        reach here is a residual where both sides ended up equal. *)
     if Type_system.equal_ty target inner.ty
-    then (
-      let%map inner = term_of_tc inner in
-      inner.desc)
+    then (term_of_tc inner).desc
     else
-      Err.fail
+      raise
         "unexpected unresolved Coerce after monomorphize"
         ~d:[%message (d : Typecheck.term_desc)]
 ;;
 
-let top_of_tc (t : Typecheck.top) : top Compiler_error.t =
-  let%bind ty = ty_of t.ty in
-  let%bind desc =
+let top_of_tc (t : Typecheck.top) : top =
+  let ty = ty_of t.ty in
+  let desc =
     match t.desc with
-    | Define (r, v, bind) ->
-      let%map bind = term_of_tc bind in
-      Define (r, v, bind)
-    | Extern v -> Ok (Extern v)
+    | Define (r, v, bind) -> Define (r, v, term_of_tc bind)
+    | Extern v -> Extern v
     | TypeDef (name, RecordDecl ([], fields)) ->
-      let%map fields =
-        List.map fields ~f:(fun (field_name, field_ty) ->
-          let%map field_ty = ty_of field_ty in
-          field_name, field_ty)
-        |> Compiler_error.all
+      let fields =
+        List.map fields ~f:(fun (field_name, field_ty) -> field_name, ty_of field_ty)
       in
       TypeDef (name, RecordDecl fields)
     | TypeDef (_, RecordDecl (_ :: _, _)) ->
-      Err.fail "unexpected parametrized TypeDef after SpecializeStructs"
+      raise "unexpected parametrized TypeDef after SpecializeStructs"
     | TypeDef (_, VariantDecl (_ :: _, _)) ->
-      Err.fail "unexpected parametrized VariantDecl after SpecializeStructs"
+      raise "unexpected parametrized VariantDecl after SpecializeStructs"
     | TypeDef (name, VariantDecl ([], ctors)) ->
-      let%map ctors =
-        ctors
-        |> List.map ~f:(fun (ctor_name, tys) ->
-          let%map tys = Compiler_error.all (List.map tys ~f:ty_of) in
-          ctor_name, tys)
-        |> Compiler_error.all
+      let ctors =
+        List.map ctors ~f:(fun (ctor_name, tys) -> ctor_name, List.map tys ~f:ty_of)
       in
       TypeDef (name, VariantDecl ctors)
   in
-  Ok { desc; ty; loc = t.loc }
+  { desc; ty; loc = t.loc }
 ;;
 
 (* GLSL has no ivec, so any [TyVe c(_, TyInt)] annotation that survived monomorphization
@@ -752,7 +698,7 @@ let assign_names ~(typedef_loc : Lexer.loc) (tops : Typecheck.top list)
   List.map assignments ~f:typedef_top @ List.map tops ~f:rtop
 ;;
 
-let monomorphize (program : Typecheck.t) : t Compiler_error.t =
+let monomorphize_exn (program : Typecheck.t) : t =
   let (Program tops) = program in
   (* Pre-populate poly_fn_env eagerly (valid because poly defines precede concrete uses) *)
   let poly_fn_env =
@@ -768,34 +714,37 @@ let monomorphize (program : Typecheck.t) : t Compiler_error.t =
             ; poly_constrs = top.scheme_constrs
             } )
       | _ -> None)
-    |> String.Map.of_alist_exn
+    |> String.Map.of_alist_or_error
+    |> of_or_error
+    |> ok_exn
   in
   (* Process Defines + Externs. TypeDefs are dropped here - they'll be
      re-emitted from collected shapes after specialization is complete. *)
   let init_state = { poly_fn_env; spec_map = String.Map.empty; all_tops_rev = [] } in
-  let%bind st =
-    fold_state init_state tops ~f:(fun st top ->
+  let st =
+    List.fold_left tops ~init:init_state ~f:(fun st top ->
       match top.desc with
-      | TypeDef _ -> Ok st
-      | Extern _ -> Ok { st with all_tops_rev = top :: st.all_tops_rev }
+      | TypeDef _ -> st
+      | Extern _ -> { st with all_tops_rev = top :: st.all_tops_rev }
       | Define _ when not (is_concrete top.ty) ->
         (* Skip poly defines (already in [poly_fn_env]) *)
-        Ok st
+        st
       | Define (recur, v, bind) ->
         let refs = collect_poly_refs st.poly_fn_env bind in
-        let%bind st =
-          fold_state st refs ~f:(fun st (name, ty) ->
-            let%map st, _ = resolve_spec st name ty in
-            st)
+        let st =
+          List.fold_left refs ~init:st ~f:(fun st (name, ty) ->
+            fst (resolve_spec st name ty))
         in
-        let%map st, bind = rewrite_refs st bind in
+        let st, bind = rewrite_refs st bind in
         let top = { top with desc = Define (recur, v, bind) } in
         { st with all_tops_rev = top :: st.all_tops_rev })
   in
   let final_value_tops = List.rev st.all_tops_rev in
-  let typedef_loc = (List.hd_exn tops).loc in
+  let typedef_loc = (List.hd tops |> of_option "empty program" |> ok_exn).loc in
   (* Every concrete TyRecord/TyVariant in the program gets a fresh, hint-derived name *)
   let all_tops_tc = assign_names ~typedef_loc final_value_tops in
-  let%map tops = Compiler_error.all (List.map all_tops_tc ~f:top_of_tc) in
+  let tops = List.map all_tops_tc ~f:top_of_tc in
   promote_int_vecs (Program tops)
 ;;
+
+let monomorphize t = try_with (fun () -> monomorphize_exn t)

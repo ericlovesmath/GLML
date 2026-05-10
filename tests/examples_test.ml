@@ -1167,15 +1167,15 @@ let%expect_test "compile examples" =
                         float anf_2 = (a - b);
                         a = anf_2;
                         b = b;
-                        int _iter_inc = (_iter + 1);
-                        _iter = _iter_inc;
+                        int _iter_inc_0 = (_iter + 1);
+                        _iter = _iter_inc_0;
                         continue;
                     } else {
                         float anf_3 = (b - a);
                         a = a;
                         b = anf_3;
-                        int _iter_inc_0 = (_iter + 1);
-                        _iter = _iter_inc_0;
+                        int _iter_inc = (_iter + 1);
+                        _iter = _iter_inc;
                         continue;
                     }
                 }

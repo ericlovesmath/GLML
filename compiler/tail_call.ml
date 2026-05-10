@@ -1,9 +1,8 @@
 open Core
 open Anf
 open Sexplib.Sexp
-open Compiler_error.Let_syntax
 
-module Err = Compiler_error.Pass (struct
+include Compiler_error.Pass (struct
     let name = "tail_call"
   end)
 
@@ -152,31 +151,20 @@ let contains_call (t : Anf.term) (v : string) : bool =
 ;;
 
 let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : string list)
-  : anf Compiler_error.t
+  : anf
   =
-  let rec patch (anf : Anf.anf) : anf Compiler_error.t =
+  let rec patch (anf : Anf.anf) : anf =
     let atom (desc : atom_desc) = ({ desc; ty = anf.ty; loc = anf.loc } : atom) in
-    let pure desc : anf Compiler_error.t = Ok { desc; ty = anf.ty; loc = anf.loc } in
+    let pure desc : anf = { desc; ty = anf.ty; loc = anf.loc } in
     match anf.desc with
     | Let (v, bind, tail) ->
       if contains_call bind name
-      then
-        Err.fail "non-tail rec call detected" ~loc:anf.loc ~d:[%message (name : string)]
-      else (
-        let%bind tail = patch tail in
-        pure (Let (v, of_term bind, tail)))
+      then raise "non-tail rec call detected" ~loc:anf.loc ~d:[%message (name : string)]
+      else pure (Let (v, of_term bind, patch tail))
     | Return { desc = If (c, t, f); ty; loc } ->
-      let%bind t = patch t in
-      let%bind f = patch f in
-      pure (Return { desc = If (c, t, f); ty; loc })
+      pure (Return { desc = If (c, patch t, patch f); ty; loc })
     | Return { desc = Match (scrutinee, cases); ty; loc } ->
-      let%bind cases =
-        cases
-        |> List.map ~f:(fun (pat, body) ->
-          let%map body = patch body in
-          pat, body)
-        |> Compiler_error.all
-      in
+      let cases = List.map cases ~f:(fun (pat, body) -> pat, patch body) in
       pure (Return { desc = Match (scrutinee, cases); ty; loc })
     | Return { desc = App (f, xs); ty = _; loc } when String.equal f name ->
       let tmp = Utils.fresh "_iter_inc" in
@@ -185,27 +173,26 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : strin
           let int_atom desc : atom = { desc; ty = TyInt; loc } in
           { desc = Bop (Add, int_atom (Var iter), int_atom (Int 1)); ty = TyInt; loc }
         in
-        let%bind continue = pure Continue in
-        let%bind set_iter_to_tmp = pure (Set (iter, atom (Var tmp), continue)) in
+        let continue = pure Continue in
+        let set_iter_to_tmp = pure (Set (iter, atom (Var tmp), continue)) in
         pure (Let (tmp, iter_inc, set_iter_to_tmp))
       in
       let tail =
         List.fold_right2 args xs ~init:inc_iter_continue ~f:(fun name arg tail ->
-          let%bind tail = tail in
           pure (Set (name, arg, tail)))
       in
       (match tail with
        | Ok res -> res
        | Unequal_lengths ->
-         Err.fail "args and xs don't match" ~loc ~d:[%message (args : string list)])
+         raise "args and xs don't match" ~loc ~d:[%message (args : string list)])
     | Return tail -> pure (Return (of_term tail))
   in
   patch anf
 ;;
 
-let remove_rec_top (top : Anf.top) : top Compiler_error.t =
+let remove_rec_top (top : Anf.top) : top =
   let atom desc : atom = { desc; ty = top.ty; loc = top.loc } in
-  let pure desc = Ok { desc; ty = top.ty; loc = top.loc } in
+  let pure desc = { desc; ty = top.ty; loc = top.loc } in
   match top.desc with
   | Const (v, anf) -> pure (Const (v, of_anf anf))
   | Extern v -> pure (Extern v)
@@ -219,7 +206,7 @@ let remove_rec_top (top : Anf.top) : top Compiler_error.t =
       let int_atom desc : atom = { desc; ty = TyInt; loc } in
       { desc = Bop (Lt, int_atom (Var iter), int_atom (Int limit)); ty = TyBool; loc }
     in
-    let%bind while_body = patch_tail_anf body name iter (List.map ~f:fst args) in
+    let while_body = patch_tail_anf body name iter (List.map ~f:fst args) in
     let while_after =
       let ty = ret_ty in
       let loc = body.loc in
@@ -232,17 +219,12 @@ let remove_rec_top (top : Anf.top) : top Compiler_error.t =
       { desc = While (while_cond, while_body, while_after); ty = top.ty; loc }
     in
     let body : anf =
-      { desc =
-          Let
-            (iter, { desc = Atom (atom (Int 0)); ty = Monomorphize.TyInt; loc }, while_anf)
-      ; ty = top.ty
-      ; loc
-      }
+      let zero : term = { desc = Atom (atom (Int 0)); ty = TyInt; loc } in
+      { desc = Let (iter, zero, while_anf); ty = top.ty; loc }
     in
     pure (Define { name; args; body; ret_ty })
 ;;
 
-let remove_rec (Program t : Anf.t) : t Compiler_error.t =
-  let%map tops = Compiler_error.all (List.map ~f:remove_rec_top t) in
-  Program tops
+let remove_rec (Program tops : Anf.t) : t Compiler_error.t =
+  try_with (fun () -> Program (List.map ~f:remove_rec_top tops))
 ;;

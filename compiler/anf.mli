@@ -70,4 +70,4 @@ type t = Program of top list [@@deriving sexp_of]
 
 (** Converts [t] to A-normal form, updating the [type map] to account for
     the new created variables. Variables are named in the form [anf_num]. *)
-val to_anf : Lambda_lift.t -> t
+val to_anf : Lambda_lift.t -> t Compiler_error.t
