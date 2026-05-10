@@ -1639,3 +1639,33 @@ let%expect_test "unused HOF with fn-typed param emits empty DFn typedef" =
     }
     |}]
 ;;
+
+let%expect_test "dot accepts mixed int/float vec args" =
+  test
+    {|
+    let f : vec3 -> vec3 =
+      fun p ->
+        let n = #dot(p, [0, 0, 0]) in
+        [n, n, n]
+
+    let main uv = [0, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 f(vec3 p) {
+        vec3 anf = vec3(0., 0., 0.);
+        float n = dot(p, anf);
+        return vec3(n, n, n);
+    }
+    vec3 main_pure(vec2 uv) {
+        return vec3(0., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;

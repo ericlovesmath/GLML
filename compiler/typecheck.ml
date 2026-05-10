@@ -723,7 +723,11 @@ and gen_builtin
       ; constr (Eq (ty, TyFloat))
       ]
     | (Distance | Dot), [ t; t' ] ->
-      [ constr (HasClass (GenType, t)); constr (Eq (t, t')); constr (Eq (ty, TyFloat)) ]
+      let bt = fresh_tyvar () in
+      [ constr (Broadcast (t, t', bt))
+      ; constr (HasClass (GenType, bt))
+      ; constr (Eq (ty, TyFloat))
+      ]
     | Cross, [ t; t' ] ->
       [ constr (Eq (t, TyVec (3, TyFloat)))
       ; constr (Eq (t', TyVec (3, TyFloat)))
