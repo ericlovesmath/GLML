@@ -34,7 +34,7 @@ let is_scalar = function
 ;;
 
 (** Lower a [Coerce] where children have already been rewritten *)
-let lower_coerce ~loc (target : ty) (inner : term) : term =
+let rec lower_coerce ~loc (target : ty) (inner : term) : term =
   if equal_ty inner.ty target
   then inner
   else if has_tyvar target || has_tyvar inner.ty
@@ -43,6 +43,20 @@ let lower_coerce ~loc (target : ty) (inner : term) : term =
     match target, inner.ty, inner.desc with
     | TyFloat, TyInt, Int i -> { desc = Float (Float.of_int i); ty = TyFloat; loc }
     | TyFloat, TyInt, _ -> { desc = Builtin (Glsl.Float, [ inner ]); ty = TyFloat; loc }
+    | TyVariant (_, t_ctors), TyVariant _, Variant (ctor, args) ->
+      let target_arg_tys = List.Assoc.find_exn t_ctors ~equal:String.equal ctor in
+      let new_args =
+        List.map2_exn args target_arg_tys ~f:(fun a t -> lower_coerce ~loc:a.loc t a)
+      in
+      { desc = Variant (ctor, new_args); ty = target; loc = inner.loc }
+    | TyRecord (_, t_fields), TyRecord _, Record args ->
+      let new_args =
+        List.map2_exn args t_fields ~f:(fun a (_, t) -> lower_coerce ~loc:a.loc t a)
+      in
+      { desc = Record new_args; ty = target; loc = inner.loc }
+    | TyVec (_, t), TyVec _, Vec (n, ts) ->
+      let new_ts = List.map ts ~f:(fun a -> lower_coerce ~loc:a.loc t a) in
+      { desc = Vec (n, new_ts); ty = target; loc = inner.loc }
     | _ when coercible inner.ty target -> { inner with ty = target }
     | _ -> inner)
 ;;

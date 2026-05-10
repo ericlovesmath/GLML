@@ -1582,3 +1582,31 @@ let%expect_test "defunctionalize unifies int/float arrow flavors" =
     }
     |}]
 ;;
+
+let%expect_test "promote ints through variant constructor coerce" =
+  test
+    {|
+    type option['a] = Some of 'a | None
+    let main uv =
+      let x : option[float] = Some 5 in
+      [0, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct option {
+        int tag;
+        float Some_0;
+    };
+    vec3 main_pure(vec2 uv) {
+        option x = option(0, 5.);
+        return vec3(0., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
