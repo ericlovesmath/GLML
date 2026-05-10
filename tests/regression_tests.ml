@@ -1610,3 +1610,32 @@ let%expect_test "promote ints through variant constructor coerce" =
     }
     |}]
 ;;
+
+let%expect_test "unused HOF with fn-typed param emits empty DFn typedef" =
+  test
+    {|
+    let add_noise (f : vec3 -> vec3) : vec3 -> vec3 =
+      fun p -> [0, 0, 0]
+
+    let main (coord : vec2) = [0, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn {
+        int tag;
+    };
+    vec3 add_noise(DFn f, vec3 p) {
+        return vec3(0., 0., 0.);
+    }
+    vec3 main_pure(vec2 coord) {
+        return vec3(0., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
