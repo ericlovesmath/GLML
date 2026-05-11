@@ -5,8 +5,7 @@ type pat =
   | PatLitFloat of float
   | PatWildcard
   | PatVar of string
-  | PatBracket of pat list
-  (** PatRecord of [(binging * pattern) list * is_partial] *)
+  | PatBracket of pat list (** PatRecord of [(binging * pattern) list * is_partial] *)
   | PatRecord of (string * pat) list * bool
 [@@deriving sexp_of, equal]
 
@@ -23,6 +22,18 @@ type ty =
   | TyApp of string * ty list
 [@@deriving sexp_of, equal]
 
+type constr_desc =
+  | CNumeric of ty
+  | CBroadcast of ty * ty * ty
+  | CMulBroadcast of ty * ty * ty
+[@@deriving sexp_of]
+
+type constr =
+  { desc : constr_desc
+  ; loc : Lexer.loc
+  }
+[@@deriving sexp_of]
+
 type type_decl =
   | RecordDecl of (string * ty) list
   | VariantDecl of (string * ty list) list
@@ -30,7 +41,7 @@ type type_decl =
 [@@deriving sexp_of]
 
 type recur =
-  (** NOTE: [int] is for the maximum number of recs allowed *)
+  (* NOTE: [int] is for the maximum number of recs allowed *)
   | Rec of int
   | Nonrec
 [@@deriving sexp_of]
@@ -44,7 +55,7 @@ type term_desc =
   | Lam of string * ty option * term
   | App of term * term
   | Pipe of term * term
-  | Let of recur * pat * ty option * term * term
+  | Let of recur * pat * ty option * constr list * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -63,7 +74,7 @@ and term =
 [@@deriving sexp_of]
 
 type top_desc =
-  | Define of recur * string * ty option * term
+  | Define of recur * string * ty option * constr list * term
   | Extern of ty * string
   (* TypeDef (var, params, type) *)
   | TypeDef of string * string list * type_decl

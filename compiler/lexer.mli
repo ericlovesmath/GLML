@@ -47,6 +47,7 @@ type token =
   | EXTERN
   | TYPE
   | OF
+  | WHERE
   | CONSTRUCTOR of string
   | NUMERIC of int
   | FLOAT_LIT of float

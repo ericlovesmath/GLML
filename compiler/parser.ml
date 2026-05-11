@@ -301,6 +301,35 @@ let let_lhs_p =
   annotated_pat_p <|> function_p <|> between `Paren pat_p <|> pat_p
 ;;
 
+let constrs_p : constr list Chomp.t =
+  let ternary_op op_tok ctor =
+    let%bind a = ty_atom_p in
+    let%bind _ = tok op_tok in
+    commit
+      (let%bind b = ty_atom_p in
+       let%bind _ = tok ARROW in
+       let%bind r = ty_atom_p in
+       return (ctor a b r))
+  in
+  let broadcast_p = ternary_op ADD (fun a b r -> CBroadcast (a, b, r)) in
+  let mul_broadcast_p = ternary_op MUL (fun a b r -> CMulBroadcast (a, b, r)) in
+  let numeric_p =
+    let classname_p =
+      satisfy (function
+        | CONSTRUCTOR "Num" -> true
+        | _ -> false)
+    in
+    classname_p *> ty_atom_p >>| fun t -> CNumeric t
+  in
+  let bare_p = broadcast_p <|> mul_broadcast_p <|> numeric_p in
+  let single_p =
+    let%map desc, loc = with_loc (between `Paren bare_p <|> bare_p) in
+    ({ desc; loc } : Frontend.constr)
+  in
+  let list_p = commas single_p <|> between `Paren (commas single_p) in
+  tok WHERE *> commit list_p <|> return []
+;;
+
 let rec term_let_p =
   fun st ->
   (with_term_loc
@@ -308,10 +337,11 @@ let rec term_let_p =
       *> commit
            (let%bind recur = recur_p in
             let%bind pat, params, ann = let_lhs_p in
-            let%bind rhs = tok EQ *> term_p in
-            let rhs_desc = make_lambdas params rhs in
+            let%bind constrs = constrs_p in
+            let%bind bind = tok EQ *> term_p in
+            let bind : term = { desc = make_lambdas params bind; loc = bind.loc } in
             let%bind body = tok IN *> term_p in
-            return (Let (recur, pat, ann, { desc = rhs_desc; loc = rhs.loc }, body))))
+            return (Let (recur, pat, ann, constrs, bind, body))))
    <??> "let expression")
     st
 
@@ -687,6 +717,26 @@ let%expect_test "pipe operator tests" =
     |}]
 ;;
 
+let%expect_test "where clause parse tests" =
+  let test = test (List.sexp_of_t sexp_of_constr) constrs_p in
+  test "where Num 'a";
+  test "where 'a + 'b -> 'r";
+  test "where 'a * 'b -> 'r";
+  test "where (Num 'c), ('a + 'b -> 'r)";
+  test "where Unknown 'a";
+  [%expect
+    {|
+    ((Numeric 'a))
+    ((Broadcast 'a 'b 'r))
+    ((MulBroadcast 'a 'b 'r))
+    ((Numeric 'c) (Broadcast 'a 'b 'r))
+    [parser] at 1:7-1:14: expected one of: `(`, identifier, type keyword/variable but found `Unknown`
+      |
+    1 | where Unknown 'a
+      |       ^^^^^^^
+    |}]
+;;
+
 let top_let_p =
   with_top_loc
     (tok LET
@@ -695,10 +745,11 @@ let top_let_p =
            let%bind id = ident_p in
            let%bind params = many param_p in
            let%bind return_ty = optional (tok COLON *> ty_p) in
-           let%bind rhs = tok EQ *> term_p in
-           let rhs_desc = make_lambdas params rhs in
+           let%bind constrs = constrs_p in
+           let%bind bind = tok EQ *> term_p in
+           let bind : term = { desc = make_lambdas params bind; loc = bind.loc } in
            let ann = function_annotation params return_ty in
-           return (Define (recur, id, ann, { desc = rhs_desc; loc = rhs.loc })))
+           return (Define (recur, id, ann, constrs, bind)))
      <??> "a top-level definition")
 ;;
 

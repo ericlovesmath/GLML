@@ -214,7 +214,7 @@ let rec is_value (t : Desugar.term) : bool =
   | Record fields -> List.for_all fields ~f:(fun (_, t) -> is_value t)
   | Variant (_, args) -> List.for_all args ~f:is_value
   | Field (t, _) | Index (t, _) -> is_value t
-  | Let (_, _, _, _, body) -> is_value body
+  | Let (_, _, _, _, _, body) -> is_value body
   | App _ | If _ | Bop _ | Builtin _ | Match _ -> false
 ;;
 
@@ -255,6 +255,17 @@ let rec resolve_stlc_ty ~(loc : Lexer.loc) (env : env) (t : Frontend.ty) : ty =
   | TyBool -> TyBool
   | TyVec (n, t) -> TyVec (n, resolve t)
   | TyVar v -> TyVar v
+;;
+
+let resolve_constr (env : env) (constr : Frontend.constr) : constr =
+  let resolve = resolve_stlc_ty ~loc:constr.loc env in
+  let desc : constr_desc =
+    match constr.desc with
+    | CNumeric t -> HasClass (Numeric, resolve t)
+    | CBroadcast (a, b, x) -> Broadcast (resolve a, resolve b, resolve x)
+    | CMulBroadcast (a, b, x) -> MulBroadcast (resolve a, resolve b, resolve x)
+  in
+  { desc; loc = constr.loc }
 ;;
 
 let bind_var ctx v ty = Map.set ctx ~key:v ~data:([], [], ty)
@@ -474,6 +485,7 @@ let rec infer_binding
           (recur : Frontend.recur)
           (v : string)
           (return_ty : Frontend.ty option)
+          (constrs : Frontend.constr list)
   : term * ty * env * constr list * constr list * substitution
   =
   let return_ty =
@@ -481,6 +493,7 @@ let rec infer_binding
     | None -> None
     | Some return_ty -> Some (resolve_stlc_ty ~loc env return_ty)
   in
+  let constrs = List.map ~f:(resolve_constr env) constrs in
   let ty_v_opt =
     match recur with
     | Nonrec -> None
@@ -500,8 +513,8 @@ let rec infer_binding
       | Some ty_v -> constr (Eq (ty_v, bind.ty)) :: constrs_bind
     in
     match recur, return_ty with
-    | Nonrec, Some full_ty -> constr (Coerce (bind.ty, full_ty)) :: rec_constrs
-    | _ -> rec_constrs
+    | Nonrec, Some full_ty -> constrs @ (constr (Coerce (bind.ty, full_ty)) :: rec_constrs)
+    | _ -> constrs @ rec_constrs
   in
   let bind =
     match recur, return_ty with
@@ -570,9 +583,9 @@ and gen_term (env : env) (t : Desugar.term) : term * constr list * substitution 
     let x = coerce_term x.loc arg_ty x in
     let composed = compose_sub sub_x sub_f in
     { desc = App (f, x); ty = ret_ty; loc }, constrs, composed
-  | Let (recur, v, return_ty, bind_stlc, body_stlc) ->
+  | Let (recur, v, return_ty, constrs, bind_stlc, body_stlc) ->
     let bind, _, env, scheme_constrs, remaining, sub_bind =
-      infer_binding env loc bind_stlc recur v return_ty
+      infer_binding env loc bind_stlc recur v return_ty constrs
     in
     let body, constrs_body, body_sub = gen_term env body_stlc in
     let bind = subst_term body_sub bind in
@@ -967,9 +980,9 @@ let typecheck_impl (Program terms : Desugar.t) : t =
         , [] )
       ~f:(fun (env, acc) top ->
         match top.desc with
-        | Define (recur, v, return_ty, bind) ->
+        | Define (recur, v, return_ty, constrs, bind) ->
           let bind, ty, env, scheme_constrs, remaining, _ =
-            infer_binding env top.loc bind recur v return_ty
+            infer_binding env top.loc bind recur v return_ty constrs
           in
           if not (List.is_empty remaining)
           then

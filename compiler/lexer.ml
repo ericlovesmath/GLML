@@ -50,6 +50,7 @@ type token =
   | EXTERN
   | TYPE
   | OF
+  | WHERE
   | CONSTRUCTOR of string
   | NUMERIC of int
   | FLOAT_LIT of float
@@ -106,6 +107,7 @@ let string_of_token = function
   | EXTERN -> "`#extern`"
   | TYPE -> "`type`"
   | OF -> "`of`"
+  | WHERE -> "`where`"
   | CONSTRUCTOR s -> Printf.sprintf "`%s`" s
   | NUMERIC n -> Int.to_string n
   | FLOAT_LIT f -> Printf.sprintf "%g" f
@@ -284,6 +286,7 @@ let read_lexeme (t : t) : token Or_error.t =
         | "extern" -> Ok EXTERN
         | "type" -> Ok TYPE
         | "of" -> Ok OF
+        | "where" -> Ok WHERE
         | s when Map.mem vecs s -> Map.find_or_error vecs s
         | s when Map.mem mats s -> Map.find_or_error mats s
         | "_" -> Ok UNDERSCORE
@@ -326,7 +329,7 @@ let%expect_test "lexer" =
   test "bool int float ' 'a 10 s_var let type of |>";
   test "+ - / * # <= >= % && || extern vec2 mat3x3";
   test "1.23 0.45 6. -1.";
-  test "Constructor";
+  test "Constructor where";
   [%expect
     {|
     (Ok (TRUE FALSE EQ ARROW LPAREN RPAREN DOT LANGLE RANGLE))
@@ -335,7 +338,7 @@ let%expect_test "lexer" =
     (Ok (BOOL INT FLOAT TICK (TYVAR a) (NUMERIC 10) (ID s_var) LET TYPE OF PIPE))
     (Ok (ADD SUB DIV MUL HASH LEQ GEQ PERCENT LAND LOR EXTERN (VEC 2) (MAT 3 3)))
     (Ok ((FLOAT_LIT 1.23) (FLOAT_LIT 0.45) (FLOAT_LIT 6) SUB (FLOAT_LIT 1)))
-    (Ok ((CONSTRUCTOR Constructor)))
+    (Ok ((CONSTRUCTOR Constructor) WHERE))
     |}];
   test "let{x:int}=match|a->fun->(f<x>*2)";
   [%expect

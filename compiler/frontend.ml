@@ -55,6 +55,26 @@ let rec sexp_of_ty = function
   | TyApp (s, args) -> List (Atom s :: List.map args ~f:sexp_of_ty)
 ;;
 
+type constr_desc =
+  | CNumeric of ty
+  | CBroadcast of ty * ty * ty
+  | CMulBroadcast of ty * ty * ty
+
+let sexp_of_constr_desc = function
+  | CNumeric t -> List [ Atom "Numeric"; sexp_of_ty t ]
+  | CBroadcast (a, b, r) ->
+    List [ Atom "Broadcast"; sexp_of_ty a; sexp_of_ty b; sexp_of_ty r ]
+  | CMulBroadcast (a, b, r) ->
+    List [ Atom "MulBroadcast"; sexp_of_ty a; sexp_of_ty b; sexp_of_ty r ]
+;;
+
+type constr =
+  { desc : constr_desc
+  ; loc : Lexer.loc
+  }
+
+let sexp_of_constr (c : constr) = sexp_of_constr_desc c.desc
+
 type type_decl =
   | RecordDecl of (string * ty) list
   | VariantDecl of (string * ty list) list
@@ -75,7 +95,7 @@ type term_desc =
   | Lam of string * ty option * term
   | App of term * term
   | Pipe of term * term
-  | Let of recur * pat * ty option * term * term
+  | Let of recur * pat * ty option * constr list * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -102,29 +122,25 @@ let rec sexp_of_term_desc = function
     List [ Atom "lambda"; List [ Atom v; ty ]; sexp_of_term body ]
   | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
   | Pipe (l, r) -> List [ sexp_of_term l; Atom "|>"; sexp_of_term r ]
-  | Let (Rec n, v, None, bind, body) ->
-    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
-    List [ Atom "let"; rec_tag; sexp_of_pat v; sexp_of_term bind; sexp_of_term body ]
-  | Let (Rec n, v, Some ret_ty, bind, body) ->
-    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
-    List
-      [ Atom "let"
-      ; rec_tag
-      ; sexp_of_pat v
-      ; List [ Atom ":"; sexp_of_ty ret_ty ]
-      ; sexp_of_term bind
-      ; sexp_of_term body
-      ]
-  | Let (Nonrec, v, None, bind, body) ->
-    List [ Atom "let"; sexp_of_pat v; sexp_of_term bind; sexp_of_term body ]
-  | Let (Nonrec, v, Some ret_ty, bind, body) ->
-    List
-      [ Atom "let"
-      ; sexp_of_pat v
-      ; List [ Atom ":"; sexp_of_ty ret_ty ]
-      ; sexp_of_term bind
-      ; sexp_of_term body
-      ]
+  | Let (recur, v, ret_ty, constrs, bind, body) ->
+    let parts = [ Atom "let" ] in
+    let parts =
+      match recur with
+      | Rec n -> parts @ [ List [ Atom "rec"; Atom (Int.to_string n) ] ]
+      | Nonrec -> parts
+    in
+    let parts = parts @ [ sexp_of_pat v ] in
+    let parts =
+      match ret_ty with
+      | None -> parts
+      | Some ret_ty -> parts @ [ List [ Atom ":"; sexp_of_ty ret_ty ] ]
+    in
+    let parts =
+      match constrs with
+      | [] -> parts
+      | _ -> parts @ [ Atom "where"; List.sexp_of_t sexp_of_constr constrs ]
+    in
+    List (parts @ [ sexp_of_term bind; sexp_of_term body ])
   | If (c, t, e) -> List [ Atom "if"; sexp_of_term c; sexp_of_term t; sexp_of_term e ]
   | Bop (op, l, r) ->
     List [ Atom (Glsl.string_of_binary_op op); sexp_of_term l; sexp_of_term r ]
@@ -147,7 +163,7 @@ let rec sexp_of_term_desc = function
 and sexp_of_term t = sexp_of_term_desc t.desc
 
 type top_desc =
-  | Define of recur * string * ty option * term
+  | Define of recur * string * ty option * constr list * term
   | Extern of ty * string
   | TypeDef of string * string list * type_decl
 
@@ -157,13 +173,18 @@ type top =
   }
 
 let sexp_of_top_desc = function
-  | Define (recur, v, ret_ty_opt, term) ->
+  | Define (recur, v, ret_ty_opt, constrs, term) ->
     let recur_sexp = sexp_of_recur recur in
     let parts = [ Atom "Define"; recur_sexp; Atom v ] in
     let parts =
       match ret_ty_opt with
       | None -> parts
       | Some ret_ty -> parts @ [ List [ Atom ":"; sexp_of_ty ret_ty ] ]
+    in
+    let parts =
+      match constrs with
+      | [] -> parts
+      | _ -> parts @ [ Atom "where"; List.sexp_of_t sexp_of_constr constrs ]
     in
     List (parts @ [ sexp_of_term term ])
   | Extern (ty, v) -> List [ Atom "Extern"; sexp_of_ty ty; Atom v ]

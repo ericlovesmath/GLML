@@ -20,7 +20,7 @@ type term_desc =
   | Vec of int * term list
   | Lam of string * ty option * term
   | App of term * term
-  | Let of Frontend.recur * string * ty option * term * term
+  | Let of recur * string * ty option * constr list * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -45,29 +45,25 @@ let rec sexp_of_term_desc = function
     let ty = Option.sexp_of_t sexp_of_ty ty_opt in
     List [ Atom "lambda"; List [ Atom v; ty ]; sexp_of_term body ]
   | App (f, x) -> List [ Atom "app"; sexp_of_term f; sexp_of_term x ]
-  | Let (Rec n, v, None, bind, body) ->
-    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
-    List [ Atom "let"; rec_tag; Atom v; sexp_of_term bind; sexp_of_term body ]
-  | Let (Rec n, v, Some ret_ty, bind, body) ->
-    let rec_tag = List [ Atom "rec"; Atom (Int.to_string n) ] in
-    List
-      [ Atom "let"
-      ; rec_tag
-      ; Atom v
-      ; List [ Atom ":"; sexp_of_ty ret_ty ]
-      ; sexp_of_term bind
-      ; sexp_of_term body
-      ]
-  | Let (Nonrec, v, None, bind, body) ->
-    List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_term body ]
-  | Let (Nonrec, v, Some ret_ty, bind, body) ->
-    List
-      [ Atom "let"
-      ; Atom v
-      ; List [ Atom ":"; sexp_of_ty ret_ty ]
-      ; sexp_of_term bind
-      ; sexp_of_term body
-      ]
+  | Let (recur, v, ret_ty, constrs, bind, body) ->
+    let parts = [ Atom "let" ] in
+    let parts =
+      match recur with
+      | Rec n -> parts @ [ List [ Atom "rec"; Atom (Int.to_string n) ] ]
+      | Nonrec -> parts
+    in
+    let parts = parts @ [ Atom v ] in
+    let parts =
+      match ret_ty with
+      | None -> parts
+      | Some ret_ty -> parts @ [ List [ Atom ":"; sexp_of_ty ret_ty ] ]
+    in
+    let parts =
+      match constrs with
+      | [] -> parts
+      | _ -> parts @ [ List [ Atom "where"; List.sexp_of_t sexp_of_constr constrs ] ]
+    in
+    List (parts @ [ sexp_of_term bind; sexp_of_term body ])
   | If (c, t, e) -> List [ Atom "if"; sexp_of_term c; sexp_of_term t; sexp_of_term e ]
   | Bop (op, l, r) ->
     List [ Atom (Glsl.string_of_binary_op op); sexp_of_term l; sexp_of_term r ]
@@ -87,7 +83,7 @@ let rec sexp_of_term_desc = function
 and sexp_of_term t = sexp_of_term_desc t.desc
 
 type top_desc =
-  | Define of recur * string * ty option * term
+  | Define of recur * string * ty option * constr list * term
   | Extern of ty * string
   | TypeDef of string * string list * type_decl
 
@@ -97,13 +93,18 @@ type top =
   }
 
 let sexp_of_top_desc = function
-  | Define (recur, v, ret_ty_opt, term) ->
+  | Define (recur, v, ret_ty, constrs, term) ->
     let recur_sexp = sexp_of_recur recur in
     let parts = [ Atom "Define"; recur_sexp; Atom v ] in
     let parts =
-      match ret_ty_opt with
+      match ret_ty with
       | None -> parts
       | Some ret_ty -> parts @ [ List [ Atom ":"; sexp_of_ty ret_ty ] ]
+    in
+    let parts =
+      match constrs with
+      | [] -> parts
+      | _ -> parts @ [ List [ Atom "where"; List.sexp_of_t sexp_of_constr constrs ] ]
     in
     List (parts @ [ sexp_of_term term ])
   | Extern (ty, v) -> List [ Atom "Extern"; sexp_of_ty ty; Atom v ]
@@ -138,11 +139,14 @@ let rec desugar_term_desc (td : Frontend.term_desc) : term_desc =
   | Pipe (l, r) ->
     (* x |> f   =>   f x *)
     App (desugar_term r, desugar_term l)
-  | Let (r, PatVar v, ty_opt, bind, body) ->
-    Let (r, v, ty_opt, desugar_term bind, desugar_term body)
-  | Let (Rec _, _, _, _, _) -> raise "recursive let binding requires a variable pattern"
-  | Let (Nonrec, pat, _, bind, body) ->
+  | Let (r, PatVar v, ty_opt, where, bind, body) ->
+    Let (r, v, ty_opt, where, desugar_term bind, desugar_term body)
+  | Let (Rec _, _, _, _, _, _) ->
+    raise "recursive let binding requires a variable pattern"
+  | Let (Nonrec, pat, _, [], bind, body) ->
     Match (desugar_term bind, [ pat, desugar_term body ])
+  | Let (Nonrec, _, _, _ :: _, _, _) ->
+    raise "where-clause requires a variable pattern on the let binding"
   | If (c, t, e) -> If (desugar_term c, desugar_term t, desugar_term e)
   | Bop (op, l, r) -> Bop (op, desugar_term l, desugar_term r)
   | Index (t, i) -> Index (desugar_term t, i)
@@ -171,7 +175,7 @@ and desugar_term (t : Frontend.term) : term =
 
 let desugar_top_desc (td : Frontend.top_desc) : top_desc =
   match td with
-  | Define (r, v, ty_opt, t) -> Define (r, v, ty_opt, desugar_term t)
+  | Define (r, v, ty_opt, where, t) -> Define (r, v, ty_opt, where, desugar_term t)
   | Extern (ty, v) -> Extern (ty, v)
   | TypeDef (name, params, decl) -> TypeDef (name, params, desugar_type_decl decl)
 ;;

@@ -14,7 +14,7 @@ type term_desc =
   | Vec of int * term list
   | Lam of string * ty option * term
   | App of term * term
-  | Let of recur * string * ty option * term * term
+  | Let of recur * string * ty option * constr list * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
@@ -32,7 +32,7 @@ and term =
 [@@deriving sexp_of]
 
 type top_desc =
-  | Define of recur * string * ty option * term
+  | Define of recur * string * ty option * constr list * term
   | Extern of ty * string
   (* TypeDef (var, params, type) *)
   | TypeDef of string * string list * type_decl
