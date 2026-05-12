@@ -6,7 +6,6 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 
 - Allow binary operations and pipes to be used as curried functions
 - Nested destructing, removing mat pattern case
-- User defined constraints for broadcasting/others, eg: `let f (x : a) (y : b) : c where (a b +> c) = x + y`
 - Type annotations for arbitrary terms
 - Type aliases with parameters
 - Curried builtin functions for partial application
@@ -19,7 +18,6 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - Add types to new passes like `specialize_params`
 - Potentially some kind of recursive types like `type list['a] = Nil | Cons of 'a * list['a]`
 - Passing constraints to mono is a bit weird, they should concretize that in `typecheck` step
-- Merging specialize and mono passes since they interplay like they're supposed to be the same pass
 - Mutual recursion
 - Add a guide or overview to playground
 - Refactor Makefile if needed to shared playground build files, since we rebuild playground on serve
@@ -74,3 +72,4 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - [Typing Haskell in Haskell]([https://web.cecs.pdx.edu/~mpj/thih/thih.pdf])
 - [Type Inference with Constrained Types]([https://www.cs.tufts.edu/~nr/cs257/archive/martin-odersky/hmx.pdf])
 - [Demystifying Typeclasses]([https://okmij.org/ftp/Computation/typeclass.html])
+- [Compiling Pattern Matching to Good Decision Trees](https://www.cs.tufts.edu/comp/150FP/archive/luc-maranget/jun08.pdf)
