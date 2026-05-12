@@ -73,3 +73,5 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - [Type Inference with Constrained Types]([https://www.cs.tufts.edu/~nr/cs257/archive/martin-odersky/hmx.pdf])
 - [Demystifying Typeclasses]([https://okmij.org/ftp/Computation/typeclass.html])
 - [Compiling Pattern Matching to Good Decision Trees](https://www.cs.tufts.edu/comp/150FP/archive/luc-maranget/jun08.pdf)
+- [Compiler Pattern Matching](https://compiler.club/compiling-pattern-matching/)
+- [Sparse Conditional Constant Propagation](https://www.cs.cornell.edu/courses/cs6120/2019fa/blog/sccp/)
