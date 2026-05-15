@@ -2,7 +2,7 @@ open Core
 open Sexplib.Sexp
 
 type pat =
-  | PatCtor of string * string list
+  | PatCtor of string * pat list
   | PatLitBool of bool
   | PatLitInt of int
   | PatLitFloat of float
@@ -13,7 +13,7 @@ type pat =
 [@@deriving equal]
 
 let rec sexp_of_pat = function
-  | PatCtor (ctor, vars) -> List (List.map (ctor :: vars) ~f:(fun v -> Atom v))
+  | PatCtor (ctor, args) -> List (Atom ctor :: List.map args ~f:sexp_of_pat)
   | PatLitBool b -> Atom (Bool.to_string b)
   | PatLitInt n -> Atom (Int.to_string n)
   | PatLitFloat f -> Atom (Float.to_string f)
@@ -25,13 +25,27 @@ let rec sexp_of_pat = function
       (Atom "record" :: List.map fields ~f:(fun (f, p) -> List [ Atom f; sexp_of_pat p ]))
 ;;
 
-let rec pat_bound_vars = function
-  | PatCtor (_, vs) -> vs
-  | PatLitBool _ | PatLitInt _ | PatLitFloat _ | PatWildcard -> []
-  | PatVar v -> [ v ]
-  | PatBracket pats -> List.concat_map pats ~f:pat_bound_vars
-  | PatRecord (fields, _) -> List.concat_map fields ~f:(fun (_, p) -> pat_bound_vars p)
+let rec pat_fold_vars p ~init ~f =
+  match p with
+  | PatWildcard | PatLitBool _ | PatLitInt _ | PatLitFloat _ -> init
+  | PatVar v -> f init v
+  | PatCtor (_, ps) | PatBracket ps ->
+    List.fold ps ~init ~f:(fun acc p -> pat_fold_vars p ~init:acc ~f)
+  | PatRecord (fields, _) ->
+    List.fold fields ~init ~f:(fun acc (_, p) -> pat_fold_vars p ~init:acc ~f)
 ;;
+
+let rec pat_map_vars p ~f =
+  match p with
+  | PatWildcard | PatLitBool _ | PatLitInt _ | PatLitFloat _ -> p
+  | PatVar v -> PatVar (f v)
+  | PatCtor (c, ps) -> PatCtor (c, List.map ps ~f:(pat_map_vars ~f))
+  | PatBracket ps -> PatBracket (List.map ps ~f:(pat_map_vars ~f))
+  | PatRecord (fields, partial) ->
+    PatRecord (List.map fields ~f:(fun (n, p) -> n, pat_map_vars p ~f), partial)
+;;
+
+let pat_bound_vars p = pat_fold_vars p ~init:[] ~f:(Fn.flip List.cons) |> List.rev
 
 type ty =
   | TyFloat

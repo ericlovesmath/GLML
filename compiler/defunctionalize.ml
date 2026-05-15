@@ -294,7 +294,10 @@ let gen_apply_fn (reg : registry) info : Lambda_lift.top =
     List.filter_map info.entries ~f:(fun entry ->
       match entry with
       | LambdaEntry e ->
-        let pat = Frontend.PatCtor (e.ctor_name, List.map e.captured ~f:fst) in
+        let pat =
+          Frontend.PatCtor
+            (e.ctor_name, List.map e.captured ~f:(fun (v, _) -> Frontend.PatVar v))
+        in
         let subs =
           match
             List.map2 (List.map e.params ~f:fst) arg_vars ~f:(fun old_v new_v ->

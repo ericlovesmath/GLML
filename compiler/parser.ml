@@ -50,15 +50,8 @@ let between brace_type p =
 ;;
 
 (** Match patterns *)
-let rec pat_p st =
-  ((let%bind ctor = constructor_p in
-    let%bind vars =
-      (* TODO: This should really be handled in a desugaring pass, similar to the other underscore cases *)
-      let field_p = ident_p <|> tok UNDERSCORE *> return "_wc" in
-      between `Paren (commas field_p) <|> (field_p >>| fun v -> [ v ]) <|> return []
-    in
-    return (PatCtor (ctor, vars)))
-   <|> tok TRUE *> return (PatLitBool true)
+let rec pat_atom_p st =
+  (tok TRUE *> return (PatLitBool true)
    <|> tok FALSE *> return (PatLitBool false)
    <|> (float_p >>| fun f -> PatLitFloat f)
    <|> (num_p >>| fun n -> PatLitInt n)
@@ -83,7 +76,19 @@ let rec pat_p st =
           in
           return (PatRecord (fields, has_wildcard)))
    <|> tok UNDERSCORE *> return PatWildcard
+   <|> (constructor_p >>| fun c -> PatCtor (c, []))
    <|> (ident_p >>| fun v -> PatVar v)
+   <|> between `Paren pat_p
+   <??> "pattern")
+    st
+
+and pat_p st =
+  ((let%bind ctor = constructor_p in
+    let%bind args =
+      between `Paren (commas pat_p) <|> (pat_atom_p >>| List.singleton) <|> return []
+    in
+    return (PatCtor (ctor, args)))
+   <|> pat_atom_p
    <??> "pattern")
     st
 ;;
@@ -564,6 +569,7 @@ let%expect_test "term parse tests" =
   test "function | Constr x -> a | Alt b -> b";
   test "function | true -> a | _ -> b";
   test "function | -1 -> a | 23 -> b | var -> c";
+  test "function | Some (None (1, _)) -> a | { x = -1, v } -> b | _ -> c";
   [%expect
     {|
     variable_name
@@ -592,6 +598,7 @@ let%expect_test "term parse tests" =
     (function ((Constr x) a) ((Alt b) b))
     (function (true a) (_ b))
     (function (-1 a) (23 b) (var c))
+    (function ((Some (None 1 _)) a) ((record (x -1) (v v)) b) (_ c))
     |}];
   test "-113.0";
   test "-113.";

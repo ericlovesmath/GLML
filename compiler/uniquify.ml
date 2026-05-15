@@ -51,52 +51,14 @@ let rec uniquify_term (ctx : env) (t : term) : term =
     let scrutinee = aux scrutinee in
     let cases =
       List.map cases ~f:(fun (pat, body) ->
-        let pat, ctx =
-          match pat with
-          | PatCtor (ctor, vs) ->
-            let ctx, vs' =
-              List.fold_map vs ~init:ctx ~f:(fun ctx v ->
-                let v' = Utils.fresh v in
-                Map.set ctx ~key:v ~data:v', v')
-            in
-            PatCtor (ctor, vs'), ctx
-          | PatWildcard -> pat, ctx
-          | PatVar v ->
-            let v, ctx = fresh v ctx in
-            PatVar v, ctx
-          | PatLitBool _ | PatLitInt _ | PatLitFloat _ -> pat, ctx
-          | PatBracket pats ->
-            let ctx, pats =
-              List.fold_map pats ~init:ctx ~f:(fun ctx p ->
-                match p with
-                | PatWildcard -> ctx, p
-                | PatVar v ->
-                  let v, ctx = fresh v ctx in
-                  ctx, PatVar v
-                | PatBracket inner ->
-                  let ctx, inner =
-                    List.fold_map inner ~init:ctx ~f:(fun ctx p ->
-                      match p with
-                      | PatWildcard -> ctx, p
-                      | PatVar v ->
-                        let v, ctx = fresh v ctx in
-                        ctx, PatVar v
-                      | _ -> ctx, p)
-                  in
-                  ctx, PatBracket inner
-                | _ -> ctx, p)
-            in
-            PatBracket pats, ctx
-          | PatRecord (fields, partial) ->
-            let ctx, fields =
-              List.fold_map fields ~init:ctx ~f:(fun ctx (fname, fpat) ->
-                match fpat with
-                | PatVar v ->
-                  let v, ctx = fresh v ctx in
-                  ctx, (fname, PatVar v)
-                | _ -> ctx, (fname, fpat))
-            in
-            PatRecord (fields, partial), ctx
+        let bound = Frontend.pat_bound_vars pat in
+        let ctx =
+          List.fold bound ~init:ctx ~f:(fun ctx v ->
+            Map.set ctx ~key:v ~data:(Utils.fresh v))
+        in
+        let pat =
+          Frontend.pat_map_vars pat ~f:(fun v ->
+            Map.find ctx v |> Option.value ~default:v)
         in
         pat, uniquify_term ctx body)
     in

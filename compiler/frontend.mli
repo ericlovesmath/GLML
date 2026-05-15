@@ -1,5 +1,5 @@
 type pat =
-  | PatCtor of string * string list
+  | PatCtor of string * pat list
   | PatLitBool of bool
   | PatLitInt of int
   | PatLitFloat of float
@@ -10,6 +10,8 @@ type pat =
 [@@deriving sexp_of, equal]
 
 val pat_bound_vars : pat -> string list
+val pat_map_vars : pat -> f:(string -> string) -> pat
+val pat_fold_vars : pat -> init:'a -> f:('a -> string -> 'a) -> 'a
 
 type ty =
   | TyFloat

@@ -864,14 +864,17 @@ let%expect_test "variants and matching" =
         int _lv_tag = s.tag;
         switch (_lv_tag) {
             case 0: {
-                float r = s.Circle_0;
+                float _lv_Circle_0 = s.Circle_0;
+                float r = _lv_Circle_0;
                 float anf = (3.14159 * r);
                 return (anf * r);
                 break;
             }
             case 1: {
-                float w = s.Rect_0;
-                float h = s.Rect_1;
+                float _lv_Rect_0 = s.Rect_0;
+                float _lv_Rect_1 = s.Rect_1;
+                float h = _lv_Rect_1;
+                float w = _lv_Rect_0;
                 return (w * h);
                 break;
             }
@@ -927,7 +930,8 @@ let%expect_test "variant match in let binding" =
         float v;
         switch (_lv_tag) {
             case 0: {
-                float f = x.Some_0;
+                float _lv_Some_0 = x.Some_0;
+                float f = _lv_Some_0;
                 v = f;
                 break;
             }
@@ -960,7 +964,7 @@ let%expect_test "variant exhaustive checking and incorrect maching" =
   [%expect
     {|
     [typecheck] at 5:15-7:22: non-exhaustive match
-      missing: (Green)
+      missing: (witness (Green))
       |
     5 |       let v = match Red with
     6 |         | Red -> 1.0
@@ -1208,7 +1212,8 @@ let%expect_test "bool match" =
     |};
   [%expect
     {|
-    [typecheck] at 4:15-5:22: non-exhaustive bool match (missing true or false)
+    [typecheck] at 4:15-5:22: non-exhaustive match
+      missing: (witness false)
       |
     4 |       let x = match b with
     5 |         | true -> 1.0
@@ -1226,8 +1231,8 @@ let%expect_test "bool match" =
     |};
   [%expect
     {|
-    [typecheck] at 4:15-7:23: duplicate bool pattern
-      b: true
+    [typecheck] at 4:15-7:23: redundant match arm
+      id: 1
       |
     4 |       let x = match b with
     5 |         | true -> 1.0
@@ -1295,7 +1300,6 @@ let%expect_test "int match" =
                 break;
             }
             default: {
-                int _wc = n;
                 x = 2.;
                 break;
             }
@@ -1318,7 +1322,8 @@ let%expect_test "int match" =
     |};
   [%expect
     {|
-    [typecheck] at 4:15-6:19: int match must have a catch-all
+    [typecheck] at 4:15-6:19: non-exhaustive match
+      missing: (witness _)
       |
     4 |       let x = match n with
     5 |         | 0 -> 0.0
@@ -1337,8 +1342,8 @@ let%expect_test "int match" =
     |};
   [%expect
     {|
-    [typecheck] at 4:15-7:19: duplicate int pattern
-      n: 0
+    [typecheck] at 4:15-7:19: redundant match arm
+      id: 1
       |
     4 |       let x = match n with
     5 |         | 0 -> 0.0
@@ -1375,7 +1380,6 @@ let%expect_test "float match" =
             if (_lv_cmp) {
                 c = 1.;
             } else {
-                float _wc = x;
                 c = 2.;
             }
         }
@@ -1411,7 +1415,6 @@ let%expect_test "float match" =
             if (_lv_cmp) {
                 return vec3(0., 1., 0.);
             } else {
-                float _wc = x;
                 return vec3(0., 0., 1.);
             }
         }
@@ -1431,7 +1434,8 @@ let%expect_test "float match" =
     |};
   [%expect
     {|
-    [typecheck] at 4:7-6:33: float match must have a catch-all
+    [typecheck] at 4:7-6:33: non-exhaustive match
+      missing: (witness _)
       |
     4 |       match x with
     5 |         | 0.0 -> [1.0, 0.0, 0.0]
@@ -1449,8 +1453,8 @@ let%expect_test "float match" =
     |};
   [%expect
     {|
-    [typecheck] at 4:7-7:31: duplicate float pattern
-      f: 0
+    [typecheck] at 4:7-7:31: redundant match arm
+      id: 1
       |
     4 |       match x with
     5 |         | 0.0 -> [1.0, 0.0, 0.0]
@@ -1469,8 +1473,8 @@ let%expect_test "float match" =
     |};
   [%expect
     {|
-    [typecheck] at 4:7-7:31: duplicate float pattern
-      f: -0
+    [typecheck] at 4:7-7:31: redundant match arm
+      id: 1
       |
     4 |       match x with
     5 |         | 0.0 -> [1.0, 0.0, 0.0]
@@ -1686,7 +1690,8 @@ let%expect_test "parametrized variants" =
         int _lv_tag = opt.tag;
         switch (_lv_tag) {
             case 0: {
-                int x = opt.Some_0;
+                int _lv_Some_0 = opt.Some_0;
+                int x = _lv_Some_0;
                 return x;
                 break;
             }
@@ -1741,12 +1746,13 @@ let%expect_test "parametrized variants" =
         int _lv_tag = r.tag;
         switch (_lv_tag) {
             case 0: {
-                float x = r.Ok_0;
+                float _lv_Ok_0 = r.Ok_0;
+                float x = _lv_Ok_0;
                 return x;
                 break;
             }
             default: {
-                int _wc = r.Err_0;
+                int _lv_Err_0 = r.Err_0;
                 return default_0;
                 break;
             }
@@ -1802,7 +1808,8 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
         int _lv_tag = opt.tag;
         switch (_lv_tag) {
             case 0: {
-                int x = opt.Some_0;
+                int _lv_Some_0 = opt.Some_0;
+                int x = _lv_Some_0;
                 return x;
                 break;
             }
@@ -1816,7 +1823,8 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
         int _lv_tag_0 = opt.tag;
         switch (_lv_tag_0) {
             case 0: {
-                bool x = opt.Some_0;
+                bool _lv_Some_0_0 = opt.Some_0;
+                bool x = _lv_Some_0_0;
                 return x;
                 break;
             }
@@ -1987,7 +1995,8 @@ let%expect_test "defunctionalization" =
         return (px + y);
     }
     float dapply(DFn dfn, float da) {
-        float ca = dfn.lctor_0;
+        float _lv_lctor_0 = dfn.lctor_0;
+        float ca = _lv_lctor_0;
         return lam(ca, da);
     }
     float apply_m(DFn f, float x) {
@@ -2028,7 +2037,8 @@ let%expect_test "defunctionalization" =
         return (y * anf);
     }
     float dapply(DFn dfn, float da) {
-        vec2 ca = dfn.lctor_0;
+        vec2 _lv_lctor_0 = dfn.lctor_0;
+        vec2 ca = _lv_lctor_0;
         return scale_0(ca, da);
     }
     float apply(DFn f, float x) {
@@ -2220,7 +2230,8 @@ let%expect_test "defunctionalization - returning closures" =
         return add(n, x_0);
     }
     float dapply(DFn dfn, float da) {
-        float ca = dfn.lctor_0;
+        float _lv_lctor_0 = dfn.lctor_0;
+        float ca = _lv_lctor_0;
         return addn(ca, da);
     }
     vec3 main_pure(vec2 coord) {
@@ -2254,7 +2265,8 @@ let%expect_test "defunctionalization - returning closures" =
         return (n + x);
     }
     float dapply(DFn dfn, float da) {
-        float ca = dfn.lctor_0;
+        float _lv_lctor_0 = dfn.lctor_0;
+        float ca = _lv_lctor_0;
         return addn_0(ca, da);
     }
     vec3 main_pure(vec2 coord) {
@@ -2289,7 +2301,8 @@ let%expect_test "defunctionalization - returning closures" =
         return (n + x);
     }
     float dapply(DFn dfn, float da) {
-        float ca = dfn.lctor_0;
+        float _lv_lctor_0 = dfn.lctor_0;
+        float ca = _lv_lctor_0;
         return addn(ca, da);
     }
     vec3 main_pure(vec2 coord) {
@@ -2336,8 +2349,10 @@ let%expect_test "defunctionalization - partial application of first-class functi
         return add_0(da, da_0);
     }
     float dapply_0(DFn_0 dfn_0, float da_1) {
-        DFn ca = dfn_0.lctor_0;
-        float ca_0 = dfn_0.lctor_1;
+        DFn _lv_lctor_0 = dfn_0.lctor_0;
+        float _lv_lctor_1 = dfn_0.lctor_1;
+        float ca_0 = _lv_lctor_1;
+        DFn ca = _lv_lctor_0;
         return dapply(ca, ca_0, da_1);
     }
     vec3 main_pure(vec2 pos) {
@@ -2390,13 +2405,17 @@ let%expect_test "defunctionalization - partial application of first-class functi
         return add3(da, da_0, da_1);
     }
     float dapply_0(DFn_0 dfn_0, float da_2, float da_3) {
-        DFn ca = dfn_0.lctor_0;
-        float ca_0 = dfn_0.lctor_1;
+        DFn _lv_lctor_0 = dfn_0.lctor_0;
+        float _lv_lctor_1 = dfn_0.lctor_1;
+        float ca_0 = _lv_lctor_1;
+        DFn ca = _lv_lctor_0;
         return dapply(ca, ca_0, da_2, da_3);
     }
     float dapply_1(DFn_1 dfn_1, float da_4) {
-        DFn_0 ca_1 = dfn_1.lctor_0_0;
-        float ca_2 = dfn_1.lctor_0_1;
+        DFn_0 _lv_lctor_0_0 = dfn_1.lctor_0_0;
+        float _lv_lctor_0_1 = dfn_1.lctor_0_1;
+        float ca_2 = _lv_lctor_0_1;
+        DFn_0 ca_1 = _lv_lctor_0_0;
         return dapply_0(ca_1, ca_2, da_4);
     }
     vec3 main_pure(vec2 pos) {
@@ -2442,8 +2461,10 @@ let%expect_test "defunctionalization - partial application of first-class functi
         return add(da_0, da_1);
     }
     float dapply(DFn dfn, float da) {
-        DFn_0 ca = dfn.lctor_0;
-        float ca_0 = dfn.lctor_1;
+        DFn_0 _lv_lctor_0 = dfn.lctor_0;
+        float _lv_lctor_1 = dfn.lctor_1;
+        float ca_0 = _lv_lctor_1;
+        DFn_0 ca = _lv_lctor_0;
         return dapply_0(ca, ca_0, da);
     }
     float apply_m(DFn f, float x) {
@@ -2485,7 +2506,8 @@ let%expect_test "defunctionalization - partial application of first-class functi
         return (x + y);
     }
     int dapply(DFn dfn, int da) {
-        int ca = dfn.lctor_0;
+        int _lv_lctor_0 = dfn.lctor_0;
+        int ca = _lv_lctor_0;
         return lam(ca, da);
     }
     DFn mkinc_m(int n) {
@@ -2857,7 +2879,8 @@ let%expect_test "function keyword desugaring" =
         return dapply(f_0, x_0);
     }
     int dapply_0(DFn_0 dfn_0, bool da_0) {
-        DFn ca = dfn_0.lctor_0;
+        DFn _lv_lctor_0 = dfn_0.lctor_0;
+        DFn ca = _lv_lctor_0;
         return apply_fn_m(ca, da_0);
     }
     struct option {
@@ -2868,7 +2891,8 @@ let%expect_test "function keyword desugaring" =
         int _lv_tag = _fn_arg.tag;
         switch (_lv_tag) {
             case 0: {
-                float x = _fn_arg.Some_0;
+                float _lv_Some_0 = _fn_arg.Some_0;
+                float x = _lv_Some_0;
                 return (x + 1.);
                 break;
             }
@@ -2953,34 +2977,43 @@ let%expect_test "bracket pattern matching" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float f(vec3 _fn_arg) {
-        float x = _fn_arg[0];
-        float z = _fn_arg[2];
+    float f_m(vec3 _fn_arg) {
+        float _lv_v0 = _fn_arg[0];
+        float _lv_v1 = _fn_arg[1];
+        float _lv_v2 = _fn_arg[2];
+        float z = _lv_v2;
+        float x = _lv_v0;
         return (x + z);
     }
-    float g(mat2 _fn_arg_0) {
-        vec2 _lv_col_0 = _fn_arg_0[0];
-        float a = _lv_col_0[0];
-        float b = _lv_col_0[1];
-        vec2 _lv_col = _fn_arg_0[1];
-        float c = _lv_col[0];
-        float d = _lv_col[1];
+    float g_m(mat2 _fn_arg_0) {
+        vec2 _lv_v0_0 = _fn_arg_0[0];
+        vec2 _lv_v1_0 = _fn_arg_0[1];
+        float _lv_v0_1 = _lv_v0_0[0];
+        float _lv_v1_1 = _lv_v0_0[1];
+        float _lv_v0_2 = _lv_v1_0[0];
+        float _lv_v1_2 = _lv_v1_0[1];
+        float b = _lv_v1_1;
+        float a = _lv_v0_1;
+        float d = _lv_v1_2;
+        float c = _lv_v0_2;
         return (a + d);
     }
     float h(vec2 v) {
-        float x_0 = v[0];
-        float y = v[1];
+        float _lv_v0_3 = v[0];
+        float _lv_v1_3 = v[1];
+        float y = _lv_v1_3;
+        float x_0 = _lv_v0_3;
         return (x_0 + y);
     }
     vec3 main_pure(vec2 coord) {
         float anf = coord[0];
         float anf_0 = coord[1];
         vec3 anf_1 = vec3(anf, anf_0, 0.);
-        float a_0 = f(anf_1);
+        float a_0 = f_m(anf_1);
         vec2 anf_2 = vec2(1., 0.);
         vec2 anf_3 = vec2(0., 1.);
         mat2 anf_4 = mat2(anf_2, anf_3);
-        float b_0 = g(anf_4);
+        float b_0 = g_m(anf_4);
         float c_0 = h(coord);
         return vec3(a_0, b_0, c_0);
     }
@@ -3016,14 +3049,18 @@ let%expect_test "let pattern binding" =
         float Wrap_0;
     };
     float f(wrapper w) {
-        float v = w.Wrap_0;
-        float v_prime = w.Wrap_0;
+        float _lv_Wrap_0 = w.Wrap_0;
+        float v = _lv_Wrap_0;
+        float _lv_Wrap_0_0 = w.Wrap_0;
+        float v_prime = _lv_Wrap_0_0;
         return (v + v_prime);
     }
     vec3 main_pure(vec2 uv) {
         float x = 2.;
-        float u = uv[0];
-        float v_0 = uv[1];
+        float _lv_v0 = uv[0];
+        float _lv_v1 = uv[1];
+        float v_0 = _lv_v1;
+        float u = _lv_v0;
         wrapper anf = wrapper(0, 1.);
         float anf_0 = f(anf);
         float anf_1 = (u + v_0);
@@ -3160,7 +3197,8 @@ let%expect_test "functions in records / structs" =
         float r;
         switch (_lv_tag) {
             case 0: {
-                DFn f_0 = cb.CB_0;
+                DFn _lv_CB_0 = cb.CB_0;
+                DFn f_0 = _lv_CB_0;
                 r = apply(f_0, 6.);
                 break;
             }
@@ -3198,8 +3236,10 @@ let%expect_test "struct pattern matching" =
     };
     vec3 main_pure(vec2 uv) {
         point anf = point(1., 2.);
-        float a = anf.x;
-        float b = anf.y;
+        float _lv_r_x = anf.x;
+        float _lv_r_y = anf.y;
+        float b = _lv_r_y;
+        float a = _lv_r_x;
         return vec3(a, b, 0.);
     }
     void main() {
@@ -3229,7 +3269,10 @@ let%expect_test "struct pattern matching" =
     };
     vec3 main_pure(vec2 uv) {
         rgb c = rgb(1., 0.5, 0.);
-        float red = c.r;
+        float _lv_r_r = c.r;
+        float _lv_r_g = c.g;
+        float _lv_r_b = c.b;
+        float red = _lv_r_r;
         return vec3(red, 0., 0.);
     }
     void main() {
@@ -3256,7 +3299,8 @@ let%expect_test "struct pattern matching" =
     };
     vec3 main_pure(vec2 uv) {
         box b = box(1.5);
-        float v = b.value;
+        float _lv_r_value = b.value;
+        float v = _lv_r_value;
         return vec3(v, 0., 0.);
     }
     void main() {
@@ -3276,7 +3320,7 @@ let%expect_test "struct pattern matching" =
     |};
   [%expect
     {|
-    [typecheck] at 6:7-7:35: non-exhaustive record pat (use _ to ignore fields)
+    [typecheck] at 6:7-7:35: non-exhaustive record pat
       |
     6 |       match p with
     7 |       | { x = a } -> [a, 0.0, 0.0]
@@ -3294,8 +3338,7 @@ let%expect_test "struct pattern matching" =
     |};
   [%expect
     {|
-    [typecheck] at 6:7-7:42: unknown field
-      fname: z
+    [typecheck] at 6:7-7:42: unknown constructor/field in pattern
       |
     6 |       match p with
     7 |       | { x = a, z = b } -> [a, 0.0, 0.0]
@@ -3340,8 +3383,10 @@ let%expect_test "struct pattern matching" =
     };
     vec3 main_pure(vec2 uv) {
         point anf = point(1., 2.);
-        float a = anf.x;
-        float y = anf.y;
+        float _lv_r_x = anf.x;
+        float _lv_r_y = anf.y;
+        float y = _lv_r_y;
+        float a = _lv_r_x;
         return vec3(a, y, 0.);
     }
     void main() {

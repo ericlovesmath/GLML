@@ -17,6 +17,7 @@
    ; Typechecking
    type_system
    constraint_solver
+   pattern_match
    typecheck
    promote_ints
    monomorphize

@@ -31,14 +31,17 @@ let%expect_test "compile examples" =
         int _lv_tag = s.tag;
         switch (_lv_tag) {
             case 0: {
-                float r = s.Circle_0;
+                float _lv_Circle_0 = s.Circle_0;
+                float r = _lv_Circle_0;
                 float anf = length(p);
                 return (anf - r);
                 break;
             }
             case 1: {
-                float w = s.Rect_0;
-                float h = s.Rect_1;
+                float _lv_Rect_0 = s.Rect_0;
+                float _lv_Rect_1 = s.Rect_1;
+                float h = _lv_Rect_1;
+                float w = _lv_Rect_0;
                 vec2 anf_0 = abs(p);
                 vec2 anf_1 = vec2(w, h);
                 vec2 d = (anf_0 - anf_1);
@@ -81,12 +84,14 @@ let%expect_test "compile examples" =
         int _lv_tag_0 = dfn.tag;
         switch (_lv_tag_0) {
             case 0: {
-                shape ca = dfn.lctor_0;
+                shape _lv_lctor_0 = dfn.lctor_0;
+                shape ca = _lv_lctor_0;
                 return sdf_shape(ca, da);
                 break;
             }
             default: {
-                shape ca_0 = dfn.lctor_0_0;
+                shape _lv_lctor_0_0 = dfn.lctor_0_0;
+                shape ca_0 = _lv_lctor_0_0;
                 return sdf_shape(ca_0, da);
                 break;
             }
@@ -108,8 +113,10 @@ let%expect_test "compile examples" =
         return min(anf_14, anf_15);
     }
     float dapply_0(DFn_0 dfn_0, vec2 da_0) {
-        DFn ca_1 = dfn_0.lctor_1_0;
-        DFn ca_2 = dfn_0.lctor_1_1;
+        DFn _lv_lctor_1_0 = dfn_0.lctor_1_0;
+        DFn _lv_lctor_1_1 = dfn_0.lctor_1_1;
+        DFn ca_2 = _lv_lctor_1_1;
+        DFn ca_1 = _lv_lctor_1_0;
         return union_0(ca_1, ca_2, da_0);
     }
     vec3 main_pure(vec2 coord_0) {
@@ -564,7 +571,8 @@ let%expect_test "compile examples" =
                 break;
             }
             default: {
-                float n = anf_28.Some_0;
+                float _lv_Some_0 = anf_28.Some_0;
+                float n = _lv_Some_0;
                 vec3 anf_29 = vec3(10., 20., 30.);
                 vec3 anf_30 = (n * anf_29);
                 vec3 anf_31 = (anf_30 + u_time);
@@ -841,7 +849,8 @@ let%expect_test "compile examples" =
                 break;
             }
             default: {
-                float t_1 = t_0.Some_0;
+                float _lv_Some_0 = t_0.Some_0;
+                float t_1 = _lv_Some_0;
                 vec3 anf_102 = (rd_0 * t_1);
                 vec3 hitPos = (ro_0 + anf_102);
                 vec3 n = getNormal(hitPos);
@@ -1116,7 +1125,8 @@ let%expect_test "compile examples" =
                 break;
             }
             default: {
-                float t_2 = anf_88.Some_0;
+                float _lv_Some_0 = anf_88.Some_0;
+                float t_2 = _lv_Some_0;
                 float anf_89 = (t_2 * 0.3);
                 col = palette(anf_89);
                 break;
@@ -1197,8 +1207,10 @@ let%expect_test "compile examples" =
         vec2 anf_14 = (uv * anf_13);
         vec2 anf_15 = (anf_14 * 2.);
         vec2 anf_16 = abs(anf_15);
-        float x = anf_16[0];
-        float y = anf_16[1];
+        float _lv_v0 = anf_16[0];
+        float _lv_v1 = anf_16[1];
+        float y = _lv_v1;
+        float x = _lv_v0;
         float res = gcd_m(x, y);
         float anf_17 = (res * 0.5);
         float anf_18 = (1. - res);

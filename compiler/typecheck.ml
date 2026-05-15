@@ -270,197 +270,89 @@ let resolve_constr (env : env) (constr : Frontend.constr) : constr =
 
 let bind_var ctx v ty = Map.set ctx ~key:v ~data:([], [], ty)
 
-let check_pat (env : env) loc (scrutinee_ty : ty) (pat : Frontend.pat) : context =
-  match pat, scrutinee_ty with
-  | PatWildcard, _ -> env.ctx
-  | PatVar v, _ -> bind_var env.ctx v scrutinee_ty
-  | (PatLitBool _ | PatLitInt _ | PatLitFloat _), _ -> env.ctx
-  | PatBracket pats, TyVec (n, elem_ty) ->
-    if List.length pats <> n
-    then raise "vec pattern has wrong number of elements" ~loc
-    else
-      List.fold pats ~init:env.ctx ~f:(fun ctx p ->
-        match p, elem_ty with
-        | PatWildcard, _ -> ctx
-        | PatVar v, _ -> bind_var ctx v elem_ty
-        | PatBracket inner_pats, TyVec (m, inner_elem_ty) ->
-          if List.length inner_pats <> m
-          then raise "inner vec pattern has wrong number of elements" ~loc
-          else
-            List.fold inner_pats ~init:ctx ~f:(fun ctx p ->
-              match p with
-              | PatWildcard -> ctx
-              | PatVar v -> bind_var ctx v inner_elem_ty
-              | _ -> raise "inner vec element pattern must be a variable" ~loc)
-        | _ -> raise "vec element pattern must be a variable or bracket" ~loc)
-  | PatCtor (ctor, vars), TyVariant (_, ctors) ->
-    (match List.find ctors ~f:(fun (c, _) -> String.equal c ctor) with
-     | None -> raise "unknown constructor in match" ~loc ~d:[%message (ctor : string)]
-     | Some (_, expected_arg_tys) ->
-       (match
-          List.fold2 vars expected_arg_tys ~init:env.ctx ~f:(fun ctx v ty ->
-            Map.set ctx ~key:v ~data:([], [], ty))
-        with
-        | Ok ctx -> ctx
-        | Unequal_lengths ->
-          let expected = List.length expected_arg_tys in
-          let got = List.length vars in
-          raise
-            "wrong number of bindings in match case"
-            ~loc
-            ~d:[%message (ctor : string) (expected : int) (got : int)]))
-  | PatRecord (fields, is_partial), TyRecord (_, struct_fields) ->
-    let all_field_names = List.map struct_fields ~f:fst |> String.Set.of_list in
-    let ctx, seen =
-      List.fold
+(** Find variant for constuctor, or record for field *)
+let lookup_unique map ~f ~loc =
+  match Map.filter map ~f |> Map.to_alist with
+  | [ (name, (params, labels)) ] ->
+    let params = List.map params ~f:(fun p -> p, fresh_tyvar ()) in
+    name, params, labels
+  | [] -> raise "unknown constructor/field in pattern" ~loc
+  | _ -> raise "ambigious constructor/field in pattern" ~loc
+;;
+
+(** Thread [check_pat] over a list of (pat, expected_ty) pairs *)
+let rec check_pats env loc (pats_with_tys : (Frontend.pat * ty) list)
+  : context * constr list
+  =
+  List.fold pats_with_tys ~init:(env.ctx, []) ~f:(fun (ctx, acc) (p, ty) ->
+    let ctx', cs = check_pat { env with ctx } loc ty p in
+    ctx', acc @ cs)
+
+and check_pat (env : env) loc (expected_ty : ty) (pat : Frontend.pat)
+  : context * constr list
+  =
+  let eq t t' : constr = { desc = Eq (t, t'); loc } in
+  match pat with
+  | PatWildcard -> env.ctx, []
+  | PatVar v -> bind_var env.ctx v expected_ty, []
+  | PatLitBool _ -> env.ctx, [ eq expected_ty TyBool ]
+  | PatLitInt _ -> env.ctx, [ eq expected_ty TyInt ]
+  | PatLitFloat _ -> env.ctx, [ eq expected_ty TyFloat ]
+  | PatBracket pats ->
+    let elem_ty = fresh_tyvar () in
+    let head_constr = eq expected_ty (TyVec (List.length pats, elem_ty)) in
+    let ctx, sub_constrs = check_pats env loc (List.map pats ~f:(fun p -> p, elem_ty)) in
+    ctx, head_constr :: sub_constrs
+  | PatCtor (ctor, sub_pats) ->
+    let name, sub, ctors =
+      lookup_unique env.variants ~loc ~f:(fun (_, ctors) ->
+        List.exists ctors ~f:(fun (c, _) -> String.equal c ctor))
+    in
+    let ctors = List.map ctors ~f:(fun (n, ts) -> n, List.map ts ~f:(subst_ty sub)) in
+    let head_constr = eq expected_ty (TyVariant (name, ctors)) in
+    let expected_arg_tys = List.Assoc.find_exn ctors ~equal:String.equal ctor in
+    (match List.zip sub_pats expected_arg_tys with
+     | Unequal_lengths ->
+       raise
+         "wrong number of bindings in match case"
+         ~loc
+         ~d:
+           [%message
+             (ctor : string)
+               ~expected:(List.length expected_arg_tys : int)
+               ~got:(List.length sub_pats : int)]
+     | Ok zipped ->
+       let ctx, sub_constrs = check_pats env loc zipped in
+       ctx, head_constr :: sub_constrs)
+  | PatRecord (fields, is_partial) ->
+    let name, sub, struct_fields =
+      lookup_unique env.structs ~loc ~f:(fun (_, decl) ->
         fields
-        ~init:(env.ctx, String.Set.empty)
-        ~f:(fun (ctx, seen) (fname, fpat) ->
-          if Set.mem seen fname
-          then raise "duplicate field" ~loc ~d:[%message (fname : string)]
-          else (
-            match List.Assoc.find struct_fields ~equal:String.equal fname with
-            | None -> raise "unknown field" ~loc ~d:[%message (fname : string)]
-            | Some field_ty ->
-              let ctx =
-                match fpat with
-                | PatWildcard -> ctx
-                | PatVar v -> bind_var ctx v field_ty
-                | _ -> raise "record field pattern must be a variable" ~loc
-              in
-              ctx, Set.add seen fname))
+        |> List.map ~f:fst
+        |> List.for_all ~f:(fun k -> List.exists decl ~f:(fun (f, _) -> String.equal f k)))
     in
-    if is_partial || Set.is_empty (Set.diff all_field_names seen)
-    then ctx
-    else raise "non-exhaustive record pat (use _ to ignore fields)" ~loc
-  | _ ->
-    raise "unexpected pattern for scrutinee type" ~loc ~d:[%message (scrutinee_ty : ty)]
-;;
-
-let resolve_match_scrutinee_ty
-      (env : env)
-      loc
-      (inferred_ty : ty)
-      (first_pat : Frontend.pat option)
-      (cases : (Frontend.pat * _) list)
-  : ty
-  =
-  let lookup_decl_by_pattern ~env ~extract_keys =
-    let keys =
-      List.filter_map cases ~f:(fun (pat, _) -> extract_keys pat)
-      |> List.concat
-      |> List.dedup_and_sort ~compare:String.compare
+    let struct_fields = List.map struct_fields ~f:(fun (n, t) -> n, subst_ty sub t) in
+    let seen_names =
+      List.fold fields ~init:String.Set.empty ~f:(fun seen (fname, _) ->
+        if Set.mem seen fname
+        then raise "duplicate field" ~loc ~d:[%message (fname : string)]
+        else Set.add seen fname)
     in
-    let candidates =
-      Map.filter env ~f:(fun (_, decl) ->
-        List.for_all keys ~f:(fun k ->
-          List.exists decl ~f:(fun (f, _) -> String.equal f k)))
-    in
-    match Map.to_alist candidates with
-    | [ (name, (params, decl)) ] -> name, params, decl
-    | [] -> raise "pattern does not match with any known type" ~loc
-    | _ -> raise "pattern match is ambiguous" ~loc
-  in
-  match first_pat with
-  | None -> inferred_ty
-  | Some (PatLitBool _) -> TyBool
-  | Some (PatLitInt _) -> TyInt
-  | Some (PatLitFloat _) -> TyFloat
-  | Some (PatBracket _) ->
-    (match inferred_ty with
-     | TyVec _ -> inferred_ty
-     | TyVar _ ->
-       List.find_map cases ~f:(fun (pat, _) ->
-         match pat with
-         | PatBracket pats ->
-           Some
-             (match List.hd pats with
-              | Some (PatBracket inner) ->
-                TyVec (List.length pats, TyVec (List.length inner, TyFloat))
-              | _ -> TyVec (List.length pats, TyFloat))
-         | _ -> None)
-       |> of_option "MatchBracket with no bracket pattern" ~loc
-       |> ok_exn
-     | _ -> raise "bracket pattern requires vec scrutinee" ~loc)
-  | Some (PatCtor _) ->
-    (match inferred_ty with
-     | TyVariant _ -> inferred_ty
-     | _ ->
-       let name, params, ctors =
-         lookup_decl_by_pattern ~env:env.variants ~extract_keys:(function
-           | PatCtor (c, _) -> Some [ c ]
-           | _ -> None)
-       in
-       let param_sub = List.map params ~f:(fun p -> p, fresh_tyvar ()) in
-       let inst_ctors =
-         List.map ctors ~f:(fun (n, ts) -> n, List.map ts ~f:(subst_ty param_sub))
-       in
-       TyVariant (name, inst_ctors))
-  | Some (PatRecord _) ->
-    (match inferred_ty with
-     | TyRecord _ -> inferred_ty
-     | _ ->
-       let name, params, fields =
-         lookup_decl_by_pattern ~env:env.structs ~extract_keys:(function
-           | PatRecord (fs, _) -> Some (List.map fs ~f:fst)
-           | _ -> None)
-       in
-       let param_sub = List.map params ~f:(fun p -> p, fresh_tyvar ()) in
-       let inst_fields = List.map fields ~f:(fun (n, t) -> n, subst_ty param_sub t) in
-       TyRecord (name, inst_fields))
-  | Some (PatWildcard | PatVar _) -> inferred_ty
-;;
-
-let check_match_exhaustiveness
-      loc
-      ~(has_catchall : bool)
-      (first_pat : Frontend.pat option)
-      (scrutinee_ty : ty)
-      (cases : (Frontend.pat * _) list)
-  : unit
-  =
-  let require_catchall msg = if has_catchall then () else raise msg ~loc in
-  match first_pat with
-  | None
-  | Some (Frontend.PatBracket _)
-  | Some (PatRecord _)
-  | Some PatWildcard
-  | Some (PatVar _) -> ()
-  | Some (PatLitBool _) ->
-    if has_catchall
-    then ()
-    else (
-      let covered =
-        List.filter_map cases ~f:(fun (p, _) ->
-          match p with
-          | PatLitBool b -> Some b
-          | _ -> None)
-        |> Bool.Set.of_list
-      in
-      if Set.equal covered (Bool.Set.of_list [ true; false ])
-      then ()
-      else raise "non-exhaustive bool match (missing true or false)" ~loc)
-  | Some (PatLitInt _) -> require_catchall "int match must have a catch-all"
-  | Some (PatLitFloat _) -> require_catchall "float match must have a catch-all"
-  | Some (PatCtor _) ->
-    if has_catchall
-    then ()
-    else (
-      match scrutinee_ty with
-      | TyVariant (_, ctors) ->
-        let case_ctors =
-          List.filter_map cases ~f:(fun (pat, _) ->
-            match pat with
-            | PatCtor (c, _) -> Some c
-            | _ -> None)
-          |> String.Set.of_list
+    let all_fields = List.map struct_fields ~f:fst |> String.Set.of_list in
+    if (not is_partial) && not (Set.is_empty (Set.diff all_fields seen_names))
+    then raise "non-exhaustive record pat" ~loc;
+    let pats_with_tys =
+      List.map fields ~f:(fun (fname, fpat) ->
+        let field_ty =
+          List.Assoc.find struct_fields ~equal:String.equal fname
+          |> of_option "unknown field" ~loc ~d:[%message (fname : string)]
+          |> ok_exn
         in
-        let all_ctors = List.map ctors ~f:fst |> String.Set.of_list in
-        let missing = Set.diff all_ctors case_ctors in
-        if Set.is_empty missing
-        then ()
-        else raise "non-exhaustive match" ~loc ~d:[%message (missing : String.Set.t)]
-      | _ -> raise "expected variant scrutinee type for exhaustiveness check" ~loc)
+        fpat, field_ty)
+    in
+    let head_constr = eq expected_ty (TyRecord (name, struct_fields)) in
+    let ctx, sub_constrs = check_pats env loc pats_with_tys in
+    ctx, head_constr :: sub_constrs
 ;;
 
 let coerce_term loc (target : ty) (t : term) : term =
@@ -863,91 +755,34 @@ and gen_match
   let constr desc = { desc; loc } in
   let scrutinee, constrs_s, sub_s = gen_term env scrutinee_stlc in
   let ret_ty = fresh_tyvar () in
-  let is_catchall = function
-    | Frontend.PatWildcard | Frontend.PatVar _ -> true
-    | _ -> false
-  in
-  let has_catchall = List.exists cases ~f:(fun (pat, _) -> is_catchall pat) in
-  let same_family p q =
-    match p, q with
-    | Frontend.PatCtor _, Frontend.PatCtor _
-    | PatLitBool _, PatLitBool _
-    | PatLitInt _, PatLitInt _
-    | PatLitFloat _, PatLitFloat _
-    | PatBracket _, PatBracket _
-    | PatRecord _, PatRecord _
-    | PatWildcard, PatWildcard -> true
-    | _ -> false
-  in
-  let first_pat =
-    List.find_map cases ~f:(fun (p, _) -> if is_catchall p then None else Some p)
-  in
-  List.iter cases ~f:(fun (pat, _) ->
-    if is_catchall pat || Option.exists first_pat ~f:(same_family pat)
-    then ()
-    else raise "mixed pattern kinds in match" ~loc);
-  let scrutinee_ty = resolve_match_scrutinee_ty env loc scrutinee.ty first_pat cases in
-  check_match_exhaustiveness loc ~has_catchall first_pat scrutinee_ty cases;
-  let check_dup_pats ~extract ~equal ~err_msg ~sexp_of_dup =
-    let pats = List.filter_map cases ~f:(fun (p, _) -> extract p) in
-    let _ : _ list =
-      List.fold pats ~init:[] ~f:(fun seen k ->
-        if List.exists seen ~f:(equal k)
-        then raise err_msg ~loc ~d:(sexp_of_dup k)
-        else k :: seen)
-    in
-    ()
-  in
-  (match first_pat with
-   | Some (Frontend.PatLitBool _) ->
-     check_dup_pats
-       ~extract:(function
-         | Frontend.PatLitBool b -> Some b
-         | _ -> None)
-       ~equal:Bool.equal
-       ~err_msg:"duplicate bool pattern"
-       ~sexp_of_dup:(fun b -> [%message (b : bool)])
-   | Some (PatLitInt _) ->
-     check_dup_pats
-       ~extract:(function
-         | Frontend.PatLitInt n -> Some n
-         | _ -> None)
-       ~equal:Int.equal
-       ~err_msg:"duplicate int pattern"
-       ~sexp_of_dup:(fun n -> [%message (n : int)])
-   | Some (PatLitFloat _) ->
-     check_dup_pats
-       ~extract:(function
-         | Frontend.PatLitFloat f -> Some f
-         | _ -> None)
-       ~equal:Float.equal
-       ~err_msg:"duplicate float pattern"
-       ~sexp_of_dup:(fun f -> [%message (f : float)])
-   | Some (PatCtor _) ->
-     check_dup_pats
-       ~extract:(function
-         | Frontend.PatCtor (c, _) -> Some c
-         | _ -> None)
-       ~equal:String.equal
-       ~err_msg:"duplicate match case"
-       ~sexp_of_dup:(fun ctor -> [%message (ctor : string)])
-   | _ -> ());
   let cases, constrs_cases, sub_cases =
     List.fold
       cases
       ~init:([], [], [])
       ~f:(fun (acc_cases, acc_constrs, acc_sub) (pat, body) ->
-        let ctx = check_pat env loc scrutinee_ty pat in
+        let ctx, pat_constrs = check_pat env loc scrutinee.ty pat in
         let body, constrs_body, body_sub = gen_term { env with ctx } body in
         let body_wrapped = coerce_term body.loc ret_ty body in
         ( (pat, body_wrapped) :: acc_cases
-        , (constr (Coerce (body.ty, ret_ty)) :: constrs_body) @ acc_constrs
+        , pat_constrs @ (constr (Coerce (body.ty, ret_ty)) :: constrs_body) @ acc_constrs
         , compose_sub body_sub acc_sub ))
   in
-  let composed = compose_sub sub_cases sub_s in
-  ( { desc = Match (scrutinee, List.rev cases); ty = ret_ty; loc }
-  , (constr (Eq (scrutinee.ty, scrutinee_ty)) :: constrs_s) @ constrs_cases
-  , composed )
+  let cases = List.rev cases in
+  let pat_sub, _ = Constraint_solver.solve (constrs_s @ constrs_cases) in
+  let () =
+    (* NOTE: Maranget usefulness check time *)
+    let scrutinee_ty = subst_ty pat_sub scrutinee.ty in
+    let pats = List.map cases ~f:fst in
+    Pattern_match.is_redundant ~scrutinee_ty pats
+    |> Option.iter ~f:(fun id ->
+      raise "redundant match arm" ~loc ~d:[%message (id : int)]);
+    Pattern_match.is_exhaustive ~scrutinee_ty pats
+    |> Option.iter ~f:(fun witness ->
+      raise "non-exhaustive match" ~loc ~d:[%message "missing" (witness : Frontend.pat)])
+  in
+  ( { desc = Match (scrutinee, cases); ty = ret_ty; loc }
+  , constrs_s @ constrs_cases
+  , compose_sub sub_cases sub_s )
 ;;
 
 let enforce_main_type _env bind ty loc v =
