@@ -98,6 +98,29 @@ let pat_args ~(h : head) : pat -> pat list option =
      | _ -> None)
 ;;
 
+(** A concrete literal counter-example for a wildcard column in infinite domain *)
+let fresh_lit_witness ~(col_ty : ty) ~(present : head list) : pat =
+  match col_ty with
+  | TyInt ->
+    let used =
+      List.filter_map present ~f:(function
+        | HInt n -> Some n
+        | _ -> None)
+      |> Int.Set.of_list
+    in
+    let rec pick n = if Set.mem used n then pick (n + 1) else n in
+    PatLitInt (pick 0)
+  | TyFloat ->
+    let used =
+      List.filter_map present ~f:(function
+        | HFloat f -> Some f
+        | _ -> None)
+    in
+    let rec pick f = if List.mem used f ~equal:Float.equal then pick (f +. 1.0) else f in
+    PatLitFloat (pick 0.0)
+  | _ -> PatWildcard
+;;
+
 let rebuild_witness (h : head) (subs : pat list) : pat =
   match h with
   | HBool b -> PatLitBool b
@@ -203,7 +226,7 @@ let rec useful_rec ~col_tys ~(matrix : unit Matrix.row list) ~(row : pat list)
               match missing_from maybe_all with
               | Some h ->
                 rebuild_witness h (List.map (head_sub_tys h) ~f:(Fn.const PatWildcard))
-              | None -> PatWildcard
+              | None -> fresh_lit_witness ~col_ty ~present
             in
             head_witness :: tail)))
 ;;
