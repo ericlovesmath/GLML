@@ -1607,3 +1607,93 @@ let%expect_test "dot accepts mixed int/float vec args" =
     }
     |}]
 ;;
+
+let%expect_test "DFn promotion when partial-app result flows to HOF param" =
+  test
+    {|
+    type fn = vec3 -> vec3
+    let id (f : fn) : fn = fun p -> f p
+    let scene_mat (p : vec3) : fn =
+      let waves p = p in
+      let noisy_waves = id waves in
+      noisy_waves
+    let eval_material (mat : fn) : vec3 = [0.0, 0.0, 0.0]
+    let main (coord : vec2) =
+      let ro = [0.0, 0.0, 0.0] in
+      let mat = scene_mat ro in
+      let col = eval_material mat in
+      col
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn {
+        int tag;
+    };
+    struct DFn_0 {
+        int tag;
+        DFn lctor_0;
+    };
+    vec3 eval_material(DFn_0 mat) {
+        return vec3(0., 0., 0.);
+    }
+    DFn_0 scene_mat(vec3 p_0) {
+        DFn anf = DFn(0);
+        DFn_0 noisy_waves = DFn_0(0, anf);
+        return noisy_waves;
+    }
+    vec3 main_pure(vec2 coord) {
+        vec3 ro = vec3(0., 0., 0.);
+        DFn_0 mat_0 = scene_mat(ro);
+        vec3 col = eval_material(mat_0);
+        return col;
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "DFn promotion when consume is declared before producer" =
+  (* Same shape as the test above, but [consume] is declared before [main]'s
+     [id waves] partial application that creates [DFn_0]. The post-pass must
+     re-resolve [consume]'s param against the now-up-to-date [by_arrow]. *)
+  test
+    {|
+    type fn = vec3 -> vec3
+    let id (f : fn) : fn = fun p -> f p
+    let waves (p : vec3) : vec3 = p
+    let consume (m : fn) : vec3 = [0.0, 0.0, 0.0]
+    let main (coord : vec2) =
+      let nw = id waves in
+      consume nw
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn {
+        int tag;
+    };
+    struct DFn_0 {
+        int tag;
+        DFn lctor_0;
+    };
+    vec3 consume(DFn_0 m) {
+        return vec3(0., 0., 0.);
+    }
+    vec3 main_pure(vec2 coord) {
+        DFn anf = DFn(0);
+        DFn_0 nw = DFn_0(0, anf);
+        return consume(nw);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;

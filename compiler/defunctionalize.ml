@@ -215,15 +215,14 @@ let add_lambda_entry (reg : registry) (ty : ty) params body captured loc
   let ctor_name = Utils.fresh "lctor" in
   let entry = LambdaEntry { ctor_name; params; body; captured; loc } in
   let info = { info with entries = info.entries @ [ entry ] } in
+  (* Always update [by_arrow] so subsequent [retype_params] calls see the highest
+     level for this arrow type. Otherwise a Define processed after a higher level
+     was created (e.g. [eval_material] after [scene_mat]'s partial app) would
+     retype its fn-typed params against the stale lower variant. *)
   let reg =
-    if target_level = 0
-    then
-      (* Update both maps so future get_or_create_info sees accumulated entries *)
-      { by_arrow = Map.set reg.by_arrow ~key:(mangle_ty ty) ~data:info
-      ; by_variant = Map.set reg.by_variant ~key:info.variant_name ~data:info
-      }
-    else
-      { reg with by_variant = Map.set reg.by_variant ~key:info.variant_name ~data:info }
+    { by_arrow = Map.set reg.by_arrow ~key:(mangle_ty ty) ~data:info
+    ; by_variant = Map.set reg.by_variant ~key:info.variant_name ~data:info
+    }
   in
   reg, info, ctor_name
 ;;
@@ -721,6 +720,45 @@ let topo_sort (all_tops : Lambda_lift.top list) : Lambda_lift.t =
        Map.find by_key n |> Option.filter ~f:(fun _ -> Set.mem reachable n)))
 ;;
 
+(** Re-resolve each variant-typed Define param against the latest [by_arrow]
+    entry, needed when [add_lambda_entry] forces a higher level after a [Define]
+    has already been retyped against the lower variant *)
+let promote_define_params (reg : registry) (tops : Lambda_lift.top list) =
+  let rec uses v (t : Lambda_lift.term) =
+    match t.desc with
+    | Var n -> String.equal n v
+    | App (f, ts) -> uses v f || List.exists ts ~f:(uses v)
+    | Vec (_, ts) | Builtin (_, ts) | Record ts | Variant (_, ts) ->
+      List.exists ts ~f:(uses v)
+    | Let (_, a, b) | Bop (_, a, b) -> uses v a || uses v b
+    | If (a, b, c) -> uses v a || uses v b || uses v c
+    | Index (t, _) | Field (t, _) -> uses v t
+    | Match (s, cs) -> uses v s || List.exists cs ~f:(fun (_, b) -> uses v b)
+    | Float _ | Int _ | Bool _ -> false
+  in
+  let promote ty =
+    match ty with
+    | TyVariant n ->
+      Map.find reg.by_variant n
+      |> Option.value_map ~default:ty ~f:(fun i ->
+        mangle_ty i.arrow_ty
+        |> Map.find reg.by_arrow
+        |> Option.value_map ~default:ty ~f:(fun w -> TyVariant w.variant_name))
+    | _ -> ty
+  in
+  List.map tops ~f:(fun (top : Lambda_lift.top) ->
+    match top.desc with
+    | Define ({ args; body; ret_ty; _ } as d) ->
+      let args =
+        List.map args ~f:(fun (v, ty) -> v, if uses v body then ty else promote ty)
+      in
+      { top with
+        desc = Define { d with args }
+      ; ty = build_arrow_ty (List.map args ~f:snd) ret_ty
+      }
+    | _ -> top)
+;;
+
 let defunctionalize (Program tops : Lambda_lift.t) : Lambda_lift.t Compiler_error.t =
   let globals = collect_globals tops in
   let (reg, _), rewritten_tops =
@@ -739,6 +777,7 @@ let defunctionalize (Program tops : Lambda_lift.t) : Lambda_lift.t Compiler_erro
         in
         (reg, global_tys), top)
   in
+  let rewritten_tops = promote_define_params reg rewritten_tops in
   let all_dfn_infos = Map.data reg.by_variant in
   let nonempty_dfn_infos =
     List.filter all_dfn_infos ~f:(fun i -> not (List.is_empty i.entries))
