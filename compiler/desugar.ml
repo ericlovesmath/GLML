@@ -127,7 +127,7 @@ let desugar_type_decl (td : Frontend.type_decl) : type_decl =
   | AliasDecl t -> AliasDecl t
 ;;
 
-let rec desugar_term_desc (td : Frontend.term_desc) : term_desc =
+let rec desugar_term_desc ~loc (td : Frontend.term_desc) : term_desc =
   match td with
   | Var v -> Var v
   | Float f -> Float f
@@ -163,14 +163,12 @@ let rec desugar_term_desc (td : Frontend.term_desc) : term_desc =
     let fresh_var = "_fn_arg" in
     let cases = List.map cases ~f:(fun (p, t) -> p, desugar_term t) in
     let match_term : term =
-      { desc = Match ({ desc = Var fresh_var; loc = Lexer.init_loc }, cases)
-      ; loc = Lexer.init_loc
-      }
+      { desc = Match ({ desc = Var fresh_var; loc }, cases); loc }
     in
     Lam (fresh_var, None, match_term)
 
 and desugar_term (t : Frontend.term) : term =
-  ({ desc = desugar_term_desc t.desc; loc = t.loc } : term)
+  ({ desc = desugar_term_desc ~loc:t.loc t.desc; loc = t.loc } : term)
 ;;
 
 let desugar_top_desc (td : Frontend.top_desc) : top_desc =

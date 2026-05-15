@@ -251,11 +251,7 @@ let add_global_entry (reg : registry) (ty : ty) (fn_name : string) (loc : Lexer.
 ;;
 
 let gen_typedef info : Lambda_lift.top =
-  let loc =
-    match List.hd info.entries with
-    | Some e -> entry_loc e
-    | None -> Lexer.init_loc
-  in
+  let loc = entry_loc (List.hd_exn info.entries) in
   let ctors =
     List.map info.entries ~f:(function
       | LambdaEntry e -> e.ctor_name, List.map e.captured ~f:snd
@@ -749,7 +745,7 @@ let defunctionalize (Program tops : Lambda_lift.t) : Lambda_lift.t Compiler_erro
   in
   let all_tops =
     rewritten_tops
-    @ List.map ~f:gen_typedef all_dfn_infos
+    @ List.map ~f:gen_typedef nonempty_dfn_infos
     @ List.map nonempty_dfn_infos ~f:(gen_apply_fn reg)
   in
   Compiler_error.try_with (fun () -> topo_sort all_tops)

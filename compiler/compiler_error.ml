@@ -48,8 +48,10 @@ let to_string_hum ?source { pass; loc; msg; details } =
     | None -> base
     | Some d -> base ^ "\n" ^ format_details d
   in
+  let is_real_loc (l, r) = l.line >= 1 && r.line >= 1 in
   match Option.both source loc with
   | None -> header_and_details
+  | Some (_, loc) when not (is_real_loc loc) -> header_and_details
   | Some (source, (l, r)) ->
     let lines = String.split_lines source in
     let num_lines = List.length lines in
@@ -61,7 +63,7 @@ let to_string_hum ?source { pass; loc; msg; details } =
     let line_num_width = String.length (Int.to_string r.line) in
     let pad_num n =
       let s = Int.to_string n in
-      String.make (line_num_width - String.length s) ' ' ^ s
+      String.make (max 0 (line_num_width - String.length s)) ' ' ^ s
     in
     let gutter_blank = String.make line_num_width ' ' ^ " | " in
     let show_line n = pad_num n ^ " | " ^ get_line n in
@@ -71,7 +73,7 @@ let to_string_hum ?source { pass; loc; msg; details } =
         (* Single-line span *)
         let underline =
           gutter_blank
-          ^ String.make (l.col - 1) ' '
+          ^ String.make (max 0 (l.col - 1)) ' '
           ^ String.make (max 1 (r.col - l.col)) '^'
         in
         [ show_line l.line; underline ])
