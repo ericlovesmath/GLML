@@ -102,15 +102,12 @@ let%expect_test "compile examples" =
         float bot = min(anf_12, anf_13);
         return (top / bot);
     }
-    float union_0(DFn f, DFn f_prime, vec2 p_0) {
-        float anf_14 = dapply(f, p_0);
-        float anf_15 = dapply(f_prime, p_0);
-        return min(anf_14, anf_15);
-    }
     float dapply_0(DFn_0 dfn_0, vec2 da_0) {
         DFn _lv_lctor_1_0 = dfn_0.lctor_1_0;
         DFn _lv_lctor_1_1 = dfn_0.lctor_1_1;
-        return union_0(_lv_lctor_1_0, _lv_lctor_1_1, da_0);
+        float anf_14_0 = dapply(_lv_lctor_1_0, da_0);
+        float anf_15_0 = dapply(_lv_lctor_1_1, da_0);
+        return min(anf_14_0, anf_15_0);
     }
     vec3 main_pure(vec2 coord_0) {
         vec2 p_1 = get_uv_m(coord_0);
@@ -233,17 +230,14 @@ let%expect_test "compile examples" =
     }
     const vec3 tooth_yel = vec3(0.92, 0.85, 0.6);
     uniform vec2 u_resolution;
-    vec2 get_uv_m(vec2 coord) {
-        vec2 anf_34 = (2. * coord);
-        vec2 top = (anf_34 - u_resolution);
-        float anf_35 = u_resolution[0];
-        float anf_36 = u_resolution[1];
-        float bot = min(anf_35, anf_36);
-        return (top / bot);
-    }
     const vec3 wht = vec3(1., 0.97, 0.93);
     vec3 main_pure(vec2 coord_0) {
-        vec2 anf_37 = get_uv_m(coord_0);
+        vec2 anf_34_0 = (2. * coord_0);
+        vec2 top_0 = (anf_34_0 - u_resolution);
+        float anf_35_0 = u_resolution[0];
+        float anf_36_0 = u_resolution[1];
+        float bot_0 = min(anf_35_0, anf_36_0);
+        vec2 anf_37 = (top_0 / bot_0);
         vec2 p_4 = (anf_37 / 1.5);
         vec2 anf_38 = vec2(0.28, -0.28);
         vec2 anf_39 = (p_4 - anf_38);
@@ -471,17 +465,14 @@ let%expect_test "compile examples" =
     precision highp float;
     out vec4 fragColor;
     uniform vec2 u_resolution;
-    vec2 get_uv_m(vec2 coord) {
-        vec2 anf = (2. * coord);
-        vec2 top = (anf - u_resolution);
-        float anf_0 = u_resolution[0];
-        float anf_1 = u_resolution[1];
-        float bot = min(anf_0, anf_1);
-        return (top / bot);
-    }
     uniform float u_time;
     vec3 main_pure(vec2 coord_0) {
-        vec2 uv = get_uv_m(coord_0);
+        vec2 anf_13 = (2. * coord_0);
+        vec2 top_0 = (anf_13 - u_resolution);
+        float anf_0_0 = u_resolution[0];
+        float anf_1_0 = u_resolution[1];
+        float bot_0 = min(anf_0_0, anf_1_0);
+        vec2 uv = (top_0 / bot_0);
         float anf_2 = float(5);
         vec2 anf_3 = (uv * anf_2);
         float anf_4 = (2. * u_time);
@@ -611,17 +602,14 @@ let%expect_test "compile examples" =
     out vec4 fragColor;
     uniform vec2 u_mouse;
     uniform vec2 u_resolution;
-    vec2 get_uv_m(vec2 coord) {
-        vec2 anf = (2. * coord);
-        vec2 top = (anf - u_resolution);
-        float anf_0 = u_resolution[0];
-        float anf_1 = u_resolution[1];
-        float bot = min(anf_0, anf_1);
-        return (top / bot);
-    }
     uniform float u_time;
     vec3 main_pure(vec2 coord_0) {
-        vec2 uv = get_uv_m(coord_0);
+        vec2 anf_10 = (2. * coord_0);
+        vec2 top_0 = (anf_10 - u_resolution);
+        float anf_0_0 = u_resolution[0];
+        float anf_1_0 = u_resolution[1];
+        float bot_0 = min(anf_0_0, anf_1_0);
+        vec2 uv = (top_0 / bot_0);
         vec2 anf_2 = (2. * u_mouse);
         vec2 anf_3 = (anf_2 - u_resolution);
         float anf_4 = u_resolution[1];
@@ -763,37 +751,6 @@ let%expect_test "compile examples" =
         float anf_66 = ro_xz[1];
         return vec3(anf_64, anf_65, anf_66);
     }
-    float sdPlanet(vec3 p_3, float radius) {
-        float len = length(p_3);
-        vec3 dir = (p_3 / len);
-        vec3 anf_67 = (dir * 3.);
-        float anf_68 = fbm(anf_67);
-        float terrain = (anf_68 * 0.4);
-        float anf_69 = (len - radius);
-        return (anf_69 - terrain);
-    }
-    vec3 getNormal(vec3 p_5) {
-        vec3 e_x = vec3(0.002, 0., 0.);
-        vec3 e_y = vec3(0., 0.002, 0.);
-        vec3 e_z = vec3(0., 0., 0.002);
-        vec3 anf_70 = (p_5 + e_x);
-        float anf_71 = sdPlanet(anf_70, 1.5);
-        vec3 anf_72 = (p_5 - e_x);
-        float anf_73 = sdPlanet(anf_72, 1.5);
-        float dx = (anf_71 - anf_73);
-        vec3 anf_74 = (p_5 + e_y);
-        float anf_75 = sdPlanet(anf_74, 1.5);
-        vec3 anf_76 = (p_5 - e_y);
-        float anf_77 = sdPlanet(anf_76, 1.5);
-        float dy = (anf_75 - anf_77);
-        vec3 anf_78 = (p_5 + e_z);
-        float anf_79 = sdPlanet(anf_78, 1.5);
-        vec3 anf_80 = (p_5 - e_z);
-        float anf_81 = sdPlanet(anf_80, 1.5);
-        float dz = (anf_79 - anf_81);
-        vec3 anf_82 = vec3(dx, dy, dz);
-        return normalize(anf_82);
-    }
     option march_0_0(vec3 rd, vec3 ro, float t, int steps) {
         int _iter = 0;
         while ((_iter < 1000)) {
@@ -803,7 +760,13 @@ let%expect_test "compile examples" =
             } else {
                 vec3 anf_84 = (rd * t);
                 vec3 anf_85 = (ro + anf_84);
-                float d_1 = sdPlanet(anf_85, 1.5);
+                float len_7 = length(anf_85);
+                vec3 dir_8 = (anf_85 / len_7);
+                vec3 anf_67_7 = (dir_8 * 3.);
+                float anf_68_7 = fbm(anf_67_7);
+                float terrain_7 = (anf_68_7 * 0.4);
+                float anf_69_7 = (len_7 - 1.5);
+                float d_1 = (anf_69_7 - terrain_7);
                 bool anf_86 = (d_1 < 0.0005);
                 if (anf_86) {
                     return option(0, t);
@@ -860,7 +823,62 @@ let%expect_test "compile examples" =
                 float _lv_Some_0 = t_0.Some_0;
                 vec3 anf_102 = (rd_0 * _lv_Some_0);
                 vec3 hitPos = (ro_0 + anf_102);
-                vec3 n = getNormal(hitPos);
+                vec3 e_x_0 = vec3(0.002, 0., 0.);
+                vec3 e_y_0 = vec3(0., 0.002, 0.);
+                vec3 e_z_0 = vec3(0., 0., 0.002);
+                vec3 anf_70_0 = (hitPos + e_x_0);
+                float len_13 = length(anf_70_0);
+                vec3 dir_14 = (anf_70_0 / len_13);
+                vec3 anf_67_13 = (dir_14 * 3.);
+                float anf_68_13 = fbm(anf_67_13);
+                float terrain_13 = (anf_68_13 * 0.4);
+                float anf_69_13 = (len_13 - 1.5);
+                float anf_71_0 = (anf_69_13 - terrain_13);
+                vec3 anf_72_0 = (hitPos - e_x_0);
+                float len_12 = length(anf_72_0);
+                vec3 dir_13 = (anf_72_0 / len_12);
+                vec3 anf_67_12 = (dir_13 * 3.);
+                float anf_68_12 = fbm(anf_67_12);
+                float terrain_12 = (anf_68_12 * 0.4);
+                float anf_69_12 = (len_12 - 1.5);
+                float anf_73_0 = (anf_69_12 - terrain_12);
+                float dx_0 = (anf_71_0 - anf_73_0);
+                vec3 anf_74_0 = (hitPos + e_y_0);
+                float len_11 = length(anf_74_0);
+                vec3 dir_12 = (anf_74_0 / len_11);
+                vec3 anf_67_11 = (dir_12 * 3.);
+                float anf_68_11 = fbm(anf_67_11);
+                float terrain_11 = (anf_68_11 * 0.4);
+                float anf_69_11 = (len_11 - 1.5);
+                float anf_75_0 = (anf_69_11 - terrain_11);
+                vec3 anf_76_0 = (hitPos - e_y_0);
+                float len_10 = length(anf_76_0);
+                vec3 dir_11 = (anf_76_0 / len_10);
+                vec3 anf_67_10 = (dir_11 * 3.);
+                float anf_68_10 = fbm(anf_67_10);
+                float terrain_10 = (anf_68_10 * 0.4);
+                float anf_69_10 = (len_10 - 1.5);
+                float anf_77_0 = (anf_69_10 - terrain_10);
+                float dy_0 = (anf_75_0 - anf_77_0);
+                vec3 anf_78_0 = (hitPos + e_z_0);
+                float len_9 = length(anf_78_0);
+                vec3 dir_10 = (anf_78_0 / len_9);
+                vec3 anf_67_9 = (dir_10 * 3.);
+                float anf_68_9 = fbm(anf_67_9);
+                float terrain_9 = (anf_68_9 * 0.4);
+                float anf_69_9 = (len_9 - 1.5);
+                float anf_79_0 = (anf_69_9 - terrain_9);
+                vec3 anf_80_0 = (hitPos - e_z_0);
+                float len_8 = length(anf_80_0);
+                vec3 dir_9 = (anf_80_0 / len_8);
+                vec3 anf_67_8 = (dir_9 * 3.);
+                float anf_68_8 = fbm(anf_67_8);
+                float terrain_8 = (anf_68_8 * 0.4);
+                float anf_69_8 = (len_8 - 1.5);
+                float anf_81_0 = (anf_69_8 - terrain_8);
+                float dz_0 = (anf_79_0 - anf_81_0);
+                vec3 anf_82_0 = vec3(dx_0, dy_0, dz_0);
+                vec3 n = normalize(anf_82_0);
                 vec3 anf_103 = vec3(1., 0.8, -0.5);
                 vec3 lightDir = normalize(anf_103);
                 float anf_104 = dot(n, lightDir);
@@ -919,17 +937,14 @@ let%expect_test "compile examples" =
     precision highp float;
     out vec4 fragColor;
     uniform vec2 u_resolution;
-    vec2 get_uv_m(vec2 coord) {
-        vec2 anf = (2. * coord);
-        vec2 top = (anf - u_resolution);
-        float anf_0 = u_resolution[0];
-        float anf_1 = u_resolution[1];
-        float bot = min(anf_0, anf_1);
-        return (top / bot);
-    }
     uniform float u_time;
     vec3 main_pure(vec2 coord_0) {
-        vec2 uv = get_uv_m(coord_0);
+        vec2 anf_10 = (2. * coord_0);
+        vec2 top_0 = (anf_10 - u_resolution);
+        float anf_0_0 = u_resolution[0];
+        float anf_1_0 = u_resolution[1];
+        float bot_0 = min(anf_0_0, anf_1_0);
+        vec2 uv = (top_0 / bot_0);
         float anf_2 = uv[0];
         float anf_3 = uv[1];
         float anf_4 = (anf_2 + anf_3);
@@ -956,14 +971,6 @@ let%expect_test "compile examples" =
         int tag;
         float Some_0;
     };
-    vec3 palette(float t) {
-        vec3 cfg = vec3(0.3, 0.416, 0.557);
-        vec3 anf = (cfg + t);
-        vec3 anf_0 = (anf * 6.28318);
-        vec3 anf_1 = cos(anf_0);
-        vec3 anf_2 = (anf_1 * 0.5);
-        return (anf_2 + 0.5);
-    }
     vec2 rotate(vec2 p, float angle) {
         float s = sin(angle);
         float c = cos(angle);
@@ -978,18 +985,6 @@ let%expect_test "compile examples" =
         float anf_11 = (anf_10 * c);
         float anf_12 = (anf_9 + anf_11);
         return vec2(anf_7, anf_12);
-    }
-    float sMin(float a, float b) {
-        float anf_13 = (b - a);
-        float anf_14 = (0.5 * anf_13);
-        float anf_15 = (anf_14 / 0.1);
-        float anf_16 = (0.5 + anf_15);
-        float h = clamp(anf_16, 0., 1.);
-        float anf_17 = mix(b, a, h);
-        float anf_18 = (0.1 * h);
-        float anf_19 = (1. - h);
-        float anf_20 = (anf_18 * anf_19);
-        return (anf_17 - anf_20);
     }
     float sdTorus(vec3 p_0, vec2 t_0) {
         float anf_21 = p_0[0];
@@ -1007,30 +1002,6 @@ let%expect_test "compile examples" =
     uniform vec2 u_mouse;
     uniform vec2 u_resolution;
     uniform float u_time;
-    float map(vec3 p_1) {
-        float angle_0 = (u_time * 2.);
-        float anf_30 = p_1[0];
-        float anf_31 = p_1[1];
-        vec2 anf_32 = vec2(anf_30, anf_31);
-        vec2 p_xy = rotate(anf_32, angle_0);
-        float anf_33 = p_xy[0];
-        float anf_34 = p_xy[1];
-        float anf_35 = p_1[2];
-        vec3 p_prime = vec3(anf_33, anf_34, anf_35);
-        float anf_36 = p_prime[1];
-        float anf_37 = p_prime[2];
-        vec2 anf_38 = vec2(anf_36, anf_37);
-        vec2 p_yz = rotate(anf_38, angle_0);
-        float anf_39 = p_prime[0];
-        float anf_40 = p_yz[0];
-        float anf_41 = p_yz[1];
-        vec3 p_prime_0 = vec3(anf_39, anf_40, anf_41);
-        vec2 anf_42 = vec2(1., 0.3);
-        float anf_43 = sdTorus(p_prime_0, anf_42);
-        vec2 anf_44 = vec2(2., 0.5);
-        float anf_45 = sdTorus(p_1, anf_44);
-        return sMin(anf_43, anf_45);
-    }
     option march_0_0(vec3 rd, vec3 ro, float t_1, int steps) {
         int _iter = 0;
         while ((_iter < 1000)) {
@@ -1040,7 +1011,37 @@ let%expect_test "compile examples" =
             } else {
                 vec3 anf_47 = (rd * t_1);
                 vec3 anf_48 = (ro + anf_47);
-                float d = map(anf_48);
+                float angle_0_0 = (u_time * 2.);
+                float anf_30_0 = anf_48[0];
+                float anf_31_0 = anf_48[1];
+                vec2 anf_32_0 = vec2(anf_30_0, anf_31_0);
+                vec2 p_xy_0 = rotate(anf_32_0, angle_0_0);
+                float anf_33_0 = p_xy_0[0];
+                float anf_34_0 = p_xy_0[1];
+                float anf_35_0 = anf_48[2];
+                vec3 p_prime_1 = vec3(anf_33_0, anf_34_0, anf_35_0);
+                float anf_36_0 = p_prime_1[1];
+                float anf_37_0 = p_prime_1[2];
+                vec2 anf_38_0 = vec2(anf_36_0, anf_37_0);
+                vec2 p_yz_0 = rotate(anf_38_0, angle_0_0);
+                float anf_39_0 = p_prime_1[0];
+                float anf_40_0 = p_yz_0[0];
+                float anf_41_0 = p_yz_0[1];
+                vec3 p_prime_0_0 = vec3(anf_39_0, anf_40_0, anf_41_0);
+                vec2 anf_42_0 = vec2(1., 0.3);
+                float anf_43_0 = sdTorus(p_prime_0_0, anf_42_0);
+                vec2 anf_44_0 = vec2(2., 0.5);
+                float anf_45_0 = sdTorus(anf_48, anf_44_0);
+                float anf_13_1 = (anf_45_0 - anf_43_0);
+                float anf_14_1 = (0.5 * anf_13_1);
+                float anf_15_1 = (anf_14_1 / 0.1);
+                float anf_16_1 = (0.5 + anf_15_1);
+                float h_1 = clamp(anf_16_1, 0., 1.);
+                float anf_17_1 = mix(anf_45_0, anf_43_0, h_1);
+                float anf_18_1 = (0.1 * h_1);
+                float anf_19_1 = (1. - h_1);
+                float anf_20_1 = (anf_18_1 * anf_19_1);
+                float d = (anf_17_1 - anf_20_1);
                 bool anf_49 = (d < 0.001);
                 if (anf_49) {
                     return option(0, t_1);
@@ -1127,7 +1128,12 @@ let%expect_test "compile examples" =
             default: {
                 float _lv_Some_0 = anf_88.Some_0;
                 float anf_89 = (_lv_Some_0 * 0.3);
-                col = palette(anf_89);
+                vec3 cfg_0 = vec3(0.3, 0.416, 0.557);
+                vec3 anf_92 = (cfg_0 + anf_89);
+                vec3 anf_0_0 = (anf_92 * 6.28318);
+                vec3 anf_1_0 = cos(anf_0_0);
+                vec3 anf_2_0 = (anf_1_0 * 0.5);
+                col = (anf_2_0 + 0.5);
                 break;
             }
         }
@@ -1179,27 +1185,21 @@ let%expect_test "compile examples" =
         }
         return 0.;
     }
-    mat2 rotate(float angle) {
-        float s = sin(angle);
-        float c = cos(angle);
-        float anf_4 = (-1. * s);
-        vec2 anf_5 = vec2(c, anf_4);
-        vec2 anf_6 = vec2(s, c);
-        return mat2(anf_5, anf_6);
-    }
     uniform vec2 u_resolution;
-    vec2 get_uv(vec2 coord) {
-        vec2 anf_7 = (2. * coord);
-        vec2 top = (anf_7 - u_resolution);
-        float anf_8 = u_resolution[0];
-        float anf_9 = u_resolution[1];
-        float bot = min(anf_8, anf_9);
-        return (top / bot);
-    }
     uniform float u_time;
     vec3 main_pure(vec2 coord_0) {
-        mat2 anf_10 = rotate(u_time);
-        vec2 anf_11 = get_uv(coord_0);
+        float s_0 = sin(u_time);
+        float c_0 = cos(u_time);
+        float anf_4_0 = (-1. * s_0);
+        vec2 anf_5_0 = vec2(c_0, anf_4_0);
+        vec2 anf_6_0 = vec2(s_0, c_0);
+        mat2 anf_10 = mat2(anf_5_0, anf_6_0);
+        vec2 anf_7_0 = (2. * coord_0);
+        vec2 top_0 = (anf_7_0 - u_resolution);
+        float anf_8_0 = u_resolution[0];
+        float anf_9_0 = u_resolution[1];
+        float bot_0 = min(anf_8_0, anf_9_0);
+        vec2 anf_11 = (top_0 / bot_0);
         vec2 uv = (anf_10 * anf_11);
         float anf_12 = (u_time * 2.);
         float anf_13 = sin(anf_12);

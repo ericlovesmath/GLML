@@ -417,39 +417,35 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
         int tag;
         float Some_0;
     };
-    int unwrap_m(option opt, int default_0) {
-        int _lv_tag = opt.tag;
-        switch (_lv_tag) {
-            case 0: {
-                int _lv_Some_0 = opt.Some_0;
-                return _lv_Some_0;
-                break;
-            }
-            default: {
-                return default_0;
-                break;
-            }
-        }
-    }
-    float unwrap_m_0(option_0 opt, float default_0) {
-        int _lv_tag_0 = opt.tag;
-        switch (_lv_tag_0) {
-            case 0: {
-                float _lv_Some_0_0 = opt.Some_0;
-                return _lv_Some_0_0;
-                break;
-            }
-            default: {
-                return default_0;
-                break;
-            }
-        }
-    }
     vec3 main_pure(vec2 coord) {
         option_0 anf = option_0(0, 1.);
-        float x_0 = unwrap_m_0(anf, 2.);
+        int _lv_tag_0_0 = anf.tag;
+        float x_0;
+        switch (_lv_tag_0_0) {
+            case 0: {
+                float _lv_Some_0_0_0 = anf.Some_0;
+                x_0 = _lv_Some_0_0_0;
+                break;
+            }
+            default: {
+                x_0 = 2.;
+                break;
+            }
+        }
         option anf_0 = option(0, 5);
-        int y = unwrap_m(anf_0, 5);
+        int _lv_tag_1 = anf_0.tag;
+        int y;
+        switch (_lv_tag_1) {
+            case 0: {
+                int _lv_Some_0_1 = anf_0.Some_0;
+                y = _lv_Some_0_1;
+                break;
+            }
+            default: {
+                y = 5;
+                break;
+            }
+        }
         float anf_1 = float(y);
         return vec3(anf_1, x_0, 0.);
     }
@@ -562,21 +558,15 @@ let%expect_test "constrained polymorphism tests" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float f_m(vec3 v) {
-        vec3 anf = floor(v);
-        vec3 anf_0 = (v - anf);
-        return anf_0[0];
-    }
-    float f_m_0(vec2 v) {
-        vec2 anf_1 = floor(v);
-        vec2 anf_2 = (v - anf_1);
-        return anf_2[0];
-    }
     vec3 main_pure(vec2 coord) {
         vec2 anf_3 = vec2(0.5, 1.5);
-        float a = f_m_0(anf_3);
+        vec2 anf_1_0 = floor(anf_3);
+        vec2 anf_2_0 = (anf_3 - anf_1_0);
+        float a = anf_2_0[0];
         vec3 anf_4 = vec3(0.5, 1.5, 2.5);
-        float b = f_m(anf_4);
+        vec3 anf_5 = floor(anf_4);
+        vec3 anf_0_0 = (anf_4 - anf_5);
+        float b = anf_0_0[0];
         return vec3(a, b, 0.);
     }
     void main() {

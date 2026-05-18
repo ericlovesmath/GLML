@@ -441,16 +441,11 @@ let%expect_test "structs" =
         float x;
         float y;
     };
-    color make_red(point p) {
-        color col = color(1., 0., 0.);
-        return col;
-    }
     vec3 main_pure(vec2 u) {
-        point p_0 = point(1., 2.);
-        color c = make_red(p_0);
-        float anf = c.r;
-        float anf_0 = c.g;
-        float anf_1 = c.b;
+        color col_0 = color(1., 0., 0.);
+        float anf = col_0.r;
+        float anf_0 = col_0.g;
+        float anf_1 = col_0.b;
         return vec3(anf, anf_0, anf_1);
     }
     void main() {
@@ -511,15 +506,11 @@ let%expect_test "nested structs" =
         point start;
         point end;
     };
-    segment make_seg(float u) {
-        point anf = point(0., 0.);
-        point anf_0 = point(1., 1.);
-        segment s = segment(anf, anf_0);
-        return s;
-    }
     vec3 main_pure(vec2 u_0) {
-        segment seg = make_seg(1.);
-        point anf_3 = seg.end;
+        point anf_4 = point(0., 0.);
+        point anf_0_0 = point(1., 1.);
+        segment s_0 = segment(anf_4, anf_0_0);
+        point anf_3 = s_0.end;
         float c = anf_3.x;
         return vec3(c, c, c);
     }
@@ -781,15 +772,12 @@ let%expect_test "defunctionalization" =
         int tag;
         float lctor_0;
     };
-    float dapply(DFn dfn, float da) {
-        float _lv_lctor_0 = dfn.lctor_0;
-        return (_lv_lctor_0 + da);
-    }
     vec3 main_pure(vec2 pos) {
         float px = pos[0];
         DFn anf = DFn(0, px);
         float anf_0 = pos[1];
-        float r = dapply(anf, anf_0);
+        float _lv_lctor_0_1 = anf.lctor_0;
+        float r = (_lv_lctor_0_1 + anf_0);
         return vec3(r, r, r);
     }
     void main() {
@@ -815,15 +803,12 @@ let%expect_test "defunctionalization" =
         int tag;
         vec2 lctor_0;
     };
-    float dapply(DFn dfn, float da) {
-        vec2 _lv_lctor_0 = dfn.lctor_0;
-        float anf_2 = _lv_lctor_0[0];
-        return (da * anf_2);
-    }
     vec3 main_pure(vec2 pos) {
         DFn anf_0 = DFn(0, pos);
         float anf_1 = pos[1];
-        float r = dapply(anf_0, anf_1);
+        vec2 _lv_lctor_0_1 = anf_0.lctor_0;
+        float anf_4 = _lv_lctor_0_1[0];
+        float r = (anf_1 * anf_4);
         return vec3(r, r, r);
     }
     void main() {
@@ -852,33 +837,61 @@ let%expect_test "defunctionalization" =
     struct DFn {
         int tag;
     };
-    float dapply(DFn dfn, float da) {
-        int _lv_tag = dfn.tag;
-        switch (_lv_tag) {
-            case 0: {
-                return (da * 2.);
-                break;
-            }
-            case 1: {
-                return (da * 3.);
-                break;
-            }
-            default: {
-                return (da * 4.);
-                break;
-            }
-        }
-    }
     vec3 main_pure(vec2 pos) {
         DFn anf = DFn(0);
         float anf_0 = pos[0];
-        float a = dapply(anf, anf_0);
+        int _lv_tag_3 = anf.tag;
+        float a;
+        switch (_lv_tag_3) {
+            case 0: {
+                a = (anf_0 * 2.);
+                break;
+            }
+            case 1: {
+                a = (anf_0 * 3.);
+                break;
+            }
+            default: {
+                a = (anf_0 * 4.);
+                break;
+            }
+        }
         DFn anf_1 = DFn(1);
         float anf_2 = pos[1];
-        float b = dapply(anf_1, anf_2);
+        int _lv_tag_2 = anf_1.tag;
+        float b;
+        switch (_lv_tag_2) {
+            case 0: {
+                b = (anf_2 * 2.);
+                break;
+            }
+            case 1: {
+                b = (anf_2 * 3.);
+                break;
+            }
+            default: {
+                b = (anf_2 * 4.);
+                break;
+            }
+        }
         DFn anf_3 = DFn(2);
         float anf_4 = pos[0];
-        float c = dapply(anf_3, anf_4);
+        int _lv_tag_1 = anf_3.tag;
+        float c;
+        switch (_lv_tag_1) {
+            case 0: {
+                c = (anf_4 * 2.);
+                break;
+            }
+            case 1: {
+                c = (anf_4 * 3.);
+                break;
+            }
+            default: {
+                c = (anf_4 * 4.);
+                break;
+            }
+        }
         return vec3(a, b, c);
     }
     void main() {
@@ -929,19 +942,15 @@ let%expect_test "defunctionalization" =
     struct DFn {
         int tag;
     };
-    vec3 map_m(DFn f, vec3 v) {
-        float anf = v[0];
-        float anf_0 = (anf * 2.);
-        float anf_1 = v[1];
-        float anf_2 = (anf_1 * 2.);
-        float anf_3 = v[2];
-        float anf_4 = (anf_3 * 2.);
-        return vec3(anf_0, anf_2, anf_4);
-    }
     vec3 main_pure(vec2 uv) {
-        DFn anf_5 = DFn(0);
         vec3 anf_6 = vec3(0., 1., 2.);
-        return map_m(anf_5, anf_6);
+        float anf_7 = anf_6[0];
+        float anf_0_0 = (anf_7 * 2.);
+        float anf_1_0 = anf_6[1];
+        float anf_2_0 = (anf_1_0 * 2.);
+        float anf_3_0 = anf_6[2];
+        float anf_4_0 = (anf_3_0 * 2.);
+        return vec3(anf_0_0, anf_2_0, anf_4_0);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -969,13 +978,10 @@ let%expect_test "defunctionalization - returning closures" =
         int tag;
         float lctor_0;
     };
-    float dapply(DFn dfn, float da) {
-        float _lv_lctor_0 = dfn.lctor_0;
-        return (_lv_lctor_0 + da);
-    }
     vec3 main_pure(vec2 coord) {
         DFn f = DFn(0, 0.);
-        float r = dapply(f, 1.);
+        float _lv_lctor_0_0 = f.lctor_0;
+        float r = (_lv_lctor_0_0 + 1.);
         return vec3(r, 0., 0.);
     }
     void main() {
@@ -1000,13 +1006,10 @@ let%expect_test "defunctionalization - returning closures" =
         int tag;
         float lctor_0;
     };
-    float dapply(DFn dfn, float da) {
-        float _lv_lctor_0 = dfn.lctor_0;
-        return (_lv_lctor_0 + da);
-    }
     vec3 main_pure(vec2 coord) {
         DFn f = DFn(0, 0.);
-        float r = dapply(f, 1.);
+        float _lv_lctor_0_0 = f.lctor_0;
+        float r = (_lv_lctor_0_0 + 1.);
         return vec3(r, 0., 0.);
     }
     void main() {
@@ -1032,13 +1035,10 @@ let%expect_test "defunctionalization - returning closures" =
         int tag;
         float lctor_0;
     };
-    float dapply(DFn dfn, float da) {
-        float _lv_lctor_0 = dfn.lctor_0;
-        return (_lv_lctor_0 + da);
-    }
     vec3 main_pure(vec2 coord) {
         DFn f = DFn(0, 1.);
-        float r = dapply(f, 2.);
+        float _lv_lctor_0_0 = f.lctor_0;
+        float r = (_lv_lctor_0_0 + 2.);
         return vec3(r, 0., 0.);
     }
     void main() {
@@ -1072,16 +1072,13 @@ let%expect_test "defunctionalization - partial application of first-class functi
         DFn lctor_0;
         float lctor_1;
     };
-    float dapply_0(DFn_0 dfn_0, float da_1) {
-        float _lv_lctor_1 = dfn_0.lctor_1;
-        return (_lv_lctor_1 + da_1);
-    }
     vec3 main_pure(vec2 pos) {
         DFn f = DFn(0);
         float anf = pos[0];
         DFn_0 g = DFn_0(0, f, anf);
         float anf_0 = pos[1];
-        float r = dapply_0(g, anf_0);
+        float _lv_lctor_1_0 = g.lctor_1;
+        float r = (_lv_lctor_1_0 + anf_0);
         return vec3(r, r, r);
     }
     void main() {
@@ -1118,22 +1115,16 @@ let%expect_test "defunctionalization - partial application of first-class functi
         DFn_0 lctor_0_0;
         float lctor_0_1;
     };
-    float dapply_0(DFn_0 dfn_0, float da_2, float da_3) {
-        float _lv_lctor_1 = dfn_0.lctor_1;
-        float anf_2 = (_lv_lctor_1 + da_2);
-        return (anf_2 + da_3);
-    }
-    float dapply_1(DFn_1 dfn_1, float da_4) {
-        DFn_0 _lv_lctor_0_0 = dfn_1.lctor_0_0;
-        float _lv_lctor_0_1 = dfn_1.lctor_0_1;
-        return dapply_0(_lv_lctor_0_0, _lv_lctor_0_1, da_4);
-    }
     vec3 main_pure(vec2 pos) {
         DFn f = DFn(0);
         DFn_0 g = DFn_0(0, f, 1.);
         DFn_1 h = DFn_1(0, g, 2.);
         float anf_0 = pos[0];
-        float r = dapply_1(h, anf_0);
+        DFn_0 _lv_lctor_0_0_0 = h.lctor_0_0;
+        float _lv_lctor_0_1_0 = h.lctor_0_1;
+        float _lv_lctor_1_1 = _lv_lctor_0_0_0.lctor_1;
+        float anf_4 = (_lv_lctor_1_1 + _lv_lctor_0_1_0);
+        float r = (anf_4 + anf_0);
         return vec3(r, r, r);
     }
     void main() {
@@ -1164,16 +1155,13 @@ let%expect_test "defunctionalization - partial application of first-class functi
         DFn_0 lctor_0;
         float lctor_1;
     };
-    float dapply(DFn dfn, float da) {
-        float _lv_lctor_1 = dfn.lctor_1;
-        return (_lv_lctor_1 + da);
-    }
     vec3 main_pure(vec2 pos) {
         DFn_0 add_as_value = DFn_0(0);
         float anf = pos[0];
         DFn anf_0 = DFn(0, add_as_value, anf);
         float anf_1 = pos[1];
-        float r = dapply(anf_0, anf_1);
+        float _lv_lctor_1_1 = anf_0.lctor_1;
+        float r = (_lv_lctor_1_1 + anf_1);
         return vec3(r, r, r);
     }
     void main() {
@@ -1200,13 +1188,10 @@ let%expect_test "defunctionalization - partial application of first-class functi
         int tag;
         int lctor_0;
     };
-    int dapply(DFn dfn, int da) {
-        int _lv_lctor_0 = dfn.lctor_0;
-        return (_lv_lctor_0 + da);
-    }
     vec3 main_pure(vec2 uv) {
         DFn inc_m = DFn(0, 1);
-        int anf = dapply(inc_m, 2);
+        int _lv_lctor_0_0 = inc_m.lctor_0;
+        int anf = (_lv_lctor_0_0 + 2);
         float anf_0 = float(anf);
         vec3 anf_1 = vec3(1., 1., 1.);
         return (anf_0 * anf_1);
@@ -1523,38 +1508,26 @@ let%expect_test "function keyword desugaring" =
         int tag;
         DFn lctor_0;
     };
-    int dapply_0(DFn_0 dfn_0, bool da_0) {
-        if (da_0) {
-            return 1;
-        } else {
-            return 0;
-        }
-    }
     struct option {
         int tag;
         float Some_0;
     };
-    float f(option _fn_arg) {
-        int _lv_tag = _fn_arg.tag;
-        switch (_lv_tag) {
+    vec3 main_pure(vec2 u) {
+        option anf_0 = option(0, 5.);
+        int _lv_tag_0 = anf_0.tag;
+        float anf_1;
+        switch (_lv_tag_0) {
             case 0: {
-                float _lv_Some_0 = _fn_arg.Some_0;
-                return (_lv_Some_0 + 1.);
+                float _lv_Some_0_0 = anf_0.Some_0;
+                anf_1 = (_lv_Some_0_0 + 1.);
                 break;
             }
             default: {
-                return 0.;
+                anf_1 = 0.;
                 break;
             }
         }
-    }
-    vec3 main_pure(vec2 u) {
-        DFn anf = DFn(0);
-        DFn_0 h = DFn_0(0, anf);
-        option anf_0 = option(0, 5.);
-        float anf_1 = f(anf_0);
-        int anf_3 = dapply_0(h, true);
-        float anf_4 = float(anf_3);
+        float anf_4 = float(1);
         return vec3(anf_1, 1., anf_4);
     }
     void main() {

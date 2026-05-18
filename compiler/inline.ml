@@ -1,12 +1,12 @@
 open Core
 open Remove_placeholder
 
-(* ========== Inlining Logic ========== *)
-
 type inlinable = (string * Monomorphize.ty) list * anf
 
-let lookup r v = Map.find r v |> Option.value ~default:v
-let bind r v = Map.set r ~key:v ~data:(Utils.fresh v)
+(* ========== Instantiating a body ========== *)
+
+let lookup env v = Map.find env v |> Option.value ~default:v
+let bind env v = Map.set env ~key:v ~data:(Utils.fresh v)
 
 let on_atom ~subst ~env (a : atom) : atom =
   match a.desc with
@@ -20,7 +20,7 @@ let on_atom ~subst ~env (a : atom) : atom =
   | Int _ | Float _ | Bool _ -> a
 ;;
 
-(** Produce a fresh copy of [body], formals replaced by actual atoms *)
+(** Produce a fresh copy of [body], formals replaced by actual atoms. *)
 let instantiate ~formals ~actuals ~body =
   let init_subst =
     List.zip_exn formals actuals
@@ -29,7 +29,7 @@ let instantiate ~formals ~actuals ~body =
     |> Compiler_error.of_or_error ~pass:"inline"
     |> Compiler_error.ok_exn
   in
-  let rec on_anf subst (env : string String.Map.t) (a : anf) =
+  let rec on_anf subst env (a : anf) =
     let desc : anf_desc =
       match a.desc with
       | Return t -> Return (on_term subst env t)
@@ -48,7 +48,7 @@ let instantiate ~formals ~actuals ~body =
       | Continue -> Continue
     in
     { a with desc }
-  and on_term subst (env : string String.Map.t) (t : term) =
+  and on_term subst env (t : term) =
     let atom = on_atom ~subst ~env in
     let desc : term_desc =
       match t.desc with
@@ -69,7 +69,7 @@ let instantiate ~formals ~actuals ~body =
   on_anf init_subst String.Map.empty body
 ;;
 
-(* ========== Size Heuristic ========== *)
+(* ========== Inlining Heuristics ========== *)
 
 let rec size_anf (a : anf) =
   match a.desc with
@@ -88,20 +88,70 @@ and size_term (t : term) =
   | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Field _ -> 1
 ;;
 
-(** Collects functions that we should inline, heuristics should live here *)
+(* TODO: Fix [While] inlining, currently just not inlining them *)
+let rec has_while_anf (a : anf) =
+  match a.desc with
+  | While _ -> true
+  | Return t -> has_while_term t
+  | Let (_, t, k) -> has_while_term t || has_while_anf k
+  | Placeholder (_, k) -> has_while_anf k
+  | Set (_, _, k) -> has_while_anf k
+  | Continue -> false
+
+and has_while_term (t : term) =
+  match t.desc with
+  | If (_, th, el) -> has_while_anf th || has_while_anf el
+  | Switch (_, cs) -> List.exists cs ~f:(fun (_, b) -> has_while_anf b)
+  | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Field _ -> false
+;;
+
+(* Collect the name of every function called anywhere in [tops]. *)
+let all_call_sites (tops : top list) : string list =
+  let rec anf (a : anf) =
+    match a.desc with
+    | Return t -> term t
+    | Continue -> []
+    | Let (_, t, tl) -> term t @ anf tl
+    | Placeholder (_, tl) -> anf tl
+    | While (c, b, tl) -> term c @ anf b @ anf tl
+    | Set (_, _, tl) -> anf tl
+  and term (t : term) =
+    match t.desc with
+    | App (f, _) -> [ f ]
+    | If (_, t, e) -> anf t @ anf e
+    | Switch (_, cases) -> List.concat_map cases ~f:(fun (_, b) -> anf b)
+    | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | Record _ | Field _ -> []
+  in
+  List.concat_map tops ~f:(fun top ->
+    match top.desc with
+    | Define { body; _ } | Const (_, body) -> anf body
+    | Extern _ | TypeDef _ -> [])
+;;
+
+let count_call_sites tops : int String.Map.t =
+  all_call_sites tops
+  |> List.fold ~init:String.Map.empty ~f:(fun m f ->
+    Map.update m f ~f:(function
+      | None -> 1
+      | Some n -> n + 1))
+;;
+
+(** Collects functions that we should inline, heuristics live here.
+
+    Body size <= 3 or if there is exactly one call site *)
 let collect_inlinable (tops : top list) : inlinable String.Map.t =
+  let counts = count_call_sites tops in
+  let call_count n = Map.find counts n |> Option.value ~default:0 in
   List.fold tops ~init:String.Map.empty ~f:(fun acc top ->
     match top.desc with
-    (* Inline functions of size <= 3 *)
-    | Define { name; args; body; _ } when size_anf body <= 3 ->
+    | Define { name; args; body; _ }
+      when (not (has_while_anf body)) && (size_anf body <= 3 || call_count name = 1) ->
       Map.set acc ~key:name ~data:(args, body)
     | Define _ | Const _ | Extern _ | TypeDef _ -> acc)
 ;;
 
-(* ========== Inlining ========== *)
+(* ========== Splicing and inlining ========== *)
 
-(** Splice [body] into the caller, each [Return final] tail along the
-    linear spine becomes [Let v = final in tl]. *)
 let rec splice ~v ~tl (t : anf) =
   let desc : anf_desc =
     match t.desc with
@@ -115,43 +165,48 @@ let rec splice ~v ~tl (t : anf) =
   { t with desc }
 ;;
 
-let inline_top (inlinable : inlinable String.Map.t) (top : top) : top =
-  let try_inline f actuals =
-    Map.find inlinable f
-    |> Option.map ~f:(fun (formals, body) -> instantiate ~formals ~actuals ~body)
-  in
-  let rec try_expand_app (t : term) : anf option =
-    match t.desc with
-    | App (f, xs) -> try_inline f xs |> Option.map ~f:on_anf
-    | _ -> None
-  and on_anf (a : anf) : anf =
+let inline_top (init : inlinable String.Map.t) (top : top) : top =
+  let rec on_anf inlinable (a : anf) : anf =
     match a.desc with
     | Continue -> a
     | Return t ->
-      (match try_expand_app t with
+      (match try_inline_term inlinable t with
        | Some body -> body
-       | None -> { a with desc = Return (on_term t) })
+       | None -> { a with desc = Return (on_term inlinable t) })
     | Let (v, t, tl) ->
-      let tl = on_anf tl in
-      (match try_expand_app t with
+      let tl = on_anf inlinable tl in
+      (match try_inline_term inlinable t with
        | Some body -> splice ~v ~tl body
-       | None -> { a with desc = Let (v, on_term t, tl) })
-    | Placeholder (v, k) -> { a with desc = Placeholder (v, on_anf k) }
-    | While (c, b, tl) -> { a with desc = While (on_term c, on_anf b, on_anf tl) }
-    | Set (v, x, k) -> { a with desc = Set (v, x, on_anf k) }
-  and on_term (t : term) : term =
-    let desc =
+       | None -> { a with desc = Let (v, on_term inlinable t, tl) })
+    | Placeholder (v, k) -> { a with desc = Placeholder (v, on_anf inlinable k) }
+    | While (c, b, tl) ->
+      { a with
+        desc = While (on_term inlinable c, on_anf inlinable b, on_anf inlinable tl)
+      }
+    | Set (v, x, k) -> { a with desc = Set (v, x, on_anf inlinable k) }
+  and on_term inlinable (t : term) : term =
+    let desc : term_desc =
       match t.desc with
-      | If (c, t, e) -> If (c, on_anf t, on_anf e)
-      | Switch (s, cases) -> Switch (s, List.map cases ~f:(fun (l, b) -> l, on_anf b))
-      | d -> d
+      | If (c, th, el) -> If (c, on_anf inlinable th, on_anf inlinable el)
+      | Switch (s, cases) ->
+        Switch (s, List.map cases ~f:(fun (l, b) -> l, on_anf inlinable b))
+      | (Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Field _) as d
+        -> d
     in
     { t with desc }
+  and try_inline_term inlinable (t : term) : anf option =
+    match t.desc with
+    | App (f, actuals) ->
+      Map.find inlinable f
+      |> Option.map ~f:(fun (formals, body) ->
+        on_anf (Map.remove inlinable f) (instantiate ~formals ~actuals ~body))
+    | _ -> None
   in
   match top.desc with
   | Define { name; args; body; ret_ty } ->
-    { top with desc = Define { name; args; body = on_anf body; ret_ty } }
-  | Const (n, b) -> { top with desc = Const (n, on_anf b) }
+    let inlinable = Map.remove init name in
+    { top with desc = Define { name; args; body = on_anf inlinable body; ret_ty } }
+  | Const (n, b) -> { top with desc = Const (n, on_anf init b) }
   | Extern _ | TypeDef _ -> top
 ;;
 

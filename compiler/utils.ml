@@ -40,8 +40,8 @@ let fresh name =
       Hash_set.add used_names base;
       base)
     else (
-      let n = Hashtbl.find_or_add counters base ~default:(Fn.const 0) in
       let rec go () =
+        let n = Hashtbl.find_or_add counters base ~default:(Fn.const 0) in
         Hashtbl.set counters ~key:base ~data:(n + 1);
         let v = Printf.sprintf "%s_%d" base n in
         if Hash_set.mem used_names v

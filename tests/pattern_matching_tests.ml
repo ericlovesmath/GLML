@@ -661,33 +661,24 @@ let%expect_test "bracket pattern matching" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float f_m(vec3 _fn_arg) {
-        float _lv_v0 = _fn_arg[0];
-        float _lv_v2 = _fn_arg[2];
-        return (_lv_v0 + _lv_v2);
-    }
-    float g_m(mat2 _fn_arg_0) {
-        vec2 _lv_v0_0 = _fn_arg_0[0];
-        vec2 _lv_v1_0 = _fn_arg_0[1];
-        float _lv_v0_1 = _lv_v0_0[0];
-        float _lv_v1_2 = _lv_v1_0[1];
-        return (_lv_v0_1 + _lv_v1_2);
-    }
-    float h(vec2 v) {
-        float _lv_v0_3 = v[0];
-        float _lv_v1_3 = v[1];
-        return (_lv_v0_3 + _lv_v1_3);
-    }
     vec3 main_pure(vec2 coord) {
         float anf = coord[0];
         float anf_0 = coord[1];
         vec3 anf_1 = vec3(anf, anf_0, 0.);
-        float a_0 = f_m(anf_1);
+        float _lv_v0_4 = anf_1[0];
+        float _lv_v2_0 = anf_1[2];
+        float a_0 = (_lv_v0_4 + _lv_v2_0);
         vec2 anf_2 = vec2(1., 0.);
         vec2 anf_3 = vec2(0., 1.);
         mat2 anf_4 = mat2(anf_2, anf_3);
-        float b_0 = g_m(anf_4);
-        float c_0 = h(coord);
+        vec2 _lv_v0_0_0 = anf_4[0];
+        vec2 _lv_v1_0_0 = anf_4[1];
+        float _lv_v0_1_0 = _lv_v0_0_0[0];
+        float _lv_v1_2_0 = _lv_v1_0_0[1];
+        float b_0 = (_lv_v0_1_0 + _lv_v1_2_0);
+        float _lv_v0_3_0 = coord[0];
+        float _lv_v1_3_0 = coord[1];
+        float c_0 = (_lv_v0_3_0 + _lv_v1_3_0);
         return vec3(a_0, b_0, c_0);
     }
     void main() {
@@ -721,16 +712,13 @@ let%expect_test "let pattern binding" =
         int tag;
         float Wrap_0;
     };
-    float f(wrapper w) {
-        float _lv_Wrap_0 = w.Wrap_0;
-        float _lv_Wrap_0_0 = w.Wrap_0;
-        return (_lv_Wrap_0 + _lv_Wrap_0_0);
-    }
     vec3 main_pure(vec2 uv) {
         float _lv_v0 = uv[0];
         float _lv_v1 = uv[1];
         wrapper anf = wrapper(0, 1.);
-        float anf_0 = f(anf);
+        float _lv_Wrap_0_1 = anf.Wrap_0;
+        float _lv_Wrap_0_0_0 = anf.Wrap_0;
+        float anf_0 = (_lv_Wrap_0_1 + _lv_Wrap_0_0_0);
         float anf_1 = (_lv_v0 + _lv_v1);
         return vec3(2., anf_0, anf_1);
     }
@@ -793,35 +781,33 @@ let%expect_test "nested pattern matching with polymorphism" =
         int tag;
         option Some_0;
     };
-    float f(option_0 a) {
-        int _lv_tag_0 = a.tag;
-        switch (_lv_tag_0) {
+    vec3 main_pure(vec2 coord) {
+        option anf = option(0, 0.5);
+        option_0 anf_0 = option_0(0, anf);
+        int _lv_tag_0_0 = anf_0.tag;
+        float v;
+        switch (_lv_tag_0_0) {
             case 0: {
-                option _lv_Some_0 = a.Some_0;
-                int _lv_tag = _lv_Some_0.tag;
-                switch (_lv_tag) {
+                option _lv_Some_0_1 = anf_0.Some_0;
+                int _lv_tag_1 = _lv_Some_0_1.tag;
+                switch (_lv_tag_1) {
                     case 0: {
-                        float _lv_Some_0_0 = _lv_Some_0.Some_0;
-                        return _lv_Some_0_0;
+                        float _lv_Some_0_0_0 = _lv_Some_0_1.Some_0;
+                        v = _lv_Some_0_0_0;
                         break;
                     }
                     default: {
-                        return 0.;
+                        v = 0.;
                         break;
                     }
                 }
                 break;
             }
             default: {
-                return 1.;
+                v = 1.;
                 break;
             }
         }
-    }
-    vec3 main_pure(vec2 coord) {
-        option anf = option(0, 0.5);
-        option_0 anf_0 = option_0(0, anf);
-        float v = f(anf_0);
         return vec3(v, 0., 0.);
     }
     void main() {
