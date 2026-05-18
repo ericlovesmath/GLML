@@ -32,6 +32,7 @@
    tail_call
    lower_variants
    remove_placeholder
+   const_fold
    lift_consts
 
    ; GLSL Passes

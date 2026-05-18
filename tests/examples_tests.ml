@@ -34,7 +34,7 @@ let%expect_test "compile examples" =
                 float _lv_Circle_0 = s.Circle_0;
                 float r = _lv_Circle_0;
                 float anf = length(p);
-                return (anf - r);
+                return (anf - _lv_Circle_0);
                 break;
             }
             case 1: {
@@ -43,7 +43,7 @@ let%expect_test "compile examples" =
                 float h = _lv_Rect_1;
                 float w = _lv_Rect_0;
                 vec2 anf_0 = abs(p);
-                vec2 anf_1 = vec2(w, h);
+                vec2 anf_1 = vec2(_lv_Rect_0, _lv_Rect_1);
                 vec2 d = (anf_0 - anf_1);
                 vec2 anf_2 = vec2(0., 0.);
                 vec2 anf_3 = max(d, anf_2);
@@ -86,13 +86,13 @@ let%expect_test "compile examples" =
             case 0: {
                 shape _lv_lctor_0 = dfn.lctor_0;
                 shape ca = _lv_lctor_0;
-                return sdf_shape(ca, da);
+                return sdf_shape(_lv_lctor_0, da);
                 break;
             }
             default: {
                 shape _lv_lctor_0_0 = dfn.lctor_0_0;
                 shape ca_0 = _lv_lctor_0_0;
-                return sdf_shape(ca_0, da);
+                return sdf_shape(_lv_lctor_0_0, da);
                 break;
             }
         }
@@ -117,7 +117,7 @@ let%expect_test "compile examples" =
         DFn _lv_lctor_1_1 = dfn_0.lctor_1_1;
         DFn ca_2 = _lv_lctor_1_1;
         DFn ca_1 = _lv_lctor_1_0;
-        return union_0(ca_1, ca_2, da_0);
+        return union_0(_lv_lctor_1_0, _lv_lctor_1_1, da_0);
     }
     vec3 main_pure(vec2 coord_0) {
         vec2 p_1 = get_uv_m(coord_0);
@@ -463,7 +463,7 @@ let%expect_test "compile examples" =
     uniform float u_time;
     vec3 main_pure(vec2 coord_0) {
         vec2 uv = get_uv_m(coord_0);
-        float anf_2 = float(size);
+        float anf_2 = float(5);
         vec2 anf_3 = (uv * anf_2);
         float anf_4 = (2. * u_time);
         vec2 anf_5 = vec2(anf_4, 0.);
@@ -574,7 +574,7 @@ let%expect_test "compile examples" =
                 float _lv_Some_0 = anf_28.Some_0;
                 float n = _lv_Some_0;
                 vec3 anf_29 = vec3(10., 20., 30.);
-                vec3 anf_30 = (n * anf_29);
+                vec3 anf_30 = (_lv_Some_0 * anf_29);
                 vec3 anf_31 = (anf_30 + u_time);
                 vec3 anf_32 = sin(anf_31);
                 vec3 anf_33 = (anf_32 * 0.5);
@@ -762,9 +762,9 @@ let%expect_test "compile examples" =
     }
     vec3 getNormal(vec3 p_5) {
         float e_0 = 0.002;
-        vec3 e_x = vec3(e_0, 0., 0.);
-        vec3 e_y = vec3(0., e_0, 0.);
-        vec3 e_z = vec3(0., 0., e_0);
+        vec3 e_x = vec3(0.002, 0., 0.);
+        vec3 e_y = vec3(0., 0.002, 0.);
+        vec3 e_z = vec3(0., 0., 0.002);
         vec3 anf_70 = (p_5 + e_x);
         float anf_71 = map(anf_70);
         vec3 anf_72 = (p_5 - e_x);
@@ -851,7 +851,7 @@ let%expect_test "compile examples" =
             default: {
                 float _lv_Some_0 = t_0.Some_0;
                 float t_1 = _lv_Some_0;
-                vec3 anf_102 = (rd_0 * t_1);
+                vec3 anf_102 = (rd_0 * _lv_Some_0);
                 vec3 hitPos = (ro_0 + anf_102);
                 vec3 n = getNormal(hitPos);
                 vec3 anf_103 = vec3(1., 0.8, -0.5);
@@ -864,9 +864,9 @@ let%expect_test "compile examples" =
                 vec3 anf_106 = (dir_0 * 3.);
                 float rawHeight = fbm(anf_106);
                 float seaLevel = 0.35;
-                float anf_107 = (rawHeight - seaLevel);
-                float anf_108 = (1. - seaLevel);
-                float anf_109 = (anf_107 / anf_108);
+                float anf_107 = (rawHeight - 0.35);
+                float anf_108 = 0.65;
+                float anf_109 = (anf_107 / 0.65);
                 float h_norm = clamp(anf_109, 0., 1.);
                 bool anf_110 = (h_norm < 0.3);
                 vec3 baseColor;
@@ -894,7 +894,7 @@ let%expect_test "compile examples" =
                 float rim = (anf_121 * 0.4);
                 vec3 atmoColor = vec3(0.3, 0.5, 1.);
                 float anf_122 = (diff * 0.9);
-                float anf_123 = (anf_122 + ambient);
+                float anf_123 = (anf_122 + 0.08);
                 vec3 anf_124 = (baseColor * anf_123);
                 vec3 anf_125 = (atmoColor * rim);
                 return (anf_124 + anf_125);
@@ -979,11 +979,11 @@ let%expect_test "compile examples" =
         float k = 0.1;
         float anf_13 = (b - a);
         float anf_14 = (0.5 * anf_13);
-        float anf_15 = (anf_14 / k);
+        float anf_15 = (anf_14 / 0.1);
         float anf_16 = (0.5 + anf_15);
         float h = clamp(anf_16, 0., 1.);
         float anf_17 = mix(b, a, h);
-        float anf_18 = (k * h);
+        float anf_18 = (0.1 * h);
         float anf_19 = (1. - h);
         float anf_20 = (anf_18 * anf_19);
         return (anf_17 - anf_20);
@@ -1127,7 +1127,7 @@ let%expect_test "compile examples" =
             default: {
                 float _lv_Some_0 = anf_88.Some_0;
                 float t_2 = _lv_Some_0;
-                float anf_89 = (t_2 * 0.3);
+                float anf_89 = (_lv_Some_0 * 0.3);
                 col = palette(anf_89);
                 break;
             }
@@ -1211,7 +1211,7 @@ let%expect_test "compile examples" =
         float _lv_v1 = anf_16[1];
         float y = _lv_v1;
         float x = _lv_v0;
-        float res = gcd_m(x, y);
+        float res = gcd_m(_lv_v0, _lv_v1);
         float anf_17 = (res * 0.5);
         float anf_18 = (1. - res);
         return vec3(res, anf_17, anf_18);

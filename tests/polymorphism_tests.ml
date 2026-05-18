@@ -10,7 +10,7 @@ let%expect_test "int broadcasting with vecs and builtins" =
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
         int n = 2;
-        float anf = float(n);
+        float anf = float(2);
         vec3 anf_0 = vec3(0.5, 0.5, 0.5);
         return (anf * anf_0);
     }
@@ -49,7 +49,7 @@ let%expect_test "int broadcasting with vecs and builtins" =
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
         int n = 2;
-        float anf = float(n);
+        float anf = float(2);
         vec3 anf_0 = vec3(0.1, 0.2, 0.3);
         return (anf + anf_0);
     }
@@ -322,7 +322,7 @@ let%expect_test "parametrized variants" =
             case 0: {
                 int _lv_Some_0 = opt.Some_0;
                 int x = _lv_Some_0;
-                return x;
+                return _lv_Some_0;
                 break;
             }
             default: {
@@ -378,7 +378,7 @@ let%expect_test "parametrized variants" =
             case 0: {
                 float _lv_Ok_0 = r.Ok_0;
                 float x = _lv_Ok_0;
-                return x;
+                return _lv_Ok_0;
                 break;
             }
             default: {
@@ -440,7 +440,7 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
             case 0: {
                 int _lv_Some_0 = opt.Some_0;
                 int x = _lv_Some_0;
-                return x;
+                return _lv_Some_0;
                 break;
             }
             default: {
@@ -455,7 +455,7 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
             case 0: {
                 bool _lv_Some_0_0 = opt.Some_0;
                 bool x = _lv_Some_0_0;
-                return x;
+                return _lv_Some_0_0;
                 break;
             }
             default: {
