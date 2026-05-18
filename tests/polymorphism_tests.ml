@@ -128,12 +128,9 @@ let%expect_test "parametrized structs" =
     struct box {
         float value;
     };
-    float f(box b) {
-        return b.value;
-    }
     vec3 main_pure(vec2 coord) {
         box anf = box(1.);
-        float anf_0 = f(anf);
+        float anf_0 = anf.value;
         return vec3(anf_0, 0., 0.);
     }
     void main() {
@@ -159,12 +156,9 @@ let%expect_test "parametrized structs" =
         float fst;
         int snd;
     };
-    float get_fst(pair p) {
-        return p.fst;
-    }
     vec3 main_pure(vec2 coord) {
         pair p_0 = pair(1., 0);
-        float anf = get_fst(p_0);
+        float anf = p_0.fst;
         return vec3(anf, 0., 0.);
     }
     void main() {
@@ -215,17 +209,11 @@ let%expect_test "parametrized structs" =
     struct box {
         float value;
     };
-    float get1(box b) {
-        return b.value;
-    }
-    float get2(box b_0) {
-        return b_0.value;
-    }
     vec3 main_pure(vec2 coord) {
         box anf = box(1.);
-        float anf_0 = get1(anf);
+        float anf_0 = anf.value;
         box anf_1 = box(2.);
-        float anf_2 = get2(anf_1);
+        float anf_2 = anf_1.value;
         float anf_3 = (anf_0 + anf_2);
         return vec3(anf_3, 0., 0.);
     }
@@ -494,27 +482,19 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
     struct box_0 {
         float value;
     };
-    bool f_m(box b) {
-        bool a = b.value;
-        return a;
-    }
-    float f_m_0(box_0 b) {
-        float a = b.value;
-        return a;
-    }
     vec3 main_pure(vec2 coord) {
         box_0 anf = box_0(1.);
-        float a_0 = f_m_0(anf);
+        float a_2 = anf.value;
         box anf_0 = box(true);
-        bool anf_1 = f_m(anf_0);
+        bool a_1 = anf_0.value;
         int b_0;
-        if (anf_1) {
+        if (a_1) {
             b_0 = 1;
         } else {
             b_0 = 2;
         }
         float anf_2 = float(b_0);
-        return vec3(a_0, anf_2, 0.);
+        return vec3(a_2, anf_2, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -534,12 +514,8 @@ let%expect_test "constrained polymorphism tests" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float f_m(float x, float y) {
-        return (x * y);
-    }
     vec3 main_pure(vec2 coord) {
-        float anf = f_m(1., 2.);
-        return vec3(anf, 0., 0.);
+        return vec3(2., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -559,18 +535,10 @@ let%expect_test "constrained polymorphism tests" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float scale_m(float x) {
-        float anf = (x * 2.);
-        return (anf - 1.);
-    }
-    vec2 scale_m_0(vec2 x) {
-        vec2 anf_0 = (x * 2.);
-        return (anf_0 - 1.);
-    }
     vec3 main_pure(vec2 coord) {
-        float anf_1 = scale_m(1.);
-        vec2 anf_2 = vec2(anf_1, 2.);
-        vec2 v = scale_m_0(anf_2);
+        vec2 anf_2 = vec2(1., 2.);
+        vec2 anf_0_0 = (anf_2 * 2.);
+        vec2 v = (anf_0_0 - 1.);
         float anf_3 = v[0];
         float anf_4 = v[1];
         return vec3(anf_3, anf_4, 0.);
@@ -632,19 +600,11 @@ let%expect_test "parametric annotations" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 id_m(vec3 x) {
-        return x;
-    }
-    float id_m_0(float x) {
-        return x;
-    }
     vec3 main_pure(vec2 coord) {
-        float a = id_m_0(1.);
         vec3 anf = vec3(1., 2., 3.);
-        vec3 b = id_m(anf);
-        float anf_0 = b[0];
-        float anf_1 = b[1];
-        return vec3(a, anf_0, anf_1);
+        float anf_0 = anf[0];
+        float anf_1 = anf[1];
+        return vec3(1., anf_0, anf_1);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -667,19 +627,12 @@ let%expect_test "where Numeric clause" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 dbl_m(vec3 x) {
-        return (x + x);
-    }
-    float dbl_m_0(float x) {
-        return (x + x);
-    }
     vec3 main_pure(vec2 coord) {
-        float a = dbl_m_0(1.);
         vec3 anf = vec3(1., 2., 3.);
-        vec3 b = dbl_m(anf);
+        vec3 b = (anf + anf);
         float anf_0 = b[0];
         float anf_1 = b[1];
-        return vec3(a, anf_0, anf_1);
+        return vec3(2., anf_0, anf_1);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -701,12 +654,9 @@ let%expect_test "where broadcast" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 add2_m(vec3 a, float b) {
-        return (a + b);
-    }
     vec3 main_pure(vec2 coord) {
         vec3 anf = vec3(1., 2., 3.);
-        vec3 v = add2_m(anf, 0.5);
+        vec3 v = (anf + 0.5);
         return v;
     }
     void main() {
@@ -729,12 +679,9 @@ let%expect_test "where mul broadcast" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 scale_m(float m, vec3 v) {
-        return (m * v);
-    }
     vec3 main_pure(vec2 coord) {
         vec3 anf = vec3(1., 2., 3.);
-        vec3 v_0 = scale_m(2., anf);
+        vec3 v_0 = (2. * anf);
         return v_0;
     }
     void main() {
@@ -759,13 +706,10 @@ let%expect_test "multiple where clauses" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 combine_m(vec3 a, float b, float c) {
-        vec3 anf = (a + b);
-        return (anf + c);
-    }
     vec3 main_pure(vec2 coord) {
         vec3 anf_0 = vec3(1., 2., 3.);
-        vec3 v = combine_m(anf_0, 0.5, 1.);
+        vec3 anf_1 = (anf_0 + 0.5);
+        vec3 v = (anf_1 + 1.);
         return v;
     }
     void main() {
@@ -790,13 +734,10 @@ let%expect_test "parens around individual where clauses" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 combine_m(vec3 a, float b, float c) {
-        vec3 anf = (a + b);
-        return (anf + c);
-    }
     vec3 main_pure(vec2 coord) {
         vec3 anf_0 = vec3(1., 2., 3.);
-        vec3 v = combine_m(anf_0, 0.5, 1.);
+        vec3 anf_1 = (anf_0 + 0.5);
+        vec3 v = (anf_1 + 1.);
         return v;
     }
     void main() {
@@ -820,13 +761,10 @@ let%expect_test "where clause on non-toplevel let" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 combine_m_0(vec3 a, float b, float c) {
-        vec3 anf = (a + b);
-        return (anf + c);
-    }
     vec3 main_pure(vec2 coord) {
         vec3 anf_0 = vec3(1., 2., 3.);
-        return combine_m_0(anf_0, 0.5, 1.);
+        vec3 anf_1 = (anf_0 + 0.5);
+        return (anf_1 + 1.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

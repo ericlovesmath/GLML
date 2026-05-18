@@ -167,9 +167,6 @@ let%expect_test "compile examples" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec2 at(vec2 offset, vec2 p) {
-        return (p - offset);
-    }
     const vec3 bg_col = vec3(0.13, 0.48, 0.3);
     const vec3 bg_dark = vec3(0.09, 0.36, 0.22);
     const vec3 black = vec3(0.06, 0.04, 0.03);
@@ -188,10 +185,6 @@ let%expect_test "compile examples" =
     const vec3 brown = vec3(0.55, 0.34, 0.16);
     const vec3 brown_dk = vec3(0.38, 0.22, 0.08);
     const vec3 brown_lt = vec3(0.68, 0.46, 0.24);
-    float circle(float r, vec2 p_1) {
-        float anf_7 = length(p_1);
-        return (anf_7 - r);
-    }
     const vec3 cream = vec3(0.95, 0.89, 0.74);
     const vec3 cream_dk = vec3(0.78, 0.68, 0.5);
     const vec3 drk_brown = vec3(0.22, 0.11, 0.03);
@@ -199,10 +192,6 @@ let%expect_test "compile examples" =
         vec2 anf_8 = (p_0 / ab);
         float anf_9 = length(anf_8);
         return (anf_9 - 1.);
-    }
-    vec3 paint(float d_0, vec3 shape_col, vec3 bg) {
-        float anf_10 = smoothstep(-0.005, 0.005, d_0);
-        return mix(shape_col, bg, anf_10);
     }
     vec3 paint_shaded(float d_1, vec3 shape_col_0, vec3 shadow_col, float shadow_depth, vec3 bg_0) {
         float anf_11 = smoothstep(-0.005, 0.005, d_1);
@@ -257,7 +246,7 @@ let%expect_test "compile examples" =
         vec2 anf_37 = get_uv_m(coord_0);
         vec2 p_4 = (anf_37 / 1.5);
         vec2 anf_38 = vec2(0.28, -0.28);
-        vec2 anf_39 = at(anf_38, p_4);
+        vec2 anf_39 = (p_4 - anf_38);
         vec2 tp = rot(-0.35, anf_39);
         vec2 anf_40 = vec2(0.22, 0.085);
         float tail = ellipse(anf_40, tp);
@@ -284,112 +273,124 @@ let%expect_test "compile examples" =
         float tail_rim = max(tail, anf_57);
         vec2 anf_58 = vec2(0.25, 0.26);
         vec2 anf_59 = vec2(0., -0.16);
-        vec2 anf_60 = at(anf_59, p_4);
+        vec2 anf_60 = (p_4 - anf_59);
         float body = ellipse(anf_58, anf_60);
         vec2 anf_61 = vec2(0.22, 0.2);
         vec2 anf_62 = vec2(0., 0.2);
-        vec2 anf_63 = at(anf_62, p_4);
+        vec2 anf_63 = (p_4 - anf_62);
         float head = ellipse(anf_61, anf_63);
         float torso = smin(body, head, 0.1);
         vec2 anf_64 = vec2(-0.14, 0.11);
-        vec2 anf_65 = at(anf_64, p_4);
-        float cheek_l = circle(0.1, anf_65);
+        vec2 anf_65 = (p_4 - anf_64);
+        float anf_7_11 = length(anf_65);
+        float cheek_l = (anf_7_11 - 0.1);
         vec2 anf_66 = vec2(0.14, 0.11);
-        vec2 anf_67 = at(anf_66, p_4);
-        float cheek_r = circle(0.1, anf_67);
+        vec2 anf_67 = (p_4 - anf_66);
+        float anf_7_10 = length(anf_67);
+        float cheek_r = (anf_7_10 - 0.1);
         float cheeks = min(cheek_l, cheek_r);
         float torso_with_cheeks = smin(torso, cheeks, 0.06);
         vec2 anf_68 = vec2(0.13, 0.095);
         vec2 anf_69 = vec2(0., 0.09);
-        vec2 anf_70 = at(anf_69, p_4);
+        vec2 anf_70 = (p_4 - anf_69);
         float muzzle = ellipse(anf_68, anf_70);
         vec2 anf_71 = vec2(0.15, 0.17);
         vec2 anf_72 = vec2(0., -0.2);
-        vec2 anf_73 = at(anf_72, p_4);
+        vec2 anf_73 = (p_4 - anf_72);
         float belly = ellipse(anf_71, anf_73);
         vec2 anf_74 = vec2(-0.175, 0.355);
-        vec2 anf_75 = at(anf_74, p_4);
-        float ear_l = circle(0.075, anf_75);
+        vec2 anf_75 = (p_4 - anf_74);
+        float anf_7_9 = length(anf_75);
+        float ear_l = (anf_7_9 - 0.075);
         vec2 anf_76 = vec2(0.175, 0.355);
-        vec2 anf_77 = at(anf_76, p_4);
-        float ear_r = circle(0.075, anf_77);
+        vec2 anf_77 = (p_4 - anf_76);
+        float anf_7_8 = length(anf_77);
+        float ear_r = (anf_7_8 - 0.075);
         vec2 anf_78 = vec2(0.035, 0.042);
         vec2 anf_79 = vec2(-0.175, 0.345);
-        vec2 anf_80 = at(anf_79, p_4);
+        vec2 anf_80 = (p_4 - anf_79);
         float ear_in_l = ellipse(anf_78, anf_80);
         vec2 anf_81 = vec2(0.035, 0.042);
         vec2 anf_82 = vec2(0.175, 0.345);
-        vec2 anf_83 = at(anf_82, p_4);
+        vec2 anf_83 = (p_4 - anf_82);
         float ear_in_r = ellipse(anf_81, anf_83);
         vec2 anf_84 = vec2(0.065, 0.09);
         vec2 anf_85 = vec2(-0.23, -0.09);
-        vec2 anf_86 = at(anf_85, p_4);
+        vec2 anf_86 = (p_4 - anf_85);
         float arm_l = ellipse(anf_84, anf_86);
         vec2 anf_87 = vec2(0.065, 0.09);
         vec2 anf_88 = vec2(0.23, -0.09);
-        vec2 anf_89 = at(anf_88, p_4);
+        vec2 anf_89 = (p_4 - anf_88);
         float arm_r = ellipse(anf_87, anf_89);
         vec2 anf_90 = vec2(-0.28, -0.19);
-        vec2 anf_91 = at(anf_90, p_4);
-        float paw_l = circle(0.055, anf_91);
+        vec2 anf_91 = (p_4 - anf_90);
+        float anf_7_7 = length(anf_91);
+        float paw_l = (anf_7_7 - 0.055);
         vec2 anf_92 = vec2(0.28, -0.19);
-        vec2 anf_93 = at(anf_92, p_4);
-        float paw_r = circle(0.055, anf_93);
+        vec2 anf_93 = (p_4 - anf_92);
+        float anf_7_6 = length(anf_93);
+        float paw_r = (anf_7_6 - 0.055);
         vec2 anf_94 = vec2(0.095, 0.048);
         vec2 anf_95 = vec2(-0.13, -0.42);
-        vec2 anf_96 = at(anf_95, p_4);
+        vec2 anf_96 = (p_4 - anf_95);
         float foot_l = ellipse(anf_94, anf_96);
         vec2 anf_97 = vec2(0.095, 0.048);
         vec2 anf_98 = vec2(0.13, -0.42);
-        vec2 anf_99 = at(anf_98, p_4);
+        vec2 anf_99 = (p_4 - anf_98);
         float foot_r = ellipse(anf_97, anf_99);
         vec2 anf_100 = vec2(0.022, 0.05);
         vec2 anf_101 = vec2(-0.028, 0.035);
-        vec2 anf_102 = at(anf_101, p_4);
+        vec2 anf_102 = (p_4 - anf_101);
         float tooth_l = box(anf_100, anf_102);
         vec2 anf_103 = vec2(0.022, 0.05);
         vec2 anf_104 = vec2(0.028, 0.035);
-        vec2 anf_105 = at(anf_104, p_4);
+        vec2 anf_105 = (p_4 - anf_104);
         float tooth_r = box(anf_103, anf_105);
         float teeth = min(tooth_l, tooth_r);
         vec2 anf_106 = vec2(0.005, 0.05);
         vec2 anf_107 = vec2(0., 0.035);
-        vec2 anf_108 = at(anf_107, p_4);
+        vec2 anf_108 = (p_4 - anf_107);
         float groove = box(anf_106, anf_108);
         vec2 anf_109 = vec2(0.038, 0.028);
         vec2 anf_110 = vec2(0., 0.135);
-        vec2 anf_111 = at(anf_110, p_4);
+        vec2 anf_111 = (p_4 - anf_110);
         float nose = ellipse(anf_109, anf_111);
         vec2 anf_112 = vec2(0.012, 0.008);
         vec2 anf_113 = vec2(-0.012, 0.142);
-        vec2 anf_114 = at(anf_113, p_4);
+        vec2 anf_114 = (p_4 - anf_113);
         float nose_hi = ellipse(anf_112, anf_114);
         vec2 anf_115 = vec2(-0.095, 0.255);
-        vec2 anf_116 = at(anf_115, p_4);
-        float eye_l = circle(0.04, anf_116);
+        vec2 anf_116 = (p_4 - anf_115);
+        float anf_7_5 = length(anf_116);
+        float eye_l = (anf_7_5 - 0.04);
         vec2 anf_117 = vec2(0.095, 0.255);
-        vec2 anf_118 = at(anf_117, p_4);
-        float eye_r = circle(0.04, anf_118);
+        vec2 anf_118 = (p_4 - anf_117);
+        float anf_7_4 = length(anf_118);
+        float eye_r = (anf_7_4 - 0.04);
         vec2 anf_119 = vec2(-0.082, 0.27);
-        vec2 anf_120 = at(anf_119, p_4);
-        float hi_l = circle(0.014, anf_120);
+        vec2 anf_120 = (p_4 - anf_119);
+        float anf_7_3 = length(anf_120);
+        float hi_l = (anf_7_3 - 0.014);
         vec2 anf_121 = vec2(0.108, 0.27);
-        vec2 anf_122 = at(anf_121, p_4);
-        float hi_r = circle(0.014, anf_122);
+        vec2 anf_122 = (p_4 - anf_121);
+        float anf_7_2 = length(anf_122);
+        float hi_r = (anf_7_2 - 0.014);
         vec2 anf_123 = vec2(-0.105, 0.245);
-        vec2 anf_124 = at(anf_123, p_4);
-        float hi_l2 = circle(0.006, anf_124);
+        vec2 anf_124 = (p_4 - anf_123);
+        float anf_7_1 = length(anf_124);
+        float hi_l2 = (anf_7_1 - 0.006);
         vec2 anf_125 = vec2(0.085, 0.245);
-        vec2 anf_126 = at(anf_125, p_4);
-        float hi_r2 = circle(0.006, anf_126);
+        vec2 anf_126 = (p_4 - anf_125);
+        float anf_7_0 = length(anf_126);
+        float hi_r2 = (anf_7_0 - 0.006);
         vec2 anf_127 = vec2(0.035, 0.01);
         vec2 anf_128 = vec2(-0.095, 0.315);
-        vec2 anf_129 = at(anf_128, p_4);
+        vec2 anf_129 = (p_4 - anf_128);
         vec2 anf_130 = rot(0.15, anf_129);
         float brow_l = ellipse(anf_127, anf_130);
         vec2 anf_131 = vec2(0.035, 0.01);
         vec2 anf_132 = vec2(0.095, 0.315);
-        vec2 anf_133 = at(anf_132, p_4);
+        vec2 anf_133 = (p_4 - anf_132);
         vec2 anf_134 = rot(-0.15, anf_133);
         float brow_r = ellipse(anf_131, anf_134);
         float anf_135 = length(p_4);
@@ -397,40 +398,66 @@ let%expect_test "compile examples" =
         vec3 col = mix(bg_col, bg_dark, vig);
         vec2 anf_136 = vec2(0.38, 0.055);
         vec2 anf_137 = vec2(0.02, -0.45);
-        vec2 anf_138 = at(anf_137, p_4);
+        vec2 anf_138 = (p_4 - anf_137);
         float shadow_d = ellipse(anf_136, anf_138);
         float shadow_falloff = smoothstep(0.08, -0.02, shadow_d);
         vec3 anf_139 = vec3(0.06, 0.28, 0.16);
         float anf_140 = (shadow_falloff * 0.55);
         vec3 col_0 = mix(col, anf_139, anf_140);
-        vec3 anf_141 = paint(tail, brown_dk, col_0);
-        vec3 anf_142 = paint(tail_rim, drk_brown, anf_141);
-        vec3 anf_143 = paint(tail_scales, drk_brown, anf_142);
-        vec3 anf_144 = paint(foot_l, drk_brown, anf_143);
-        vec3 anf_145 = paint(foot_r, drk_brown, anf_144);
-        vec3 anf_146 = paint(arm_l, brown_dk, anf_145);
-        vec3 anf_147 = paint(arm_r, brown_dk, anf_146);
+        float anf_10_25 = smoothstep(-0.005, 0.005, tail);
+        vec3 anf_141 = mix(brown_dk, col_0, anf_10_25);
+        float anf_10_24 = smoothstep(-0.005, 0.005, tail_rim);
+        vec3 anf_142 = mix(drk_brown, anf_141, anf_10_24);
+        float anf_10_23 = smoothstep(-0.005, 0.005, tail_scales);
+        vec3 anf_143 = mix(drk_brown, anf_142, anf_10_23);
+        float anf_10_22 = smoothstep(-0.005, 0.005, foot_l);
+        vec3 anf_144 = mix(drk_brown, anf_143, anf_10_22);
+        float anf_10_21 = smoothstep(-0.005, 0.005, foot_r);
+        vec3 anf_145 = mix(drk_brown, anf_144, anf_10_21);
+        float anf_10_20 = smoothstep(-0.005, 0.005, arm_l);
+        vec3 anf_146 = mix(brown_dk, anf_145, anf_10_20);
+        float anf_10_19 = smoothstep(-0.005, 0.005, arm_r);
+        vec3 anf_147 = mix(brown_dk, anf_146, anf_10_19);
         vec3 anf_148 = paint_shaded(torso_with_cheeks, brown, brown_dk, 0.08, anf_147);
         vec3 anf_149 = paint_shaded(belly, cream, cream_dk, 0.05, anf_148);
-        vec3 anf_150 = paint(paw_l, cream, anf_149);
-        vec3 anf_151 = paint(paw_r, cream, anf_150);
-        vec3 anf_152 = paint(ear_l, brown, anf_151);
-        vec3 anf_153 = paint(ear_r, brown, anf_152);
-        vec3 anf_154 = paint(ear_in_l, pink, anf_153);
-        vec3 anf_155 = paint(ear_in_r, pink, anf_154);
-        vec3 anf_156 = paint(muzzle, cream, anf_155);
-        vec3 anf_157 = paint(brow_l, drk_brown, anf_156);
-        vec3 anf_158 = paint(brow_r, drk_brown, anf_157);
-        vec3 anf_159 = paint(teeth, tooth_yel, anf_158);
-        vec3 anf_160 = paint(groove, brown_dk, anf_159);
-        vec3 anf_161 = paint(nose, drk_brown, anf_160);
-        vec3 anf_162 = paint(nose_hi, brown_lt, anf_161);
-        vec3 anf_163 = paint(eye_l, black, anf_162);
-        vec3 anf_164 = paint(eye_r, black, anf_163);
-        vec3 anf_165 = paint(hi_l, wht, anf_164);
-        vec3 anf_166 = paint(hi_r, wht, anf_165);
-        vec3 anf_167 = paint(hi_l2, wht, anf_166);
-        return paint(hi_r2, wht, anf_167);
+        float anf_10_18 = smoothstep(-0.005, 0.005, paw_l);
+        vec3 anf_150 = mix(cream, anf_149, anf_10_18);
+        float anf_10_17 = smoothstep(-0.005, 0.005, paw_r);
+        vec3 anf_151 = mix(cream, anf_150, anf_10_17);
+        float anf_10_16 = smoothstep(-0.005, 0.005, ear_l);
+        vec3 anf_152 = mix(brown, anf_151, anf_10_16);
+        float anf_10_15 = smoothstep(-0.005, 0.005, ear_r);
+        vec3 anf_153 = mix(brown, anf_152, anf_10_15);
+        float anf_10_14 = smoothstep(-0.005, 0.005, ear_in_l);
+        vec3 anf_154 = mix(pink, anf_153, anf_10_14);
+        float anf_10_13 = smoothstep(-0.005, 0.005, ear_in_r);
+        vec3 anf_155 = mix(pink, anf_154, anf_10_13);
+        float anf_10_12 = smoothstep(-0.005, 0.005, muzzle);
+        vec3 anf_156 = mix(cream, anf_155, anf_10_12);
+        float anf_10_11 = smoothstep(-0.005, 0.005, brow_l);
+        vec3 anf_157 = mix(drk_brown, anf_156, anf_10_11);
+        float anf_10_10 = smoothstep(-0.005, 0.005, brow_r);
+        vec3 anf_158 = mix(drk_brown, anf_157, anf_10_10);
+        float anf_10_9 = smoothstep(-0.005, 0.005, teeth);
+        vec3 anf_159 = mix(tooth_yel, anf_158, anf_10_9);
+        float anf_10_8 = smoothstep(-0.005, 0.005, groove);
+        vec3 anf_160 = mix(brown_dk, anf_159, anf_10_8);
+        float anf_10_7 = smoothstep(-0.005, 0.005, nose);
+        vec3 anf_161 = mix(drk_brown, anf_160, anf_10_7);
+        float anf_10_6 = smoothstep(-0.005, 0.005, nose_hi);
+        vec3 anf_162 = mix(brown_lt, anf_161, anf_10_6);
+        float anf_10_5 = smoothstep(-0.005, 0.005, eye_l);
+        vec3 anf_163 = mix(black, anf_162, anf_10_5);
+        float anf_10_4 = smoothstep(-0.005, 0.005, eye_r);
+        vec3 anf_164 = mix(black, anf_163, anf_10_4);
+        float anf_10_3 = smoothstep(-0.005, 0.005, hi_l);
+        vec3 anf_165 = mix(wht, anf_164, anf_10_3);
+        float anf_10_2 = smoothstep(-0.005, 0.005, hi_r);
+        vec3 anf_166 = mix(wht, anf_165, anf_10_2);
+        float anf_10_1 = smoothstep(-0.005, 0.005, hi_l2);
+        vec3 anf_167 = mix(wht, anf_166, anf_10_1);
+        float anf_10_0 = smoothstep(-0.005, 0.005, hi_r2);
+        return mix(wht, anf_167, anf_10_0);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -534,10 +561,6 @@ let%expect_test "compile examples" =
         option _tmp;
         return _tmp;
     }
-    option mandelbrot_m(vec2 c) {
-        vec2 anf_18 = vec2(0., 0.);
-        return mandel_0(c, anf_18, 0);
-    }
     uniform vec2 u_resolution;
     uniform float u_time;
     vec3 main_pure(vec2 coord) {
@@ -555,7 +578,8 @@ let%expect_test "compile examples" =
         vec2 anf_26 = vec2(-0.7453, 0.1127);
         vec2 anf_27 = (uv / zoom);
         vec2 seahorse_valley = (anf_26 + anf_27);
-        option anf_28 = mandelbrot_m(seahorse_valley);
+        vec2 anf_18_0 = vec2(0., 0.);
+        option anf_28 = mandel_0(seahorse_valley, anf_18_0, 0);
         int _lv_tag = anf_28.tag;
         switch (_lv_tag) {
             case 1: {
@@ -748,27 +772,24 @@ let%expect_test "compile examples" =
         float anf_69 = (len - radius);
         return (anf_69 - terrain);
     }
-    float map(vec3 p_4) {
-        return sdPlanet(p_4, 1.5);
-    }
     vec3 getNormal(vec3 p_5) {
         vec3 e_x = vec3(0.002, 0., 0.);
         vec3 e_y = vec3(0., 0.002, 0.);
         vec3 e_z = vec3(0., 0., 0.002);
         vec3 anf_70 = (p_5 + e_x);
-        float anf_71 = map(anf_70);
+        float anf_71 = sdPlanet(anf_70, 1.5);
         vec3 anf_72 = (p_5 - e_x);
-        float anf_73 = map(anf_72);
+        float anf_73 = sdPlanet(anf_72, 1.5);
         float dx = (anf_71 - anf_73);
         vec3 anf_74 = (p_5 + e_y);
-        float anf_75 = map(anf_74);
+        float anf_75 = sdPlanet(anf_74, 1.5);
         vec3 anf_76 = (p_5 - e_y);
-        float anf_77 = map(anf_76);
+        float anf_77 = sdPlanet(anf_76, 1.5);
         float dy = (anf_75 - anf_77);
         vec3 anf_78 = (p_5 + e_z);
-        float anf_79 = map(anf_78);
+        float anf_79 = sdPlanet(anf_78, 1.5);
         vec3 anf_80 = (p_5 - e_z);
-        float anf_81 = map(anf_80);
+        float anf_81 = sdPlanet(anf_80, 1.5);
         float dz = (anf_79 - anf_81);
         vec3 anf_82 = vec3(dx, dy, dz);
         return normalize(anf_82);
@@ -782,7 +803,7 @@ let%expect_test "compile examples" =
             } else {
                 vec3 anf_84 = (rd * t);
                 vec3 anf_85 = (ro + anf_84);
-                float d_1 = map(anf_85);
+                float d_1 = sdPlanet(anf_85, 1.5);
                 bool anf_86 = (d_1 < 0.0005);
                 if (anf_86) {
                     return option(0, t);
@@ -808,9 +829,6 @@ let%expect_test "compile examples" =
         option _tmp;
         return _tmp;
     }
-    option march(vec3 ro, vec3 rd) {
-        return march_0_0(rd, ro, 0., 0);
-    }
     const vec3 snowColor = vec3(0.85, 0.85, 0.9);
     uniform vec2 u_mouse;
     uniform vec2 u_resolution;
@@ -831,7 +849,7 @@ let%expect_test "compile examples" =
         vec3 anf_100 = vec3(anf_98, anf_99, 1.5);
         vec3 anf_101 = normalize(anf_100);
         vec3 rd_0 = rotate_by_mouse_m_0(mouseUV, anf_101);
-        option t_0 = march(ro_0, rd_0);
+        option t_0 = march_0_0(rd_0, ro_0, 0., 0);
         int _lv_tag = t_0.tag;
         switch (_lv_tag) {
             case 1: {
@@ -1047,9 +1065,6 @@ let%expect_test "compile examples" =
         option _tmp;
         return _tmp;
     }
-    option march(vec3 ro, vec3 rd) {
-        return march_0_0(rd, ro, 0., 0);
-    }
     vec3 main_pure(vec2 coord) {
         float anf_53 = u_resolution[0];
         float anf_54 = u_resolution[1];
@@ -1101,7 +1116,7 @@ let%expect_test "compile examples" =
         float anf_86 = rd_0[1];
         float anf_87 = rd_xz[1];
         vec3 rd_1 = vec3(anf_85, anf_86, anf_87);
-        option anf_88 = march(ro_1, rd_1);
+        option anf_88 = march_0_0(rd_1, ro_1, 0., 0);
         int _lv_tag = anf_88.tag;
         vec3 col;
         switch (_lv_tag) {

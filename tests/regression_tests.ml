@@ -202,12 +202,9 @@ let%expect_test "regression - polymorphic struct type in function" =
     struct box {
         float value;
     };
-    float f_m(box b) {
-        return b.value;
-    }
     vec3 main_pure(vec2 coord) {
         box anf = box(1.);
-        float anf_0 = f_m(anf);
+        float anf_0 = anf.value;
         return vec3(anf_0, 0., 0.);
     }
     void main() {
@@ -235,17 +232,11 @@ let%expect_test "regression - polymorphic struct type in function" =
     struct box_0 {
         float value;
     };
-    bool f_m(box b) {
-        return b.value;
-    }
-    float f_m_0(box_0 b) {
-        return b.value;
-    }
     vec3 main_pure(vec2 coord) {
         box_0 anf = box_0(1.);
-        float a = f_m_0(anf);
+        float a = anf.value;
         box anf_0 = box(true);
-        bool anf_1 = f_m(anf_0);
+        bool anf_1 = anf_0.value;
         int b_0;
         if (anf_1) {
             b_0 = 1;
@@ -358,14 +349,10 @@ let%expect_test "field access in let binding (unannotated)" =
     struct box {
         float value;
     };
-    float f_m(box b) {
-        float a = b.value;
-        return a;
-    }
     vec3 main_pure(vec2 coord) {
         box anf = box(1.);
-        float anf_0 = f_m(anf);
-        return vec3(anf_0, 0., 0.);
+        float a_0 = anf.value;
+        return vec3(a_0, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -393,27 +380,19 @@ let%expect_test "field access in let binding (unannotated)" =
     struct box_0 {
         float value;
     };
-    bool f_m(box b) {
-        bool a = b.value;
-        return a;
-    }
-    float f_m_0(box_0 b) {
-        float a = b.value;
-        return a;
-    }
     vec3 main_pure(vec2 coord) {
         box_0 anf = box_0(1.);
-        float x = f_m_0(anf);
+        float a_1 = anf.value;
         box anf_0 = box(true);
-        bool anf_1 = f_m(anf_0);
+        bool a_0 = anf_0.value;
         int y;
-        if (anf_1) {
+        if (a_0) {
             y = 1;
         } else {
             y = 2;
         }
         float anf_2 = float(y);
-        return vec3(x, anf_2, 0.);
+        return vec3(a_1, anf_2, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -435,13 +414,10 @@ let%expect_test "field access in let binding (unannotated)" =
     struct box {
         float value;
     };
-    float scale_m(box b) {
-        float x = b.value;
-        return (x * 2.);
-    }
     vec3 main_pure(vec2 coord) {
         box anf = box(1.);
-        float anf_0 = scale_m(anf);
+        float x_0 = anf.value;
+        float anf_0 = (x_0 * 2.);
         return vec3(anf_0, 0., 0.);
     }
     void main() {
@@ -460,13 +436,9 @@ let%expect_test "field access in let binding (unannotated)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float get_x_m(vec2 v) {
-        float x = v[0];
-        return x;
-    }
     vec3 main_pure(vec2 coord) {
-        float anf = get_x_m(coord);
-        return vec3(anf, 0., 0.);
+        float x_0 = coord[0];
+        return vec3(x_0, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -596,12 +568,8 @@ let%expect_test "return type annotation for function-returning functions" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float add(float x, float y) {
-        return (x + y);
-    }
     vec3 main_pure(vec2 coord) {
-        float r = add(1., 2.);
-        return vec3(r, r, r);
+        return vec3(3., 3., 3.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -633,12 +601,9 @@ let%expect_test "regression - defunctionalization closure globals use correct da
         int tag;
         float lctor_0;
     };
-    float adder(float x, float y) {
-        return (x + y);
-    }
     float dapply(DFn dfn, float da) {
         float _lv_lctor_0 = dfn.lctor_0;
-        return adder(_lv_lctor_0, da);
+        return (_lv_lctor_0 + da);
     }
     const DFn scene = DFn(0, 0.5);
     vec3 main_pure(vec2 coord) {
@@ -696,12 +661,9 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
         int lctor_0;
     };
     const DFn inc_m = DFn(0, 1);
-    int lam(int x, int y) {
-        return (x + y);
-    }
     int dapply(DFn dfn, int da) {
         int _lv_lctor_0 = dfn.lctor_0;
-        return lam(_lv_lctor_0, da);
+        return (_lv_lctor_0 + da);
     }
     vec3 main_pure(vec2 uv) {
         int anf = dapply(inc_m, 1);
@@ -732,13 +694,10 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
         int lctor_0;
     };
     const DFn inc_m = DFn(0, 1);
-    float lam(int x, float y) {
-        float anf = float(x);
-        return (anf + y);
-    }
     float dapply(DFn dfn, float da) {
         int _lv_lctor_0 = dfn.lctor_0;
-        return lam(_lv_lctor_0, da);
+        float anf_1 = float(_lv_lctor_0);
+        return (anf_1 + da);
     }
     vec3 main_pure(vec2 uv) {
         float anf_0 = dapply(inc_m, 1.);
@@ -772,24 +731,18 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
         float lctor_0_0;
     };
     const DFn add_one_m = DFn(0, 1, 0.);
-    float lam(int k, float x) {
-        float anf = float(k);
-        return (x + anf);
-    }
-    float lam_0(float s, float x_0) {
-        return (x_0 * s);
-    }
     float dapply(DFn dfn, float da) {
         int _lv_tag = dfn.tag;
         switch (_lv_tag) {
             case 0: {
                 int _lv_lctor_0 = dfn.lctor_0;
-                return lam(_lv_lctor_0, da);
+                float anf_2 = float(_lv_lctor_0);
+                return (da + anf_2);
                 break;
             }
             default: {
                 float _lv_lctor_0_0 = dfn.lctor_0_0;
-                return lam_0(_lv_lctor_0_0, da);
+                return (da * _lv_lctor_0_0);
                 break;
             }
         }
@@ -862,13 +815,10 @@ let%expect_test "regression - partial application stored as top level value" =
         int tag;
         float lctor_0;
     };
-    float add(float x, float y) {
-        return (x + y);
-    }
     const DFn add5 = DFn(0, 5.);
     float dapply(DFn dfn, float da) {
         float _lv_lctor_0 = dfn.lctor_0;
-        return add(_lv_lctor_0, da);
+        return (_lv_lctor_0 + da);
     }
     vec3 main_pure(vec2 coord) {
         float r = dapply(add5, 3.);
@@ -901,15 +851,9 @@ let%expect_test "regression - int promotion through closures / partial applicati
         int tag;
         float lctor_0;
     };
-    float add(float x, float y) {
-        return (x + y);
-    }
-    float addn(float n, float x_0) {
-        return add(n, x_0);
-    }
     float dapply(DFn dfn, float da) {
         float _lv_lctor_0 = dfn.lctor_0;
-        return addn(_lv_lctor_0, da);
+        return (_lv_lctor_0 + da);
     }
     vec3 main_pure(vec2 coord) {
         DFn f = DFn(0, 0.);
@@ -935,15 +879,8 @@ let%expect_test "regression - int promotion through closures / partial applicati
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    float add(float x, float y) {
-        return (x + y);
-    }
-    float addn(float n, float x_0) {
-        return add(n, x_0);
-    }
     vec3 main_pure(vec2 coord) {
-        float r = addn(0., 1.);
-        return vec3(r, 0., 0.);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -970,15 +907,9 @@ let%expect_test "regression - int promotion through closures / partial applicati
         int tag;
         float lctor_0;
     };
-    float add(float x, float y) {
-        return (x + y);
-    }
-    float addn(float n, float x_0) {
-        return add(n, x_0);
-    }
     float dapply(DFn dfn, float da) {
         float _lv_lctor_0 = dfn.lctor_0;
-        return addn(_lv_lctor_0, da);
+        return (_lv_lctor_0 + da);
     }
     vec3 main_pure(vec2 coord) {
         float anf = float(5);
@@ -1017,18 +948,8 @@ let%expect_test "regression - inferred type in higher-order local function" =
     struct DFn {
         int tag;
     };
-    int lam(int t_0) {
-        return (t_0 + 1);
-    }
-    int dapply(DFn dfn, int da) {
-        return lam(da);
-    }
-    int app_t_0(int t, DFn f) {
-        return dapply(f, t);
-    }
     vec2 func_m(int t) {
-        DFn anf = DFn(0);
-        int x = app_t_0(t, anf);
+        int x = (t + 1);
         float anf_0 = float(x);
         float anf_1 = float(x);
         return vec2(anf_0, anf_1);
@@ -1060,18 +981,8 @@ let%expect_test "regression - inferred type in higher-order local function" =
     struct DFn {
         int tag;
     };
-    float lam(float t_0) {
-        return (t_0 + 1.);
-    }
-    float dapply(DFn dfn, float da) {
-        return lam(da);
-    }
-    float app_t_0(float t, DFn f) {
-        return dapply(f, t);
-    }
     vec3 func_m(float t) {
-        DFn anf = DFn(0);
-        float x = app_t_0(t, anf);
+        float x = (t + 1.);
         return vec3(x, x, x);
     }
     vec3 main_pure(vec2 uv) {
@@ -1107,22 +1018,16 @@ let%expect_test "closures in records / structs" =
         int tag;
         float lctor_0;
     };
-    float add_m(float x, float y) {
-        return (x + y);
-    }
     float dapply(DFn dfn, float da) {
         float _lv_lctor_0 = dfn.lctor_0;
-        return add_m(_lv_lctor_0, da);
+        return (_lv_lctor_0 + da);
     }
     struct fn_box {
         DFn fn;
     };
-    fn_box box_add_n(float x_0) {
-        DFn anf = DFn(0, x_0);
-        return fn_box(anf);
-    }
     vec3 main_pure(vec2 pos) {
-        fn_box boxed_add_five = box_add_n(5.);
+        DFn anf_1 = DFn(0, 5.);
+        fn_box boxed_add_five = fn_box(anf_1);
         DFn anf_0 = boxed_add_five.fn;
         float n = dapply(anf_0, 10.);
         return vec3(n, 0., 0.);
@@ -1157,16 +1062,13 @@ let%expect_test "function in variant, match-bound var used with int arg" =
         int tag;
         float lctor_0;
     };
-    float add_m(float x, float y) {
-        return (x + y);
-    }
     struct cb {
         int tag;
         DFn CB_0;
     };
     float dapply(DFn dfn, float da) {
         float _lv_lctor_0 = dfn.lctor_0;
-        return add_m(_lv_lctor_0, da);
+        return (_lv_lctor_0 + da);
     }
     vec3 main_pure(vec2 pos) {
         DFn anf = DFn(0, 1.);
@@ -1202,14 +1104,10 @@ let%expect_test "struct pattern matching on non-concrete types" =
     struct box {
         float value;
     };
-    float unbox_m(box _fn_arg) {
-        float _lv_r_value = _fn_arg.value;
-        return _lv_r_value;
-    }
     vec3 main_pure(vec2 uv) {
         box anf = box(1.5);
-        float n = unbox_m(anf);
-        return vec3(n, 0., 0.);
+        float _lv_r_value_0 = anf.value;
+        return vec3(_lv_r_value_0, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1338,35 +1236,26 @@ let%expect_test "defunctionalize unifies int/float arrow flavors" =
     struct DFn {
         int tag;
     };
-    vec3 lam(vec3 p_0) {
-        return vec3(0., 0., 0.);
-    }
-    vec3 lam_0(vec3 p_1) {
-        return p_1;
-    }
     vec3 dapply(DFn dfn, vec3 da) {
         int _lv_tag = dfn.tag;
         switch (_lv_tag) {
             case 0: {
-                return lam(da);
+                return vec3(0., 0., 0.);
                 break;
             }
             default: {
-                return lam_0(da);
+                return da;
                 break;
             }
         }
     }
-    vec3 pick(DFn f, vec3 p) {
-        return dapply(f, p);
-    }
     vec3 main_pure(vec2 uv) {
         DFn anf = DFn(0);
         vec3 anf_0 = vec3(1., 0., 0.);
-        vec3 a = pick(anf, anf_0);
+        vec3 a = dapply(anf, anf_0);
         DFn anf_1 = DFn(1);
         vec3 anf_2 = vec3(0., 1., 0.);
-        vec3 b = pick(anf_1, anf_2);
+        vec3 b = dapply(anf_1, anf_2);
         return (a + b);
     }
     void main() {
@@ -1391,36 +1280,28 @@ let%expect_test "defunctionalize unifies int/float arrow flavors" =
     struct DFn {
         int tag;
     };
-    vec3 lam(vec3 p_0) {
-        return vec3(0., 0., 0.);
-    }
-    vec3 lam_0(vec3 p) {
-        return p;
-    }
     vec3 dapply(DFn dfn, vec3 da) {
         int _lv_tag = dfn.tag;
         switch (_lv_tag) {
             case 0: {
-                return lam(da);
+                return vec3(0., 0., 0.);
                 break;
             }
             default: {
-                return lam_0(da);
+                return da;
                 break;
             }
-        }
-    }
-    DFn make(bool b) {
-        if (b) {
-            return DFn(0);
-        } else {
-            return DFn(1);
         }
     }
     vec3 main_pure(vec2 uv) {
         float anf = uv[0];
         bool anf_0 = (anf > 0.5);
-        DFn f = make(anf_0);
+        DFn f;
+        if (anf_0) {
+            f = DFn(0);
+        } else {
+            f = DFn(1);
+        }
         vec3 anf_1 = vec3(1., 0., 0.);
         return dapply(f, anf_1);
     }
@@ -1505,12 +1386,8 @@ let%expect_test "HOF that applies param but is never called drops wrapper" =
         int tag;
         DFn lctor_0;
     };
-    vec3 test(DFn f, vec3 p) {
-        return vec3(0., 0., 0.);
-    }
     vec3 dapply_0(DFn_0 dfn_0, vec3 da_0) {
-        DFn _lv_lctor_0 = dfn_0.lctor_0;
-        return test(_lv_lctor_0, da_0);
+        return vec3(0., 0., 0.);
     }
     vec3 main_pure(vec2 uv) {
         DFn anf = DFn(0);
@@ -1578,18 +1455,8 @@ let%expect_test "DFn promotion when partial-app result flows to HOF param" =
         int tag;
         DFn lctor_0;
     };
-    vec3 eval_material(DFn_0 mat) {
-        return vec3(0., 0., 0.);
-    }
-    DFn_0 scene_mat(vec3 p_0) {
-        DFn anf = DFn(0);
-        DFn_0 noisy_waves = DFn_0(0, anf);
-        return noisy_waves;
-    }
     vec3 main_pure(vec2 coord) {
-        vec3 ro = vec3(0., 0., 0.);
-        DFn_0 mat_0 = scene_mat(ro);
-        vec3 col = eval_material(mat_0);
+        vec3 col = vec3(0., 0., 0.);
         return col;
     }
     void main() {
@@ -1625,13 +1492,8 @@ let%expect_test "DFn promotion when consume is declared before producer" =
         int tag;
         DFn lctor_0;
     };
-    vec3 consume(DFn_0 m) {
-        return vec3(0., 0., 0.);
-    }
     vec3 main_pure(vec2 coord) {
-        DFn anf = DFn(0);
-        DFn_0 nw = DFn_0(0, anf);
-        return consume(nw);
+        return vec3(0., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

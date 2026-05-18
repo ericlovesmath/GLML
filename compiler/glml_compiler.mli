@@ -17,6 +17,7 @@ module Passes : sig
     | Tail_call
     | Lower_variants
     | Remove_placeholder
+    | Inline
     | Const_fold
     | Dce
     | Lift_consts

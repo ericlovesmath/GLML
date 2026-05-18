@@ -32,6 +32,7 @@
    tail_call
    lower_variants
    remove_placeholder
+   inline
    const_fold
    dce
    lift_consts

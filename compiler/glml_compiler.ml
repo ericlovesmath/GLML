@@ -18,6 +18,7 @@ module Passes = struct
       | Tail_call
       | Lower_variants
       | Remove_placeholder
+      | Inline
       | Const_fold
       | Dce
       | Lift_consts
@@ -70,6 +71,8 @@ let compile
     if not optimize
     then t
     else (
+      let t = Inline.inline t in
+      trace Inline (Remove_placeholder.sexp_of_t t);
       let t = Const_fold.rewrite t in
       trace Const_fold (Remove_placeholder.sexp_of_t t);
       let t = Dce.rewrite t in
