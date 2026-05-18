@@ -18,6 +18,7 @@ module Passes : sig
     | Lower_variants
     | Remove_placeholder
     | Const_fold
+    | Dce
     | Lift_consts
     | Translate
     | Patch_main

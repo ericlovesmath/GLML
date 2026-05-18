@@ -9,7 +9,6 @@ let%expect_test "int promotion edge cases" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        int x = 5;
         float anf = float(5);
         float y = (anf + 3.);
         return vec3(y, y, y);
@@ -27,7 +26,6 @@ let%expect_test "int promotion edge cases" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        int n = 2;
         float anf = float(2);
         return vec3(anf, 0., 0.);
     }
@@ -110,7 +108,6 @@ let%expect_test "int promotion edge cases" =
         float y;
     };
     vec3 main_pure(vec2 u) {
-        int a = 3;
         float anf = float(3);
         point p = point(anf, 0.);
         float anf_0 = p.x;
@@ -174,7 +171,6 @@ let%expect_test "int promotion edge cases" =
         switch (_lv_tag) {
             case 0: {
                 float _lv_Gray_0 = anf.Gray_0;
-                float v = _lv_Gray_0;
                 return vec3(_lv_Gray_0, _lv_Gray_0, _lv_Gray_0);
                 break;
             }
@@ -290,7 +286,6 @@ let%expect_test "regression - polymorphic variant type in function" =
         int _lv_tag = o.tag;
         switch (_lv_tag) {
             case 0: {
-                float _lv_Some_0 = o.Some_0;
                 return true;
                 break;
             }
@@ -548,8 +543,6 @@ let%expect_test "regression - no recursive DFn structs from partial application"
         DFn lctor_0;
     };
     vec3 main_pure(vec2 coord) {
-        DFn anf = DFn(0);
-        DFn_0 a = DFn_0(0, anf);
         return vec3(0., 0., 0.);
     }
     void main() {
@@ -645,7 +638,6 @@ let%expect_test "regression - defunctionalization closure globals use correct da
     }
     float dapply(DFn dfn, float da) {
         float _lv_lctor_0 = dfn.lctor_0;
-        float ca = _lv_lctor_0;
         return adder(_lv_lctor_0, da);
     }
     const DFn scene = DFn(0, 0.5);
@@ -673,7 +665,6 @@ let%expect_test "toplevel vectors of ints are treated as consts with builtin #fl
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    const int a = 10;
     const vec3 x = vec3(float(10), float(10), float(10));
     vec3 main_pure(vec2 coord) {
         return x;
@@ -710,7 +701,6 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
     }
     int dapply(DFn dfn, int da) {
         int _lv_lctor_0 = dfn.lctor_0;
-        int ca = _lv_lctor_0;
         return lam(_lv_lctor_0, da);
     }
     vec3 main_pure(vec2 uv) {
@@ -748,7 +738,6 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
     }
     float dapply(DFn dfn, float da) {
         int _lv_lctor_0 = dfn.lctor_0;
-        int ca = _lv_lctor_0;
         return lam(_lv_lctor_0, da);
     }
     vec3 main_pure(vec2 uv) {
@@ -795,13 +784,11 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
         switch (_lv_tag) {
             case 0: {
                 int _lv_lctor_0 = dfn.lctor_0;
-                int ca = _lv_lctor_0;
                 return lam(_lv_lctor_0, da);
                 break;
             }
             default: {
                 float _lv_lctor_0_0 = dfn.lctor_0_0;
-                float ca_0 = _lv_lctor_0_0;
                 return lam_0(_lv_lctor_0_0, da);
                 break;
             }
@@ -845,7 +832,6 @@ let%expect_test "regression - partial application stored as top level value" =
     }
     vec3 dapply(DFn dfn, int da) {
         vec3 _lv_lctor_0 = dfn.lctor_0;
-        vec3 ca = _lv_lctor_0;
         return palette_m(_lv_lctor_0, da);
     }
     const DFn warm_m = DFn(0, vec3(0.5, 0.3, 0.1));
@@ -882,7 +868,6 @@ let%expect_test "regression - partial application stored as top level value" =
     const DFn add5 = DFn(0, 5.);
     float dapply(DFn dfn, float da) {
         float _lv_lctor_0 = dfn.lctor_0;
-        float ca = _lv_lctor_0;
         return add(_lv_lctor_0, da);
     }
     vec3 main_pure(vec2 coord) {
@@ -924,7 +909,6 @@ let%expect_test "regression - int promotion through closures / partial applicati
     }
     float dapply(DFn dfn, float da) {
         float _lv_lctor_0 = dfn.lctor_0;
-        float ca = _lv_lctor_0;
         return addn(_lv_lctor_0, da);
     }
     vec3 main_pure(vec2 coord) {
@@ -994,11 +978,9 @@ let%expect_test "regression - int promotion through closures / partial applicati
     }
     float dapply(DFn dfn, float da) {
         float _lv_lctor_0 = dfn.lctor_0;
-        float ca = _lv_lctor_0;
         return addn(_lv_lctor_0, da);
     }
     vec3 main_pure(vec2 coord) {
-        int n_0 = 5;
         float anf = float(5);
         DFn f = DFn(0, anf);
         float r = dapply(f, 1.);
@@ -1025,7 +1007,7 @@ let%expect_test "regression - inferred type in higher-order local function" =
       [x, x]
     let main (uv : vec2) =
       let result = func 0 in
-      [0, 0, 0]
+      [result.0, 0, 0]
     |};
   [%expect
     {|
@@ -1053,7 +1035,8 @@ let%expect_test "regression - inferred type in higher-order local function" =
     }
     vec3 main_pure(vec2 uv) {
         vec2 result = func_m(0);
-        return vec3(0., 0., 0.);
+        float anf_2 = result[0];
+        return vec3(anf_2, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1129,7 +1112,6 @@ let%expect_test "closures in records / structs" =
     }
     float dapply(DFn dfn, float da) {
         float _lv_lctor_0 = dfn.lctor_0;
-        float ca = _lv_lctor_0;
         return add_m(_lv_lctor_0, da);
     }
     struct fn_box {
@@ -1184,14 +1166,12 @@ let%expect_test "function in variant, match-bound var used with int arg" =
     };
     float dapply(DFn dfn, float da) {
         float _lv_lctor_0 = dfn.lctor_0;
-        float ca = _lv_lctor_0;
         return add_m(_lv_lctor_0, da);
     }
     vec3 main_pure(vec2 pos) {
         DFn anf = DFn(0, 1.);
         cb f = cb(0, anf);
         DFn _lv_CB_0 = f.CB_0;
-        DFn g = _lv_CB_0;
         float result = dapply(_lv_CB_0, 10.);
         return vec3(result, 0., 0.);
     }
@@ -1224,7 +1204,6 @@ let%expect_test "struct pattern matching on non-concrete types" =
     };
     float unbox_m(box _fn_arg) {
         float _lv_r_value = _fn_arg.value;
-        float v = _lv_r_value;
         return _lv_r_value;
     }
     vec3 main_pure(vec2 uv) {
@@ -1261,35 +1240,7 @@ let%expect_test "regression - vec broadcast against polymorphic param with int-t
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    int go_0(vec2 c, vec2 z, int i) {
-        int _iter = 0;
-        while ((_iter < 1000)) {
-            bool anf = (i > 10);
-            if (anf) {
-                return i;
-            } else {
-                float anf_0 = z[0];
-                float anf_1 = z[1];
-                float zy = (anf_0 * anf_1);
-                vec2 anf_2 = vec2(zy, zy);
-                vec2 z_prime = (anf_2 + c);
-                int anf_3 = (i + 1);
-                c = c;
-                z = z_prime;
-                i = anf_3;
-                int _iter_inc = (_iter + 1);
-                _iter = _iter_inc;
-                continue;
-            }
-        }
-        return 0;
-    }
-    int mandelbrot_m(vec2 c) {
-        vec2 anf_4 = vec2(0., 0.);
-        return go_0(c, anf_4, 0);
-    }
     vec3 main_pure(vec2 uv) {
-        int a = mandelbrot_m(uv);
         return vec3(0., 0., 0.);
     }
     void main() {
@@ -1498,7 +1449,6 @@ let%expect_test "promote ints through variant constructor coerce" =
         float Some_0;
     };
     vec3 main_pure(vec2 uv) {
-        option x = option(0, 5.);
         return vec3(0., 0., 0.);
     }
     void main() {
@@ -1555,19 +1505,11 @@ let%expect_test "HOF that applies param but is never called drops wrapper" =
         int tag;
         DFn lctor_0;
     };
-    vec3 lam(vec3 a) {
-        return a;
-    }
-    vec3 dapply(DFn dfn, vec3 da) {
-        return lam(da);
-    }
     vec3 test(DFn f, vec3 p) {
-        vec3 n = dapply(f, p);
         return vec3(0., 0., 0.);
     }
     vec3 dapply_0(DFn_0 dfn_0, vec3 da_0) {
         DFn _lv_lctor_0 = dfn_0.lctor_0;
-        DFn ca = _lv_lctor_0;
         return test(_lv_lctor_0, da_0);
     }
     vec3 main_pure(vec2 uv) {

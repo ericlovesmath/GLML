@@ -9,7 +9,6 @@ let%expect_test "int broadcasting with vecs and builtins" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        int n = 2;
         float anf = float(2);
         vec3 anf_0 = vec3(0.5, 0.5, 0.5);
         return (anf * anf_0);
@@ -48,7 +47,6 @@ let%expect_test "int broadcasting with vecs and builtins" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        int n = 2;
         float anf = float(2);
         vec3 anf_0 = vec3(0.1, 0.2, 0.3);
         return (anf + anf_0);
@@ -321,7 +319,6 @@ let%expect_test "parametrized variants" =
         switch (_lv_tag) {
             case 0: {
                 int _lv_Some_0 = opt.Some_0;
-                int x = _lv_Some_0;
                 return _lv_Some_0;
                 break;
             }
@@ -377,12 +374,10 @@ let%expect_test "parametrized variants" =
         switch (_lv_tag) {
             case 0: {
                 float _lv_Ok_0 = r.Ok_0;
-                float x = _lv_Ok_0;
                 return _lv_Ok_0;
                 break;
             }
             default: {
-                int _lv_Err_0 = r.Err_0;
                 return default_0;
                 break;
             }
@@ -417,9 +412,9 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
       | None -> default
 
     let main (coord : vec2) =
-      let x = unwrap (Some true) false in
+      let x = unwrap (Some 1.0) 2.0 in
       let y = unwrap (Some 5) 5 in
-      [ 0, 0, 0 ]
+      [ y, x, 0 ]
     |};
   [%expect
     {|
@@ -432,14 +427,13 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
     };
     struct option_0 {
         int tag;
-        bool Some_0;
+        float Some_0;
     };
     int unwrap_m(option opt, int default_0) {
         int _lv_tag = opt.tag;
         switch (_lv_tag) {
             case 0: {
                 int _lv_Some_0 = opt.Some_0;
-                int x = _lv_Some_0;
                 return _lv_Some_0;
                 break;
             }
@@ -449,12 +443,11 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
             }
         }
     }
-    bool unwrap_m_0(option_0 opt, bool default_0) {
+    float unwrap_m_0(option_0 opt, float default_0) {
         int _lv_tag_0 = opt.tag;
         switch (_lv_tag_0) {
             case 0: {
-                bool _lv_Some_0_0 = opt.Some_0;
-                bool x = _lv_Some_0_0;
+                float _lv_Some_0_0 = opt.Some_0;
                 return _lv_Some_0_0;
                 break;
             }
@@ -465,11 +458,12 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
         }
     }
     vec3 main_pure(vec2 coord) {
-        option_0 anf = option_0(0, true);
-        bool x_0 = unwrap_m_0(anf, false);
+        option_0 anf = option_0(0, 1.);
+        float x_0 = unwrap_m_0(anf, 2.);
         option anf_0 = option(0, 5);
         int y = unwrap_m(anf_0, 5);
-        return vec3(0., 0., 0.);
+        float anf_1 = float(y);
+        return vec3(anf_1, x_0, 0.);
     }
     uniform vec2 u_resolution;
     uniform float u_time;

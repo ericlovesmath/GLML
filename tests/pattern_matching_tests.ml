@@ -345,7 +345,6 @@ let%expect_test "variants and matching" =
         switch (_lv_tag) {
             case 0: {
                 float _lv_Circle_0 = s.Circle_0;
-                float r = _lv_Circle_0;
                 float anf = (3.14159 * _lv_Circle_0);
                 return (anf * _lv_Circle_0);
                 break;
@@ -353,8 +352,6 @@ let%expect_test "variants and matching" =
             case 1: {
                 float _lv_Rect_0 = s.Rect_0;
                 float _lv_Rect_1 = s.Rect_1;
-                float h = _lv_Rect_1;
-                float w = _lv_Rect_0;
                 return (_lv_Rect_0 * _lv_Rect_1);
                 break;
             }
@@ -411,7 +408,6 @@ let%expect_test "variant match in let binding" =
         switch (_lv_tag) {
             case 0: {
                 float _lv_Some_0 = x.Some_0;
-                float f = _lv_Some_0;
                 v = _lv_Some_0;
                 break;
             }
@@ -493,8 +489,6 @@ let%expect_test "struct pattern matching" =
         point anf = point(1., 2.);
         float _lv_r_x = anf.x;
         float _lv_r_y = anf.y;
-        float b = _lv_r_y;
-        float a = _lv_r_x;
         return vec3(_lv_r_x, _lv_r_y, 0.);
     }
     void main() {
@@ -525,9 +519,6 @@ let%expect_test "struct pattern matching" =
     vec3 main_pure(vec2 uv) {
         rgb c = rgb(1., 0.5, 0.);
         float _lv_r_r = c.r;
-        float _lv_r_g = c.g;
-        float _lv_r_b = c.b;
-        float red = _lv_r_r;
         return vec3(_lv_r_r, 0., 0.);
     }
     void main() {
@@ -555,7 +546,6 @@ let%expect_test "struct pattern matching" =
     vec3 main_pure(vec2 uv) {
         box b = box(1.5);
         float _lv_r_value = b.value;
-        float v = _lv_r_value;
         return vec3(_lv_r_value, 0., 0.);
     }
     void main() {
@@ -640,8 +630,6 @@ let%expect_test "struct pattern matching" =
         point anf = point(1., 2.);
         float _lv_r_x = anf.x;
         float _lv_r_y = anf.y;
-        float y = _lv_r_y;
-        float a = _lv_r_x;
         return vec3(_lv_r_x, _lv_r_y, 0.);
     }
     void main() {
@@ -675,30 +663,19 @@ let%expect_test "bracket pattern matching" =
     out vec4 fragColor;
     float f_m(vec3 _fn_arg) {
         float _lv_v0 = _fn_arg[0];
-        float _lv_v1 = _fn_arg[1];
         float _lv_v2 = _fn_arg[2];
-        float z = _lv_v2;
-        float x = _lv_v0;
         return (_lv_v0 + _lv_v2);
     }
     float g_m(mat2 _fn_arg_0) {
         vec2 _lv_v0_0 = _fn_arg_0[0];
         vec2 _lv_v1_0 = _fn_arg_0[1];
         float _lv_v0_1 = _lv_v0_0[0];
-        float _lv_v1_1 = _lv_v0_0[1];
-        float _lv_v0_2 = _lv_v1_0[0];
         float _lv_v1_2 = _lv_v1_0[1];
-        float b = _lv_v1_1;
-        float a = _lv_v0_1;
-        float d = _lv_v1_2;
-        float c = _lv_v0_2;
         return (_lv_v0_1 + _lv_v1_2);
     }
     float h(vec2 v) {
         float _lv_v0_3 = v[0];
         float _lv_v1_3 = v[1];
-        float y = _lv_v1_3;
-        float x_0 = _lv_v0_3;
         return (_lv_v0_3 + _lv_v1_3);
     }
     vec3 main_pure(vec2 coord) {
@@ -746,17 +723,12 @@ let%expect_test "let pattern binding" =
     };
     float f(wrapper w) {
         float _lv_Wrap_0 = w.Wrap_0;
-        float v = _lv_Wrap_0;
         float _lv_Wrap_0_0 = w.Wrap_0;
-        float v_prime = _lv_Wrap_0_0;
         return (_lv_Wrap_0 + _lv_Wrap_0_0);
     }
     vec3 main_pure(vec2 uv) {
-        float x = 2.;
         float _lv_v0 = uv[0];
         float _lv_v1 = uv[1];
-        float v_0 = _lv_v1;
-        float u = _lv_v0;
         wrapper anf = wrapper(0, 1.);
         float anf_0 = f(anf);
         float anf_1 = (_lv_v0 + _lv_v1);
@@ -830,7 +802,6 @@ let%expect_test "nested pattern matching with polymorphism" =
                 switch (_lv_tag) {
                     case 0: {
                         float _lv_Some_0_0 = _lv_Some_0.Some_0;
-                        float y = _lv_Some_0_0;
                         return _lv_Some_0_0;
                         break;
                     }
@@ -889,11 +860,8 @@ let%expect_test "nested pattern matching with literals in records" =
         bool _lv_cmp = (_lv_r_x == 0.);
         float v;
         if (_lv_cmp) {
-            float y = _lv_r_y;
             v = _lv_r_y;
         } else {
-            float y_0 = _lv_r_y;
-            float x = _lv_r_x;
             v = (_lv_r_x + _lv_r_y);
         }
         return vec3(v, 0., 0.);
@@ -996,9 +964,6 @@ let%expect_test "pattern match exhaustiveness edge cases" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        int n = 7;
-        int x = 7;
-        int anf = 7;
         return vec3(0., 0., 0.);
     }
     void main() {
@@ -1070,7 +1035,6 @@ let%expect_test "pattern match exhaustiveness edge cases" =
         float v;
         switch (_lv_tag) {
             case 0: {
-                float _lv_Some_0 = anf.Some_0;
                 v = 1.;
                 break;
             }

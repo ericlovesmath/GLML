@@ -33,6 +33,7 @@
    lower_variants
    remove_placeholder
    const_fold
+   dce
    lift_consts
 
    ; GLSL Passes

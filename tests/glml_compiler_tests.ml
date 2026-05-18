@@ -8,9 +8,6 @@ let%expect_test "simple tests for compile_stlc" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        float x = 2.;
-        float anf = 24.;
-        float anf_0 = 34.;
         return vec3(34., 0., 0.);
     }
     void main() {
@@ -25,7 +22,6 @@ let%expect_test "simple tests for compile_stlc" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        bool anf = false;
         return vec3(0., 0., 0.);
     }
     void main() {
@@ -88,9 +84,9 @@ let%expect_test "generic vectors and matrices" =
     {|
     let main (u : vec2) =
       let m = [ [1.0, 0.0, 0.0], [ 0.0, 1.0, 0.0 ], [ 0.0, 0.0, 1.0] ] in
-      let m = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]] in
+      let n = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]] in
       let v = [ 1.0, 2.0 ] in
-      [ 1.0, 0.0, 0.0 ]
+      [ (m.0).0, (n.0).0, v.0 ]
     |};
   [%expect
     {|
@@ -105,9 +101,14 @@ let%expect_test "generic vectors and matrices" =
         vec2 anf_2 = vec2(1., 2.);
         vec2 anf_3 = vec2(3., 4.);
         vec2 anf_4 = vec2(5., 6.);
-        mat3x2 m_0 = mat3x2(anf_2, anf_3, anf_4);
+        mat3x2 n = mat3x2(anf_2, anf_3, anf_4);
         vec2 v = vec2(1., 2.);
-        return vec3(1., 0., 0.);
+        vec3 anf_5 = m[0];
+        float anf_6 = anf_5[0];
+        vec2 anf_7 = n[0];
+        float anf_8 = anf_7[0];
+        float anf_9 = v[0];
+        return vec3(anf_6, anf_8, anf_9);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -268,8 +269,6 @@ let%expect_test "lambda lifting" =
         return (anf + z);
     }
     vec3 main_pure(vec2 u) {
-        float x = 10.;
-        float y = 5.;
         float anf_0 = add_0(10., 5., 1.);
         return vec3(anf_0, 0., 0.);
     }
@@ -366,7 +365,7 @@ let%expect_test "recursive functions" =
 
     let main (u : vec2) =
       let num = fact 5 1 in
-      [ 0., 0., 0. ]
+      [ num, 0., 0. ]
     |};
   [%expect
     {|
@@ -393,7 +392,8 @@ let%expect_test "recursive functions" =
     }
     vec3 main_pure(vec2 u) {
         int num = fact(5, 1);
-        return vec3(0., 0., 0.);
+        float anf_2 = float(num);
+        return vec3(anf_2, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -730,7 +730,6 @@ let%expect_test "toplevel constant (atomic only)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    const float pi = 3.14159;
     vec3 main_pure(vec2 u) {
         return vec3(3.14159, 3.14159, 3.14159);
     }
@@ -775,7 +774,6 @@ let%expect_test "promotion of ints to floats" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 u) {
-        int b = 3;
         float anf = float(3);
         float a = (anf + 2.);
         float anf_0 = float(3);
@@ -885,7 +883,6 @@ let%expect_test "defunctionalization" =
     }
     float dapply(DFn dfn, float da) {
         float _lv_lctor_0 = dfn.lctor_0;
-        float ca = _lv_lctor_0;
         return lam(_lv_lctor_0, da);
     }
     float apply_m(DFn f, float x) {
@@ -927,7 +924,6 @@ let%expect_test "defunctionalization" =
     }
     float dapply(DFn dfn, float da) {
         vec2 _lv_lctor_0 = dfn.lctor_0;
-        vec2 ca = _lv_lctor_0;
         return scale_0(_lv_lctor_0, da);
     }
     float apply(DFn f, float x) {
@@ -1054,8 +1050,7 @@ let%expect_test "defunctionalization" =
     {|
     let map f v = [f v.0, f v.1, f v.2]
     let main (uv : vec2) =
-      let color = map (fun x -> x * 2) [0, 1, 2] in
-      [0, 0, 0]
+      map (fun x -> x * 2) [0, 1, 2]
     |};
   [%expect
     {|
@@ -1083,8 +1078,7 @@ let%expect_test "defunctionalization" =
     vec3 main_pure(vec2 uv) {
         DFn anf_5 = DFn(0);
         vec3 anf_6 = vec3(0., 1., 2.);
-        vec3 color = map_m(anf_5, anf_6);
-        return vec3(0., 0., 0.);
+        return map_m(anf_5, anf_6);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1120,7 +1114,6 @@ let%expect_test "defunctionalization - returning closures" =
     }
     float dapply(DFn dfn, float da) {
         float _lv_lctor_0 = dfn.lctor_0;
-        float ca = _lv_lctor_0;
         return addn(_lv_lctor_0, da);
     }
     vec3 main_pure(vec2 coord) {
@@ -1155,7 +1148,6 @@ let%expect_test "defunctionalization - returning closures" =
     }
     float dapply(DFn dfn, float da) {
         float _lv_lctor_0 = dfn.lctor_0;
-        float ca = _lv_lctor_0;
         return addn_0(_lv_lctor_0, da);
     }
     vec3 main_pure(vec2 coord) {
@@ -1191,12 +1183,10 @@ let%expect_test "defunctionalization - returning closures" =
     }
     float dapply(DFn dfn, float da) {
         float _lv_lctor_0 = dfn.lctor_0;
-        float ca = _lv_lctor_0;
         return addn(_lv_lctor_0, da);
     }
     vec3 main_pure(vec2 coord) {
         DFn f = DFn(0, 1.);
-        DFn g = f;
         float r = dapply(f, 2.);
         return vec3(r, 0., 0.);
     }
@@ -1240,8 +1230,6 @@ let%expect_test "defunctionalization - partial application of first-class functi
     float dapply_0(DFn_0 dfn_0, float da_1) {
         DFn _lv_lctor_0 = dfn_0.lctor_0;
         float _lv_lctor_1 = dfn_0.lctor_1;
-        float ca_0 = _lv_lctor_1;
-        DFn ca = _lv_lctor_0;
         return dapply(_lv_lctor_0, _lv_lctor_1, da_1);
     }
     vec3 main_pure(vec2 pos) {
@@ -1296,15 +1284,11 @@ let%expect_test "defunctionalization - partial application of first-class functi
     float dapply_0(DFn_0 dfn_0, float da_2, float da_3) {
         DFn _lv_lctor_0 = dfn_0.lctor_0;
         float _lv_lctor_1 = dfn_0.lctor_1;
-        float ca_0 = _lv_lctor_1;
-        DFn ca = _lv_lctor_0;
         return dapply(_lv_lctor_0, _lv_lctor_1, da_2, da_3);
     }
     float dapply_1(DFn_1 dfn_1, float da_4) {
         DFn_0 _lv_lctor_0_0 = dfn_1.lctor_0_0;
         float _lv_lctor_0_1 = dfn_1.lctor_0_1;
-        float ca_2 = _lv_lctor_0_1;
-        DFn_0 ca_1 = _lv_lctor_0_0;
         return dapply_0(_lv_lctor_0_0, _lv_lctor_0_1, da_4);
     }
     vec3 main_pure(vec2 pos) {
@@ -1352,8 +1336,6 @@ let%expect_test "defunctionalization - partial application of first-class functi
     float dapply(DFn dfn, float da) {
         DFn_0 _lv_lctor_0 = dfn.lctor_0;
         float _lv_lctor_1 = dfn.lctor_1;
-        float ca_0 = _lv_lctor_1;
-        DFn_0 ca = _lv_lctor_0;
         return dapply_0(_lv_lctor_0, _lv_lctor_1, da);
     }
     float apply_m(DFn f, float x) {
@@ -1396,11 +1378,9 @@ let%expect_test "defunctionalization - partial application of first-class functi
     }
     int dapply(DFn dfn, int da) {
         int _lv_lctor_0 = dfn.lctor_0;
-        int ca = _lv_lctor_0;
         return lam(_lv_lctor_0, da);
     }
     DFn mkinc_m(int n) {
-        int x = 1;
         return DFn(0, 1);
     }
     vec3 main_pure(vec2 uv) {
@@ -1482,7 +1462,6 @@ let%expect_test "toplevel complex consts / promotion to zero-arg functions" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    const float pi = 3.14159;
     vec3 main_pure(vec2 coord) {
         return vec3(3.14159, 3.14159, 3.14159);
     }
@@ -1504,7 +1483,6 @@ let%expect_test "toplevel complex consts / promotion to zero-arg functions" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    const float base = 3.;
     struct v_4 {
         float a;
     };
@@ -1575,7 +1553,6 @@ let%expect_test "ints in float contexts" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        float x = 3.;
         return vec3(3., 3., 3.);
     }
     void main() {
@@ -1594,7 +1571,6 @@ let%expect_test "ints in float contexts" =
         return (x + 1.);
     }
     vec3 main_pure(vec2 coord) {
-        int n = 4;
         float anf = float(4);
         float anf_0 = f_0(anf);
         return vec3(anf_0, 0., 0.);
@@ -1667,7 +1643,6 @@ let%expect_test "ints in float contexts" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        int r = 1;
         float anf = float(1);
         return vec3(anf, 0., 0.);
     }
@@ -1764,7 +1739,6 @@ let%expect_test "function keyword desugaring" =
     }
     int dapply_0(DFn_0 dfn_0, bool da_0) {
         DFn _lv_lctor_0 = dfn_0.lctor_0;
-        DFn ca = _lv_lctor_0;
         return apply_fn_m(_lv_lctor_0, da_0);
     }
     struct option {
@@ -1776,7 +1750,6 @@ let%expect_test "function keyword desugaring" =
         switch (_lv_tag) {
             case 0: {
                 float _lv_Some_0 = _fn_arg.Some_0;
-                float x = _lv_Some_0;
                 return (_lv_Some_0 + 1.);
                 break;
             }
@@ -1964,7 +1937,6 @@ let%expect_test "functions in records / structs" =
         switch (_lv_tag) {
             case 0: {
                 DFn _lv_CB_0 = cb.CB_0;
-                DFn f_0 = _lv_CB_0;
                 r = apply(_lv_CB_0, 6.);
                 break;
             }

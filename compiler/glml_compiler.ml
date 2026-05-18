@@ -19,6 +19,7 @@ module Passes = struct
       | Lower_variants
       | Remove_placeholder
       | Const_fold
+      | Dce
       | Lift_consts
       | Translate
       | Patch_main
@@ -64,6 +65,8 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   trace Remove_placeholder (Remove_placeholder.sexp_of_t t);
   let t = Const_fold.rewrite t in
   trace Const_fold (Remove_placeholder.sexp_of_t t);
+  let t = Dce.rewrite t in
+  trace Dce (Remove_placeholder.sexp_of_t t);
   let t = Lift_consts.lift t in
   trace Lift_consts (Remove_placeholder.sexp_of_t t);
   let%bind glsl = Translate.translate t in

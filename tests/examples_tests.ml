@@ -32,7 +32,6 @@ let%expect_test "compile examples" =
         switch (_lv_tag) {
             case 0: {
                 float _lv_Circle_0 = s.Circle_0;
-                float r = _lv_Circle_0;
                 float anf = length(p);
                 return (anf - _lv_Circle_0);
                 break;
@@ -40,8 +39,6 @@ let%expect_test "compile examples" =
             case 1: {
                 float _lv_Rect_0 = s.Rect_0;
                 float _lv_Rect_1 = s.Rect_1;
-                float h = _lv_Rect_1;
-                float w = _lv_Rect_0;
                 vec2 anf_0 = abs(p);
                 vec2 anf_1 = vec2(_lv_Rect_0, _lv_Rect_1);
                 vec2 d = (anf_0 - anf_1);
@@ -85,13 +82,11 @@ let%expect_test "compile examples" =
         switch (_lv_tag_0) {
             case 0: {
                 shape _lv_lctor_0 = dfn.lctor_0;
-                shape ca = _lv_lctor_0;
                 return sdf_shape(_lv_lctor_0, da);
                 break;
             }
             default: {
                 shape _lv_lctor_0_0 = dfn.lctor_0_0;
-                shape ca_0 = _lv_lctor_0_0;
                 return sdf_shape(_lv_lctor_0_0, da);
                 break;
             }
@@ -115,8 +110,6 @@ let%expect_test "compile examples" =
     float dapply_0(DFn_0 dfn_0, vec2 da_0) {
         DFn _lv_lctor_1_0 = dfn_0.lctor_1_0;
         DFn _lv_lctor_1_1 = dfn_0.lctor_1_1;
-        DFn ca_2 = _lv_lctor_1_1;
-        DFn ca_1 = _lv_lctor_1_0;
         return union_0(_lv_lctor_1_0, _lv_lctor_1_1, da_0);
     }
     vec3 main_pure(vec2 coord_0) {
@@ -450,7 +443,6 @@ let%expect_test "compile examples" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    const int size = 5;
     uniform vec2 u_resolution;
     vec2 get_uv_m(vec2 coord) {
         vec2 anf = (2. * coord);
@@ -572,7 +564,6 @@ let%expect_test "compile examples" =
             }
             default: {
                 float _lv_Some_0 = anf_28.Some_0;
-                float n = _lv_Some_0;
                 vec3 anf_29 = vec3(10., 20., 30.);
                 vec3 anf_30 = (_lv_Some_0 * anf_29);
                 vec3 anf_31 = (anf_30 + u_time);
@@ -761,7 +752,6 @@ let%expect_test "compile examples" =
         return sdPlanet(p_4, 1.5);
     }
     vec3 getNormal(vec3 p_5) {
-        float e_0 = 0.002;
         vec3 e_x = vec3(0.002, 0., 0.);
         vec3 e_y = vec3(0., 0.002, 0.);
         vec3 e_z = vec3(0., 0., 0.002);
@@ -850,7 +840,6 @@ let%expect_test "compile examples" =
             }
             default: {
                 float _lv_Some_0 = t_0.Some_0;
-                float t_1 = _lv_Some_0;
                 vec3 anf_102 = (rd_0 * _lv_Some_0);
                 vec3 hitPos = (ro_0 + anf_102);
                 vec3 n = getNormal(hitPos);
@@ -858,14 +847,11 @@ let%expect_test "compile examples" =
                 vec3 lightDir = normalize(anf_103);
                 float anf_104 = dot(n, lightDir);
                 float diff = max(anf_104, 0.);
-                float ambient = 0.08;
                 float anf_105 = length(hitPos);
                 vec3 dir_0 = (hitPos / anf_105);
                 vec3 anf_106 = (dir_0 * 3.);
                 float rawHeight = fbm(anf_106);
-                float seaLevel = 0.35;
                 float anf_107 = (rawHeight - 0.35);
-                float anf_108 = 0.65;
                 float anf_109 = (anf_107 / 0.65);
                 float h_norm = clamp(anf_109, 0., 1.);
                 bool anf_110 = (h_norm < 0.3);
@@ -976,7 +962,6 @@ let%expect_test "compile examples" =
         return vec2(anf_7, anf_12);
     }
     float sMin(float a, float b) {
-        float k = 0.1;
         float anf_13 = (b - a);
         float anf_14 = (0.5 * anf_13);
         float anf_15 = (anf_14 / 0.1);
@@ -1126,7 +1111,6 @@ let%expect_test "compile examples" =
             }
             default: {
                 float _lv_Some_0 = anf_88.Some_0;
-                float t_2 = _lv_Some_0;
                 float anf_89 = (_lv_Some_0 * 0.3);
                 col = palette(anf_89);
                 break;
@@ -1209,8 +1193,6 @@ let%expect_test "compile examples" =
         vec2 anf_16 = abs(anf_15);
         float _lv_v0 = anf_16[0];
         float _lv_v1 = anf_16[1];
-        float y = _lv_v1;
-        float x = _lv_v0;
         float res = gcd_m(_lv_v0, _lv_v1);
         float anf_17 = (res * 0.5);
         float anf_18 = (1. - res);
