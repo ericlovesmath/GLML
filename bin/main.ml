@@ -14,7 +14,7 @@ let compile_command =
        flag "-p" (listed string) ~doc:"PASSES name of pass to dump or 'all'"
      and dump_dir =
        flag "-d" (optional string) ~doc:"DIR directory to dump pass files into"
-     in
+     and no_optimize = flag "-no-optimize" no_arg ~doc:"disable optimization passes" in
      fun () ->
        let handler pass sexp =
          let pass = Glml.Passes.to_string pass in
@@ -38,7 +38,7 @@ let compile_command =
          |> Glml.Passes.Map.of_alist_exn
        in
        let source = In_channel.read_all input_file in
-       match Glml.compile ~dump source with
+       match Glml.compile ~dump ~optimize:(not no_optimize) source with
        | Ok result ->
          (match output_file with
           | Some path -> Out_channel.write_all path ~data:result

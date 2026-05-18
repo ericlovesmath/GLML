@@ -30,7 +30,10 @@ module Passes = struct
   include Comparable.Make (T)
 end
 
-let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : string)
+let compile
+      ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty)
+      ?(optimize : bool = true)
+      (s : string)
   : string Compiler_error.t
   =
   let trace pass sexp = Map.find dump pass |> Option.iter ~f:(fun f -> f sexp) in
@@ -63,10 +66,16 @@ let compile ?(dump : (Sexp.t -> unit) Passes.Map.t = Passes.Map.empty) (s : stri
   trace Lower_variants (Lower_variants.sexp_of_t t);
   let t = Remove_placeholder.remove t in
   trace Remove_placeholder (Remove_placeholder.sexp_of_t t);
-  let t = Const_fold.rewrite t in
-  trace Const_fold (Remove_placeholder.sexp_of_t t);
-  let t = Dce.rewrite t in
-  trace Dce (Remove_placeholder.sexp_of_t t);
+  let t =
+    if not optimize
+    then t
+    else (
+      let t = Const_fold.rewrite t in
+      trace Const_fold (Remove_placeholder.sexp_of_t t);
+      let t = Dce.rewrite t in
+      trace Dce (Remove_placeholder.sexp_of_t t);
+      t)
+  in
   let t = Lift_consts.lift t in
   trace Lift_consts (Remove_placeholder.sexp_of_t t);
   let%bind glsl = Translate.translate t in

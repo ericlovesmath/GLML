@@ -29,4 +29,8 @@ end
 
 (** Compile from [Stlc.t] string repr to GLSL, pass handlers to dump the sexp
     output of each [Passes.t] if desired (defaults to none) *)
-val compile : ?dump:(Sexp.t -> unit) Passes.Map.t -> string -> string Compiler_error.t
+val compile
+  :  ?dump:(Sexp.t -> unit) Passes.Map.t
+  -> ?optimize:bool (** run optimization passes, default [true] *)
+  -> string
+  -> string Compiler_error.t
