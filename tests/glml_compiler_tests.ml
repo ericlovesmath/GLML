@@ -651,10 +651,7 @@ let%expect_test "promotion of ints to floats" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 u) {
-        float anf = float(3);
-        float a = (anf + 2.);
-        float anf_0 = float(3);
-        return vec3(anf_0, a, 3.);
+        return vec3(3., 5., 3.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1071,9 +1068,7 @@ let%expect_test "defunctionalization - partial application of first-class functi
         int lctor_0;
     };
     vec3 main_pure(vec2 uv) {
-        float anf_0 = float(3);
-        vec3 anf_1 = vec3(1., 1., 1.);
-        return (anf_0 * anf_1);
+        return vec3(3., 3., 3.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1098,8 +1093,7 @@ let%expect_test "non-parametrized type aliases" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 u) {
-        float anf_0 = float(0);
-        return vec3(anf_0, 0., 0.);
+        return vec3(0., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1245,9 +1239,7 @@ let%expect_test "ints in float contexts" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        float anf = float(4);
-        float anf_0 = (anf + 1.);
-        return vec3(anf_0, 0., 0.);
+        return vec3(5., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1314,8 +1306,7 @@ let%expect_test "ints in float contexts" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        float anf = float(1);
-        return vec3(anf, 0., 0.);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1389,8 +1380,7 @@ let%expect_test "function keyword desugaring" =
         float Some_0;
     };
     vec3 main_pure(vec2 u) {
-        float anf_4 = float(1);
-        return vec3(6., 1., anf_4);
+        return vec3(6., 1., 1.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

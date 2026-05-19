@@ -9,9 +9,7 @@ let%expect_test "int promotion edge cases" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        float anf = float(5);
-        float y = (anf + 3.);
-        return vec3(y, y, y);
+        return vec3(8., 8., 8.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -26,8 +24,7 @@ let%expect_test "int promotion edge cases" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        float anf = float(2);
-        return vec3(anf, 0., 0.);
+        return vec3(2., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -105,8 +102,7 @@ let%expect_test "int promotion edge cases" =
         float y;
     };
     vec3 main_pure(vec2 u) {
-        float anf = float(3);
-        return vec3(anf, 0., 0.);
+        return vec3(3., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -210,8 +206,7 @@ let%expect_test "regression - polymorphic struct type in function" =
         float value;
     };
     vec3 main_pure(vec2 coord) {
-        float anf_2 = float(1);
-        return vec3(1., anf_2, 0.);
+        return vec3(1., 1., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -325,8 +320,7 @@ let%expect_test "field access in let binding (unannotated)" =
         float value;
     };
     vec3 main_pure(vec2 coord) {
-        float anf_2 = float(1);
-        return vec3(1., anf_2, 0.);
+        return vec3(1., 1., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -551,7 +545,7 @@ let%expect_test "toplevel vectors of ints are treated as consts with builtin #fl
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    const vec3 x = vec3(float(10), float(10), float(10));
+    const vec3 x = vec3(10., 10., 10.);
     vec3 main_pure(vec2 coord) {
         return x;
     }
@@ -696,8 +690,7 @@ let%expect_test "regression - partial application stored as top level value" =
     const DFn warm_m = DFn(0, vec3(0.5, 0.3, 0.1));
     vec3 main_pure(vec2 coord) {
         vec3 _lv_lctor_0_0 = warm_m.lctor_0;
-        float anf_4 = float(2);
-        vec3 anf_0_1 = (_lv_lctor_0_0 * anf_4);
+        vec3 anf_0_1 = (_lv_lctor_0_0 * 2.);
         vec3 anf_2 = cos(anf_0_1);
         float a_0 = anf_2[0];
         return vec3(a_0, 0., 0.);
@@ -808,9 +801,7 @@ let%expect_test "regression - int promotion through closures / partial applicati
         float lctor_0;
     };
     vec3 main_pure(vec2 coord) {
-        float anf = float(5);
-        float r = (anf + 1.);
-        return vec3(r, 0., 0.);
+        return vec3(6., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -844,8 +835,7 @@ let%expect_test "regression - inferred type in higher-order local function" =
         int tag;
     };
     vec3 main_pure(vec2 uv) {
-        float anf_0_0 = float(1);
-        return vec3(anf_0_0, 0., 0.);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

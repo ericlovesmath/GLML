@@ -9,9 +9,7 @@ let%expect_test "int broadcasting with vecs and builtins" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        float anf = float(2);
-        vec3 anf_0 = vec3(0.5, 0.5, 0.5);
-        return (anf * anf_0);
+        return vec3(1., 1., 1.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -47,9 +45,7 @@ let%expect_test "int broadcasting with vecs and builtins" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        float anf = float(2);
-        vec3 anf_0 = vec3(0.1, 0.2, 0.3);
-        return (anf + anf_0);
+        return vec3(2.1, 2.2, 2.3);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -400,8 +396,7 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
         float Some_0;
     };
     vec3 main_pure(vec2 coord) {
-        float anf_1 = float(5);
-        return vec3(anf_1, 1., 0.);
+        return vec3(5., 1., 0.);
     }
     uniform vec2 u_resolution;
     uniform float u_time;
@@ -433,8 +428,7 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
         float value;
     };
     vec3 main_pure(vec2 coord) {
-        float anf_2 = float(1);
-        return vec3(1., anf_2, 0.);
+        return vec3(1., 1., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

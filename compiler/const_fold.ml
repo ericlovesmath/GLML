@@ -1,4 +1,5 @@
 (* TODO: Algebraic identities for bops and prims *)
+(* TODO: Builtin functions *)
 
 open Core
 open Remove_placeholder
@@ -138,6 +139,18 @@ let try_fold_bop ctx op (a : atom) (b : atom) (t : term) : term_desc option =
     Some (Vec (List.length ds, atoms))
 ;;
 
+let try_fold_builtin ctx (b : Glsl.builtin) (args : atom list) (t : term)
+  : term_desc option
+  =
+  let open Option.Let_syntax in
+  match b, args with
+  | Float, [ a ] ->
+    (match%bind const_components ctx a with
+     | [ Int n ] -> Some (Atom { desc = Float (Float.of_int n); ty = t.ty; loc = t.loc })
+     | _ -> None)
+  | _ -> None
+;;
+
 (** Looks up [a]'s structured value and projects out a sub-atom *)
 let try_project ctx (a : atom) (t : term) ~f : term_desc option =
   let open Option.Let_syntax in
@@ -153,7 +166,9 @@ let simplify_primitive_term (ctx : ctx) (t : term) : term =
     match t.desc with
     | Atom a -> Atom (rewrite a)
     | Vec (n, atoms) -> Vec (n, List.map atoms ~f:rewrite)
-    | Builtin (b, atoms) -> Builtin (b, List.map atoms ~f:rewrite)
+    | Builtin (b, atoms) ->
+      let atoms = List.map atoms ~f:rewrite in
+      try_fold_builtin ctx b atoms t <|> Builtin (b, atoms)
     | App (n, atoms) -> App (n, List.map atoms ~f:rewrite)
     | Record atoms -> Record (List.map atoms ~f:rewrite)
     | Bop (op, a, b) ->
