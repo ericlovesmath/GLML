@@ -1,6 +1,5 @@
 (* TODO: Algebraic identities for bops and prims *)
 (* TODO: Vec Broadcasting *)
-(* TODO: Index and Field *)
 
 open Core
 open Remove_placeholder
@@ -13,10 +12,13 @@ type value =
   | Top
   | Const of atom_desc
   | Alias of string
+  | VecLit of atom list
+  | RecordLit of atom String.Map.t
 
 type ctx =
   { env : value String.Map.t
   ; mut : String.Set.t (* names that appear as [Set] targets *)
+  ; records : (string * Monomorphize.ty) list String.Map.t
   }
 
 let bind ctx v value = { ctx with env = Map.set ctx.env ~key:v ~data:value }
@@ -27,11 +29,10 @@ let rec rewrite_atom (ctx : ctx) (a : atom) : atom =
   | Int _ | Float _ | Bool _ -> a
   | Var v ->
     (match Map.find ctx.env v with
-     | None | Some Top -> a
      | Some (Const d) -> { a with desc = d }
      | Some (Alias v') when not (String.equal v v') ->
        rewrite_atom ctx { a with desc = Var v' }
-     | Some (Alias _) -> a)
+     | None | Some (Top | Alias _ | VecLit _ | RecordLit _) -> a)
 ;;
 
 let fold_bop (op : Glsl.binary_op) (a : atom_desc) (b : atom_desc) : atom_desc option =
@@ -83,23 +84,54 @@ let unexpected_branch (t : term) =
   Err.raise ~loc:t.loc "unexpected branching term" ~d:[%message (t : term)]
 ;;
 
+(** [Some v]'s structured value, after walking aliases. *)
+let structured_value_of (ctx : ctx) (a : atom) : value option =
+  match a.desc with
+  | Var v ->
+    let rec lookup_value v =
+      match Map.find ctx.env v with
+      | Some (Alias v') when not (String.equal v v') -> lookup_value v'
+      | other -> other
+    in
+    lookup_value v
+  | _ -> None
+;;
+
 let simplify_primitive_term (ctx : ctx) (t : term) : term =
-  let r = rewrite_atom ctx in
+  let rewrite = rewrite_atom ctx in
   let desc =
     match t.desc with
-    | Atom a -> Atom (r a)
+    | Atom a -> Atom (rewrite a)
     | Bop (op, a, b) ->
-      let a = r a
-      and b = r b in
+      let a = rewrite a in
+      let b = rewrite b in
       (match fold_bop op a.desc b.desc with
        | Some d -> Atom { desc = d; ty = t.ty; loc = t.loc }
        | None -> Bop (op, a, b))
-    | Vec (n, atoms) -> Vec (n, List.map atoms ~f:r)
-    | Index (a, i) -> Index (r a, i)
-    | Builtin (b, atoms) -> Builtin (b, List.map atoms ~f:r)
-    | App (n, atoms) -> App (n, List.map atoms ~f:r)
-    | Record atoms -> Record (List.map atoms ~f:r)
-    | Field (a, name) -> Field (r a, name)
+    | Vec (n, atoms) -> Vec (n, List.map atoms ~f:rewrite)
+    | Index (a, i) ->
+      let a = rewrite a in
+      let v =
+        match structured_value_of ctx a with
+        | Some (VecLit atoms) ->
+          List.nth atoms i
+          |> Option.map ~f:(fun a -> Atom { a with ty = t.ty; loc = t.loc })
+        | _ -> None
+      in
+      Option.value v ~default:(Index (a, i))
+    | Builtin (b, atoms) -> Builtin (b, List.map atoms ~f:rewrite)
+    | App (n, atoms) -> App (n, List.map atoms ~f:rewrite)
+    | Record atoms -> Record (List.map atoms ~f:rewrite)
+    | Field (a, name) ->
+      let a = rewrite a in
+      let v =
+        match structured_value_of ctx a with
+        | Some (RecordLit fields) ->
+          Map.find fields name
+          |> Option.map ~f:(fun a -> Atom { a with ty = t.ty; loc = t.loc })
+        | _ -> None
+      in
+      Option.value v ~default:(Field (a, name))
     | If _ | Switch _ -> unexpected_branch t
   in
   { t with desc }
@@ -109,6 +141,20 @@ let value_of_term ctx (t : term) : value =
   match t.desc with
   | Atom { desc = (Int _ | Float _ | Bool _) as d; _ } -> Const d
   | Atom { desc = Var v; _ } -> if Set.mem ctx.mut v then Top else Alias v
+  | Vec (_, atoms) -> VecLit atoms
+  | Record atoms ->
+    (match t.ty with
+     | TyRecord s ->
+       (match Map.find ctx.records s with
+        | None -> Top
+        | Some fields ->
+          (match List.map2 fields atoms ~f:(fun (name, _) a -> name, a) with
+           | Unequal_lengths -> Err.raise "record literal arity mismatch" ~loc:t.loc
+           | Ok pairs -> String.Map.of_alist_or_error pairs)
+          |> Err.of_or_error ~loc:t.loc
+          |> Err.ok_exn
+          |> fun m -> RecordLit m)
+     | _ -> Err.raise "Record does not have type record" ~loc:t.loc)
   | _ -> Top
 ;;
 
@@ -199,8 +245,15 @@ and resolve_branch ctx (t : term) : branch_resolution =
   | _ -> unexpected_branch t
 ;;
 
-let rewrite_top (env : value String.Map.t) (top : top) : top * value String.Map.t =
-  let rewrite anf = rewrite_anf { env; mut = collect_set_anf anf String.Set.empty } anf in
+let rewrite_top
+      (records : (string * Monomorphize.ty) list String.Map.t)
+      (env : value String.Map.t)
+      (top : top)
+  : top * value String.Map.t
+  =
+  let rewrite anf =
+    rewrite_anf { env; mut = collect_set_anf anf String.Set.empty; records } anf
+  in
   match top.desc with
   | Const (name, anf) ->
     let anf = rewrite anf in
@@ -216,10 +269,21 @@ let rewrite_top (env : value String.Map.t) (top : top) : top * value String.Map.
   | Extern _ | TypeDef _ -> top, env
 ;;
 
+let collect_records (tops : top list) : (string * Monomorphize.ty) list String.Map.t =
+  List.filter_map tops ~f:(fun top ->
+    match top.desc with
+    | TypeDef (name, RecordDecl fields) -> Some (name, fields)
+    | _ -> None)
+  |> String.Map.of_alist_or_error
+  |> Err.of_or_error
+  |> Err.ok_exn
+;;
+
 let rewrite (Program tops : t) : t =
+  let records = collect_records tops in
   let _, tops_rev =
     List.fold tops ~init:(String.Map.empty, []) ~f:(fun (env, acc) top ->
-      let top, env = rewrite_top env top in
+      let top, env = rewrite_top records env top in
       env, top :: acc)
   in
   Program (List.rev tops_rev)

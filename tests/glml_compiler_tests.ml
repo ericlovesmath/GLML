@@ -88,21 +88,7 @@ let%expect_test "generic vectors and matrices" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 u) {
-        vec3 anf = vec3(1., 0., 0.);
-        vec3 anf_0 = vec3(0., 1., 0.);
-        vec3 anf_1 = vec3(0., 0., 1.);
-        mat3 m = mat3(anf, anf_0, anf_1);
-        vec2 anf_2 = vec2(1., 2.);
-        vec2 anf_3 = vec2(3., 4.);
-        vec2 anf_4 = vec2(5., 6.);
-        mat3x2 n = mat3x2(anf_2, anf_3, anf_4);
-        vec2 v = vec2(1., 2.);
-        vec3 anf_5 = m[0];
-        float anf_6 = anf_5[0];
-        vec2 anf_7 = n[0];
-        float anf_8 = anf_7[0];
-        float anf_9 = v[0];
-        return vec3(anf_6, anf_8, anf_9);
+        return vec3(1., 1., 1.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -119,9 +105,7 @@ let%expect_test "indexing" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        vec3 v = vec3(1., 2., 3.);
-        float anf = v[0];
-        return vec3(anf, 0., 0.);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -140,15 +124,7 @@ let%expect_test "indexing" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        vec3 anf = vec3(1., 0., 0.);
-        vec3 anf_0 = vec3(0., 1., 0.);
-        vec3 anf_1 = vec3(0., 0., 1.);
-        mat3 m = mat3(anf, anf_0, anf_1);
-        vec3 c = m[0];
-        float anf_2 = c[0];
-        float anf_3 = c[1];
-        float anf_4 = c[2];
-        return vec3(anf_2, anf_3, anf_4);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -395,13 +371,7 @@ let%expect_test "structs" =
         float y;
     };
     vec3 main_pure(vec2 u) {
-        point p_0 = point(1., 2.);
-        float p_y_0 = p_0.y;
-        color c = color(p_y_0, 0., 0.);
-        float anf = c.r;
-        float anf_0 = c.g;
-        float anf_1 = c.b;
-        return vec3(anf, anf_0, anf_1);
+        return vec3(2., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -442,11 +412,7 @@ let%expect_test "structs" =
         float y;
     };
     vec3 main_pure(vec2 u) {
-        color col_0 = color(1., 0., 0.);
-        float anf = col_0.r;
-        float anf_0 = col_0.g;
-        float anf_1 = col_0.b;
-        return vec3(anf, anf_0, anf_1);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -507,11 +473,8 @@ let%expect_test "nested structs" =
         point end;
     };
     vec3 main_pure(vec2 u_0) {
-        point anf_4 = point(0., 0.);
         point anf_0_0 = point(1., 1.);
-        segment s_0 = segment(anf_4, anf_0_0);
-        point anf_3 = s_0.end;
-        float c = anf_3.x;
+        float c = anf_0_0.x;
         return vec3(c, c, c);
     }
     void main() {
@@ -774,10 +737,8 @@ let%expect_test "defunctionalization" =
     };
     vec3 main_pure(vec2 pos) {
         float px = pos[0];
-        DFn anf = DFn(0, px);
         float anf_0 = pos[1];
-        float _lv_lctor_0_1 = anf.lctor_0;
-        float r = (_lv_lctor_0_1 + anf_0);
+        float r = (px + anf_0);
         return vec3(r, r, r);
     }
     void main() {
@@ -804,10 +765,8 @@ let%expect_test "defunctionalization" =
         vec2 lctor_0;
     };
     vec3 main_pure(vec2 pos) {
-        DFn anf_0 = DFn(0, pos);
         float anf_1 = pos[1];
-        vec2 _lv_lctor_0_1 = anf_0.lctor_0;
-        float anf_4 = _lv_lctor_0_1[0];
+        float anf_4 = pos[0];
         float r = (anf_1 * anf_4);
         return vec3(r, r, r);
     }
@@ -838,60 +797,12 @@ let%expect_test "defunctionalization" =
         int tag;
     };
     vec3 main_pure(vec2 pos) {
-        DFn anf = DFn(0);
         float anf_0 = pos[0];
-        int _lv_tag_3 = anf.tag;
-        float a;
-        switch (_lv_tag_3) {
-            case 0: {
-                a = (anf_0 * 2.);
-                break;
-            }
-            case 1: {
-                a = (anf_0 * 3.);
-                break;
-            }
-            default: {
-                a = (anf_0 * 4.);
-                break;
-            }
-        }
-        DFn anf_1 = DFn(1);
+        float a = (anf_0 * 2.);
         float anf_2 = pos[1];
-        int _lv_tag_2 = anf_1.tag;
-        float b;
-        switch (_lv_tag_2) {
-            case 0: {
-                b = (anf_2 * 2.);
-                break;
-            }
-            case 1: {
-                b = (anf_2 * 3.);
-                break;
-            }
-            default: {
-                b = (anf_2 * 4.);
-                break;
-            }
-        }
-        DFn anf_3 = DFn(2);
+        float b = (anf_2 * 3.);
         float anf_4 = pos[0];
-        int _lv_tag_1 = anf_3.tag;
-        float c;
-        switch (_lv_tag_1) {
-            case 0: {
-                c = (anf_4 * 2.);
-                break;
-            }
-            case 1: {
-                c = (anf_4 * 3.);
-                break;
-            }
-            default: {
-                c = (anf_4 * 4.);
-                break;
-            }
-        }
+        float c = (anf_4 * 4.);
         return vec3(a, b, c);
     }
     void main() {
@@ -943,14 +854,7 @@ let%expect_test "defunctionalization" =
         int tag;
     };
     vec3 main_pure(vec2 uv) {
-        vec3 anf_6 = vec3(0., 1., 2.);
-        float anf_7 = anf_6[0];
-        float anf_0_0 = (anf_7 * 2.);
-        float anf_1_0 = anf_6[1];
-        float anf_2_0 = (anf_1_0 * 2.);
-        float anf_3_0 = anf_6[2];
-        float anf_4_0 = (anf_3_0 * 2.);
-        return vec3(anf_0_0, anf_2_0, anf_4_0);
+        return vec3(0., 2., 4.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -979,10 +883,7 @@ let%expect_test "defunctionalization - returning closures" =
         float lctor_0;
     };
     vec3 main_pure(vec2 coord) {
-        DFn f = DFn(0, 0.);
-        float _lv_lctor_0_0 = f.lctor_0;
-        float r = (_lv_lctor_0_0 + 1.);
-        return vec3(r, 0., 0.);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1007,10 +908,7 @@ let%expect_test "defunctionalization - returning closures" =
         float lctor_0;
     };
     vec3 main_pure(vec2 coord) {
-        DFn f = DFn(0, 0.);
-        float _lv_lctor_0_0 = f.lctor_0;
-        float r = (_lv_lctor_0_0 + 1.);
-        return vec3(r, 0., 0.);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1036,10 +934,7 @@ let%expect_test "defunctionalization - returning closures" =
         float lctor_0;
     };
     vec3 main_pure(vec2 coord) {
-        DFn f = DFn(0, 1.);
-        float _lv_lctor_0_0 = f.lctor_0;
-        float r = (_lv_lctor_0_0 + 2.);
-        return vec3(r, 0., 0.);
+        return vec3(3., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1073,12 +968,9 @@ let%expect_test "defunctionalization - partial application of first-class functi
         float lctor_1;
     };
     vec3 main_pure(vec2 pos) {
-        DFn f = DFn(0);
         float anf = pos[0];
-        DFn_0 g = DFn_0(0, f, anf);
         float anf_0 = pos[1];
-        float _lv_lctor_1_0 = g.lctor_1;
-        float r = (_lv_lctor_1_0 + anf_0);
+        float r = (anf + anf_0);
         return vec3(r, r, r);
     }
     void main() {
@@ -1116,15 +1008,8 @@ let%expect_test "defunctionalization - partial application of first-class functi
         float lctor_0_1;
     };
     vec3 main_pure(vec2 pos) {
-        DFn f = DFn(0);
-        DFn_0 g = DFn_0(0, f, 1.);
-        DFn_1 h = DFn_1(0, g, 2.);
         float anf_0 = pos[0];
-        DFn_0 _lv_lctor_0_0_0 = h.lctor_0_0;
-        float _lv_lctor_0_1_0 = h.lctor_0_1;
-        float _lv_lctor_1_1 = _lv_lctor_0_0_0.lctor_1;
-        float anf_4 = (_lv_lctor_1_1 + _lv_lctor_0_1_0);
-        float r = (anf_4 + anf_0);
+        float r = (3. + anf_0);
         return vec3(r, r, r);
     }
     void main() {
@@ -1156,12 +1041,9 @@ let%expect_test "defunctionalization - partial application of first-class functi
         float lctor_1;
     };
     vec3 main_pure(vec2 pos) {
-        DFn_0 add_as_value = DFn_0(0);
         float anf = pos[0];
-        DFn anf_0 = DFn(0, add_as_value, anf);
         float anf_1 = pos[1];
-        float _lv_lctor_1_1 = anf_0.lctor_1;
-        float r = (_lv_lctor_1_1 + anf_1);
+        float r = (anf + anf_1);
         return vec3(r, r, r);
     }
     void main() {
@@ -1189,10 +1071,7 @@ let%expect_test "defunctionalization - partial application of first-class functi
         int lctor_0;
     };
     vec3 main_pure(vec2 uv) {
-        DFn inc_m = DFn(0, 1);
-        int _lv_lctor_0_0 = inc_m.lctor_0;
-        int anf = (_lv_lctor_0_0 + 2);
-        float anf_0 = float(anf);
+        float anf_0 = float(3);
         vec3 anf_1 = vec3(1., 1., 1.);
         return (anf_0 * anf_1);
     }
@@ -1288,7 +1167,7 @@ let%expect_test "toplevel complex consts / promotion to zero-arg functions" =
     struct v_4 {
         float a;
     };
-    const float derived = v_4(6.).a;
+    const float derived = 6.;
     vec3 main_pure(vec2 coord) {
         return vec3(derived, 0., 0.);
     }
@@ -1398,10 +1277,7 @@ let%expect_test "ints in float contexts" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        vec3 v = vec3(1., 2., 3.);
-        float anf = v[0];
-        float anf_0 = (2. * anf);
-        return vec3(anf_0, 0., 0.);
+        return vec3(2., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1513,22 +1389,8 @@ let%expect_test "function keyword desugaring" =
         float Some_0;
     };
     vec3 main_pure(vec2 u) {
-        option anf_0 = option(0, 5.);
-        int _lv_tag_0 = anf_0.tag;
-        float anf_1;
-        switch (_lv_tag_0) {
-            case 0: {
-                float _lv_Some_0_0 = anf_0.Some_0;
-                anf_1 = (_lv_Some_0_0 + 1.);
-                break;
-            }
-            default: {
-                anf_1 = 0.;
-                break;
-            }
-        }
         float anf_4 = float(1);
-        return vec3(anf_1, 1., anf_4);
+        return vec3(6., 1., anf_4);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1647,21 +1509,7 @@ let%expect_test "functions in records / structs" =
         DFn CB_0;
     };
     vec3 main_pure(vec2 pos) {
-        DFn anf = DFn(0);
-        callback cb = callback(0, anf);
-        int _lv_tag = cb.tag;
-        float r;
-        switch (_lv_tag) {
-            case 0: {
-                r = 12.;
-                break;
-            }
-            default: {
-                r = 0.;
-                break;
-            }
-        }
-        return vec3(r, 0., 0.);
+        return vec3(12., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

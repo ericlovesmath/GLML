@@ -402,21 +402,7 @@ let%expect_test "variant match in let binding" =
         float Some_0;
     };
     vec3 main_pure(vec2 coord) {
-        opt x = opt(0, 5.);
-        int _lv_tag = x.tag;
-        float v;
-        switch (_lv_tag) {
-            case 0: {
-                float _lv_Some_0 = x.Some_0;
-                v = _lv_Some_0;
-                break;
-            }
-            default: {
-                v = 0.;
-                break;
-            }
-        }
-        return vec3(v, v, v);
+        return vec3(5., 5., 5.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -486,10 +472,7 @@ let%expect_test "struct pattern matching" =
         float y;
     };
     vec3 main_pure(vec2 uv) {
-        point anf = point(1., 2.);
-        float _lv_r_x = anf.x;
-        float _lv_r_y = anf.y;
-        return vec3(_lv_r_x, _lv_r_y, 0.);
+        return vec3(1., 2., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -517,9 +500,7 @@ let%expect_test "struct pattern matching" =
         float b;
     };
     vec3 main_pure(vec2 uv) {
-        rgb c = rgb(1., 0.5, 0.);
-        float _lv_r_r = c.r;
-        return vec3(_lv_r_r, 0., 0.);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -544,9 +525,7 @@ let%expect_test "struct pattern matching" =
         float value;
     };
     vec3 main_pure(vec2 uv) {
-        box b = box(1.5);
-        float _lv_r_value = b.value;
-        return vec3(_lv_r_value, 0., 0.);
+        return vec3(1.5, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -627,10 +606,7 @@ let%expect_test "struct pattern matching" =
         float y;
     };
     vec3 main_pure(vec2 uv) {
-        point anf = point(1., 2.);
-        float _lv_r_x = anf.x;
-        float _lv_r_y = anf.y;
-        return vec3(_lv_r_x, _lv_r_y, 0.);
+        return vec3(1., 2., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -663,23 +639,11 @@ let%expect_test "bracket pattern matching" =
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
         float anf = coord[0];
-        float anf_0 = coord[1];
-        vec3 anf_1 = vec3(anf, anf_0, 0.);
-        float _lv_v0_4 = anf_1[0];
-        float _lv_v2_0 = anf_1[2];
-        float a_0 = (_lv_v0_4 + _lv_v2_0);
-        vec2 anf_2 = vec2(1., 0.);
-        vec2 anf_3 = vec2(0., 1.);
-        mat2 anf_4 = mat2(anf_2, anf_3);
-        vec2 _lv_v0_0_0 = anf_4[0];
-        vec2 _lv_v1_0_0 = anf_4[1];
-        float _lv_v0_1_0 = _lv_v0_0_0[0];
-        float _lv_v1_2_0 = _lv_v1_0_0[1];
-        float b_0 = (_lv_v0_1_0 + _lv_v1_2_0);
+        float a_0 = (anf + 0.);
         float _lv_v0_3_0 = coord[0];
         float _lv_v1_3_0 = coord[1];
         float c_0 = (_lv_v0_3_0 + _lv_v1_3_0);
-        return vec3(a_0, b_0, c_0);
+        return vec3(a_0, 2., c_0);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -715,12 +679,8 @@ let%expect_test "let pattern binding" =
     vec3 main_pure(vec2 uv) {
         float _lv_v0 = uv[0];
         float _lv_v1 = uv[1];
-        wrapper anf = wrapper(0, 1.);
-        float _lv_Wrap_0_1 = anf.Wrap_0;
-        float _lv_Wrap_0_0_0 = anf.Wrap_0;
-        float anf_0 = (_lv_Wrap_0_1 + _lv_Wrap_0_0_0);
         float anf_1 = (_lv_v0 + _lv_v1);
-        return vec3(2., anf_0, anf_1);
+        return vec3(2., 2., anf_1);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -782,33 +742,7 @@ let%expect_test "nested pattern matching with polymorphism" =
         option Some_0;
     };
     vec3 main_pure(vec2 coord) {
-        option anf = option(0, 0.5);
-        option_0 anf_0 = option_0(0, anf);
-        int _lv_tag_0_0 = anf_0.tag;
-        float v;
-        switch (_lv_tag_0_0) {
-            case 0: {
-                option _lv_Some_0_1 = anf_0.Some_0;
-                int _lv_tag_1 = _lv_Some_0_1.tag;
-                switch (_lv_tag_1) {
-                    case 0: {
-                        float _lv_Some_0_0_0 = _lv_Some_0_1.Some_0;
-                        v = _lv_Some_0_0_0;
-                        break;
-                    }
-                    default: {
-                        v = 0.;
-                        break;
-                    }
-                }
-                break;
-            }
-            default: {
-                v = 1.;
-                break;
-            }
-        }
-        return vec3(v, 0., 0.);
+        return vec3(0.5, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -840,17 +774,7 @@ let%expect_test "nested pattern matching with literals in records" =
         float y;
     };
     vec3 main_pure(vec2 coord) {
-        point p = point(0., 0.5);
-        float _lv_r_x = p.x;
-        float _lv_r_y = p.y;
-        bool _lv_cmp = (_lv_r_x == 0.);
-        float v;
-        if (_lv_cmp) {
-            v = _lv_r_y;
-        } else {
-            v = (_lv_r_x + _lv_r_y);
-        }
-        return vec3(v, 0., 0.);
+        return vec3(0.5, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1016,20 +940,7 @@ let%expect_test "pattern match exhaustiveness edge cases" =
         float Some_0;
     };
     vec3 main_pure(vec2 coord) {
-        option anf = option(0, 1.);
-        int _lv_tag = anf.tag;
-        float v;
-        switch (_lv_tag) {
-            case 0: {
-                v = 1.;
-                break;
-            }
-            default: {
-                v = 0.;
-                break;
-            }
-        }
-        return vec3(v, 0., 0.);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

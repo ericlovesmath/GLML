@@ -79,10 +79,7 @@ let%expect_test "int promotion edge cases" =
         float y;
     };
     vec3 main_pure(vec2 u) {
-        point p = point(1., 2.);
-        float anf = p.x;
-        float anf_0 = p.y;
-        return vec3(anf, anf_0, 0.);
+        return vec3(1., 2., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -109,10 +106,7 @@ let%expect_test "int promotion edge cases" =
     };
     vec3 main_pure(vec2 u) {
         float anf = float(3);
-        point p = point(anf, 0.);
-        float anf_0 = p.x;
-        float anf_1 = p.y;
-        return vec3(anf_0, anf_1, 0.);
+        return vec3(anf, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -137,10 +131,7 @@ let%expect_test "int promotion edge cases" =
         float snd;
     };
     vec3 main_pure(vec2 u) {
-        pair p = pair(true, 2.);
-        float anf = p.snd;
-        float anf_0 = p.snd;
-        return vec3(anf, anf_0, 0.);
+        return vec3(2., 2., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -166,19 +157,7 @@ let%expect_test "int promotion edge cases" =
         float Gray_0;
     };
     vec3 main_pure(vec2 u) {
-        color anf = color(0, 1.);
-        int _lv_tag = anf.tag;
-        switch (_lv_tag) {
-            case 0: {
-                float _lv_Gray_0 = anf.Gray_0;
-                return vec3(_lv_Gray_0, _lv_Gray_0, _lv_Gray_0);
-                break;
-            }
-            default: {
-                return vec3(0., 0., 0.);
-                break;
-            }
-        }
+        return vec3(1., 1., 1.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -203,9 +182,7 @@ let%expect_test "regression - polymorphic struct type in function" =
         float value;
     };
     vec3 main_pure(vec2 coord) {
-        box anf = box(1.);
-        float anf_0 = anf.value;
-        return vec3(anf_0, 0., 0.);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -233,18 +210,8 @@ let%expect_test "regression - polymorphic struct type in function" =
         float value;
     };
     vec3 main_pure(vec2 coord) {
-        box_0 anf = box_0(1.);
-        float a = anf.value;
-        box anf_0 = box(true);
-        bool anf_1 = anf_0.value;
-        int b_0;
-        if (anf_1) {
-            b_0 = 1;
-        } else {
-            b_0 = 2;
-        }
-        float anf_2 = float(b_0);
-        return vec3(a, anf_2, 0.);
+        float anf_2 = float(1);
+        return vec3(1., anf_2, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -274,26 +241,7 @@ let%expect_test "regression - polymorphic variant type in function" =
         float Some_0;
     };
     vec3 main_pure(vec2 coord) {
-        option anf = option(0, 1.);
-        int _lv_tag_0 = anf.tag;
-        bool anf_0;
-        switch (_lv_tag_0) {
-            case 0: {
-                anf_0 = true;
-                break;
-            }
-            default: {
-                anf_0 = false;
-                break;
-            }
-        }
-        float b;
-        if (anf_0) {
-            b = 1.;
-        } else {
-            b = 0.;
-        }
-        return vec3(b, 0., 0.);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -348,9 +296,7 @@ let%expect_test "field access in let binding (unannotated)" =
         float value;
     };
     vec3 main_pure(vec2 coord) {
-        box anf = box(1.);
-        float a_0 = anf.value;
-        return vec3(a_0, 0., 0.);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -379,18 +325,8 @@ let%expect_test "field access in let binding (unannotated)" =
         float value;
     };
     vec3 main_pure(vec2 coord) {
-        box_0 anf = box_0(1.);
-        float a_1 = anf.value;
-        box anf_0 = box(true);
-        bool a_0 = anf_0.value;
-        int y;
-        if (a_0) {
-            y = 1;
-        } else {
-            y = 2;
-        }
-        float anf_2 = float(y);
-        return vec3(a_1, anf_2, 0.);
+        float anf_2 = float(1);
+        return vec3(1., anf_2, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -413,10 +349,7 @@ let%expect_test "field access in let binding (unannotated)" =
         float value;
     };
     vec3 main_pure(vec2 coord) {
-        box anf = box(1.);
-        float x_0 = anf.value;
-        float anf_0 = (x_0 * 2.);
-        return vec3(anf_0, 0., 0.);
+        return vec3(2., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -829,10 +762,7 @@ let%expect_test "regression - int promotion through closures / partial applicati
         float lctor_0;
     };
     vec3 main_pure(vec2 coord) {
-        DFn f = DFn(0, 0.);
-        float _lv_lctor_0_0 = f.lctor_0;
-        float r = (_lv_lctor_0_0 + 1.);
-        return vec3(r, 0., 0.);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -883,9 +813,7 @@ let%expect_test "regression - int promotion through closures / partial applicati
     };
     vec3 main_pure(vec2 coord) {
         float anf = float(5);
-        DFn f = DFn(0, anf);
-        float _lv_lctor_0_0 = f.lctor_0;
-        float r = (_lv_lctor_0_0 + 1.);
+        float r = (anf + 1.);
         return vec3(r, 0., 0.);
     }
     void main() {
@@ -921,10 +849,7 @@ let%expect_test "regression - inferred type in higher-order local function" =
     };
     vec3 main_pure(vec2 uv) {
         float anf_0_0 = float(1);
-        float anf_1_0 = float(1);
-        vec2 result = vec2(anf_0_0, anf_1_0);
-        float anf_2 = result[0];
-        return vec3(anf_2, 0., 0.);
+        return vec3(anf_0_0, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -985,12 +910,7 @@ let%expect_test "closures in records / structs" =
         DFn fn;
     };
     vec3 main_pure(vec2 pos) {
-        DFn anf_1 = DFn(0, 5.);
-        fn_box boxed_add_five = fn_box(anf_1);
-        DFn anf_0 = boxed_add_five.fn;
-        float _lv_lctor_0_0 = anf_0.lctor_0;
-        float n = (_lv_lctor_0_0 + 10.);
-        return vec3(n, 0., 0.);
+        return vec3(15., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1027,12 +947,7 @@ let%expect_test "function in variant, match-bound var used with int arg" =
         DFn CB_0;
     };
     vec3 main_pure(vec2 pos) {
-        DFn anf = DFn(0, 1.);
-        cb f = cb(0, anf);
-        DFn _lv_CB_0 = f.CB_0;
-        float _lv_lctor_0_0 = _lv_CB_0.lctor_0;
-        float result = (_lv_lctor_0_0 + 10.);
-        return vec3(result, 0., 0.);
+        return vec3(11., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1062,9 +977,7 @@ let%expect_test "struct pattern matching on non-concrete types" =
         float value;
     };
     vec3 main_pure(vec2 uv) {
-        box anf = box(1.5);
-        float _lv_r_value_0 = anf.value;
-        return vec3(_lv_r_value_0, 0., 0.);
+        return vec3(1.5, 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1194,35 +1107,9 @@ let%expect_test "defunctionalize unifies int/float arrow flavors" =
         int tag;
     };
     vec3 main_pure(vec2 uv) {
-        DFn anf = DFn(0);
-        vec3 anf_0 = vec3(1., 0., 0.);
-        int _lv_tag_2 = anf.tag;
-        vec3 a;
-        switch (_lv_tag_2) {
-            case 0: {
-                a = vec3(0., 0., 0.);
-                break;
-            }
-            default: {
-                a = anf_0;
-                break;
-            }
-        }
-        DFn anf_1 = DFn(1);
+        vec3 a = vec3(0., 0., 0.);
         vec3 anf_2 = vec3(0., 1., 0.);
-        int _lv_tag_1 = anf_1.tag;
-        vec3 b;
-        switch (_lv_tag_1) {
-            case 0: {
-                b = vec3(0., 0., 0.);
-                break;
-            }
-            default: {
-                b = anf_2;
-                break;
-            }
-        }
-        return (a + b);
+        return (a + anf_2);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

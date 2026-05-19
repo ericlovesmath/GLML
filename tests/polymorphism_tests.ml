@@ -129,9 +129,7 @@ let%expect_test "parametrized structs" =
         float value;
     };
     vec3 main_pure(vec2 coord) {
-        box anf = box(1.);
-        float anf_0 = anf.value;
-        return vec3(anf_0, 0., 0.);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -157,9 +155,7 @@ let%expect_test "parametrized structs" =
         int snd;
     };
     vec3 main_pure(vec2 coord) {
-        pair p_0 = pair(1., 0);
-        float anf = p_0.fst;
-        return vec3(anf, 0., 0.);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -183,9 +179,7 @@ let%expect_test "parametrized structs" =
         float value;
     };
     vec3 main_pure(vec2 coord) {
-        box b = box(1.);
-        float anf = b.value;
-        return vec3(anf, 0., 0.);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -210,12 +204,7 @@ let%expect_test "parametrized structs" =
         float value;
     };
     vec3 main_pure(vec2 coord) {
-        box anf = box(1.);
-        float anf_0 = anf.value;
-        box anf_1 = box(2.);
-        float anf_2 = anf_1.value;
-        float anf_3 = (anf_0 + anf_2);
-        return vec3(anf_3, 0., 0.);
+        return vec3(3., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -261,14 +250,7 @@ let%expect_test "parametrized structs" =
         box y;
     };
     vec3 main_pure(vec2 coord) {
-        box anf = box(1.);
-        box_0 anf_0 = box_0(anf);
-        box anf_1 = box(2.);
-        point b = point(anf_0, anf_1);
-        box_0 anf_2 = b.x;
-        box anf_3 = anf_2.value;
-        float anf_4 = anf_3.value;
-        return vec3(anf_4, 0., 0.);
+        return vec3(1., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -418,36 +400,8 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
         float Some_0;
     };
     vec3 main_pure(vec2 coord) {
-        option_0 anf = option_0(0, 1.);
-        int _lv_tag_0_0 = anf.tag;
-        float x_0;
-        switch (_lv_tag_0_0) {
-            case 0: {
-                float _lv_Some_0_0_0 = anf.Some_0;
-                x_0 = _lv_Some_0_0_0;
-                break;
-            }
-            default: {
-                x_0 = 2.;
-                break;
-            }
-        }
-        option anf_0 = option(0, 5);
-        int _lv_tag_1 = anf_0.tag;
-        int y;
-        switch (_lv_tag_1) {
-            case 0: {
-                int _lv_Some_0_1 = anf_0.Some_0;
-                y = _lv_Some_0_1;
-                break;
-            }
-            default: {
-                y = 5;
-                break;
-            }
-        }
-        float anf_1 = float(y);
-        return vec3(anf_1, x_0, 0.);
+        float anf_1 = float(5);
+        return vec3(anf_1, 1., 0.);
     }
     uniform vec2 u_resolution;
     uniform float u_time;
@@ -479,18 +433,8 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
         float value;
     };
     vec3 main_pure(vec2 coord) {
-        box_0 anf = box_0(1.);
-        float a_2 = anf.value;
-        box anf_0 = box(true);
-        bool a_1 = anf_0.value;
-        int b_0;
-        if (a_1) {
-            b_0 = 1;
-        } else {
-            b_0 = 2;
-        }
-        float anf_2 = float(b_0);
-        return vec3(a_2, anf_2, 0.);
+        float anf_2 = float(1);
+        return vec3(1., anf_2, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -591,10 +535,7 @@ let%expect_test "parametric annotations" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        vec3 anf = vec3(1., 2., 3.);
-        float anf_0 = anf[0];
-        float anf_1 = anf[1];
-        return vec3(1., anf_0, anf_1);
+        return vec3(1., 1., 2.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
