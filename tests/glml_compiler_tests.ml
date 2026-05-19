@@ -283,9 +283,6 @@ let%expect_test "lambda lifting" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
     vec3 main_pure(vec2 u) {
         return vec3(11., 0., 0.);
     }
@@ -361,15 +358,6 @@ let%expect_test "structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct color {
-        float r;
-        float g;
-        float b;
-    };
-    struct point {
-        float x;
-        float y;
-    };
     vec3 main_pure(vec2 u) {
         return vec3(2., 0., 0.);
     }
@@ -402,15 +390,6 @@ let%expect_test "structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct color {
-        float r;
-        float g;
-        float b;
-    };
-    struct point {
-        float x;
-        float y;
-    };
     vec3 main_pure(vec2 u) {
         return vec3(1., 0., 0.);
     }
@@ -675,9 +654,6 @@ let%expect_test "defunctionalization" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
     vec3 main_pure(vec2 pos) {
         float anf_0 = pos[0];
         float r = (anf_0 * 2.);
@@ -701,9 +677,6 @@ let%expect_test "defunctionalization" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
     vec3 main_pure(vec2 pos) {
         float anf_0 = pos[0];
         float r = (anf_0 + 1.);
@@ -728,10 +701,6 @@ let%expect_test "defunctionalization" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        float lctor_0;
-    };
     vec3 main_pure(vec2 pos) {
         float px = pos[0];
         float anf_0 = pos[1];
@@ -757,10 +726,6 @@ let%expect_test "defunctionalization" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        vec2 lctor_0;
-    };
     vec3 main_pure(vec2 pos) {
         float anf_1 = pos[1];
         float anf_4 = pos[0];
@@ -790,9 +755,6 @@ let%expect_test "defunctionalization" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
     vec3 main_pure(vec2 pos) {
         float anf_0 = pos[0];
         float a = (anf_0 * 2.);
@@ -821,9 +783,6 @@ let%expect_test "defunctionalization" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
     vec3 main_pure(vec2 pos) {
         float anf_0 = pos[0];
         float anf_1 = pos[1];
@@ -847,9 +806,6 @@ let%expect_test "defunctionalization" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
     vec3 main_pure(vec2 uv) {
         return vec3(0., 2., 4.);
     }
@@ -875,10 +831,6 @@ let%expect_test "defunctionalization - returning closures" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        float lctor_0;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(1., 0., 0.);
     }
@@ -900,10 +852,6 @@ let%expect_test "defunctionalization - returning closures" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        float lctor_0;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(1., 0., 0.);
     }
@@ -926,10 +874,6 @@ let%expect_test "defunctionalization - returning closures" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        float lctor_0;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(3., 0., 0.);
     }
@@ -956,14 +900,6 @@ let%expect_test "defunctionalization - partial application of first-class functi
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
-    struct DFn_0 {
-        int tag;
-        DFn lctor_0;
-        float lctor_1;
-    };
     vec3 main_pure(vec2 pos) {
         float anf = pos[0];
         float anf_0 = pos[1];
@@ -991,19 +927,6 @@ let%expect_test "defunctionalization - partial application of first-class functi
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
-    struct DFn_0 {
-        int tag;
-        DFn lctor_0;
-        float lctor_1;
-    };
-    struct DFn_1 {
-        int tag;
-        DFn_0 lctor_0_0;
-        float lctor_0_1;
-    };
     vec3 main_pure(vec2 pos) {
         float anf_0 = pos[0];
         float r = (3. + anf_0);
@@ -1029,14 +952,6 @@ let%expect_test "defunctionalization - partial application of first-class functi
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_0 {
-        int tag;
-    };
-    struct DFn {
-        int tag;
-        DFn_0 lctor_0;
-        float lctor_1;
-    };
     vec3 main_pure(vec2 pos) {
         float anf = pos[0];
         float anf_1 = pos[1];
@@ -1063,10 +978,6 @@ let%expect_test "defunctionalization - partial application of first-class functi
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        int lctor_0;
-    };
     vec3 main_pure(vec2 uv) {
         return vec3(3., 3., 3.);
     }
@@ -1140,7 +1051,6 @@ let%expect_test "toplevel complex consts / promotion to zero-arg functions" =
     vec3 main_pure(vec2 coord) {
         return vec3(3.14159, 3.14159, 3.14159);
     }
-    uniform float u_scale;
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
@@ -1158,9 +1068,6 @@ let%expect_test "toplevel complex consts / promotion to zero-arg functions" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct v_4 {
-        float a;
-    };
     const float derived = 6.;
     vec3 main_pure(vec2 coord) {
         return vec3(derived, 0., 0.);
@@ -1368,17 +1275,6 @@ let%expect_test "function keyword desugaring" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
-    struct DFn_0 {
-        int tag;
-        DFn lctor_0;
-    };
-    struct option {
-        int tag;
-        float Some_0;
-    };
     vec3 main_pure(vec2 u) {
         return vec3(6., 1., 1.);
     }
@@ -1428,12 +1324,6 @@ let%expect_test "functions in records / structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
-    struct fn_box {
-        DFn fn;
-    };
     vec3 main_pure(vec2 pos) {
         return vec3(6., 0., 0.);
     }
@@ -1458,12 +1348,6 @@ let%expect_test "functions in records / structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
-    struct fn_box {
-        DFn fn;
-    };
     vec3 main_pure(vec2 pos) {
         return vec3(12., 0., 0.);
     }
@@ -1491,13 +1375,6 @@ let%expect_test "functions in records / structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
-    struct callback {
-        int tag;
-        DFn CB_0;
-    };
     vec3 main_pure(vec2 pos) {
         return vec3(12., 0., 0.);
     }

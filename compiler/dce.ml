@@ -5,18 +5,25 @@ module Err = Compiler_error.Pass (struct
     let name = "dce"
   end)
 
-let ftv_atom (a : atom) : String.Set.t =
+let var_of_atom (a : atom) =
   match a.desc with
-  | Var v -> String.Set.singleton v
-  | Int _ | Float _ | Bool _ -> String.Set.empty
+  | Var v -> Some v
+  | Int _ | Float _ | Bool _ -> None
 ;;
 
-let ftv_atoms (atoms : atom list) : String.Set.t =
-  String.Set.union_list (List.map ~f:ftv_atom atoms)
+(** Atoms appearing directly in [t] (excluding sub-anfs of [If]/[Switch]). *)
+let atoms_of_term (t : term) : atom list =
+  match t.desc with
+  | Atom a | Index (a, _) | Field (a, _) -> [ a ]
+  | Bop (_, l, r) -> [ l; r ]
+  | Vec (_, atoms) | Builtin (_, atoms) | Record atoms | App (_, atoms) -> atoms
+  | If _ | Switch _ -> []
 ;;
+
+let vars_of_atoms atoms = List.filter_map atoms ~f:var_of_atom |> String.Set.of_list
 
 (** Does [a] contain a [While]/[Set] *)
-let rec effectful_anf (a : anf) : bool =
+let rec effectful_anf (a : anf) =
   match a.desc with
   | Set _ | While _ -> true
   | Return t -> effectful_term t
@@ -24,7 +31,7 @@ let rec effectful_anf (a : anf) : bool =
   | Placeholder (_, t) -> effectful_anf t
   | Continue -> false
 
-and effectful_term (t : term) : bool =
+and effectful_term (t : term) =
   match t.desc with
   | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Field _ -> false
   | If (_, t, e) -> effectful_anf t || effectful_anf e
@@ -53,7 +60,7 @@ let rec liveness_anf ~(live : String.Set.t) (a : anf) : anf * String.Set.t =
     let t, live_t = liveness_anf ~live t in
     if Set.mem live_t v
     then (
-      let live = Set.union (Set.remove live_t v) (ftv_atom x) in
+      let live = Set.union (Set.remove live_t v) (vars_of_atoms [ x ]) in
       { a with desc = Set (v, x, t) }, live)
     else t, live_t
   | While (cond, body, tl) ->
@@ -71,23 +78,19 @@ let rec liveness_anf ~(live : String.Set.t) (a : anf) : anf * String.Set.t =
 
 and liveness_term ~(live : String.Set.t) (t : term) : term * String.Set.t =
   match t.desc with
-  | Atom a -> t, ftv_atom a
-  | Bop (_, l, r) -> t, Set.union (ftv_atom l) (ftv_atom r)
-  | Vec (_, atoms) | Builtin (_, atoms) | Record atoms -> t, ftv_atoms atoms
-  | App (_, atoms) -> t, ftv_atoms atoms
-  | Index (a, _) | Field (a, _) -> t, ftv_atom a
   | If (c, th, e) ->
     let th, live_th = liveness_anf ~live th in
     let e, live_e = liveness_anf ~live e in
-    let live = Set.union (ftv_atom c) (Set.union live_th live_e) in
-    { t with desc = If (c, th, e) }, live
+    ( { t with desc = If (c, th, e) }
+    , Set.union (vars_of_atoms [ c ]) (Set.union live_th live_e) )
   | Switch (s, cases) ->
     let live, cases =
-      List.fold_map cases ~init:(ftv_atom s) ~f:(fun acc (lbl, a) ->
+      List.fold_map cases ~init:(vars_of_atoms [ s ]) ~f:(fun acc (lbl, a) ->
         let a, live_a = liveness_anf ~live a in
         Set.union acc live_a, (lbl, a))
     in
     { t with desc = Switch (s, cases) }, live
+  | _ -> t, vars_of_atoms (atoms_of_term t)
 ;;
 
 let liveness_top (top : top) : top =
@@ -101,44 +104,61 @@ let liveness_top (top : top) : top =
   | Extern _ | TypeDef _ -> top
 ;;
 
-(** Names referenced anywhere (for reachability) *)
-let reachable_atom (acc : String.Set.t) (a : atom) : String.Set.t =
-  match a.desc with
-  | Var v -> Set.add acc v
-  | Int _ | Float _ | Bool _ -> acc
+let rec ty_refs (acc : String.Set.t) (ty : Monomorphize.ty) : String.Set.t =
+  match ty with
+  | TyFloat | TyInt | TyBool -> acc
+  | TyVec (_, t) -> ty_refs acc t
+  | TyArrow (a, b) -> ty_refs (ty_refs acc a) b
+  | TyRecord s | TyVariant s -> Set.add acc s
 ;;
 
-let rec reachable_term (acc : String.Set.t) (t : term) : String.Set.t =
-  match t.desc with
-  | Atom a -> reachable_atom acc a
-  | Bop (_, l, r) -> reachable_atom (reachable_atom acc l) r
-  | Vec (_, atoms) | Builtin (_, atoms) | Record atoms ->
-    List.fold atoms ~init:acc ~f:reachable_atom
-  | App (name, atoms) -> List.fold atoms ~init:(Set.add acc name) ~f:reachable_atom
-  | Index (a, _) | Field (a, _) -> reachable_atom acc a
-  | If (c, t, e) -> reachable_anf (reachable_anf (reachable_atom acc c) t) e
-  | Switch (s, cases) ->
-    List.fold cases ~init:(reachable_atom acc s) ~f:(fun acc (_, a) ->
-      reachable_anf acc a)
+let atom_refs acc (a : atom) =
+  Option.fold (var_of_atom a) ~init:(ty_refs acc a.ty) ~f:Set.add
+;;
 
-and reachable_anf (acc : String.Set.t) (a : anf) : String.Set.t =
+let rec term_refs acc (t : term) =
+  let acc = ty_refs acc t.ty in
+  match t.desc with
+  | If (c, th, e) -> List.fold [ th; e ] ~init:(atom_refs acc c) ~f:anf_refs
+  | Switch (s, cases) ->
+    List.fold (List.map cases ~f:snd) ~init:(atom_refs acc s) ~f:anf_refs
+  | App (name, atoms) -> List.fold atoms ~init:(Set.add acc name) ~f:atom_refs
+  | _ -> List.fold (atoms_of_term t) ~init:acc ~f:atom_refs
+
+and anf_refs acc (a : anf) =
+  let acc = ty_refs acc a.ty in
   match a.desc with
-  | Return t -> reachable_term acc t
-  | Let (_, b, t) -> reachable_anf (reachable_term acc b) t
-  | Placeholder (_, t) -> reachable_anf acc t
-  | While (c, b, tl) -> reachable_anf (reachable_anf (reachable_term acc c) b) tl
-  | Set (_, x, t) -> reachable_anf (reachable_atom acc x) t
+  | Return t -> term_refs acc t
+  | Let (_, b, t) -> anf_refs (term_refs acc b) t
+  | Placeholder (_, t) -> anf_refs acc t
+  | While (c, b, tl) -> List.fold [ b; tl ] ~init:(term_refs acc c) ~f:anf_refs
+  | Set (_, x, t) -> anf_refs (atom_refs acc x) t
   | Continue -> acc
 ;;
 
-(** Reachable top-level names starting from [main] *)
+let top_refs (top : top) : String.Set.t =
+  let empty = String.Set.empty in
+  match top.desc with
+  | Define { name = _; args; body; ret_ty } ->
+    List.fold (ret_ty :: List.map args ~f:snd) ~init:(anf_refs empty body) ~f:ty_refs
+  | Const (_, body) -> anf_refs empty body
+  | TypeDef (_, RecordDecl fields) ->
+    List.fold (List.map fields ~f:snd) ~init:empty ~f:ty_refs
+  | TypeDef (_, VariantDecl ctors) ->
+    List.fold (List.concat_map ctors ~f:snd) ~init:empty ~f:ty_refs
+  | Extern _ -> empty
+;;
+
+let name_of_top (top : top) =
+  match top.desc with
+  | Define { name; _ } | Const (name, _) | Extern name | TypeDef (name, _) -> name
+;;
+
+(** Reachable top-level names starting from [main]. Covers defines, consts,
+    externs, and type names. *)
 let reachable_tops (tops : top list) : String.Set.t =
-  let body_of =
-    List.filter_map tops ~f:(fun top ->
-      match top.desc with
-      | Define { name; body; _ } -> Some (name, body)
-      | Const (name, body) -> Some (name, body)
-      | Extern _ | TypeDef _ -> None)
+  let top_by_name =
+    List.map tops ~f:(fun top -> name_of_top top, top)
     |> String.Map.of_alist_or_error
     |> Err.of_or_error
     |> Err.ok_exn
@@ -149,11 +169,9 @@ let reachable_tops (tops : top list) : String.Set.t =
     | name :: rest when Set.mem acc name -> dfs rest acc
     | name :: rest ->
       let acc = Set.add acc name in
-      (match Map.find body_of name with
+      (match Map.find top_by_name name with
        | None -> dfs rest acc
-       | Some body ->
-         let refs = reachable_anf String.Set.empty body in
-         dfs (Set.to_list refs @ rest) acc)
+       | Some top -> dfs (Set.to_list (top_refs top) @ rest) acc)
   in
   dfs [ "main" ] String.Set.empty
 ;;
@@ -161,11 +179,5 @@ let reachable_tops (tops : top list) : String.Set.t =
 let rewrite (Program tops : t) : t =
   let tops = List.map tops ~f:liveness_top in
   let live = reachable_tops tops in
-  let tops =
-    List.filter tops ~f:(fun top ->
-      match top.desc with
-      | Define { name; _ } | Const (name, _) -> Set.mem live name
-      | Extern _ | TypeDef _ -> true)
-  in
-  Program tops
+  Program (List.filter tops ~f:(fun top -> Set.mem live (name_of_top top)))
 ;;

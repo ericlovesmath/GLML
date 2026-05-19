@@ -152,7 +152,6 @@ let%expect_test "compile examples" =
         vec3 col_2 = mix(col_1, anf_34, anf_36);
         return col_2;
     }
-    uniform float u_time;
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
@@ -923,7 +922,6 @@ let%expect_test "compile examples" =
             }
         }
     }
-    uniform float u_time;
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);

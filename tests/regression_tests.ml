@@ -71,10 +71,6 @@ let%expect_test "int promotion edge cases" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct point {
-        float x;
-        float y;
-    };
     vec3 main_pure(vec2 u) {
         return vec3(1., 2., 0.);
     }
@@ -97,10 +93,6 @@ let%expect_test "int promotion edge cases" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct point {
-        float x;
-        float y;
-    };
     vec3 main_pure(vec2 u) {
         return vec3(3., 0., 0.);
     }
@@ -122,10 +114,6 @@ let%expect_test "int promotion edge cases" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct pair {
-        bool fst;
-        float snd;
-    };
     vec3 main_pure(vec2 u) {
         return vec3(2., 2., 0.);
     }
@@ -148,10 +136,6 @@ let%expect_test "int promotion edge cases" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct color {
-        int tag;
-        float Gray_0;
-    };
     vec3 main_pure(vec2 u) {
         return vec3(1., 1., 1.);
     }
@@ -174,9 +158,6 @@ let%expect_test "regression - polymorphic struct type in function" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct box {
-        float value;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(1., 0., 0.);
     }
@@ -199,12 +180,6 @@ let%expect_test "regression - polymorphic struct type in function" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct box {
-        bool value;
-    };
-    struct box_0 {
-        float value;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(1., 1., 0.);
     }
@@ -231,10 +206,6 @@ let%expect_test "regression - polymorphic variant type in function" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct option {
-        int tag;
-        float Some_0;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(1., 0., 0.);
     }
@@ -287,9 +258,6 @@ let%expect_test "field access in let binding (unannotated)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct box {
-        float value;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(1., 0., 0.);
     }
@@ -313,12 +281,6 @@ let%expect_test "field access in let binding (unannotated)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct box {
-        bool value;
-    };
-    struct box_0 {
-        float value;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(1., 1., 0.);
     }
@@ -339,9 +301,6 @@ let%expect_test "field access in let binding (unannotated)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct box {
-        float value;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(2., 0., 0.);
     }
@@ -432,13 +391,6 @@ let%expect_test "regression - no recursive DFn structs from partial application"
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
-    struct DFn_0 {
-        int tag;
-        DFn lctor_0;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(0., 0., 0.);
     }
@@ -746,10 +698,6 @@ let%expect_test "regression - int promotion through closures / partial applicati
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        float lctor_0;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(1., 0., 0.);
     }
@@ -796,10 +744,6 @@ let%expect_test "regression - int promotion through closures / partial applicati
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        float lctor_0;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(6., 0., 0.);
     }
@@ -831,9 +775,6 @@ let%expect_test "regression - inferred type in higher-order local function" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
     vec3 main_pure(vec2 uv) {
         return vec3(1., 0., 0.);
     }
@@ -856,9 +797,6 @@ let%expect_test "regression - inferred type in higher-order local function" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
     vec3 main_pure(vec2 uv) {
         return vec3(1., 1., 1.);
     }
@@ -888,13 +826,6 @@ let%expect_test "closures in records / structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        float lctor_0;
-    };
-    struct fn_box {
-        DFn fn;
-    };
     vec3 main_pure(vec2 pos) {
         return vec3(15., 0., 0.);
     }
@@ -924,14 +855,6 @@ let%expect_test "function in variant, match-bound var used with int arg" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        float lctor_0;
-    };
-    struct cb {
-        int tag;
-        DFn CB_0;
-    };
     vec3 main_pure(vec2 pos) {
         return vec3(11., 0., 0.);
     }
@@ -959,9 +882,6 @@ let%expect_test "struct pattern matching on non-concrete types" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct box {
-        float value;
-    };
     vec3 main_pure(vec2 uv) {
         return vec3(1.5, 0., 0.);
     }
@@ -1089,9 +1009,6 @@ let%expect_test "defunctionalize unifies int/float arrow flavors" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
     vec3 main_pure(vec2 uv) {
         return vec3(0., 1., 0.);
     }
@@ -1159,10 +1076,6 @@ let%expect_test "promote ints through variant constructor coerce" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct option {
-        int tag;
-        float Some_0;
-    };
     vec3 main_pure(vec2 uv) {
         return vec3(0., 0., 0.);
     }
@@ -1213,13 +1126,6 @@ let%expect_test "HOF that applies param but is never called drops wrapper" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
-    struct DFn_0 {
-        int tag;
-        DFn lctor_0;
-    };
     vec3 main_pure(vec2 uv) {
         return vec3(0., 0., 0.);
     }
@@ -1276,13 +1182,6 @@ let%expect_test "DFn promotion when partial-app result flows to HOF param" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
-    struct DFn_0 {
-        int tag;
-        DFn lctor_0;
-    };
     vec3 main_pure(vec2 coord) {
         vec3 col = vec3(0., 0., 0.);
         return col;
@@ -1313,13 +1212,6 @@ let%expect_test "DFn promotion when consume is declared before producer" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
-    struct DFn_0 {
-        int tag;
-        DFn lctor_0;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(0., 0., 0.);
     }

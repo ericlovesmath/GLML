@@ -397,10 +397,6 @@ let%expect_test "variant match in let binding" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct opt {
-        int tag;
-        float Some_0;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(5., 5., 5.);
     }
@@ -467,10 +463,6 @@ let%expect_test "struct pattern matching" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct point {
-        float x;
-        float y;
-    };
     vec3 main_pure(vec2 uv) {
         return vec3(1., 2., 0.);
     }
@@ -494,11 +486,6 @@ let%expect_test "struct pattern matching" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct rgb {
-        float r;
-        float g;
-        float b;
-    };
     vec3 main_pure(vec2 uv) {
         return vec3(1., 0., 0.);
     }
@@ -521,9 +508,6 @@ let%expect_test "struct pattern matching" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct box {
-        float value;
-    };
     vec3 main_pure(vec2 uv) {
         return vec3(1.5, 0., 0.);
     }
@@ -601,10 +585,6 @@ let%expect_test "struct pattern matching" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct point {
-        float x;
-        float y;
-    };
     vec3 main_pure(vec2 uv) {
         return vec3(1., 2., 0.);
     }
@@ -672,10 +652,6 @@ let%expect_test "let pattern binding" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct wrapper {
-        int tag;
-        float Wrap_0;
-    };
     vec3 main_pure(vec2 uv) {
         float _lv_v0 = uv[0];
         float _lv_v1 = uv[1];
@@ -733,14 +709,6 @@ let%expect_test "nested pattern matching with polymorphism" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct option {
-        int tag;
-        float Some_0;
-    };
-    struct option_0 {
-        int tag;
-        option Some_0;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(0.5, 0., 0.);
     }
@@ -769,10 +737,6 @@ let%expect_test "nested pattern matching with literals in records" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct point {
-        float x;
-        float y;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(0.5, 0., 0.);
     }
@@ -935,10 +899,6 @@ let%expect_test "pattern match exhaustiveness edge cases" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct option {
-        int tag;
-        float Some_0;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(1., 0., 0.);
     }

@@ -121,9 +121,6 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct box {
-        float value;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(1., 0., 0.);
     }
@@ -146,10 +143,6 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct pair {
-        float fst;
-        int snd;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(1., 0., 0.);
     }
@@ -171,9 +164,6 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct box {
-        float value;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(1., 0., 0.);
     }
@@ -196,9 +186,6 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct box {
-        float value;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(3., 0., 0.);
     }
@@ -235,16 +222,6 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct box {
-        float value;
-    };
-    struct box_0 {
-        box value;
-    };
-    struct point {
-        box_0 x;
-        box y;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(1., 0., 0.);
     }
@@ -387,19 +364,9 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct option {
-        int tag;
-        int Some_0;
-    };
-    struct option_0 {
-        int tag;
-        float Some_0;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(5., 1., 0.);
     }
-    uniform vec2 u_resolution;
-    uniform float u_time;
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
@@ -421,12 +388,6 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct box {
-        bool value;
-    };
-    struct box_0 {
-        float value;
-    };
     vec3 main_pure(vec2 coord) {
         return vec3(1., 1., 0.);
     }
