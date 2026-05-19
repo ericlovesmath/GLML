@@ -467,15 +467,9 @@ let%expect_test "regression - defunctionalization closure globals use correct da
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        float lctor_0;
-    };
-    const DFn scene = DFn(0, 0.5);
     vec3 main_pure(vec2 coord) {
         float anf = coord[0];
-        float _lv_lctor_0_0 = scene.lctor_0;
-        float d = (_lv_lctor_0_0 + anf);
+        float d = (0.5 + anf);
         return vec3(d, 0., 0.);
     }
     void main() {
@@ -523,16 +517,8 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        int lctor_0;
-    };
-    const DFn inc_m = DFn(0, 1);
     vec3 main_pure(vec2 uv) {
-        int _lv_lctor_0_0 = inc_m.lctor_0;
-        int anf = (_lv_lctor_0_0 + 1);
-        float anf_0 = float(anf);
-        return vec3(anf_0, 1., 1.);
+        return vec3(2., 1., 1.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -553,16 +539,8 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        int lctor_0;
-    };
-    const DFn inc_m = DFn(0, 1);
     vec3 main_pure(vec2 uv) {
-        int _lv_lctor_0_0 = inc_m.lctor_0;
-        float anf_2 = float(_lv_lctor_0_0);
-        float anf_0 = (anf_2 + 1.);
-        return vec3(anf_0, 0., 0.);
+        return vec3(2., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -586,33 +564,8 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        int lctor_0;
-        float lctor_0_0;
-    };
-    const DFn add_one_m = DFn(0, 1, 0.);
-    float dapply(DFn dfn, float da) {
-        int _lv_tag = dfn.tag;
-        switch (_lv_tag) {
-            case 0: {
-                int _lv_lctor_0 = dfn.lctor_0;
-                float anf_2 = float(_lv_lctor_0);
-                return (da + anf_2);
-                break;
-            }
-            default: {
-                float _lv_lctor_0_0 = dfn.lctor_0_0;
-                return (da * _lv_lctor_0_0);
-                break;
-            }
-        }
-    }
-    const DFn scale_m = DFn(1, 0, 2.);
     vec3 main_pure(vec2 uv) {
-        float anf_0 = dapply(add_one_m, 3.);
-        float anf_1 = dapply(scale_m, anf_0);
-        return vec3(anf_1, 0., 0.);
+        return vec3(8., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -635,14 +588,8 @@ let%expect_test "regression - partial application stored as top level value" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        vec3 lctor_0;
-    };
-    const DFn warm_m = DFn(0, vec3(0.5, 0.3, 0.1));
     vec3 main_pure(vec2 coord) {
-        vec3 _lv_lctor_0_0 = warm_m.lctor_0;
-        vec3 anf_0_1 = (_lv_lctor_0_0 * 2.);
+        vec3 anf_0_1 = vec3(1., 0.6, 0.2);
         vec3 anf_2 = cos(anf_0_1);
         float a_0 = anf_2[0];
         return vec3(a_0, 0., 0.);
@@ -665,15 +612,8 @@ let%expect_test "regression - partial application stored as top level value" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        float lctor_0;
-    };
-    const DFn add5 = DFn(0, 5.);
     vec3 main_pure(vec2 coord) {
-        float _lv_lctor_0_0 = add5.lctor_0;
-        float r = (_lv_lctor_0_0 + 3.);
-        return vec3(r, r, r);
+        return vec3(8., 8., 8.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

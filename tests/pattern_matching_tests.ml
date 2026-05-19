@@ -334,41 +334,8 @@ let%expect_test "variants and matching" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct shape {
-        int tag;
-        float Circle_0;
-        float Rect_0;
-        float Rect_1;
-    };
-    float area(shape s) {
-        int _lv_tag = s.tag;
-        switch (_lv_tag) {
-            case 0: {
-                float _lv_Circle_0 = s.Circle_0;
-                float anf = (3.14159 * _lv_Circle_0);
-                return (anf * _lv_Circle_0);
-                break;
-            }
-            case 1: {
-                float _lv_Rect_0 = s.Rect_0;
-                float _lv_Rect_1 = s.Rect_1;
-                return (_lv_Rect_0 * _lv_Rect_1);
-                break;
-            }
-            default: {
-                return 0.;
-                break;
-            }
-        }
-    }
     vec3 main_pure(vec2 coord) {
-        shape anf_0 = shape(0, 2., 0., 0.);
-        float a = area(anf_0);
-        shape anf_1 = shape(1, 0., 3., 4.);
-        float b = area(anf_1);
-        shape anf_2 = shape(2, 0., 0., 0.);
-        float c = area(anf_2);
-        return vec3(a, b, c);
+        return vec3(12.56636, 12., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

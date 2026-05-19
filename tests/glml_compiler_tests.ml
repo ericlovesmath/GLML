@@ -443,18 +443,8 @@ let%expect_test "nested structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct point {
-        float x;
-        float y;
-    };
-    struct segment {
-        point start;
-        point end;
-    };
     vec3 main_pure(vec2 u_0) {
-        point anf_0_0 = point(1., 1.);
-        float c = anf_0_0.x;
-        return vec3(c, c, c);
+        return vec3(1., 1., 1.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -1068,9 +1058,8 @@ let%expect_test "toplevel complex consts / promotion to zero-arg functions" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    const float derived = 6.;
     vec3 main_pure(vec2 coord) {
-        return vec3(derived, 0., 0.);
+        return vec3(6., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

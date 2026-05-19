@@ -1,8 +1,6 @@
 open Core
 open Remove_placeholder
 
-type inlinable = (string * Monomorphize.ty) list * anf
-
 (* ========== Instantiating a body ========== *)
 
 let lookup env v = Map.find env v |> Option.value ~default:v
@@ -69,7 +67,7 @@ let instantiate ~formals ~actuals ~body =
   on_anf init_subst String.Map.empty body
 ;;
 
-(* ========== Inlining Heuristics ========== *)
+(* ========== Size / shape heuristics ========== *)
 
 let rec size_anf (a : anf) =
   match a.desc with
@@ -105,48 +103,104 @@ and has_while_term (t : term) =
   | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Field _ -> false
 ;;
 
-(* Collect the name of every function called anywhere in [tops]. *)
-let all_call_sites (tops : top list) : string list =
-  let rec anf (a : anf) =
+let count_call_sites (tops : top list) : int String.Map.t =
+  let rec on_anf (a : anf) acc =
     match a.desc with
-    | Return t -> term t
-    | Continue -> []
-    | Let (_, t, tl) -> term t @ anf tl
-    | Placeholder (_, tl) -> anf tl
-    | While (c, b, tl) -> term c @ anf b @ anf tl
-    | Set (_, _, tl) -> anf tl
-  and term (t : term) =
+    | Return t -> on_term t acc
+    | Continue -> acc
+    | Let (_, t, tl) -> acc |> on_term t |> on_anf tl
+    | Placeholder (_, tl) -> on_anf tl acc
+    | While (c, b, tl) -> acc |> on_term c |> on_anf b |> on_anf tl
+    | Set (_, _, tl) -> on_anf tl acc
+  and on_term (t : term) acc =
     match t.desc with
-    | App (f, _) -> [ f ]
-    | If (_, t, e) -> anf t @ anf e
-    | Switch (_, cases) -> List.concat_map cases ~f:(fun (_, b) -> anf b)
-    | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | Record _ | Field _ -> []
+    | App (f, _) ->
+      Map.update acc f ~f:(function
+        | None -> 1
+        | Some n -> n + 1)
+    | If (_, t, e) -> on_anf t acc |> on_anf e
+    | Switch (_, cases) -> List.fold_right cases ~init:acc ~f:(fun (_, b) -> on_anf b)
+    | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | Record _ | Field _ -> acc
   in
-  List.concat_map tops ~f:(fun top ->
+  List.fold tops ~init:String.Map.empty ~f:(fun acc top ->
     match top.desc with
-    | Define { body; _ } | Const (_, body) -> anf body
-    | Extern _ | TypeDef _ -> [])
+    | Define { body; _ } | Const (_, body) -> on_anf body acc
+    | Extern _ | TypeDef _ -> acc)
 ;;
 
-let count_call_sites tops : int String.Map.t =
-  all_call_sites tops
-  |> List.fold ~init:String.Map.empty ~f:(fun m f ->
-    Map.update m f ~f:(function
-      | None -> 1
-      | Some n -> n + 1))
+(** Does [body] read any formal via [Field _] or [Switch(Field _, _)]?
+    This is used for [case-of-known-constructor] *)
+let projects_formal (formals : (string * Monomorphize.ty) list) (body : anf) : bool =
+  let formals = String.Set.of_list (List.map formals ~f:fst) in
+  let is_formal (a : atom) =
+    match a.desc with
+    | Var v -> Set.mem formals v
+    | _ -> false
+  in
+  let rec on_anf (a : anf) =
+    match a.desc with
+    | Return t -> on_term t
+    | Continue -> false
+    | Let (_, t, k) -> on_term t || on_anf k
+    | Placeholder (_, k) -> on_anf k
+    | While (c, b, tl) -> on_term c || on_anf b || on_anf tl
+    | Set (_, _, k) -> on_anf k
+  and on_term (t : term) =
+    match t.desc with
+    | Field (a, _) -> is_formal a
+    | Switch (s, cases) -> is_formal s || List.exists cases ~f:(fun (_, b) -> on_anf b)
+    | If (_, t, e) -> on_anf t || on_anf e
+    | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ -> false
+  in
+  on_anf body
 ;;
 
-(** Collects functions that we should inline, heuristics live here.
+(* ========== Inlining entries ========== *)
 
-    Body size <= 3 or if there is exactly one call site *)
-let collect_inlinable (tops : top list) : inlinable String.Map.t =
+type guard =
+  | Unconditional (* Always inline *)
+  | On_record_actual (* Only inline when actual argument is a literal record *)
+
+type entry =
+  { formals : (string * Monomorphize.ty) list
+  ; body : anf
+  ; guard : guard
+  }
+
+let collect_entries (tops : top list) : entry String.Map.t =
   let counts = count_call_sites tops in
   let call_count n = Map.find counts n |> Option.value ~default:0 in
   List.fold tops ~init:String.Map.empty ~f:(fun acc top ->
     match top.desc with
-    | Define { name; args; body; _ }
-      when (not (has_while_anf body)) && (size_anf body <= 3 || call_count name = 1) ->
-      Map.set acc ~key:name ~data:(args, body)
+    | Define { name; args; body; _ } when not (has_while_anf body) ->
+      let guard =
+        if size_anf body <= 3 || call_count name = 1
+        then Some Unconditional
+        else if projects_formal args body
+        then Some On_record_actual
+        else None
+      in
+      (match guard with
+       | Some guard -> Map.set acc ~key:name ~data:{ formals = args; body; guard }
+       | None -> acc)
+    | Define _ | Const _ | Extern _ | TypeDef _ -> acc)
+;;
+
+(** Names of top-level [Const]s whose body tail is a [Record] literal *)
+let collect_record_const_names (tops : top list) : String.Set.t =
+  let rec returns_record (a : anf) : bool =
+    match a.desc with
+    | Return t ->
+      (match t.desc with
+       | Record _ -> true
+       | _ -> false)
+    | Let (_, _, tl) | Placeholder (_, tl) | Set (_, _, tl) -> returns_record tl
+    | While _ | Continue -> false
+  in
+  List.fold tops ~init:String.Set.empty ~f:(fun acc top ->
+    match top.desc with
+    | Const (name, body) when (not (has_while_anf body)) && returns_record body ->
+      Set.add acc name
     | Define _ | Const _ | Extern _ | TypeDef _ -> acc)
 ;;
 
@@ -165,52 +219,74 @@ let rec splice ~v ~tl (t : anf) =
   { t with desc }
 ;;
 
-let inline_top (init : inlinable String.Map.t) (top : top) : top =
-  let rec on_anf inlinable (a : anf) : anf =
-    match a.desc with
-    | Continue -> a
-    | Return t ->
-      (match try_inline_term inlinable t with
-       | Some body -> body
-       | None -> { a with desc = Return (on_term inlinable t) })
-    | Let (v, t, tl) ->
-      let tl = on_anf inlinable tl in
-      (match try_inline_term inlinable t with
-       | Some body -> splice ~v ~tl body
-       | None -> { a with desc = Let (v, on_term inlinable t, tl) })
-    | Placeholder (v, k) -> { a with desc = Placeholder (v, on_anf inlinable k) }
-    | While (c, b, tl) ->
-      { a with
-        desc = While (on_term inlinable c, on_anf inlinable b, on_anf inlinable tl)
-      }
-    | Set (v, x, k) -> { a with desc = Set (v, x, on_anf inlinable k) }
-  and on_term inlinable (t : term) : term =
-    let desc : term_desc =
-      match t.desc with
-      | If (c, th, el) -> If (c, on_anf inlinable th, on_anf inlinable el)
-      | Switch (s, cases) ->
-        Switch (s, List.map cases ~f:(fun (l, b) -> l, on_anf inlinable b))
-      | (Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Field _) as d
-        -> d
-    in
-    { t with desc }
-  and try_inline_term inlinable (t : term) : anf option =
+let is_known_record records (a : atom) =
+  match a.desc with
+  | Var v -> Set.mem records v
+  | _ -> false
+;;
+
+let track_record_binding records v (t : term) : String.Set.t =
+  match t.desc with
+  | Record _ -> Set.add records v
+  | Atom a when is_known_record records a -> Set.add records v
+  | Field (a, _) when is_known_record records a ->
+    (match t.ty with
+     | TyRecord _ -> Set.add records v
+     | _ -> records)
+  | _ -> records
+;;
+
+let try_inline entries records (t : term) : anf option =
+  let open Option.Let_syntax in
+  match t.desc with
+  | App (f, actuals) ->
+    let%bind { formals; body; guard } = Map.find entries f in
+    (match guard with
+     | Unconditional -> Some (instantiate ~formals ~actuals ~body)
+     | On_record_actual when List.exists actuals ~f:(is_known_record records) ->
+       Some (instantiate ~formals ~actuals ~body)
+     | On_record_actual -> None)
+  | _ -> None
+;;
+
+let rec rewrite_anf entries records (a : anf) : anf =
+  let go = rewrite_anf entries records in
+  match a.desc with
+  | Continue -> a
+  | Return t ->
+    (match try_inline entries records t with
+     | Some body -> go body
+     | None -> { a with desc = Return (rewrite_term entries records t) })
+  | Let (v, t, tl) ->
+    let tl = rewrite_anf entries (track_record_binding records v t) tl in
+    (match try_inline entries records t with
+     | Some body -> go (splice ~v ~tl body)
+     | None -> { a with desc = Let (v, rewrite_term entries records t, tl) })
+  | Placeholder (v, k) -> { a with desc = Placeholder (v, go k) }
+  | While (c, b, tl) ->
+    { a with desc = While (rewrite_term entries records c, go b, go tl) }
+  | Set (v, x, k) -> { a with desc = Set (v, x, go k) }
+
+and rewrite_term entries records (t : term) : term =
+  let go = rewrite_anf entries records in
+  let desc : term_desc =
     match t.desc with
-    | App (f, actuals) ->
-      Map.find inlinable f
-      |> Option.map ~f:(fun (formals, body) ->
-        on_anf (Map.remove inlinable f) (instantiate ~formals ~actuals ~body))
-    | _ -> None
+    | If (c, t, e) -> If (c, go t, go e)
+    | Switch (s, cases) -> Switch (s, List.map cases ~f:(fun (l, b) -> l, go b))
+    | (Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Field _) as d ->
+      d
   in
-  match top.desc with
-  | Define { name; args; body; ret_ty } ->
-    let inlinable = Map.remove init name in
-    { top with desc = Define { name; args; body = on_anf inlinable body; ret_ty } }
-  | Const (n, b) -> { top with desc = Const (n, on_anf init b) }
-  | Extern _ | TypeDef _ -> top
+  { t with desc }
 ;;
 
 let inline (Program tops : t) : t =
-  let inlinable = collect_inlinable tops in
-  Program (List.map tops ~f:(inline_top inlinable))
+  let entries = collect_entries tops in
+  let records = collect_record_const_names tops in
+  let body_of = rewrite_anf entries records in
+  Program
+    (List.map tops ~f:(fun top ->
+       match top.desc with
+       | Define d -> { top with desc = Define { d with body = body_of d.body } }
+       | Const (n, b) -> { top with desc = Const (n, body_of b) }
+       | Extern _ | TypeDef _ -> top))
 ;;

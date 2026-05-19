@@ -253,35 +253,8 @@ let%expect_test "parametrized variants" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct option {
-        int tag;
-        int Some_0;
-    };
-    int unwrap(option opt, int default_0) {
-        int _lv_tag = opt.tag;
-        switch (_lv_tag) {
-            case 0: {
-                int _lv_Some_0 = opt.Some_0;
-                return _lv_Some_0;
-                break;
-            }
-            default: {
-                return default_0;
-                break;
-            }
-        }
-    }
     vec3 main_pure(vec2 uv) {
-        option anf = option(0, 10);
-        int a = unwrap(anf, 10);
-        option anf_0 = option(1, 0);
-        int b = unwrap(anf_0, 5);
-        option anf_1 = option(1, 0);
-        int c = unwrap(anf_1, 5);
-        float anf_2 = float(a);
-        float anf_3 = float(b);
-        float anf_4 = float(c);
-        return vec3(anf_2, anf_3, anf_4);
+        return vec3(10., 5., 5.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -307,32 +280,9 @@ let%expect_test "parametrized variants" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct result {
-        int tag;
-        float Ok_0;
-        int Err_0;
-    };
-    float unwrap(result r, float default_0) {
-        int _lv_tag = r.tag;
-        switch (_lv_tag) {
-            case 0: {
-                float _lv_Ok_0 = r.Ok_0;
-                return _lv_Ok_0;
-                break;
-            }
-            default: {
-                return default_0;
-                break;
-            }
-        }
-    }
     vec3 main_pure(vec2 uv) {
-        result anf = result(0, 5.4, 0);
-        float a = unwrap(anf, 5.);
-        result anf_0 = result(1, 0., 2);
-        float b = unwrap(anf_0, 2.3);
         float anf_1 = uv[0];
-        return vec3(anf_1, a, b);
+        return vec3(anf_1, 5.4, 2.3);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

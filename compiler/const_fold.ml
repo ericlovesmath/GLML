@@ -8,12 +8,17 @@ module Err = Compiler_error.Pass (struct
     let name = "const_fold"
   end)
 
+type literal =
+  | Int of int
+  | Float of float
+  | Bool of bool
+
 type value =
   | Top
-  | Const of atom_desc
+  | Lit of literal
   | Alias of string
-  | VecLit of atom list
-  | RecordLit of atom String.Map.t
+  | Vec of value list
+  | Fields of value String.Map.t
 
 type ctx =
   { env : value String.Map.t
@@ -23,7 +28,20 @@ type ctx =
 
 let bind ctx v value = { ctx with env = Map.set ctx.env ~key:v ~data:value }
 
-(** [a] rewritten to point at the terminal name and the value bound there, if any *)
+let lit_of_desc : atom_desc -> literal option = function
+  | Int i -> Some (Int i)
+  | Float f -> Some (Float f)
+  | Bool b -> Some (Bool b)
+  | Var _ -> None
+;;
+
+let desc_of_lit : literal -> atom_desc = function
+  | Int i -> Int i
+  | Float f -> Float f
+  | Bool b -> Bool b
+;;
+
+(** Return the dereferenced atom along with the value bound *)
 let resolve (ctx : ctx) (a : atom) : atom * value option =
   match a.desc with
   | Var v ->
@@ -32,21 +50,21 @@ let resolve (ctx : ctx) (a : atom) : atom * value option =
       | Some (Alias v') when not (String.equal v v') -> go v'
       | other -> v, other
     in
-    let v, value = go v in
-    { a with desc = Var v }, value
+    let v, abs = go v in
+    { a with desc = Var v }, abs
   | _ -> a, None
 ;;
 
-let lookup_value ctx a = snd (resolve ctx a)
+let lookup ctx a = snd (resolve ctx a)
 
-(** Walks alias chains and substitutes literals. *)
+(** Walks alias chains and substitutes literals *)
 let rewrite_atom ctx a =
   match resolve ctx a with
-  | a, Some (Const d) -> { a with desc = d }
+  | a, Some (Lit l) -> { a with desc = desc_of_lit l }
   | a, _ -> a
 ;;
 
-let fold_bop (op : Glsl.binary_op) (a : atom_desc) (b : atom_desc) : atom_desc option =
+let fold_bop (op : Glsl.binary_op) (a : literal) (b : literal) : literal option =
   match op, a, b with
   | Add, Int x, Int y -> Some (Int (x + y))
   | Sub, Int x, Int y -> Some (Int (x - y))
@@ -73,20 +91,22 @@ let fold_bop (op : Glsl.binary_op) (a : atom_desc) (b : atom_desc) : atom_desc o
   | _ -> None
 ;;
 
-let lit_of_desc = function
-  | (Int _ | Float _ | Bool _) as d -> Some d
-  | Var _ -> None
+let lit_of_value = function
+  | Lit l -> Some l
+  | _ -> None
 ;;
 
-(** Constant component descs of [a] if all components are statically known *)
-let const_components (ctx : ctx) (a : atom) : atom_desc list option =
-  match lit_of_desc a.desc with
-  | Some d -> Some [ d ]
-  | None ->
-    (match lookup_value ctx a with
-     | Some (Const d) -> Some [ d ]
-     | Some (VecLit atoms) -> Option.all (List.map atoms ~f:(fun a -> lit_of_desc a.desc))
-     | _ -> None)
+(** Constant scalar components of [a] if all components are statically known *)
+let const_components (ctx : ctx) (a : atom) : literal list option =
+  let v =
+    match lit_of_desc a.desc with
+    | Some l -> Some (Lit l)
+    | None -> lookup ctx a
+  in
+  match v with
+  | Some (Lit l) -> Some [ l ]
+  | Some (Vec cs) -> Option.all (List.map cs ~f:lit_of_value)
+  | _ -> None
 ;;
 
 let broadcast xs ys =
@@ -121,22 +141,24 @@ let unexpected_branch (t : term) =
   Err.raise ~loc:t.loc "unexpected branching term" ~d:[%message (t : term)]
 ;;
 
+let atom_of_lit (l : literal) ~ty ~loc : atom = { desc = desc_of_lit l; ty; loc }
+
 let try_fold_bop ctx op (a : atom) (b : atom) (t : term) : term_desc option =
   let open Option.Let_syntax in
   let%bind xs = const_components ctx a in
   let%bind ys = const_components ctx b in
   let%bind pairs = broadcast xs ys in
-  let%bind ds = List.map pairs ~f:(fun (x, y) -> fold_bop op x y) |> Option.all in
-  match ds with
-  | [ desc ] -> Some (Atom { desc; ty = t.ty; loc = t.loc })
-  | ds ->
-    let ty =
+  let%bind ls = List.map pairs ~f:(fun (x, y) -> fold_bop op x y) |> Option.all in
+  match ls with
+  | [ l ] -> Some (Atom (atom_of_lit l ~ty:t.ty ~loc:t.loc))
+  | ls ->
+    let inner_ty =
       match t.ty with
       | TyVec (_, inner) -> inner
       | other -> other
     in
-    let atoms = List.map ds ~f:(fun desc -> ({ desc; ty; loc = t.loc } : atom)) in
-    Some (Vec (List.length ds, atoms))
+    let atoms = List.map ls ~f:(atom_of_lit ~ty:inner_ty ~loc:t.loc) in
+    Some (Vec (List.length ls, atoms))
 ;;
 
 let try_fold_builtin ctx (b : Glsl.builtin) (args : atom list) (t : term)
@@ -146,17 +168,29 @@ let try_fold_builtin ctx (b : Glsl.builtin) (args : atom list) (t : term)
   match b, args with
   | Float, [ a ] ->
     (match%bind const_components ctx a with
-     | [ Int n ] -> Some (Atom { desc = Float (Float.of_int n); ty = t.ty; loc = t.loc })
+     | [ Int n ] -> Some (Atom (atom_of_lit (Float (Float.of_int n)) ~ty:t.ty ~loc:t.loc))
      | _ -> None)
   | _ -> None
 ;;
 
-(** Looks up [a]'s structured value and projects out a sub-atom *)
-let try_project ctx (a : atom) (t : term) ~f : term_desc option =
+let try_project (ctx : ctx) (a : atom) (t : term) ~f : term_desc option =
   let open Option.Let_syntax in
-  let%bind v = lookup_value ctx a in
-  let%bind (sub : atom) = f v in
-  Some (Atom { desc = sub.desc; loc = t.loc; ty = t.ty })
+  let%bind v = lookup ctx a in
+  let%bind sub = f v in
+  let atom desc : atom = { desc; ty = t.ty; loc = t.loc } in
+  match sub with
+  | Lit l -> Some (Atom (atom (desc_of_lit l)))
+  | Alias v -> Some (Atom (atom (Var v)))
+  | Vec cs ->
+    let%map ls = List.map cs ~f:lit_of_value |> Option.all in
+    let inner_ty =
+      match t.ty with
+      | TyVec (_, inner) -> inner
+      | other -> other
+    in
+    let atoms = List.map ls ~f:(atom_of_lit ~ty:inner_ty ~loc:t.loc) in
+    (Vec (List.length atoms, atoms) : term_desc)
+  | Top | Fields _ -> None
 ;;
 
 let simplify_primitive_term (ctx : ctx) (t : term) : term =
@@ -177,13 +211,13 @@ let simplify_primitive_term (ctx : ctx) (t : term) : term =
     | Index (a, i) ->
       let a = rewrite a in
       try_project ctx a t ~f:(function
-        | VecLit atoms -> List.nth atoms i
+        | Vec cs -> List.nth cs i
         | _ -> None)
       <|> Index (a, i)
     | Field (a, name) ->
       let a = rewrite a in
       try_project ctx a t ~f:(function
-        | RecordLit fields -> Map.find fields name
+        | Fields fs -> Map.find fs name
         | _ -> None)
       <|> Field (a, name)
     | If _ | Switch _ -> unexpected_branch t
@@ -191,33 +225,64 @@ let simplify_primitive_term (ctx : ctx) (t : term) : term =
   { t with desc }
 ;;
 
-let value_of_term ctx (t : term) : value =
+let abs_of_atom ctx (a : atom) : value =
+  match a.desc with
+  | Var v -> if Set.mem ctx.mut v then Top else Alias v
+  | Int i -> Lit (Int i)
+  | Float f -> Lit (Float f)
+  | Bool b -> Lit (Bool b)
+;;
+
+let abs_of_term ctx (t : term) : value =
   match t.desc with
-  | Atom { desc = (Int _ | Float _ | Bool _) as d; _ } -> Const d
-  | Atom { desc = Var v; _ } -> if Set.mem ctx.mut v then Top else Alias v
-  | Vec (_, atoms) -> VecLit atoms
+  | Atom a -> abs_of_atom ctx a
+  | Vec (_, atoms) -> Vec (List.map atoms ~f:(abs_of_atom ctx))
   | Record atoms ->
     (match t.ty with
      | TyRecord s ->
        (match Map.find ctx.records s with
         | None -> Top
         | Some fields ->
-          (match List.map2 fields atoms ~f:(fun (name, _) a -> name, a) with
+          (match List.(zip (map ~f:fst fields) (map ~f:(abs_of_atom ctx) atoms)) with
            | Unequal_lengths -> Err.raise "record literal arity mismatch" ~loc:t.loc
            | Ok pairs -> String.Map.of_alist_or_error pairs)
           |> Err.of_or_error ~loc:t.loc
           |> Err.ok_exn
-          |> fun m -> RecordLit m)
+          |> fun m -> Fields m)
      | _ -> Err.raise "Record does not have type record" ~loc:t.loc)
+  | Field (a, name) ->
+    lookup ctx a
+    |> Option.bind ~f:(function
+      | Fields fs -> Map.find fs name
+      | _ -> None)
+    |> Option.value ~default:Top
+  | Index (a, i) ->
+    lookup ctx a
+    |> Option.bind ~f:(function
+      | Vec cs -> List.nth cs i
+      | _ -> None)
+    |> Option.value ~default:Top
   | _ -> Top
 ;;
 
-let rec tail_value ctx (a : anf) : value =
+let rec tail_abs ctx (a : anf) : value =
   match a.desc with
-  | Return t -> value_of_term ctx t
-  | Let (_, _, k) | Placeholder (_, k) | While (_, _, k) | Set (_, _, k) ->
-    tail_value ctx k
+  | Return t -> abs_of_term ctx t
+  | Let (_, _, k) | Placeholder (_, k) | While (_, _, k) | Set (_, _, k) -> tail_abs ctx k
   | Continue -> Top
+;;
+
+(** Resolve every [Alias _] through [env]; returns a value with no free names *)
+let rec ground (ctx : ctx) (v : value) : value =
+  match v with
+  | Top -> Top
+  | Lit _ as l -> l
+  | Alias v ->
+    (match Map.find ctx.env v with
+     | None -> Top
+     | Some v -> ground ctx v)
+  | Vec cs -> Vec (List.map cs ~f:(ground ctx))
+  | Fields fs -> Fields (Map.map fs ~f:(ground ctx))
 ;;
 
 (** Rewrite each [Return t] term. *)
@@ -263,13 +328,13 @@ and rewrite_let ctx a v t k =
     (match resolve_branch ctx t with
      | Picked branch ->
        let branch = rewrite_anf ctx branch in
-       let value = if Set.mem ctx.mut v then Top else tail_value ctx branch in
+       let value = if Set.mem ctx.mut v then Top else tail_abs ctx branch in
        let k = rewrite_anf (bind ctx v value) k in
        splice branch ~k:(fun final_t -> { a with desc = Let (v, final_t, k) })
      | Rebuild t -> { a with desc = Let (v, t, rewrite_anf (bind ctx v Top) k) })
   | _ ->
     let t = simplify_primitive_term ctx t in
-    let value = if Set.mem ctx.mut v then Top else value_of_term ctx t in
+    let value = if Set.mem ctx.mut v then Top else abs_of_term ctx t in
     { a with desc = Let (v, t, rewrite_anf (bind ctx v value) k) }
 
 and resolve_branch ctx (t : term) : branch_resolution =
@@ -312,10 +377,22 @@ let rewrite_top
   | Const (name, anf) ->
     let anf = rewrite anf in
     let env =
-      match anf.desc with
-      | Return { desc = Atom { desc = (Int _ | Float _ | Bool _) as d; _ }; _ } ->
-        Map.set env ~key:name ~data:(Const d)
-      | _ -> env
+      (* Walk the rewritten body with its own local env to compute the tail
+         abs, then [ground] it so the published value carries no escaping
+         name references. *)
+      let rec tail_in local_env (a : anf) : value =
+        let ctx = { env = local_env; mut = String.Set.empty; records } in
+        match a.desc with
+        | Return t -> ground ctx (abs_of_term ctx t)
+        | Let (v, t, k) ->
+          let value = abs_of_term ctx t in
+          tail_in (Map.set local_env ~key:v ~data:value) k
+        | Placeholder (_, k) -> tail_in local_env k
+        | While _ | Set _ | Continue -> Top
+      in
+      match tail_in env anf with
+      | Top -> env
+      | grounded -> Map.set env ~key:name ~data:grounded
     in
     { top with desc = Const (name, anf) }, env
   | Define { name; args; body; ret_ty } ->

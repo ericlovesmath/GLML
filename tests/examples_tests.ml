@@ -21,77 +21,6 @@ let%expect_test "compile examples" =
     out vec4 fragColor;
     const vec3 blue = vec3(0.65, 0.85, 1.);
     const vec3 orange = vec3(0.9, 0.6, 0.3);
-    struct shape {
-        int tag;
-        float Circle_0;
-        float Rect_0;
-        float Rect_1;
-    };
-    float sdf_shape(shape s, vec2 p) {
-        int _lv_tag = s.tag;
-        switch (_lv_tag) {
-            case 0: {
-                float _lv_Circle_0 = s.Circle_0;
-                float anf = length(p);
-                return (anf - _lv_Circle_0);
-                break;
-            }
-            case 1: {
-                float _lv_Rect_0 = s.Rect_0;
-                float _lv_Rect_1 = s.Rect_1;
-                vec2 anf_0 = abs(p);
-                vec2 anf_1 = vec2(_lv_Rect_0, _lv_Rect_1);
-                vec2 d = (anf_0 - anf_1);
-                vec2 anf_2 = vec2(0., 0.);
-                vec2 anf_3 = max(d, anf_2);
-                float anf_4 = length(anf_3);
-                float anf_5 = d[0];
-                float anf_6 = d[1];
-                float anf_7 = max(anf_5, anf_6);
-                float anf_8 = min(anf_7, 0.);
-                return (anf_4 + anf_8);
-                break;
-            }
-            default: {
-                return 1.;
-                break;
-            }
-        }
-    }
-    struct DFn {
-        int tag;
-        shape lctor_0;
-        shape lctor_0_0;
-    };
-    struct DFn_0 {
-        int tag;
-        DFn lctor_1_0;
-        DFn lctor_1_1;
-    };
-    DFn_0 scene() {
-        shape anf_9 = shape(0, 0.3, 0., 0.);
-        shape _tmp;
-        DFn circle = DFn(0, anf_9, _tmp);
-        shape anf_10 = shape(1, 0., 0.7, 0.1);
-        shape _tmp_0;
-        DFn rect = DFn(1, _tmp_0, anf_10);
-        return DFn_0(0, circle, rect);
-    }
-    float dapply(DFn dfn, vec2 da) {
-        int _lv_tag_0 = dfn.tag;
-        switch (_lv_tag_0) {
-            case 0: {
-                shape _lv_lctor_0 = dfn.lctor_0;
-                return sdf_shape(_lv_lctor_0, da);
-                break;
-            }
-            default: {
-                shape _lv_lctor_0_0 = dfn.lctor_0_0;
-                return sdf_shape(_lv_lctor_0_0, da);
-                break;
-            }
-        }
-    }
     uniform vec2 u_mouse;
     uniform vec2 u_resolution;
     vec2 get_uv_m(vec2 coord) {
@@ -102,18 +31,23 @@ let%expect_test "compile examples" =
         float bot = min(anf_12, anf_13);
         return (top / bot);
     }
-    float dapply_0(DFn_0 dfn_0, vec2 da_0) {
-        DFn _lv_lctor_1_0 = dfn_0.lctor_1_0;
-        DFn _lv_lctor_1_1 = dfn_0.lctor_1_1;
-        float anf_14_0 = dapply(_lv_lctor_1_0, da_0);
-        float anf_15_0 = dapply(_lv_lctor_1_1, da_0);
-        return min(anf_14_0, anf_15_0);
-    }
     vec3 main_pure(vec2 coord_0) {
         vec2 p_1 = get_uv_m(coord_0);
         vec2 m = get_uv_m(u_mouse);
-        DFn_0 _lc = scene();
-        float d_0 = dapply_0(_lc, p_1);
+        float anf_43 = length(p_1);
+        float anf_14_2 = (anf_43 - 0.3);
+        vec2 anf_0_5 = abs(p_1);
+        vec2 anf_1_5 = vec2(0.7, 0.1);
+        vec2 d_8 = (anf_0_5 - anf_1_5);
+        vec2 anf_2_5 = vec2(0., 0.);
+        vec2 anf_3_5 = max(d_8, anf_2_5);
+        float anf_4_5 = length(anf_3_5);
+        float anf_5_5 = d_8[0];
+        float anf_6_5 = d_8[1];
+        float anf_7_5 = max(anf_5_5, anf_6_5);
+        float anf_8_5 = min(anf_7_5, 0.);
+        float anf_15_2 = (anf_4_5 + anf_8_5);
+        float d_0 = min(anf_14_2, anf_15_2);
         bool anf_16 = (d_0 > 0.);
         vec3 col;
         if (anf_16) {
@@ -136,8 +70,20 @@ let%expect_test "compile examples" =
         float anf_26 = smoothstep(0., 0.01, anf_25);
         float anf_27 = (1. - anf_26);
         vec3 col_1 = mix(col_0, anf_24, anf_27);
-        DFn_0 _lc_0 = scene();
-        float anf_28 = dapply_0(_lc_0, m);
+        float anf_39 = length(m);
+        float anf_14_1 = (anf_39 - 0.3);
+        vec2 anf_0_1 = abs(m);
+        vec2 anf_1_1 = vec2(0.7, 0.1);
+        vec2 d_4 = (anf_0_1 - anf_1_1);
+        vec2 anf_2_1 = vec2(0., 0.);
+        vec2 anf_3_1 = max(d_4, anf_2_1);
+        float anf_4_1 = length(anf_3_1);
+        float anf_5_1 = d_4[0];
+        float anf_6_1 = d_4[1];
+        float anf_7_1 = max(anf_5_1, anf_6_1);
+        float anf_8_1 = min(anf_7_1, 0.);
+        float anf_15_1 = (anf_4_1 + anf_8_1);
+        float anf_28 = min(anf_14_1, anf_15_1);
         float d_1 = abs(anf_28);
         vec2 anf_29 = (p_1 - m);
         float dm = length(anf_29);
