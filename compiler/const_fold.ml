@@ -1,5 +1,4 @@
 (* TODO: Algebraic identities for bops and prims *)
-(* TODO: Vec Broadcasting *)
 
 open Core
 open Remove_placeholder
@@ -23,16 +22,27 @@ type ctx =
 
 let bind ctx v value = { ctx with env = Map.set ctx.env ~key:v ~data:value }
 
-(** Walks alias chains and substitutes literals. *)
-let rec rewrite_atom (ctx : ctx) (a : atom) : atom =
+(** [a] rewritten to point at the terminal name and the value bound there, if any *)
+let resolve (ctx : ctx) (a : atom) : atom * value option =
   match a.desc with
-  | Int _ | Float _ | Bool _ -> a
   | Var v ->
-    (match Map.find ctx.env v with
-     | Some (Const d) -> { a with desc = d }
-     | Some (Alias v') when not (String.equal v v') ->
-       rewrite_atom ctx { a with desc = Var v' }
-     | None | Some (Top | Alias _ | VecLit _ | RecordLit _) -> a)
+    let rec go v =
+      match Map.find ctx.env v with
+      | Some (Alias v') when not (String.equal v v') -> go v'
+      | other -> v, other
+    in
+    let v, value = go v in
+    { a with desc = Var v }, value
+  | _ -> a, None
+;;
+
+let lookup_value ctx a = snd (resolve ctx a)
+
+(** Walks alias chains and substitutes literals. *)
+let rewrite_atom ctx a =
+  match resolve ctx a with
+  | a, Some (Const d) -> { a with desc = d }
+  | a, _ -> a
 ;;
 
 let fold_bop (op : Glsl.binary_op) (a : atom_desc) (b : atom_desc) : atom_desc option =
@@ -62,6 +72,32 @@ let fold_bop (op : Glsl.binary_op) (a : atom_desc) (b : atom_desc) : atom_desc o
   | _ -> None
 ;;
 
+let lit_of_desc = function
+  | (Int _ | Float _ | Bool _) as d -> Some d
+  | Var _ -> None
+;;
+
+(** Constant component descs of [a] if all components are statically known *)
+let const_components (ctx : ctx) (a : atom) : atom_desc list option =
+  match lit_of_desc a.desc with
+  | Some d -> Some [ d ]
+  | None ->
+    (match lookup_value ctx a with
+     | Some (Const d) -> Some [ d ]
+     | Some (VecLit atoms) -> Option.all (List.map atoms ~f:(fun a -> lit_of_desc a.desc))
+     | _ -> None)
+;;
+
+let broadcast xs ys =
+  match xs, ys with
+  | [ x ], ys -> Some (List.map ys ~f:(fun y -> x, y))
+  | xs, [ y ] -> Some (List.map xs ~f:(fun x -> x, y))
+  | xs, ys ->
+    (match List.zip xs ys with
+     | Ok zip -> Some zip
+     | Unequal_lengths -> None)
+;;
+
 let rec collect_set_anf (a : anf) (acc : String.Set.t) : String.Set.t =
   match a.desc with
   | Return t -> collect_set_term t acc
@@ -84,54 +120,57 @@ let unexpected_branch (t : term) =
   Err.raise ~loc:t.loc "unexpected branching term" ~d:[%message (t : term)]
 ;;
 
-(** [Some v]'s structured value, after walking aliases. *)
-let structured_value_of (ctx : ctx) (a : atom) : value option =
-  match a.desc with
-  | Var v ->
-    let rec lookup_value v =
-      match Map.find ctx.env v with
-      | Some (Alias v') when not (String.equal v v') -> lookup_value v'
+let try_fold_bop ctx op (a : atom) (b : atom) (t : term) : term_desc option =
+  let open Option.Let_syntax in
+  let%bind xs = const_components ctx a in
+  let%bind ys = const_components ctx b in
+  let%bind pairs = broadcast xs ys in
+  let%bind ds = List.map pairs ~f:(fun (x, y) -> fold_bop op x y) |> Option.all in
+  match ds with
+  | [ desc ] -> Some (Atom { desc; ty = t.ty; loc = t.loc })
+  | ds ->
+    let ty =
+      match t.ty with
+      | TyVec (_, inner) -> inner
       | other -> other
     in
-    lookup_value v
-  | _ -> None
+    let atoms = List.map ds ~f:(fun desc -> ({ desc; ty; loc = t.loc } : atom)) in
+    Some (Vec (List.length ds, atoms))
+;;
+
+(** Looks up [a]'s structured value and projects out a sub-atom *)
+let try_project ctx (a : atom) (t : term) ~f : term_desc option =
+  let open Option.Let_syntax in
+  let%bind v = lookup_value ctx a in
+  let%bind (sub : atom) = f v in
+  Some (Atom { desc = sub.desc; loc = t.loc; ty = t.ty })
 ;;
 
 let simplify_primitive_term (ctx : ctx) (t : term) : term =
   let rewrite = rewrite_atom ctx in
+  let ( <|> ) opt default = Option.value opt ~default in
   let desc =
     match t.desc with
     | Atom a -> Atom (rewrite a)
-    | Bop (op, a, b) ->
-      let a = rewrite a in
-      let b = rewrite b in
-      (match fold_bop op a.desc b.desc with
-       | Some d -> Atom { desc = d; ty = t.ty; loc = t.loc }
-       | None -> Bop (op, a, b))
     | Vec (n, atoms) -> Vec (n, List.map atoms ~f:rewrite)
-    | Index (a, i) ->
-      let a = rewrite a in
-      let v =
-        match structured_value_of ctx a with
-        | Some (VecLit atoms) ->
-          List.nth atoms i
-          |> Option.map ~f:(fun a -> Atom { a with ty = t.ty; loc = t.loc })
-        | _ -> None
-      in
-      Option.value v ~default:(Index (a, i))
     | Builtin (b, atoms) -> Builtin (b, List.map atoms ~f:rewrite)
     | App (n, atoms) -> App (n, List.map atoms ~f:rewrite)
     | Record atoms -> Record (List.map atoms ~f:rewrite)
+    | Bop (op, a, b) ->
+      let a, b = rewrite a, rewrite b in
+      try_fold_bop ctx op a b t <|> Bop (op, a, b)
+    | Index (a, i) ->
+      let a = rewrite a in
+      try_project ctx a t ~f:(function
+        | VecLit atoms -> List.nth atoms i
+        | _ -> None)
+      <|> Index (a, i)
     | Field (a, name) ->
       let a = rewrite a in
-      let v =
-        match structured_value_of ctx a with
-        | Some (RecordLit fields) ->
-          Map.find fields name
-          |> Option.map ~f:(fun a -> Atom { a with ty = t.ty; loc = t.loc })
-        | _ -> None
-      in
-      Option.value v ~default:(Field (a, name))
+      try_project ctx a t ~f:(function
+        | RecordLit fields -> Map.find fields name
+        | _ -> None)
+      <|> Field (a, name)
     | If _ | Switch _ -> unexpected_branch t
   in
   { t with desc }

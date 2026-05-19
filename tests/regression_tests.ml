@@ -471,11 +471,7 @@ let%expect_test "return type annotation for function-returning functions" =
     vec3 main_pure(vec2 coord) {
         vec3 anf_4 = vec3(0., 0., 0.);
         vec3 anf_5 = vec3(0., 0., 0.);
-        vec3 anf_6 = vec3(0., 0., 0.);
-        vec3 anf_7 = vec3(0., 0., 0.);
-        vec3 anf_8 = (anf_6 * 0.);
-        vec3 anf_0_0 = (anf_8 + anf_7);
-        vec3 anf_1_0 = (6.28318 * anf_0_0);
+        vec3 anf_1_0 = vec3(0., 0., 0.);
         vec3 anf_2_0 = cos(anf_1_0);
         vec3 anf_3_0 = (anf_5 * anf_2_0);
         return (anf_4 + anf_3_0);
@@ -1107,9 +1103,7 @@ let%expect_test "defunctionalize unifies int/float arrow flavors" =
         int tag;
     };
     vec3 main_pure(vec2 uv) {
-        vec3 a = vec3(0., 0., 0.);
-        vec3 anf_2 = vec3(0., 1., 0.);
-        return (a + anf_2);
+        return vec3(0., 1., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

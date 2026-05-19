@@ -476,12 +476,7 @@ let%expect_test "constrained polymorphism tests" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        vec2 anf_2 = vec2(1., 2.);
-        vec2 anf_0_0 = (anf_2 * 2.);
-        vec2 v = (anf_0_0 - 1.);
-        float anf_3 = v[0];
-        float anf_4 = v[1];
-        return vec3(anf_3, anf_4, 0.);
+        return vec3(1., 3., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -559,11 +554,7 @@ let%expect_test "where Numeric clause" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        vec3 anf = vec3(1., 2., 3.);
-        vec3 b = (anf + anf);
-        float anf_0 = b[0];
-        float anf_1 = b[1];
-        return vec3(2., anf_0, anf_1);
+        return vec3(2., 2., 4.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -586,8 +577,7 @@ let%expect_test "where broadcast" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        vec3 anf = vec3(1., 2., 3.);
-        vec3 v = (anf + 0.5);
+        vec3 v = vec3(1.5, 2.5, 3.5);
         return v;
     }
     void main() {
@@ -611,8 +601,7 @@ let%expect_test "where mul broadcast" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        vec3 anf = vec3(1., 2., 3.);
-        vec3 v_0 = (2. * anf);
+        vec3 v_0 = vec3(2., 4., 6.);
         return v_0;
     }
     void main() {
@@ -638,9 +627,7 @@ let%expect_test "multiple where clauses" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        vec3 anf_0 = vec3(1., 2., 3.);
-        vec3 anf_1 = (anf_0 + 0.5);
-        vec3 v = (anf_1 + 1.);
+        vec3 v = vec3(2.5, 3.5, 4.5);
         return v;
     }
     void main() {
@@ -666,9 +653,7 @@ let%expect_test "parens around individual where clauses" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        vec3 anf_0 = vec3(1., 2., 3.);
-        vec3 anf_1 = (anf_0 + 0.5);
-        vec3 v = (anf_1 + 1.);
+        vec3 v = vec3(2.5, 3.5, 4.5);
         return v;
     }
     void main() {
@@ -693,9 +678,7 @@ let%expect_test "where clause on non-toplevel let" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        vec3 anf_0 = vec3(1., 2., 3.);
-        vec3 anf_1 = (anf_0 + 0.5);
-        return (anf_1 + 1.);
+        return vec3(2.5, 3.5, 4.5);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
