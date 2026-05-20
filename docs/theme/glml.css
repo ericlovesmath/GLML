@@ -1,0 +1,72 @@
+code.language-glml .hljs-type,
+code.language-glsl .hljs-type {
+  color: #4a6a8a;
+}
+
+.navy code.language-glml .hljs-type,
+.navy code.language-glsl .hljs-type,
+.coal code.language-glml .hljs-type,
+.coal code.language-glsl .hljs-type,
+.ayu code.language-glml .hljs-type,
+.ayu code.language-glsl .hljs-type {
+  color: #8aa9c9;
+}
+
+code.language-glml .hljs-meta,
+code.language-glsl .hljs-meta {
+  color: #9d00ec; /* highlight.css default */
+}
+
+.navy code.language-glml .hljs-meta,
+.navy code.language-glsl .hljs-meta,
+.coal code.language-glml .hljs-meta,
+.coal code.language-glsl .hljs-meta {
+  color: #b294bb; /* tomorrow-night.css soft mauve */
+}
+
+.ayu code.language-glml .hljs-meta,
+.ayu code.language-glsl .hljs-meta {
+  color: #ff7733; /* ayu-highlight.css keyword color */
+}
+
+code.language-glml,
+code.language-glsl {
+  position: relative;
+  padding-top: 2.6em !important;
+}
+
+code.language-glml::before,
+code.language-glsl::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 0.4em 1rem;
+  font-size: 0.7em;
+  font-family: var(--mono-font, monospace);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.55);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+code.language-glml::before {
+  content: "GLML";
+}
+
+code.language-glsl::before {
+  content: "GLSL";
+}
+
+.navy code.language-glml::before,
+.navy code.language-glsl::before,
+.coal code.language-glml::before,
+.coal code.language-glsl::before,
+.ayu code.language-glml::before,
+.ayu code.language-glsl::before {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.55);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}

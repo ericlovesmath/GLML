@@ -6,3 +6,4 @@ title = "GLML"
 
 [output.html]
 additional-js = ["theme/glml.js", "theme/glsl.js"]
+additional-css = ["theme/glml.css"]

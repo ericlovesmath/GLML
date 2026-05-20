@@ -1,6 +1,6 @@
 # Overview
 
-*Note: We assume some familiarity with GLSL and ML terminology, see [Guide](./tutorial/first-shader.md) for a more details*
+*Note: We assume some familiarity with GLSL and ML terminology*
 
 A GLML program is a single pure function from a `vec2` pixel coordinate to a `vec3` color:
 
@@ -51,9 +51,8 @@ let main (coord : vec2) =
 The following is the same scene in both GLSL and GLML, where we define a SDF of a circle and rectangle.
 
 ```glsl
-// GLSL
-struct Shape { int kind; float a; float b; };
 // kind 0 = circle (a = radius), kind 1 = rect (a, b)
+struct Shape { int kind; float a; float b; };
 
 float sdShape(Shape s, vec2 p) {
     if (s.kind == 0) return length(p) - s.a;
@@ -71,7 +70,6 @@ float scene(vec2 p) {
 }
 ```
 ```glml
-// GLML
 type shape = Circle of float | Rect of float * float
 
 let sdf_shape (s : shape) = fun p ->
@@ -105,7 +103,6 @@ By the time the program reaches the GPU, it is straight GLSL with no allocation,
 Below is GLML code rendering a simple union of two SDFs, and the optimized GLSL that is generated
 
 ```glml
-// GLML
 #extern vec2 u_resolution
 
 type sdf = vec2 -> float

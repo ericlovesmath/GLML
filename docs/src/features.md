@@ -43,8 +43,6 @@ match s with
 // ERROR: missing case `Empty`
 ```
 
-See [Variants and Pattern Matching](./tutorial/variants.md).
-
 ## First-Class Functions
 
 The compiler defunctionalizes first class functions into a tag plus a capturing the minimal environment struct. The combinator pattern that makes SDF composition pleasant has zero runtime cost, since the optimizer can aggressively remove these kinds of expressions.
@@ -53,8 +51,6 @@ The compiler defunctionalizes first class functions into a tag plus a capturing 
 let union (f : sdf) (g : sdf) : sdf = fun p -> #min(f p, g p)
 let scale s (f : sdf) : sdf         = fun p -> f (p / s)
 ```
-
-See [First-Class Functions](./tutorial/higher-order.md).
 
 ## Type Classes and Constraints
 
@@ -69,5 +65,3 @@ let add a b = a + b
 *, /       : 'a -> 'b -> 'r   where MulBroadcast('a, 'b, 'r)
 #sin(x)    : 'a -> 'b         where Broadcast('a, float, 'b), GenType('b)
 ```
-
-See [Type System](./type-system.md)
