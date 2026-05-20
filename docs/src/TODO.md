@@ -4,6 +4,13 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 
 ## Tasks / Bugs
 
+- Inline/fold effectful while loops
+- Check if main is recursive
+- Inline `main_pure` function into `main` potentially 
+- Algebraic identities of binary operations folded
+- `vec<_, float>)`
+- Get rid of vec3 or matnxn syntax
+- Tuples (can't just be desugared since index access is unclear if tuple or vec)
 - Allow binary operations and pipes to be used as curried functions
 - Nested destructing, removing mat pattern case
 - Type annotations for arbitrary terms
