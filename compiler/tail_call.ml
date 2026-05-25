@@ -199,6 +199,8 @@ let remove_rec_top (top : Anf.top) : top =
   | TypeDef (name, decl) -> pure (TypeDef (name, decl))
   | Define { name; recur = Nonrec; args; body; ret_ty } ->
     pure (Define { name; args; body = of_anf body; ret_ty })
+  | Define { name = "main"; recur = Rec _; _ } ->
+    raise "main may not be recursive" ~loc:top.loc
   | Define { name; recur = Rec limit; args; body; ret_ty } ->
     let loc = body.loc in
     let iter = Utils.fresh "_iter" in
