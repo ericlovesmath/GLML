@@ -415,12 +415,7 @@ let%expect_test "return type annotation for function-returning functions" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        vec3 anf_4 = vec3(0., 0., 0.);
-        vec3 anf_5 = vec3(0., 0., 0.);
-        vec3 anf_1_0 = vec3(0., 0., 0.);
-        vec3 anf_2_0 = cos(anf_1_0);
-        vec3 anf_3_0 = (anf_5 * anf_2_0);
-        return (anf_4 + anf_3_0);
+        return vec3(0., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

@@ -1,4 +1,3 @@
-(* TODO: Algebraic identities for bops and prims *)
 (* TODO: Builtin functions *)
 
 open Core
@@ -27,6 +26,22 @@ type ctx =
   }
 
 let bind ctx v value = { ctx with env = Map.set ctx.env ~key:v ~data:value }
+
+let equal_atom (a : atom) (b : atom) : bool =
+  match a.desc, b.desc with
+  | Var x, Var y -> String.equal x y
+  | Float x, Float y -> Float.equal x y
+  | Int x, Int y -> Int.equal x y
+  | Bool x, Bool y -> Bool.equal x y
+  | _ -> false
+;;
+
+let equal_lit_float (target : float) (l : literal) : bool =
+  match l with
+  | Float f -> Float.equal f target
+  | Int i -> Float.equal (Float.of_int i) target
+  | Bool _ -> false
+;;
 
 let lit_of_desc : atom_desc -> literal option = function
   | Int i -> Some (Int i)
@@ -143,86 +158,160 @@ let unexpected_branch (t : term) =
 
 let atom_of_lit (l : literal) ~ty ~loc : atom = { desc = desc_of_lit l; ty; loc }
 
-let try_fold_bop ctx op (a : atom) (b : atom) (t : term) : term_desc option =
-  let open Option.Let_syntax in
-  let%bind xs = const_components ctx a in
-  let%bind ys = const_components ctx b in
-  let%bind pairs = broadcast xs ys in
-  let%bind ls = List.map pairs ~f:(fun (x, y) -> fold_bop op x y) |> Option.all in
-  match ls with
-  | [ l ] -> Some (Atom (atom_of_lit l ~ty:t.ty ~loc:t.loc))
-  | ls ->
-    let inner_ty =
-      match t.ty with
-      | TyVec (_, inner) -> inner
-      | other -> other
-    in
-    let atoms = List.map ls ~f:(atom_of_lit ~ty:inner_ty ~loc:t.loc) in
-    Some (Vec (List.length ls, atoms))
+let inner_ty_of (t : term) =
+  match t.ty with
+  | TyVec (_, inner) -> inner
+  | other -> other
 ;;
 
-let try_fold_builtin ctx (b : Glsl.builtin) (args : atom list) (t : term)
-  : term_desc option
-  =
+let const_all_eq_float ctx (a : atom) (target : float) : bool =
+  Option.value_map
+    (const_components ctx a)
+    ~default:false
+    ~f:(List.for_all ~f:(equal_lit_float target))
+;;
+
+(** Splat constant [k] across the scalar/vector shape of [t].
+
+    [None] for matrix/record/etc shapes we don't synthesize yet *)
+let splat (t : term) (k : float) : term_desc option =
+  let scalar : Lower_tuples.ty -> atom_desc option = function
+    | TyFloat -> Some (Float k)
+    | TyInt -> Some (Int (Float.to_int k))
+    | _ -> None
+  in
+  let loc = t.loc in
+  match t.ty with
+  | (TyFloat | TyInt) as ty ->
+    Option.map (scalar ty) ~f:(fun d -> Atom { desc = d; ty; loc })
+  | TyVec (n, inner) ->
+    Option.map (scalar inner) ~f:(fun d ->
+      let a : atom = { desc = d; ty = inner; loc } in
+      (Vec (n, List.init n ~f:(Fn.const a)) : term_desc))
+  | _ -> None
+;;
+
+(** Literal-fold a fully-constant Bop, broadcasting as needed. *)
+let try_fold_bop ctx (t : term) : term_desc option =
   let open Option.Let_syntax in
-  match b, args with
-  | Float, [ a ] ->
-    (match%bind const_components ctx a with
-     | [ Int n ] -> Some (Atom (atom_of_lit (Float (Float.of_int n)) ~ty:t.ty ~loc:t.loc))
+  match t.desc with
+  | Bop (op, a, b) ->
+    let%bind xs = const_components ctx a in
+    let%bind ys = const_components ctx b in
+    let%bind pairs = broadcast xs ys in
+    let%map ls = List.map pairs ~f:(fun (x, y) -> fold_bop op x y) |> Option.all in
+    (match ls with
+     | [ l ] -> Atom (atom_of_lit l ~ty:t.ty ~loc:t.loc)
+     | ls ->
+       let atoms = List.map ls ~f:(atom_of_lit ~ty:(inner_ty_of t) ~loc:t.loc) in
+       Vec (List.length ls, atoms))
+  | _ -> None
+;;
+
+(** Algebraic identities on Bop *)
+let try_identity_bop ctx (t : term) : term_desc option =
+  match t.desc with
+  | Bop (op, a, b) ->
+    let is k x = const_all_eq_float ctx x k in
+    let bool_atom b : atom = { desc = Bool b; ty = t.ty; loc = t.loc } in
+    (match op, a.desc, b.desc with
+     | Add, _, _ when is 0. b -> Some (Atom a)
+     | Add, _, _ when is 0. a -> Some (Atom b)
+     | Sub, _, _ when is 0. b -> Some (Atom a)
+     | Sub, _, _ when equal_atom a b -> splat t 0.
+     | Mul, _, _ when is 1. b -> Some (Atom a)
+     | Mul, _, _ when is 1. a -> Some (Atom b)
+     | Mul, _, _ when is 0. a || is 0. b -> splat t 0.
+     | Div, _, _ when is 1. b -> Some (Atom a)
+     | Div, _, _ when equal_atom a b -> splat t 1.
+     | Eq, _, _ when equal_atom a b -> Some (Atom (bool_atom true))
+     | And, Bool true, _ -> Some (Atom b)
+     | And, _, Bool true -> Some (Atom a)
+     | And, Bool false, _ | And, _, Bool false -> Some (Atom (bool_atom false))
+     | Or, Bool false, _ -> Some (Atom b)
+     | Or, _, Bool false -> Some (Atom a)
+     | Or, Bool true, _ | Or, _, Bool true -> Some (Atom (bool_atom true))
      | _ -> None)
   | _ -> None
 ;;
 
-let try_project (ctx : ctx) (a : atom) (t : term) ~f : term_desc option =
-  let open Option.Let_syntax in
-  let%bind v = lookup ctx a in
-  let%bind sub = f v in
-  let atom desc : atom = { desc; ty = t.ty; loc = t.loc } in
-  match sub with
-  | Lit l -> Some (Atom (atom (desc_of_lit l)))
-  | Alias v -> Some (Atom (atom (Var v)))
-  | Vec cs ->
-    let%map ls = List.map cs ~f:lit_of_value |> Option.all in
-    let inner_ty =
-      match t.ty with
-      | TyVec (_, inner) -> inner
-      | other -> other
-    in
-    let atoms = List.map ls ~f:(atom_of_lit ~ty:inner_ty ~loc:t.loc) in
-    (Vec (List.length atoms, atoms) : term_desc)
-  | Top | Fields _ -> None
+let try_fold_builtin ctx (t : term) : term_desc option =
+  match t.desc with
+  | Builtin (b, args) ->
+    let is k x = const_all_eq_float ctx x k in
+    (match b, args with
+     | Float, [ a ] ->
+       (match const_components ctx a with
+        | Some [ Int n ] ->
+          Some (Atom (atom_of_lit (Float (Float.of_int n)) ~ty:t.ty ~loc:t.loc))
+        | _ -> None)
+     | Pow, [ _; e ] when is 0. e -> splat t 1.
+     | Pow, [ x; e ] when is 1. e -> Some (Atom x)
+     | Pow, [ x; e ] when is 2. e -> Some (Bop (Mul, x, x))
+     | Pow, [ x; e ] when is 0.5 e -> Some (Builtin (Sqrt, [ x ]))
+     | Sin, [ a ] when is 0. a -> splat t 0.
+     | Cos, [ a ] when is 0. a -> splat t 1.
+     | (Min | Max), [ a; b ] when equal_atom a b -> Some (Atom a)
+     | _ -> None)
+  | _ -> None
 ;;
 
-let simplify_primitive_term (ctx : ctx) (t : term) : term =
-  let rewrite = rewrite_atom ctx in
-  let ( <|> ) opt default = Option.value opt ~default in
+let try_project ctx (t : term) : term_desc option =
+  let open Option.Let_syntax in
+  let project (a : atom) ~(select : value -> value option) =
+    let%bind v = lookup ctx a in
+    let%bind sub = select v in
+    let atom desc : atom = { desc; ty = t.ty; loc = t.loc } in
+    match sub with
+    | Lit l -> Some (Atom (atom (desc_of_lit l)))
+    | Alias v -> Some (Atom (atom (Var v)))
+    | Vec cs ->
+      let%map ls = List.map cs ~f:lit_of_value |> Option.all in
+      let atoms = List.map ls ~f:(atom_of_lit ~ty:(inner_ty_of t) ~loc:t.loc) in
+      (Vec (List.length atoms, atoms) : term_desc)
+    | Top | Fields _ -> None
+  in
+  match t.desc with
+  | Index (a, i) ->
+    project a ~select:(function
+      | Vec cs -> List.nth cs i
+      | _ -> None)
+  | Field (a, name) ->
+    project a ~select:(function
+      | Fields fs -> Map.find fs name
+      | _ -> None)
+  | _ -> None
+;;
+
+(** Rewrite atoms in place using [ctx]; pure mechanical substitution. *)
+let normalize_atoms ctx (t : term) : term =
+  let rw = rewrite_atom ctx in
   let desc =
     match t.desc with
-    | Atom a -> Atom (rewrite a)
-    | Vec (n, atoms) -> Vec (n, List.map atoms ~f:rewrite)
-    | Builtin (b, atoms) ->
-      let atoms = List.map atoms ~f:rewrite in
-      try_fold_builtin ctx b atoms t <|> Builtin (b, atoms)
-    | App (n, atoms) -> App (n, List.map atoms ~f:rewrite)
-    | Record atoms -> Record (List.map atoms ~f:rewrite)
-    | Bop (op, a, b) ->
-      let a, b = rewrite a, rewrite b in
-      try_fold_bop ctx op a b t <|> Bop (op, a, b)
-    | Index (a, i) ->
-      let a = rewrite a in
-      try_project ctx a t ~f:(function
-        | Vec cs -> List.nth cs i
-        | _ -> None)
-      <|> Index (a, i)
-    | Field (a, name) ->
-      let a = rewrite a in
-      try_project ctx a t ~f:(function
-        | Fields fs -> Map.find fs name
-        | _ -> None)
-      <|> Field (a, name)
+    | Atom a -> Atom (rw a)
+    | Vec (n, atoms) -> Vec (n, List.map atoms ~f:rw)
+    | Builtin (b, atoms) -> Builtin (b, List.map atoms ~f:rw)
+    | App (n, atoms) -> App (n, List.map atoms ~f:rw)
+    | Record atoms -> Record (List.map atoms ~f:rw)
+    | Bop (op, a, b) -> Bop (op, rw a, rw b)
+    | Index (a, i) -> Index (rw a, i)
+    | Field (a, n) -> Field (rw a, n)
     | If _ | Switch _ -> unexpected_branch t
   in
   { t with desc }
+;;
+
+let simplify_primitive_term ctx (t : term) : term =
+  let t = normalize_atoms ctx t in
+  let simplified =
+    match t.desc with
+    | Bop _ -> Option.first_some (try_fold_bop ctx t) (try_identity_bop ctx t)
+    | Builtin _ -> try_fold_builtin ctx t
+    | Index _ | Field _ -> try_project ctx t
+    | Atom _ | Vec _ | App _ | Record _ -> None
+    | If _ | Switch _ -> unexpected_branch t
+  in
+  Option.value_map simplified ~default:t ~f:(fun desc -> { t with desc })
 ;;
 
 let abs_of_atom ctx (a : atom) : value =

@@ -636,8 +636,7 @@ let%expect_test "compile examples" =
         return mix(abcd, efgh, anf_25);
     }
     float fbm(vec3 p_2) {
-        vec3 anf_26 = (p_2 * 1.);
-        float anf_27 = noise3d(anf_26);
+        float anf_27 = noise3d(p_2);
         float anf_28 = (anf_27 * 0.5);
         vec3 anf_29 = (p_2 * 2.);
         float anf_30 = noise3d(anf_29);

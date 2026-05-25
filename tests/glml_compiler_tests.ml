@@ -1217,8 +1217,7 @@ let%expect_test "ints in float contexts" =
     precision highp float;
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
-        float s = sin(0.);
-        return vec3(s, 0., 0.);
+        return vec3(0., 0., 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

@@ -586,11 +586,10 @@ let%expect_test "bracket pattern matching" =
     out vec4 fragColor;
     vec3 main_pure(vec2 coord) {
         float anf = coord[0];
-        float a_0 = (anf + 0.);
         float _lv_v0_3_0 = coord[0];
         float _lv_v1_3_0 = coord[1];
         float c_0 = (_lv_v0_3_0 + _lv_v1_3_0);
-        return vec3(a_0, 2., c_0);
+        return vec3(anf, 2., c_0);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
