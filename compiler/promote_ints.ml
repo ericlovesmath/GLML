@@ -10,6 +10,7 @@ let rec has_tyvar = function
   | TyRecord (_, fields) -> List.exists fields ~f:(fun (_, t) -> has_tyvar t)
   | TyVariant (_, ctors) ->
     List.exists ctors ~f:(fun (_, ts) -> List.exists ts ~f:has_tyvar)
+  | TyTuple ts -> List.exists ts ~f:has_tyvar
 ;;
 
 let rec coercible (from_ty : ty) (to_ty : ty) : bool =
@@ -25,6 +26,8 @@ let rec coercible (from_ty : ty) (to_ty : ty) : bool =
     | TyVariant (_, cs), TyVariant (_, cs') when List.length cs = List.length cs' ->
       List.for_all2_exn cs cs' ~f:(fun (_, ts) (_, ts') ->
         List.length ts = List.length ts' && List.for_all2_exn ts ts' ~f:coercible)
+    | TyTuple ts, TyTuple ts' when List.length ts = List.length ts' ->
+      List.for_all2_exn ts ts' ~f:coercible
     | _ -> false)
 ;;
 
@@ -119,6 +122,7 @@ let rec rewrite (t : term) : term =
   | Variant (ctor, args) -> { t with desc = Variant (ctor, List.map args ~f:rewrite) }
   | Match (scrut, cases) ->
     { t with desc = Match (rewrite scrut, List.map cases ~f:(Tuple2.map_snd ~f:rewrite)) }
+  | Tuple ts -> { t with desc = Tuple (List.map ts ~f:rewrite) }
 ;;
 
 let materialize (Program tops : t) : t =

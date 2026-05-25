@@ -78,7 +78,10 @@ let rec pat_atom_p st =
    <|> tok UNDERSCORE *> return PatWildcard
    <|> (constructor_p >>| fun c -> PatCtor (c, []))
    <|> (ident_p >>| fun v -> PatVar v)
-   <|> between `Paren pat_p
+   <|> (let%bind ps = between `Paren (commas pat_p) in
+        match ps with
+        | [ p ] -> return p
+        | _ -> return (PatTuple ps))
    <??> "pattern")
     st
 
@@ -132,8 +135,15 @@ let rec ty_atom_p st =
    <??> "type")
     st
 
+and ty_paren_or_tuple_p st =
+  (let%bind ts = between `Paren (commas ty_p) in
+   match ts with
+   | [ t ] -> return t
+   | _ -> return (TyTuple ts))
+    st
+
 and ty_arrow_p st =
-  (let%bind l = ty_atom_p <|> between `Paren ty_p in
+  (let%bind l = ty_atom_p <|> ty_paren_or_tuple_p in
    let%bind _ = tok ARROW in
    let%bind r = ty_p in
    return (TyArrow (l, r)) <??> "function type")
@@ -141,7 +151,7 @@ and ty_arrow_p st =
 
 and ty_p st =
   let p = ty_arrow_p <|> ty_atom_p in
-  (p <|> between `Paren p) st
+  (p <|> ty_paren_or_tuple_p) st
 ;;
 
 let test sexp_of parser source =
@@ -163,6 +173,9 @@ let%expect_test "ty parse tests" =
   test "float -> int";
   test "'a";
   test "record_or_variant";
+  test "(float)";
+  test "((float, int), bool)";
+  test "float -> (int, bool)";
   [%expect
     {|
     float
@@ -174,6 +187,9 @@ let%expect_test "ty parse tests" =
     (float -> int)
     'a
     record_or_variant
+    float
+    (tuple (tuple float int) bool)
+    (float -> (tuple int bool))
     |}];
   test "(vec4)";
   test "(mat3x2->vec2)->(vec2->int)";
@@ -197,7 +213,6 @@ let%expect_test "ty parse tests" =
     {|
     [parser]: expected one of: identifier, type keyword/variable, `(`
     [parser] at 1:2-1:3: expected one of: identifier, type keyword/variable, `(` but found `)`
-      in: "type at 1:2-1:3"
       |
     1 | ()
       |  ^
@@ -478,13 +493,22 @@ and term_unary_neg_p =
    <??> "negation")
     st
 
+and term_paren_or_tuple_p =
+  fun st ->
+  (with_term_loc
+     (let%bind ts = between `Paren (commas term_p) in
+      match ts with
+      | [ t ] -> return t.desc
+      | _ -> return (Tuple ts)))
+    st
+
 and term_head_p =
   fun st ->
   (term_variant_p
    <|> term_atom_p
    <|> term_number_p
    <|> term_unary_neg_p
-   <|> between `Paren term_p)
+   <|> term_paren_or_tuple_p)
     st
 
 and term_postfix_p =
@@ -509,7 +533,7 @@ and term_postfix_p =
   in
   let term_arg_base_p =
     (* NOTE: intentionally excludes signed literals to avoid cases like [f -5] *)
-    term_atom_p <|> term_unsigned_number_p <|> between `Paren term_p <??> "term_arg"
+    term_atom_p <|> term_unsigned_number_p <|> term_paren_or_tuple_p <??> "term_arg"
   in
   let term_arg_p = postfix_chain term_arg_base_p dot_op_p in
   let app_op_p =
@@ -570,6 +594,7 @@ let%expect_test "term parse tests" =
   test "function | true -> a | _ -> b";
   test "function | -1 -> a | 23 -> b | var -> c";
   test "function | Some (None (1, _)) -> a | { x = -1, v } -> b | _ -> c";
+  test "(1 + 2, 3 * 4)";
   [%expect
     {|
     variable_name
@@ -599,6 +624,7 @@ let%expect_test "term parse tests" =
     (function (true a) (_ b))
     (function (-1 a) (23 b) (var c))
     (function ((Some (None 1 _)) a) ((record (x -1) (v v)) b) (_ c))
+    (tuple (+ 1 2) (* 3 4))
     |}];
   test "-113.0";
   test "-113.";
@@ -640,6 +666,7 @@ let%expect_test "term parse tests" =
   test "let (x : float) = 1.0 in x";
   test "let Foo v = e in v";
   test "let [a, b, c] = arr in a";
+  test "let (a, (b, c)) = p in a";
   [%expect
     {|
     (let f (lambda (x (bool)) (lambda (y (bool)) (&& x y))) f)
@@ -651,6 +678,7 @@ let%expect_test "term parse tests" =
     (let x (: float) 1. x)
     (let (Foo v) e v)
     (let (bracket a b c) arr a)
+    (let (tuple a (tuple b c)) p a)
     |}]
 ;;
 

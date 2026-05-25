@@ -1,5 +1,5 @@
 open Core
-open Monomorphize
+open Lower_tuples
 open Lambda_lift
 
 include Compiler_error.Pass (struct

@@ -1,7 +1,7 @@
 open Core
 open Anf
 open Sexplib.Sexp
-open Monomorphize
+open Lower_tuples
 open Tail_call
 
 (* TODO: Add type for lower_variants to remove variants *)
@@ -85,7 +85,7 @@ type top_desc =
       { name : string
       ; args : (string * ty) list
       ; body : anf
-      ; ret_ty : Monomorphize.ty
+      ; ret_ty : Lower_tuples.ty
       }
   | Const of string * anf
   | Extern of string
@@ -107,12 +107,12 @@ let sexp_of_top_desc = function
 
 type top =
   { desc : top_desc
-  ; ty : Monomorphize.ty
+  ; ty : Lower_tuples.ty
   ; loc : Lexer.loc
   }
 
 let sexp_of_top t =
-  List [ sexp_of_top_desc t.desc; Atom ":"; Monomorphize.sexp_of_ty t.ty ]
+  List [ sexp_of_top_desc t.desc; Atom ":"; Lower_tuples.sexp_of_ty t.ty ]
 ;;
 
 type t = Program of top list
@@ -243,6 +243,7 @@ let head_of_pat ~loc ~(tenv : type_env) ~(col_ty : ty) : Frontend.pat -> head op
       | _ -> []
     in
     Some (HRecord fs)
+  | PatTuple _ -> raise "unexpected PatTuple after lower_tuples" ~loc
 ;;
 
 (** Sub-patterns of [pat] under [h]: [Some args] if [pat]'s head equals [h]
@@ -279,6 +280,7 @@ let pat_args ~(h : head) : Frontend.pat -> Frontend.pat list option = function
             List.Assoc.find fields ~equal:String.equal fname
             |> Option.value ~default:Frontend.PatWildcard))
      | _ -> None)
+  | PatTuple _ -> raise "unexpected PatTuple after lower_tuples"
 ;;
 
 (** Distinct heads observed in the first column of [rows], in first-seen order. *)

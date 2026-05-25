@@ -130,7 +130,7 @@ let count_call_sites (tops : top list) : int String.Map.t =
 
 (** Does [body] read any formal via [Field _] or [Switch(Field _, _)]?
     This is used for [case-of-known-constructor] *)
-let projects_formal (formals : (string * Monomorphize.ty) list) (body : anf) : bool =
+let projects_formal (formals : (string * Lower_tuples.ty) list) (body : anf) : bool =
   let formals = String.Set.of_list (List.map formals ~f:fst) in
   let is_formal (a : atom) =
     match a.desc with
@@ -162,7 +162,7 @@ type guard =
   | On_record_actual (* Only inline when actual argument is a literal record *)
 
 type entry =
-  { formals : (string * Monomorphize.ty) list
+  { formals : (string * Lower_tuples.ty) list
   ; body : anf
   ; guard : guard
   }

@@ -11,6 +11,7 @@ module Passes = struct
       | Typecheck
       | Promote_ints
       | Monomorphize
+      | Lower_tuples
       | Uncurry
       | Lambda_lift
       | Defunctionalize
@@ -51,6 +52,8 @@ let compile
   trace Promote_ints (Typecheck.sexp_of_t t);
   let%bind t = Monomorphize.monomorphize t in
   trace Monomorphize (Monomorphize.sexp_of_t t);
+  let%bind t = Lower_tuples.lower t in
+  trace Lower_tuples (Lower_tuples.sexp_of_t t);
   let t = Uncurry.uncurry t in
   trace Uncurry (Uncurry.sexp_of_t t);
   let%bind t = Lambda_lift.lift t in

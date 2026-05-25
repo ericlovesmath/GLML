@@ -23,7 +23,7 @@ type value =
 type ctx =
   { env : value String.Map.t
   ; mut : String.Set.t (* names that appear as [Set] targets *)
-  ; records : (string * Monomorphize.ty) list String.Map.t
+  ; records : (string * Lower_tuples.ty) list String.Map.t
   }
 
 let bind ctx v value = { ctx with env = Map.set ctx.env ~key:v ~data:value }
@@ -365,7 +365,7 @@ and resolve_branch ctx (t : term) : branch_resolution =
 ;;
 
 let rewrite_top
-      (records : (string * Monomorphize.ty) list String.Map.t)
+      (records : (string * Lower_tuples.ty) list String.Map.t)
       (env : value String.Map.t)
       (top : top)
   : top * value String.Map.t
@@ -400,7 +400,7 @@ let rewrite_top
   | Extern _ | TypeDef _ -> top, env
 ;;
 
-let collect_records (tops : top list) : (string * Monomorphize.ty) list String.Map.t =
+let collect_records (tops : top list) : (string * Lower_tuples.ty) list String.Map.t =
   List.filter_map tops ~f:(fun top ->
     match top.desc with
     | TypeDef (name, RecordDecl fields) -> Some (name, fields)

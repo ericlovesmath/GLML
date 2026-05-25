@@ -10,6 +10,7 @@ module Passes : sig
     | Typecheck
     | Promote_ints
     | Monomorphize
+    | Lower_tuples
     | Uncurry
     | Lambda_lift
     | Defunctionalize

@@ -18,7 +18,7 @@ let sexp_of_atom_desc = function
 
 type atom =
   { desc : atom_desc
-  ; ty : Monomorphize.ty
+  ; ty : Lower_tuples.ty
   ; loc : Lexer.loc
   }
 
@@ -39,7 +39,7 @@ type term_desc =
 
 and term =
   { desc : term_desc
-  ; ty : Monomorphize.ty
+  ; ty : Lower_tuples.ty
   ; loc : Lexer.loc
   }
 
@@ -49,7 +49,7 @@ and anf_desc =
 
 and anf =
   { desc : anf_desc
-  ; ty : Monomorphize.ty
+  ; ty : Lower_tuples.ty
   ; loc : Lexer.loc
   }
 
@@ -84,18 +84,18 @@ type top_desc =
   | Define of
       { name : string
       ; recur : Frontend.recur
-      ; args : (string * Monomorphize.ty) list
+      ; args : (string * Lower_tuples.ty) list
       ; body : anf
-      ; ret_ty : Monomorphize.ty
+      ; ret_ty : Lower_tuples.ty
       }
   | Const of string * anf
   | Extern of string
-  | TypeDef of string * Monomorphize.type_decl
+  | TypeDef of string * Lower_tuples.type_decl
 
 let sexp_of_top_desc = function
   | Define { name; recur; args; body; ret_ty = _ } ->
     let args_sexp =
-      List.map args ~f:(fun (v, ty) -> List [ Atom v; Monomorphize.sexp_of_ty ty ])
+      List.map args ~f:(fun (v, ty) -> List [ Atom v; Lower_tuples.sexp_of_ty ty ])
     in
     List
       [ Atom "Define"
@@ -107,17 +107,17 @@ let sexp_of_top_desc = function
   | Const (name, term) -> List [ Atom "Const"; Atom name; sexp_of_anf term ]
   | Extern name -> List [ Atom "Extern"; Atom name ]
   | TypeDef (name, decl) ->
-    List [ Atom "TypeDef"; Atom name; Monomorphize.sexp_of_type_decl decl ]
+    List [ Atom "TypeDef"; Atom name; Lower_tuples.sexp_of_type_decl decl ]
 ;;
 
 type top =
   { desc : top_desc
-  ; ty : Monomorphize.ty
+  ; ty : Lower_tuples.ty
   ; loc : Lexer.loc
   }
 
 let sexp_of_top t =
-  List [ sexp_of_top_desc t.desc; Atom ":"; Monomorphize.sexp_of_ty t.ty ]
+  List [ sexp_of_top_desc t.desc; Atom ":"; Lower_tuples.sexp_of_ty t.ty ]
 ;;
 
 type t = Program of top list

@@ -18,6 +18,7 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution =
       | TyVariant (_, ctors) ->
         List.exists ctors ~f:(fun (_, ts) -> List.exists ts ~f:occurs_in)
       | TyArrow (ty, ty') -> occurs_in ty || occurs_in ty'
+      | TyTuple ts -> List.exists ts ~f:occurs_in
     in
     if equal_ty (TyVar v) ty
     then unify con
@@ -35,6 +36,8 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution =
   | (loc, TyRecord (_, fs), TyRecord (_, fs')) :: con
     when List.length fs = List.length fs' ->
     unify (List.map2_exn fs fs' ~f:(fun (_, t) (_, t') -> loc, t, t') @ con)
+  | (loc, TyTuple ts, TyTuple ts') :: con when List.length ts = List.length ts' ->
+    unify (List.map2_exn ts ts' ~f:(Tuple3.create loc) @ con)
   | (loc, TyVariant (_, cs), TyVariant (_, cs')) :: con
     when List.length cs = List.length cs' ->
     let pairs =
@@ -58,6 +61,7 @@ let rec widen_numeric = function
   | TyVariant (hint, ctors) ->
     TyVariant (hint, List.map ctors ~f:(fun (n, ts) -> n, List.map ts ~f:widen_numeric))
   | TyArrow (a, b) -> TyArrow (widen_numeric a, widen_numeric b)
+  | TyTuple ts -> TyTuple (List.map ts ~f:widen_numeric)
   | t -> t
 ;;
 
@@ -234,6 +238,8 @@ let resolve_constraints (constrs : constr list) : constr list * (Lexer.loc * ty 
             |> List.concat
           in
           aux deferred eqs (coerces @ rest)
+        | TyTuple ts, TyTuple ts' when List.length ts = List.length ts' ->
+          aux deferred eqs (List.map2_exn ts ts' ~f:(fun a b -> mk (Coerce (a, b))) @ rest)
         | (TyRecord _ | TyVariant _), (TyRecord _ | TyVariant _) ->
           aux deferred ((loc, from_ty, to_ty) :: eqs) rest
         | TyVar _, _ | _, TyVar _ ->
@@ -268,6 +274,10 @@ let rec join_ty (a : ty) (b : ty) : ty option =
           List.map2_exn ts ts' ~f:join_ty |> Option.all |> Option.map ~f:(fun ts -> n, ts))
       |> Option.all
       |> Option.map ~f:(fun ctors -> TyVariant (merge_hint h1 h2, ctors))
+    | TyTuple ts, TyTuple ts' when List.length ts = List.length ts' ->
+      List.map2_exn ts ts' ~f:join_ty
+      |> Option.all
+      |> Option.map ~f:(fun ts -> TyTuple ts)
     | _ -> None)
 ;;
 

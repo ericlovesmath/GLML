@@ -1,6 +1,6 @@
 open Core
 open Anf
-open Monomorphize
+open Lower_tuples
 open Lower_variants
 open Sexplib.Sexp
 
@@ -19,7 +19,7 @@ let sexp_of_atom_desc = function
 
 type atom =
   { desc : atom_desc
-  ; ty : Monomorphize.ty
+  ; ty : Lower_tuples.ty
   ; loc : Lexer.loc
   }
 
@@ -100,7 +100,7 @@ type top_desc =
       { name : string
       ; args : (string * ty) list
       ; body : anf
-      ; ret_ty : Monomorphize.ty
+      ; ret_ty : Lower_tuples.ty
       }
   | Const of string * anf
   | Extern of string
@@ -122,12 +122,12 @@ let sexp_of_top_desc = function
 
 type top =
   { desc : top_desc
-  ; ty : Monomorphize.ty
+  ; ty : Lower_tuples.ty
   ; loc : Lexer.loc
   }
 
 let sexp_of_top t =
-  List [ sexp_of_top_desc t.desc; Atom ":"; Monomorphize.sexp_of_ty t.ty ]
+  List [ sexp_of_top_desc t.desc; Atom ":"; Lower_tuples.sexp_of_ty t.ty ]
 ;;
 
 type t = Program of top list

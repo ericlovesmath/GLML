@@ -19,6 +19,7 @@
    constraint_solver
    pattern_match
    typecheck
+   lower_tuples
    promote_ints
    monomorphize
 

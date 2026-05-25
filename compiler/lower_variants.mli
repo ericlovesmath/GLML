@@ -15,7 +15,7 @@ type term_desc =
 
 and term =
   { desc : term_desc
-  ; ty : Monomorphize.ty
+  ; ty : Lower_tuples.ty
   ; loc : Lexer.loc
   }
 [@@deriving sexp_of]
@@ -30,7 +30,7 @@ and anf_desc =
 
 and anf =
   { desc : anf_desc
-  ; ty : Monomorphize.ty
+  ; ty : Lower_tuples.ty
   ; loc : Lexer.loc
   }
 [@@deriving sexp_of]
@@ -38,18 +38,18 @@ and anf =
 type top_desc =
   | Define of
       { name : string
-      ; args : (string * Monomorphize.ty) list
+      ; args : (string * Lower_tuples.ty) list
       ; body : anf
-      ; ret_ty : Monomorphize.ty
+      ; ret_ty : Lower_tuples.ty
       }
   | Const of string * anf
   | Extern of string
-  | TypeDef of string * Monomorphize.type_decl
+  | TypeDef of string * Lower_tuples.type_decl
 [@@deriving sexp_of]
 
 type top =
   { desc : top_desc
-  ; ty : Monomorphize.ty
+  ; ty : Lower_tuples.ty
   ; loc : Lexer.loc
   }
 [@@deriving sexp_of]

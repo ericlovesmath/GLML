@@ -104,7 +104,7 @@ let liveness_top (top : top) : top =
   | Extern _ | TypeDef _ -> top
 ;;
 
-let rec ty_refs (acc : String.Set.t) (ty : Monomorphize.ty) : String.Set.t =
+let rec ty_refs (acc : String.Set.t) (ty : Lower_tuples.ty) : String.Set.t =
   match ty with
   | TyFloat | TyInt | TyBool -> acc
   | TyVec (_, t) -> ty_refs acc t

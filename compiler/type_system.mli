@@ -14,6 +14,7 @@ type ty =
   | TyRecord of string * (string * ty) list
   | TyVariant of string * (string * ty list) list
   | TyVar of string
+  | TyTuple of ty list
 [@@deriving sexp_of, equal, compare]
 
 val merge_hint : string -> string -> string

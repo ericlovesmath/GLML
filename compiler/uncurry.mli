@@ -4,7 +4,7 @@ type term_desc =
   | Int of int
   | Bool of bool
   | Vec of int * term list
-  | Lam of (string * Monomorphize.ty) list * term
+  | Lam of (string * Lower_tuples.ty) list * term
   | App of term * term list
   | Let of Frontend.recur * string * term * term
   | If of term * term * term
@@ -19,7 +19,7 @@ type term_desc =
 
 and term =
   { desc : term_desc
-  ; ty : Monomorphize.ty
+  ; ty : Lower_tuples.ty
   ; loc : Lexer.loc
   }
 [@@deriving sexp_of]
@@ -27,16 +27,16 @@ and term =
 type top_desc =
   | Define of Frontend.recur * string * term
   | Extern of string
-  | TypeDef of string * Monomorphize.type_decl
+  | TypeDef of string * Lower_tuples.type_decl
 [@@deriving sexp_of]
 
 type top =
   { desc : top_desc
-  ; ty : Monomorphize.ty
+  ; ty : Lower_tuples.ty
   ; loc : Lexer.loc
   }
 [@@deriving sexp_of]
 
 type t = Program of top list [@@deriving sexp_of]
 
-val uncurry : Monomorphize.t -> t
+val uncurry : Lower_tuples.t -> t

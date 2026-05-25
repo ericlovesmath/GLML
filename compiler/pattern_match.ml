@@ -13,11 +13,12 @@ type head =
   | HCtor of string * (ty list[@equal.ignore])
   | HBracket of (ty list[@equal.ignore])
   | HRecord of ((string * ty) list[@equal.ignore])
+  | HTuple of (ty list[@equal.ignore])
 [@@deriving equal]
 
 let head_sub_tys = function
   | HBool _ | HInt _ | HFloat _ -> []
-  | HCtor (_, ts) | HBracket ts -> ts
+  | HCtor (_, ts) | HBracket ts | HTuple ts -> ts
   | HRecord fs -> List.map fs ~f:snd
 ;;
 
@@ -28,6 +29,7 @@ let signature_heads : ty -> head list option = function
   | TyVariant (_, ctors) -> List.map ctors ~f:(fun (c, ts) -> HCtor (c, ts)) |> Some
   | TyVec (n, elem) -> [ HBracket (List.init n ~f:(Fn.const elem)) ] |> Some
   | TyRecord (_, fs) -> [ HRecord fs ] |> Some
+  | TyTuple ts -> [ HTuple ts ] |> Some
   | TyInt | TyFloat | TyArrow _ | TyVar _ -> None
 ;;
 
@@ -59,6 +61,13 @@ let head_of_pat ~(col_ty : ty) : pat -> head option = function
       | _ -> []
     in
     Some (HRecord fs)
+  | PatTuple _ ->
+    let ts =
+      match col_ty with
+      | TyTuple ts -> ts
+      | _ -> []
+    in
+    Some (HTuple ts)
 ;;
 
 (** Sub-patterns of [pat] under [h]: [Some args] if [pat]'s head equals [h]
@@ -96,6 +105,10 @@ let pat_args ~(h : head) : pat -> pat list option =
             List.Assoc.find fields ~equal:String.equal fname
             |> Option.value ~default:PatWildcard))
      | _ -> None)
+  | PatTuple pats ->
+    (match h with
+     | HTuple _ -> Some pats
+     | _ -> None)
 ;;
 
 (** A concrete literal counter-example for a wildcard column in infinite domain *)
@@ -129,6 +142,7 @@ let rebuild_witness (h : head) (subs : pat list) : pat =
   | HCtor (c, _) -> PatCtor (c, subs)
   | HBracket _ -> PatBracket subs
   | HRecord fs -> PatRecord (List.map2_exn fs subs ~f:(fun (n, _) p -> n, p), false)
+  | HTuple _ -> PatTuple subs
 ;;
 
 module Matrix = struct
@@ -136,7 +150,8 @@ module Matrix = struct
 
   let is_wild : pat -> bool = function
     | PatWildcard | PatVar _ -> true
-    | _ -> false
+    | PatCtor _ | PatLitBool _ | PatLitInt _ | PatLitFloat _ | PatBracket _
+    | PatRecord _ | PatTuple _ -> false
   ;;
 
   let classify (rows : 'a row list) : [ `Empty | `Leaf of 'a row | `Pivot of int ] =

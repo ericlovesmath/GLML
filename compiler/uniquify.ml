@@ -47,6 +47,7 @@ let rec uniquify_term (ctx : env) (t : term) : term =
   | Record fields -> pure (Record (List.map fields ~f:(fun (f, t) -> f, aux t)))
   | Field (t, f) -> pure (Field (aux t, f))
   | Variant (ctor, args) -> pure (Variant (ctor, aux_list args))
+  | Tuple ts -> pure (Tuple (aux_list ts))
   | Match (scrutinee, cases) ->
     let scrutinee = aux scrutinee in
     let cases =

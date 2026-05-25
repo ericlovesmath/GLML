@@ -10,6 +10,7 @@ type ty =
   | TyRecord of (string[@equal.ignore] [@compare.ignore]) * (string * ty) list
   | TyVariant of (string[@equal.ignore] [@compare.ignore]) * (string * ty list) list
   | TyVar of string
+  | TyTuple of ty list
 [@@deriving equal, compare]
 
 let merge_hint a b = if String.is_empty a then b else a
@@ -31,6 +32,7 @@ let rec sexp_of_ty = function
        :: Atom hint
        :: List.map ctors ~f:(fun (n, ts) -> List (Atom n :: List.map ts ~f:sexp_of_ty)))
   | TyVar v -> Atom ("'" ^ v)
+  | TyTuple ts -> List (Atom "tuple" :: List.map ts ~f:sexp_of_ty)
 ;;
 
 type type_decl =
@@ -93,6 +95,7 @@ let rec subst_ty (sub : substitution) (ty : ty) : ty =
   | TyRecord (hint, fields) ->
     TyRecord (hint, List.map fields ~f:(fun (n, t) -> n, subst_ty sub t))
   | TyArrow (f, x) -> TyArrow (subst_ty sub f, subst_ty sub x)
+  | TyTuple ts -> TyTuple (List.map ts ~f:(subst_ty sub))
 ;;
 
 let subst_constraints (sub : substitution) (con : constr list) : constr list =
@@ -128,6 +131,7 @@ let rec ftv_of_ty = function
     String.Set.union_list
       (List.concat_map ctors ~f:(fun (_, ts) -> List.map ts ~f:ftv_of_ty))
   | TyArrow (t1, t2) -> Set.union (ftv_of_ty t1) (ftv_of_ty t2)
+  | TyTuple ts -> String.Set.union_list (List.map ts ~f:ftv_of_ty)
 ;;
 
 let ftv_of_constraint (c : constr) : String.Set.t =

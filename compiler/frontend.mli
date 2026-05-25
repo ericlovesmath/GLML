@@ -7,6 +7,7 @@ type pat =
   | PatVar of string
   | PatBracket of pat list (** PatRecord of [(binging * pattern) list * is_partial] *)
   | PatRecord of (string * pat) list * bool
+  | PatTuple of pat list
 [@@deriving sexp_of, equal]
 
 val pat_bound_vars : pat -> string list
@@ -22,6 +23,7 @@ type ty =
   | TyName of string
   | TyVar of string
   | TyApp of string * ty list
+  | TyTuple of ty list
 [@@deriving sexp_of, equal]
 
 type constr_desc =
@@ -67,6 +69,7 @@ type term_desc =
   | Variant of string * term list
   | Match of term * (pat * term) list
   | Function of (pat * term) list
+  | Tuple of term list
 [@@deriving sexp_of]
 
 and term =

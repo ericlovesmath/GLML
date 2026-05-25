@@ -29,6 +29,7 @@ type term_desc =
   | Field of term * string
   | Variant of string * term list
   | Match of term * (Frontend.pat * term) list
+  | Tuple of term list
 
 and term =
   { desc : term_desc
@@ -79,6 +80,7 @@ let rec sexp_of_term_desc = function
   | Match (scrutinee, cases) ->
     let sexp_of_case (pat, body) = List [ Frontend.sexp_of_pat pat; sexp_of_term body ] in
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
+  | Tuple ts -> List (Atom "tuple" :: List.map ts ~f:sexp_of_term)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
 
@@ -157,6 +159,7 @@ let rec desugar_term_desc ~loc (td : Frontend.term_desc) : term_desc =
   | Match (scrutinee, cases) ->
     let cases = List.map cases ~f:(fun (p, t) -> p, desugar_term t) in
     Match (desugar_term scrutinee, cases)
+  | Tuple ts -> Tuple (List.map ts ~f:desugar_term)
   | Function cases ->
     (* function | pat -> e | pat' -> e'
        => fun _v -> match _v with | pat -> e | pat' -> e' *)

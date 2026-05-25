@@ -7,7 +7,7 @@ type term_desc =
   | Int of int
   | Bool of bool
   | Vec of int * term list
-  | Lam of (string * Monomorphize.ty) list * term
+  | Lam of (string * Lower_tuples.ty) list * term
   | App of term * term list
   | Let of Frontend.recur * string * term * term
   | If of term * term * term
@@ -21,7 +21,7 @@ type term_desc =
 
 and term =
   { desc : term_desc
-  ; ty : Monomorphize.ty
+  ; ty : Lower_tuples.ty
   ; loc : Lexer.loc
   }
 
@@ -33,7 +33,7 @@ let rec sexp_of_term_desc = function
   | Vec (n, ts) -> List (Atom ("vec" ^ Int.to_string n) :: List.map ts ~f:sexp_of_term)
   | Lam (args, body) ->
     let args =
-      List.map args ~f:(fun (v, ty) -> List [ Atom v; Monomorphize.sexp_of_ty ty ])
+      List.map args ~f:(fun (v, ty) -> List [ Atom v; Lower_tuples.sexp_of_ty ty ])
     in
     List [ Atom "lambda"; List args; sexp_of_term body ]
   | App (f, args) -> List (Atom "app" :: sexp_of_term f :: List.map args ~f:sexp_of_term)
@@ -61,35 +61,35 @@ and sexp_of_term t = sexp_of_term_desc t.desc
 type top_desc =
   | Define of Frontend.recur * string * term
   | Extern of string
-  | TypeDef of string * Monomorphize.type_decl
+  | TypeDef of string * Lower_tuples.type_decl
 [@@deriving sexp_of]
 
 type top =
   { desc : top_desc
-  ; ty : Monomorphize.ty
+  ; ty : Lower_tuples.ty
   ; loc : Lexer.loc
   }
 
 let sexp_of_top t =
-  List [ sexp_of_top_desc t.desc; Atom ":"; Monomorphize.sexp_of_ty t.ty ]
+  List [ sexp_of_top_desc t.desc; Atom ":"; Lower_tuples.sexp_of_ty t.ty ]
 ;;
 
 type t = Program of top list [@@deriving sexp_of]
 
-let arg_ty (t : Monomorphize.term) =
+let arg_ty (t : Lower_tuples.term) =
   match t.ty with
   | TyArrow (a, _) -> a
   | _ -> failwith "applying a non function type"
 ;;
 
-let rec collect_lams (t : Monomorphize.term) : (string * Monomorphize.ty) list * term =
+let rec collect_lams (t : Lower_tuples.term) : (string * Lower_tuples.ty) list * term =
   match t.desc with
   | Lam (v, body) ->
     let args, body = collect_lams body in
     (v, arg_ty t) :: args, body
   | _ -> [], uncurry_term t
 
-and uncurry_term (t : Monomorphize.term) : term =
+and uncurry_term (t : Lower_tuples.term) : term =
   let desc =
     match t.desc with
     | Var v -> Var v
@@ -101,7 +101,7 @@ and uncurry_term (t : Monomorphize.term) : term =
       let args, body = collect_lams body in
       Lam ((v, arg_ty t) :: args, body)
     | App _ ->
-      let rec collect (acc : term list) (t : Monomorphize.term) =
+      let rec collect (acc : term list) (t : Lower_tuples.term) =
         match t.desc with
         | App (f, x) -> collect (uncurry_term x :: acc) f
         | _ -> uncurry_term t, acc
@@ -122,7 +122,7 @@ and uncurry_term (t : Monomorphize.term) : term =
   { desc; ty = t.ty; loc = t.loc }
 ;;
 
-let uncurry_top (t : Monomorphize.top) : top =
+let uncurry_top (t : Lower_tuples.top) : top =
   let desc =
     match t.desc with
     | Define (recur, v, term) -> Define (recur, v, uncurry_term term)
@@ -132,4 +132,4 @@ let uncurry_top (t : Monomorphize.top) : top =
   { desc; ty = t.ty; loc = t.loc }
 ;;
 
-let uncurry (Monomorphize.Program tops) : t = Program (List.map tops ~f:uncurry_top)
+let uncurry (Lower_tuples.Program tops) : t = Program (List.map tops ~f:uncurry_top)

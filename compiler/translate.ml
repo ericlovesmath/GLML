@@ -5,9 +5,9 @@ include Compiler_error.Pass (struct
     let name = "translate"
   end)
 
-type record_env = (string * Monomorphize.ty) list String.Map.t
+type record_env = (string * Lower_tuples.ty) list String.Map.t
 
-let to_glsl_ty (loc : Lexer.loc) (ty : Monomorphize.ty) : ty =
+let to_glsl_ty (loc : Lexer.loc) (ty : Lower_tuples.ty) : ty =
   match ty with
   | TyFloat -> TyFloat
   | TyInt -> TyInt
@@ -16,7 +16,7 @@ let to_glsl_ty (loc : Lexer.loc) (ty : Monomorphize.ty) : ty =
   | TyVec (n, TyVec (m, TyFloat)) -> TyMat (n, m)
   | TyRecord s | TyVariant s -> TyStruct s
   | TyArrow _ | TyVec _ ->
-    raise "unexpected type" ~loc ~d:[%message (ty : Monomorphize.ty)]
+    raise "unexpected type" ~loc ~d:[%message (ty : Lower_tuples.ty)]
 ;;
 
 let to_glsl_atom (a : Remove_placeholder.atom) : term =

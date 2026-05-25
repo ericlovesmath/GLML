@@ -37,6 +37,7 @@ type ty =
   | TyArrow of ty * ty
   | TyRecord of string
   | TyVariant of string
+  | TyTuple of ty list
 [@@deriving equal]
 
 let rec sexp_of_ty = function
@@ -47,6 +48,7 @@ let rec sexp_of_ty = function
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
   | TyRecord s -> Atom s
   | TyVariant s -> Atom s
+  | TyTuple ts -> List (Atom "tuple" :: List.map ts ~f:sexp_of_ty)
 ;;
 
 type type_decl =
@@ -71,6 +73,7 @@ type term_desc =
   | Field of term * string
   | Variant of string * term list
   | Match of term * (Frontend.pat * term) list
+  | Tuple of term list
 
 and term =
   { desc : term_desc
@@ -104,6 +107,7 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | Match (scrutinee, cases) ->
     let sexp_of_case (pat, body) = List [ Frontend.sexp_of_pat pat; sexp_of_term body ] in
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
+  | Tuple ts -> List (Atom "tuple" :: List.map ts ~f:sexp_of_term)
 
 and sexp_of_term t = List [ sexp_of_term_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
 
@@ -156,6 +160,7 @@ let rec is_concrete (ty : Type_system.ty) : bool =
     List.for_all ctors ~f:(fun (_, ts) -> List.for_all ts ~f:is_concrete)
   | TyRecord (_, fields) -> List.for_all fields ~f:(fun (_, t) -> is_concrete t)
   | TyArrow (a, b) -> is_concrete a && is_concrete b
+  | TyTuple ts -> List.for_all ts ~f:is_concrete
 ;;
 
 (* ===== Monomorphize-specific helpers ===== *)
@@ -245,6 +250,7 @@ let rec subst_var
     | Match (scrutinee, cases) ->
       Match (subst scrutinee, map_cases_capture_avoiding ~var:name ~f:subst cases)
     | Coerce (target, inner) -> Coerce (target, subst inner)
+    | Tuple ts -> Tuple (List.map ts ~f:subst)
   in
   { t with desc }
 ;;
@@ -426,6 +432,9 @@ and rewrite_refs (st : state) (t : Typecheck.term) : state * Typecheck.term =
           st, (pat, body))
       in
       st, Match (scrutinee, cases)
+    | Tuple ts ->
+      let st, ts = List.fold_map ~f:rewrite_refs ~init:st ts in
+      st, Tuple ts
   in
   st, { t with desc }
 ;;
@@ -445,6 +454,7 @@ let rec ty_of (t : Type_system.ty) : ty =
     let a = ty_of a in
     let b = ty_of b in
     TyArrow (a, b)
+  | TyTuple ts -> TyTuple (List.map ts ~f:ty_of)
 ;;
 
 let rec term_of_tc (t : Typecheck.term) : term =
@@ -488,6 +498,7 @@ and term_desc_of_tc (d : Typecheck.term_desc) : term_desc =
     let scrutinee = term_of_tc scrutinee in
     let cases = List.map cases ~f:(fun (pat, body) -> pat, term_of_tc body) in
     Match (scrutinee, cases)
+  | Tuple ts -> Tuple (List.map ts ~f:term_of_tc)
   | Coerce (target, inner) ->
     (* materialize_coerce re-runs after monomorphize, so the only Coerce that can
        reach here is a residual where both sides ended up equal. *)
@@ -533,6 +544,7 @@ let promote_int_vecs : t -> t =
     | TyVec (n, TyInt) -> TyVec (n, TyFloat)
     | TyVec (n, inner) -> TyVec (n, promote_ty inner)
     | TyArrow (a, b) -> TyArrow (promote_ty a, promote_ty b)
+    | TyTuple ts -> TyTuple (List.map ts ~f:promote_ty)
     | (TyFloat | TyInt | TyBool | TyRecord _ | TyVariant _) as ty -> ty
   in
   let rec promote_term (t : term) : term =
@@ -553,6 +565,7 @@ let promote_int_vecs : t -> t =
       | Variant (ctor, args) -> Variant (ctor, List.map args ~f:promote_term)
       | Match (scrut, cases) ->
         Match (promote_term scrut, List.map cases ~f:(Tuple2.map_snd ~f:promote_term))
+      | Tuple ts -> Tuple (List.map ts ~f:promote_term)
     in
     { t with desc; ty }
   in
@@ -607,6 +620,7 @@ let assign_names ~(typedef_loc : Lexer.loc) (tops : Typecheck.top list)
       record
         (List.fold ctors ~init:acc ~f:(fun a (_, ts) -> List.fold ts ~init:a ~f:walk_ty))
         ty
+    | TyTuple ts -> List.fold ts ~init:acc ~f:walk_ty
   in
   let walk_term acc t = fold_term ~f:(fun a t -> walk_ty a t.ty) acc t in
   let walk_top acc (top : Typecheck.top) =
@@ -643,6 +657,7 @@ let assign_names ~(typedef_loc : Lexer.loc) (tops : Typecheck.top list)
     | TyVariant (h, ctors) ->
       let ctors = List.map ctors ~f:(fun (n, ts) -> n, List.map ts ~f:rty) in
       TyVariant (Option.value (lookup_ty (TyVariant (h, ctors))) ~default:h, ctors)
+    | TyTuple ts -> TyTuple (List.map ts ~f:rty)
   in
   let rec rterm (t : Typecheck.term) : Typecheck.term =
     let desc : Typecheck.term_desc =
@@ -663,6 +678,7 @@ let assign_names ~(typedef_loc : Lexer.loc) (tops : Typecheck.top list)
       | Match (scrut, cases) ->
         Match (rterm scrut, List.map cases ~f:(fun (p, b) -> p, rterm b))
       | Coerce (target, inner) -> Coerce (rty target, rterm inner)
+      | Tuple ts -> Tuple (List.map ts ~f:rterm)
     in
     { t with desc; ty = rty t.ty }
   in

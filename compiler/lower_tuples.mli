@@ -6,7 +6,6 @@ type ty =
   | TyArrow of ty * ty
   | TyRecord of string
   | TyVariant of string
-  | TyTuple of ty list
 [@@deriving sexp_of, equal]
 
 type term_desc =
@@ -26,7 +25,6 @@ type term_desc =
   | Field of term * string
   | Variant of string * term list
   | Match of term * (Frontend.pat * term) list
-  | Tuple of term list
 [@@deriving sexp_of]
 
 and term =
@@ -56,6 +54,10 @@ type top =
 
 type t = Program of top list [@@deriving sexp_of]
 
-(** Specializes polymorphic functions and parametrized types, generating a concrete
-    instance for every monomorphic type usage. Absorbs the former [Specialize_params] pass. *)
-val monomorphize : Typecheck.t -> t Compiler_error.t
+(** Replaces tuples with records, does not duplicate identical tuple types.
+
+    [Frontend.pat] is reused for [Match] arms because [Pattern_match] is shared
+    with the typechecker, but [lower_tuples] ensures no [PatTuple] remains.
+
+    TODO: drop [PatTuple] from [Frontend.pat] entirely *)
+val lower : Monomorphize.t -> t Compiler_error.t

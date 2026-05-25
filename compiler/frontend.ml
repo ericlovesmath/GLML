@@ -10,6 +10,7 @@ type pat =
   | PatVar of string
   | PatBracket of pat list
   | PatRecord of (string * pat) list * bool
+  | PatTuple of pat list
 [@@deriving equal]
 
 let rec sexp_of_pat = function
@@ -23,13 +24,14 @@ let rec sexp_of_pat = function
   | PatRecord (fields, _) ->
     List
       (Atom "record" :: List.map fields ~f:(fun (f, p) -> List [ Atom f; sexp_of_pat p ]))
+  | PatTuple pats -> List (Atom "tuple" :: List.map pats ~f:sexp_of_pat)
 ;;
 
 let rec pat_fold_vars p ~init ~f =
   match p with
   | PatWildcard | PatLitBool _ | PatLitInt _ | PatLitFloat _ -> init
   | PatVar v -> f init v
-  | PatCtor (_, ps) | PatBracket ps ->
+  | PatCtor (_, ps) | PatBracket ps | PatTuple ps ->
     List.fold ps ~init ~f:(fun acc p -> pat_fold_vars p ~init:acc ~f)
   | PatRecord (fields, _) ->
     List.fold fields ~init ~f:(fun acc (_, p) -> pat_fold_vars p ~init:acc ~f)
@@ -41,6 +43,7 @@ let rec pat_map_vars p ~f =
   | PatVar v -> PatVar (f v)
   | PatCtor (c, ps) -> PatCtor (c, List.map ps ~f:(pat_map_vars ~f))
   | PatBracket ps -> PatBracket (List.map ps ~f:(pat_map_vars ~f))
+  | PatTuple ps -> PatTuple (List.map ps ~f:(pat_map_vars ~f))
   | PatRecord (fields, partial) ->
     PatRecord (List.map fields ~f:(fun (n, p) -> n, pat_map_vars p ~f), partial)
 ;;
@@ -56,6 +59,7 @@ type ty =
   | TyName of string
   | TyVar of string
   | TyApp of string * ty list
+  | TyTuple of ty list
 [@@deriving equal]
 
 let rec sexp_of_ty = function
@@ -67,6 +71,7 @@ let rec sexp_of_ty = function
   | TyName s -> Atom s
   | TyVar v -> Atom ("'" ^ v)
   | TyApp (s, args) -> List (Atom s :: List.map args ~f:sexp_of_ty)
+  | TyTuple ts -> List (Atom "tuple" :: List.map ts ~f:sexp_of_ty)
 ;;
 
 type constr_desc =
@@ -119,6 +124,7 @@ type term_desc =
   | Variant of string * term list
   | Match of term * (pat * term) list
   | Function of (pat * term) list
+  | Tuple of term list
 
 and term =
   { desc : term_desc
@@ -173,6 +179,7 @@ let rec sexp_of_term_desc = function
   | Function cases ->
     let sexp_of_case (pat, body) = List [ sexp_of_pat pat; sexp_of_term body ] in
     List (Atom "function" :: List.map cases ~f:sexp_of_case)
+  | Tuple ts -> List (Atom "tuple" :: List.map ts ~f:sexp_of_term)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
 

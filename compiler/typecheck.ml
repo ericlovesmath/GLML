@@ -27,6 +27,7 @@ type term_desc =
   | Variant of string * term list
   | Match of term * (Frontend.pat * term) list
   | Coerce of ty * term
+  | Tuple of term list
 
 and term =
   { desc : term_desc
@@ -74,6 +75,7 @@ let rec sexp_of_term_desc = function
     List (Atom "match" :: sexp_of_term scrutinee :: List.map cases ~f:sexp_of_case)
   | Coerce (target, inner) ->
     List [ Atom "coerce"; sexp_of_ty target; sexp_of_term inner ]
+  | Tuple ts -> List (Atom "tuple" :: List.map ts ~f:sexp_of_term)
 
 and sexp_of_term t = List [ sexp_of_term_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
 
@@ -137,6 +139,7 @@ let rec fold_term ~(f : 'a -> term -> 'a) (acc : 'a) (t : term) : 'a =
     let acc = fold acc scrutinee in
     List.fold cases ~init:acc ~f:(fun acc (_, body) -> fold acc body)
   | Coerce (_, inner) -> fold acc inner
+  | Tuple ts -> List.fold ts ~init:acc ~f:fold
 ;;
 
 (** Apply substitution to term *)
@@ -160,6 +163,7 @@ let rec subst_term (sub : substitution) (t : term) : term =
     | Match (scrutinee, cases) ->
       Match (subst scrutinee, List.map cases ~f:(fun (pat, body) -> pat, subst body))
     | Coerce (target, inner) -> Coerce (subst_ty sub target, subst inner)
+    | Tuple ts -> Tuple (List.map ts ~f:subst)
   in
   { t with desc; ty = subst_ty sub t.ty }
 ;;
@@ -211,6 +215,7 @@ let rec is_value (t : Desugar.term) : bool =
   match t.desc with
   | Float _ | Int _ | Bool _ | Var _ | Lam _ -> true
   | Vec (_, ts) -> List.for_all ts ~f:is_value
+  | Tuple ts -> List.for_all ts ~f:is_value
   | Record fields -> List.for_all fields ~f:(fun (_, t) -> is_value t)
   | Variant (_, args) -> List.for_all args ~f:is_value
   | Field (t, _) | Index (t, _) -> is_value t
@@ -255,6 +260,7 @@ let rec resolve_stlc_ty ~(loc : Lexer.loc) (env : env) (t : Frontend.ty) : ty =
   | TyBool -> TyBool
   | TyVec (n, t) -> TyVec (n, resolve t)
   | TyVar v -> TyVar v
+  | TyTuple ts -> TyTuple (List.map ts ~f:resolve)
 ;;
 
 let resolve_constr (env : env) (constr : Frontend.constr) : constr =
@@ -302,6 +308,11 @@ and check_pat (env : env) loc (expected_ty : ty) (pat : Frontend.pat)
     let elem_ty = fresh_tyvar () in
     let head_constr = eq expected_ty (TyVec (List.length pats, elem_ty)) in
     let ctx, sub_constrs = check_pats env loc (List.map pats ~f:(fun p -> p, elem_ty)) in
+    ctx, head_constr :: sub_constrs
+  | PatTuple pats ->
+    let elem_tys = List.map pats ~f:(fun _ -> fresh_tyvar ()) in
+    let head_constr = eq expected_ty (TyTuple elem_tys) in
+    let ctx, sub_constrs = check_pats env loc (List.zip_exn pats elem_tys) in
     ctx, head_constr :: sub_constrs
   | PatCtor (ctor, sub_pats) ->
     let name, sub, ctors =
@@ -569,6 +580,15 @@ and gen_term (env : env) (t : Desugar.term) : term * constr list * substitution 
     , sub_t )
   | Variant (ctor, args) -> gen_variant env loc ctor args
   | Match (scrutinee, cases) -> gen_match env loc scrutinee cases
+  | Tuple ts ->
+    let sub_args, results =
+      List.fold_map ts ~init:[] ~f:(fun acc t ->
+        let t, constrs, sub = gen_term env t in
+        compose_sub sub acc, (t, constrs))
+    in
+    let args, constrs_list = List.unzip results in
+    let ty = TyTuple (List.map args ~f:(fun a -> a.ty)) in
+    { desc = Tuple args; ty; loc }, List.concat constrs_list, sub_args
 
 and gen_builtin
       (env : env)
@@ -878,6 +898,7 @@ let typecheck_impl (Program terms : Desugar.t) : t =
             | TyApp (s, args) ->
               String.equal s name || check_alias s || List.exists args ~f:occurs_in
             | TyArrow (l, r) -> occurs_in l || occurs_in r
+            | TyTuple ts -> List.exists ts ~f:occurs_in
           in
           if occurs_in ty
           then

@@ -25,6 +25,7 @@ type term_desc =
   | Variant of string * term list
   | Match of term * (Frontend.pat * term) list
   | Coerce of ty * term
+  | Tuple of term list
 [@@deriving sexp_of]
 
 and term =
