@@ -720,10 +720,14 @@ let topo_sort (all_tops : Lambda_lift.top list) : Lambda_lift.t =
        Map.find by_key n |> Option.filter ~f:(fun _ -> Set.mem reachable n)))
 ;;
 
-(** Re-resolve each variant-typed Define param against the latest [by_arrow]
-    entry, needed when [add_lambda_entry] forces a higher level after a [Define]
-    has already been retyped against the lower variant *)
-let promote_define_params (reg : registry) (tops : Lambda_lift.top list) =
+(** Re-resolve each DFn-variant reference against the latest [by_arrow] entry.
+    Needed when [add_lambda_entry] forces a higher level after a [Define] or a
+    user-declared [TypeDef] has already been retyped against the lower variant.
+
+    Without this, a user variant processed at level 0 keeps a [DFn_0]-typed field
+    while later processing may promotes the canonical to [DFn_1] and stores
+    [DFn_1] values into that field *)
+let canonicalize_variant_types (reg : registry) (tops : Lambda_lift.top list) =
   let rec uses v (t : Lambda_lift.term) =
     match t.desc with
     | Var n -> String.equal n v
@@ -756,6 +760,12 @@ let promote_define_params (reg : registry) (tops : Lambda_lift.top list) =
         desc = Define { d with args }
       ; ty = build_arrow_ty (List.map args ~f:snd) ret_ty
       }
+    | TypeDef (name, RecordDecl fields) ->
+      let fields = List.map fields ~f:(Tuple2.map_snd ~f:promote) in
+      { top with desc = TypeDef (name, RecordDecl fields) }
+    | TypeDef (name, VariantDecl ctors) ->
+      let ctors = List.map ctors ~f:(Tuple2.map_snd ~f:(List.map ~f:promote)) in
+      { top with desc = TypeDef (name, VariantDecl ctors) }
     | _ -> top)
 ;;
 
@@ -777,7 +787,7 @@ let defunctionalize (Program tops : Lambda_lift.t) : Lambda_lift.t Compiler_erro
         in
         (reg, global_tys), top)
   in
-  let rewritten_tops = promote_define_params reg rewritten_tops in
+  let rewritten_tops = canonicalize_variant_types reg rewritten_tops in
   let all_dfn_infos = Map.data reg.by_variant in
   let nonempty_dfn_infos =
     List.filter all_dfn_infos ~f:(fun i -> not (List.is_empty i.entries))
