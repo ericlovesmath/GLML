@@ -3,7 +3,8 @@ import { inject } from "@vercel/analytics";
 import { EditorView, basicSetup } from "codemirror";
 import { keymap } from "@codemirror/view";
 import { Compartment, Prec } from "@codemirror/state";
-import { toggleLineComment } from "@codemirror/commands";
+import { toggleLineComment, indentWithTab } from "@codemirror/commands";
+import { indentUnit } from "@codemirror/language";
 import { vim, getCM, Vim } from "@replit/codemirror-vim";
 import { initRenderer, compileAndLinkGLSL } from "./renderer";
 import { EXAMPLES } from "./examples";
@@ -88,6 +89,8 @@ const inputView = new EditorView({
   extensions: [
     vimCompartment.of([]),
     basicSetup,
+    indentUnit.of("  "),
+    keymap.of([indentWithTab]),
     darkTheme,
     ...glmlExtension,
     vimStatusListener,
