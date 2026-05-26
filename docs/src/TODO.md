@@ -5,14 +5,10 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 ## Tasks / Bugs
 
 - Inline/fold effectful while loops
-- Check if main is recursive
 - Inline `main_pure` function into `main` potentially 
-- Algebraic identities of binary operations folded
 - `vec<_, float>)`
 - Get rid of vec3 or matnxn syntax
-- Tuples (can't just be desugared since index access is unclear if tuple or vec)
 - Allow binary operations and pipes to be used as curried functions
-- Nested destructing, removing mat pattern case
 - Type annotations for arbitrary terms
 - Type aliases with parameters
 - Curried builtin functions for partial application
@@ -20,11 +16,10 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - Add builtin GLSL function callers or GLSL extern libraries
 - `uintBitsToFloat` instead of fat structs to represent variants, instead storing as uvec4 in raw bits
 - Reuse fields with same type for structs / defunctionalization
-- Tuples and static arrays
+- static arrays
 - `when` clause for match statements
 - Add types to new passes like `specialize_params`
 - Potentially some kind of recursive types like `type list['a] = Nil | Cons of 'a * list['a]`
-- Passing constraints to mono is a bit weird, they should concretize that in `typecheck` step
 - Mutual recursion
 - Add a guide or overview to playground
 - Refactor Makefile if needed to shared playground build files, since we rebuild playground on serve
@@ -47,24 +42,19 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - Size dependent types
 - Swizzle syntax or some kind of rank polymorphism
 - Function `inlining` / `specialize` (but likely everything is specialized)
-- Dead code elimination
-- Constant folding/propagation (Sparse conditional constant propagation)
 - Doc strings or emission of helpful comments
 - Better benchmarking tests
 - Add sliders in playground to change values
 - Update blog posts
 - Set up Neovim/Emacs/Treesitter plugins
 - Set up Github organization
-- Add language reference and examples to mdbook
 
 ## Potentially Interesting Thoughts
 
 - `wasm_of_ocaml` build? `Core` seems to cause `Error: Base_am_testing not implemented`
-- Write Nix derivation for Javascript and OCaml bindings
 - Emit on compilation what data needs to be passed from host
 - Indexing vectors by arbitrary terms?
 - Differentiate int and float division explicitly
-- Have `int <: float` be a true subtype (currently can't assign `let (x : option[float]) = Some 5`)
 - WebGPU backend for computer shaders and SSBOs?
 - Export to shadertoy?
 

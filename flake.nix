@@ -52,11 +52,25 @@
         devOpamPackages = builtins.attrValues (
           pkgs.lib.getAttrs (builtins.attrNames devOpamPackagesQuery) scope'
         );
-        main = scope'.${package};
+        main = scope'.${package}.overrideAttrs (old: {
+          meta = (old.meta or { }) // {
+            description = "GLML (OpenGL Meta Language): A functional DSL that compiles to GLSL fragment shaders";
+            homepage = "https://github.com/glml-lang/GLML";
+            license = pkgs.lib.licenses.mit;
+            mainProgram = "glml";
+          };
+        });
       in
       {
         legacyPackages = scope';
         packages.default = main;
+        packages.glml = main;
+
+        apps.glml = {
+          type = "app";
+          program = "${main}/bin/glml";
+        };
+        apps.default = self.apps.${system}.glml;
 
         devShells = {
           default = pkgs.mkShell {

@@ -2,12 +2,28 @@
 
 ## Install with Nix
 
+Run directly from the flake without cloning:
+
 ```bash
-# NOTE: If someone can make a PR for a proper Nix derivation, would be appreciated
+nix run github:glml-lang/glml -- build <example.glml>
+```
+
+Or build the CLI locally:
+
+```bash
+nix build github:glml-lang/glml
+./result/bin/glml build example.glml
 
 git clone https://github.com/glml-lang/glml
+nix run ".#glml" -- build <example.glml>
+```
+
+For development, clone and enter the dev shell:
+
+```bash
+git clone https://github.com/glml-lang/glml
 cd glml
-nix develop         # enters a shell with all dependencies
+nix develop
 ```
 
 ## Install with opam

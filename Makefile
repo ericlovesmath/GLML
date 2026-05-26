@@ -1,4 +1,4 @@
-.PHONY: clean bin js playground serve test benchmark website
+.PHONY: all clean bin js playground-deps playground serve test benchmark website
 
 PROFILE := dev
 ifdef RELEASE
@@ -14,23 +14,24 @@ clean:
 	rm -rf dist
 
 bin:
-    # Use dune exec GLML -- <args> to run cli
-    # Alternatively use ./_build/default/bin/main.exe
 	dune build $(DUNE_FLAGS) _build/default/bin/main.exe
 
 js:
 	dune build $(DUNE_FLAGS) _build/default/jsoo/main.bc.js
 
-playground: js
+playground-deps: js
 	mkdir -p playground/public
 	cp -f _build/default/jsoo/main.bc.js playground/public/
-	cd playground && npm install && npm run build
+	cd playground && npm install
 
-serve: playground
+playground: playground-deps
+	cd playground && npm run build
+
+serve: playground-deps
 	cd playground && npm run dev
 
 website: clean playground
-	cd docs && mdbook build;
+	cd docs && mdbook build
 	cp -r docs/book dist
 	cp -r playground/dist dist/playground
 
