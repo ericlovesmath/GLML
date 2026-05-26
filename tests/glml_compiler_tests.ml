@@ -1025,6 +1025,101 @@ let%expect_test "non-parametrized type aliases" =
     |}]
 ;;
 
+let%expect_test "parametrized type aliases" =
+  test
+    {|
+    type id['a] = 'a
+    let f (n : id[int]) : id[int] = n
+    let main (u : vec2) = [f 0, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 main_pure(vec2 u) {
+        return vec3(0., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    type either['a, 'b] = ('a, 'b)
+    let f (p : either[int, float]) : float =
+      let (_, y) = p in
+      y
+    let main (u : vec2) = [f (1, 2.0), 0.0, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 main_pure(vec2 u) {
+        return vec3(2., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    type box['a] = 'a
+    type boxed_int = box[int]
+    let f (n : boxed_int) : box[int] = n
+    let main (u : vec2) = [f 0, 0, 0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 main_pure(vec2 u) {
+        return vec3(0., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "parametrized type aliases error cases" =
+  test
+    {|
+    type id['a] = 'a
+    let f (n : id) : int = n
+    let main (u : vec2) = [f 0, 0, 0]
+    |};
+  [%expect
+    {|
+    [typecheck] at 3:5-3:29: type alias requires type arguments
+      name: id
+      params: (a)
+      |
+    3 |     let f (n : id) : int = n
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^
+    |}];
+  test
+    {|
+    type id['a] = 'a
+    let f (n : id[int, int]) : int = n
+    let main (u : vec2) = [f 0, 0, 0]
+    |};
+  [%expect
+    {|
+    [typecheck] at 3:5-3:39: wrong number of type args
+      name: id
+      |
+    3 |     let f (n : id[int, int]) : int = n
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |}]
+;;
+
 let%expect_test "toplevel complex consts / promotion to zero-arg functions" =
   test
     {|

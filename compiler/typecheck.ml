@@ -106,7 +106,7 @@ type context = type_scheme String.Map.t
 
 (** Threaded state for typechecker *)
 type env =
-  { aliases : Frontend.ty String.Map.t
+  { aliases : (string list * ty) String.Map.t
   ; structs : (string list * (string * ty) list) String.Map.t
   ; variants : (string list * (string * ty list) list) String.Map.t
   ; ctx : context
@@ -247,12 +247,20 @@ let rec resolve_stlc_ty ~(loc : Lexer.loc) (env : env) (t : Frontend.ty) : ty =
   match t with
   | TyName name ->
     (match Map.find env.aliases name with
-     | Some alias -> resolve alias
+     | Some ([], body) -> body
+     | Some (params, _) ->
+       raise
+         "type alias requires type arguments"
+         ~loc
+         ~d:[%message (name : string) (params : string list)]
      | None -> resolve_variant_or_struct name [])
   | TyApp (name, args) ->
     (match Map.find env.aliases name with
-     | Some (TyName name) -> resolve (TyApp (name, args))
-     | Some _ -> raise "alias expected to be a typename for parametrized" ~loc
+     | Some (params, body) ->
+       (match List.zip params (List.map args ~f:resolve) with
+        | Unequal_lengths ->
+          raise "wrong number of type args" ~loc ~d:[%message (name : string)]
+        | Ok sub -> subst_ty sub body)
      | None -> args |> List.map ~f:resolve |> resolve_variant_or_struct name)
   | TyArrow (l, r) -> TyArrow (resolve l, resolve r)
   | TyFloat -> TyFloat
@@ -887,16 +895,12 @@ let typecheck_impl (Program terms : Desugar.t) : t =
             }
           in
           env, top :: acc
-        | TypeDef (name, _, AliasDecl ty) ->
-          let rec occurs_in ty =
-            let check_alias s =
-              Map.find env.aliases s |> Option.value_map ~default:false ~f:occurs_in
-            in
+        | TypeDef (name, params, AliasDecl ty) ->
+          let rec occurs_in (ty : Frontend.ty) =
             match ty with
             | TyFloat | TyInt | TyBool | TyVec _ | TyVar _ -> false
-            | TyName s -> String.equal s name || check_alias s
-            | TyApp (s, args) ->
-              String.equal s name || check_alias s || List.exists args ~f:occurs_in
+            | TyName s -> String.equal s name
+            | TyApp (s, args) -> String.equal s name || List.exists args ~f:occurs_in
             | TyArrow (l, r) -> occurs_in l || occurs_in r
             | TyTuple ts -> List.exists ts ~f:occurs_in
           in
@@ -904,7 +908,10 @@ let typecheck_impl (Program terms : Desugar.t) : t =
           then
             raise "type alias cycle detected" ~loc:top.loc ~d:[%message (name : string)]
           else (
-            let env = { env with aliases = Map.set env.aliases ~key:name ~data:ty } in
+            let body = resolve_stlc_ty ~loc:top.loc env ty in
+            let env =
+              { env with aliases = Map.set env.aliases ~key:name ~data:(params, body) }
+            in
             env, acc))
   in
   Program (List.rev tops)
