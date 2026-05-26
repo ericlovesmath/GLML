@@ -4,6 +4,9 @@ language = "en"
 src = "src"
 title = "GLML"
 
+[preprocessor.glml]
+command = "../_build/default/docs/preprocessor/main.exe"
+
 [output.html]
-additional-js = ["theme/glml.js", "theme/glsl.js"]
+additional-js = ["theme/glml.js", "theme/glsl.js", "theme/glml-runner.js"]
 additional-css = ["theme/glml.css"]

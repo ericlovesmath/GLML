@@ -14,7 +14,7 @@ The host pipes in uniforms with `#extern`, builtins are prefixed with `#`, and t
 
 Here is the classic Mandelbrot shader, which can be written as a terse and typesafe recursive function without any annotations:
 
-```glml
+```glml,live
 #extern vec2 u_resolution
 #extern float u_time
 
@@ -100,10 +100,11 @@ Each ML feature has a corresponding lowering pass that erases it before GLSL is 
 
 By the time the program reaches the GPU, it is straight GLSL with no allocation, no function pointers, and no runtime tag dispatch beyond what the algorithm actually needs.
 
-Below is GLML code rendering a simple union of two SDFs, and the optimized GLSL that is generated
+Below is GLML code rendering a simple union of two SDFs (open the optimized GLSL that is generated, the code before `vec3 base;` is all that is needed to represent the SDF!)
 
-```glml
+```glml,live
 #extern vec2 u_resolution
+#extern vec2 u_mouse
 
 type sdf = vec2 -> float
 
@@ -116,60 +117,32 @@ let sdf_shape (s : shape) : sdf =
     match s with
     | Circle r -> #length(p) - r
     | Rect (w, h) ->
-      let d = #abs(p) - [w,h] in
+      let d = #abs(p) - [w, h] in
       #length(#max(d, [0, 0])) + #min(#max(d.0, d.1), 0)
-    
-let union (f : sdf) (f' : sdf) : sdf =
-  fun p -> #min(f p, f' p)
 
-let scene : sdf =
-  let circle = sdf_shape (Circle 0.3) in
-  let rect = sdf_shape (Rect (0.7, 0.1)) in
-  union circle rect
+let union (f : sdf) (g : sdf) : sdf = fun p -> #min(f p, g p)
+
+let scene = union (sdf_shape (Circle 0.3)) (sdf_shape (Rect (0.7, 0.1)))
+
+let uv coord =
+  (2 * coord - u_resolution) / #min(u_resolution.0, u_resolution.1)
 
 let main (coord : vec2) =
-  let p = 2 * coord / u_resolution - 1 in
+  let p = uv coord in
+  let m = uv u_mouse in
   let d = scene p in
-  if d > 0 then [d, d, d] else [1, 1, 1] + d
+
+  let base  = if d > 0 then [0.9, 0.6, 0.3] else [0.65, 0.85, 1.0] in
+  let shade = (1 - #exp(-6 * #abs(d))) * (0.8 + 0.2 * #cos(150 * d)) in
+  let edge  = 1 - #smoothstep(0, 0.01, #abs(d)) in
+  let dm    = #length(p - m) in
+  let ds    = #abs(dm - #abs(scene m)) in
+  let mouse = 1 - #smoothstep(0, 0.005, #min(ds - 0.0025, dm - 0.015)) in
+
+  let col = base * shade in
+  let col = #mix(col, [1, 1, 1], edge) in
+  #mix(col, [1, 1, 0], mouse)
 ```
 
-Generated GLSL output:
-
-```glsl
-#version 300 es
-precision highp float;
-out vec4 fragColor;
-uniform vec2 u_resolution;
-vec3 main_pure(vec2 coord) {
-    vec2 anf_13 = (2. * coord);
-    vec2 anf_14 = (anf_13 / u_resolution);
-    vec2 p_1 = (anf_14 - 1.);
-    float anf_19 = length(p_1);
-    float anf_11_1 = (anf_19 - 0.3);
-    vec2 anf_0_1 = abs(p_1);
-    vec2 anf_1_1 = vec2(0.7, 0.1);
-    vec2 d_2 = (anf_0_1 - anf_1_1);
-    vec2 anf_2_1 = vec2(0., 0.);
-    vec2 anf_3_1 = max(d_2, anf_2_1);
-    float anf_4_1 = length(anf_3_1);
-    float anf_5_1 = d_2[0];
-    float anf_6_1 = d_2[1];
-    float anf_7_1 = max(anf_5_1, anf_6_1);
-    float anf_8_1 = min(anf_7_1, 0.);
-    float anf_12_1 = (anf_4_1 + anf_8_1);
-    float d_0 = min(anf_11_1, anf_12_1);
-    bool anf_15 = (d_0 > 0.);
-    if (anf_15) {
-        return vec3(d_0, d_0, d_0);
-    } else {
-        vec3 anf_16 = vec3(1., 1., 1.);
-        return (anf_16 + d_0);
-    }
-}
-void main() {
-    vec3 color = main_pure(gl_FragCoord.xy);
-    fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
-}
-```
 
 Overall, we get the elegance of a functional language that is performant enough for shaders!

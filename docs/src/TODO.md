@@ -10,7 +10,6 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - Get rid of vec3 or matnxn syntax
 - Allow binary operations and pipes to be used as curried functions
 - Type annotations for arbitrary terms
-- Type aliases with parameters
 - Curried builtin functions for partial application
 - Auto lift `f : float -> float` to work over vecs?
 - Add builtin GLSL function callers or GLSL extern libraries
@@ -41,7 +40,6 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - Add support for LSP hover or something, at least a simple [inspect] for the playground
 - Size dependent types
 - Swizzle syntax or some kind of rank polymorphism
-- Function `inlining` / `specialize` (but likely everything is specialized)
 - Doc strings or emission of helpful comments
 - Better benchmarking tests
 - Add sliders in playground to change values

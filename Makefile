@@ -31,6 +31,7 @@ serve: playground-deps
 	cd playground && npm run dev
 
 website: clean playground
+	dune build $(DUNE_FLAGS) _build/default/docs/preprocessor/main.exe
 	cd docs && mdbook build
 	cp -r docs/book dist
 	cp -r playground/dist dist/playground
