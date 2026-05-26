@@ -1,5 +1,6 @@
 (executable
- (public_name GLML)
+ (public_name glml)
+ (package GLML)
  (name main)
  (modes exe)
  (preprocess (pps ppx_string ppx_jane))
