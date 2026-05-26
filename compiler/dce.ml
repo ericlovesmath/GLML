@@ -55,7 +55,9 @@ let rec liveness_anf ~(live : String.Set.t) (a : anf) : anf * String.Set.t =
       { a with desc = Let (v, b, t) }, live)
   | Placeholder (v, t) ->
     let t, live_t = liveness_anf ~live t in
-    { a with desc = Placeholder (v, t) }, Set.remove live_t v
+    if Set.mem live_t v
+    then { a with desc = Placeholder (v, t) }, Set.remove live_t v
+    else t, live_t
   | Set (v, x, t) ->
     let t, live_t = liveness_anf ~live t in
     if Set.mem live_t v

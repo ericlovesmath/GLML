@@ -179,7 +179,9 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : strin
       in
       let tail =
         List.fold_right2 args xs ~init:inc_iter_continue ~f:(fun name arg tail ->
-          pure (Set (name, arg, tail)))
+          match arg.desc with
+          | Var v when String.equal v name -> tail
+          | _ -> pure (Set (name, arg, tail)))
       in
       (match tail with
        | Ok res -> res

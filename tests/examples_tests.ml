@@ -484,7 +484,6 @@ let%expect_test "compile examples" =
                     vec2 anf_16 = vec2(zx, zy);
                     vec2 z_prime = (anf_16 + c);
                     int anf_17 = (i + 1);
-                    c = c;
                     z = z_prime;
                     i = anf_17;
                     int _iter_inc = (_iter + 1);
@@ -721,8 +720,6 @@ let%expect_test "compile examples" =
                         float anf_88 = (d_1 * 0.8);
                         float anf_89 = (t + anf_88);
                         int anf_90 = (steps + 1);
-                        rd = rd;
-                        ro = ro;
                         t = anf_89;
                         steps = anf_90;
                         int _iter_inc = (_iter + 1);
@@ -990,8 +987,6 @@ let%expect_test "compile examples" =
                     } else {
                         float anf_51 = (t_1 + d);
                         int anf_52 = (steps + 1);
-                        rd = rd;
-                        ro = ro;
                         t_1 = anf_51;
                         steps = anf_52;
                         int _iter_inc = (_iter + 1);
@@ -1094,13 +1089,11 @@ let%expect_test "compile examples" =
                     if (anf_1) {
                         float anf_2 = (a - b);
                         a = anf_2;
-                        b = b;
                         int _iter_inc_0 = (_iter + 1);
                         _iter = _iter_inc_0;
                         continue;
                     } else {
                         float anf_3 = (b - a);
-                        a = a;
                         b = anf_3;
                         int _iter_inc = (_iter + 1);
                         _iter = _iter_inc;

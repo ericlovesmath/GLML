@@ -75,7 +75,7 @@ let compile
       let rec go n t =
         if n <= 0
         then t
-        else t |> Inline.inline |> Const_fold.rewrite |> Dce.rewrite |> go (n - 1)
+        else t |> Inline.rewrite |> Const_fold.rewrite |> Dce.rewrite |> go (n - 1)
       in
       let t = go 3 t in
       trace Optimize (Remove_placeholder.sexp_of_t t);

@@ -966,29 +966,14 @@ let%expect_test "defunctionalize unifies int/float arrow flavors" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-    };
     vec3 main_pure(vec2 uv) {
         float anf = uv[0];
         bool anf_0 = (anf > 0.5);
-        DFn f;
         if (anf_0) {
-            f = DFn(0);
+            return vec3(0., 0., 0.);
         } else {
-            f = DFn(1);
-        }
-        vec3 anf_1 = vec3(1., 0., 0.);
-        int _lv_tag_0 = f.tag;
-        switch (_lv_tag_0) {
-            case 0: {
-                return vec3(0., 0., 0.);
-                break;
-            }
-            default: {
-                return anf_1;
-                break;
-            }
+            vec3 anf_1 = vec3(1., 0., 0.);
+            return anf_1;
         }
     }
     void main() {
@@ -1194,64 +1179,13 @@ let%expect_test "DFn promotion of fields in user-declared variant type" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
-        int tag;
-        float lctor_0;
-    };
-    struct DFn_0 {
-        int tag;
-        DFn lctor_0_0;
-        float lctor_1_0;
-    };
-    vec3 dapply_0(DFn_0 dfn_0, vec3 da_0) {
-        int _lv_tag = dfn_0.tag;
-        switch (_lv_tag) {
-            case 0: {
-                return vec3(0., 0., 0.);
-                break;
-            }
-            default: {
-                return vec3(0., 0., 0.);
-                break;
-            }
-        }
-    }
-    struct material {
-        int tag;
-        DFn_0 Lambert_0;
-        DFn_0 Phong_0;
-        float Phong_1;
-    };
     uniform float u_pick;
     vec3 main_pure(vec2 coord) {
         bool anf_1 = (u_pick > 0.5);
-        material m_0;
         if (anf_1) {
-            DFn w_0 = DFn(0, 3.);
-            DFn_0 nw_0 = DFn_0(0, w_0, 0.);
-            DFn_0 _tmp_2;
-            m_0 = material(1, _tmp_2, nw_0, 64.);
+            return vec3(0., 0., 0.);
         } else {
-            DFn _tmp_0_0;
-            DFn_0 anf_0_0 = DFn_0(1, _tmp_0_0, 2.);
-            DFn_0 _tmp_1_0;
-            m_0 = material(0, anf_0_0, _tmp_1_0, 0.);
-        }
-        vec3 anf_2 = vec3(0., 0., 0.);
-        int _lv_tag_0_0 = m_0.tag;
-        switch (_lv_tag_0_0) {
-            case 0: {
-                DFn_0 _lv_Lambert_0_0 = m_0.Lambert_0;
-                return dapply_0(_lv_Lambert_0_0, anf_2);
-                break;
-            }
-            default: {
-                DFn_0 _lv_Phong_0_0 = m_0.Phong_0;
-                float _lv_Phong_1_0 = m_0.Phong_1;
-                vec3 anf_3 = dapply_0(_lv_Phong_0_0, anf_2);
-                return (anf_3 * _lv_Phong_1_0);
-                break;
-            }
+            return vec3(0., 0., 0.);
         }
     }
     void main() {
