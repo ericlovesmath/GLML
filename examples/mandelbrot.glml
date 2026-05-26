@@ -10,8 +10,8 @@ let mandelbrot c =
   let rec mandel z i =
     if i > 150 then
       None
-    else if #length(z) > 4 then
-      let nu = #log2(#log2(#length(z))) in
+    else if #length z > 4 then
+      let nu = #log2 (#log2 (#length z)) in
       Some ((i - nu) / 150)
     else
       let zx = z.0 * z.0 - z.1 * z.1 in
@@ -24,15 +24,15 @@ let mandelbrot c =
 let main (coord : vec2) =
   let uv =
     let top = 2 * coord - u_resolution in
-    let bot = #min(u_resolution.0, u_resolution.1) in
+    let bot = #min u_resolution.0 u_resolution.1 in
     top / bot
   in
 
   // Zooming mandelbrot set in Seahorse Valley
-  let zoom = #exp(#sin(u_time * 0.4) * 4.5 + 3.5) in
+  let zoom = #exp (#sin (u_time * 0.4) * 4.5 + 3.5) in
   let seahorse_valley = [-0.7453, 0.1127] + uv / zoom in
 
   // Use iteration count as color, black if iteration count exceeded
   match mandelbrot seahorse_valley with
   | None -> [ 0, 0, 0 ]
-  | Some n -> #sin(n * [10, 20, 30] + u_time) * 0.5 + 0.5
+  | Some n -> #sin (n * [10, 20, 30] + u_time) * 0.5 + 0.5

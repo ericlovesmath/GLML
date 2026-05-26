@@ -37,8 +37,8 @@ let add x y  = x + y
 
 // argument and return annotations are optional
 let rotate (angle : float) : mat2 =
-  let s = #sin(angle) in
-  let c = #cos(angle) in
+  let s = #sin angle in
+  let c = #cos angle in
   [[c, -s], [s, c]]
 
 // recursion
@@ -66,8 +66,8 @@ let _ = true && false         // logical
 // `x |> f` is sugar for `f x`
 let _ =
   sky
-  |> #max(0)
-  |> #min([1, 1, 1])
+  |> #max 0
+  |> #min [1, 1, 1]
 
 //// Local bindings
 let example coord =
@@ -102,7 +102,7 @@ let area s =
 
 //// Higher-order functions
 let scale s    = fun v -> v * s
-let union f g  = fun p -> #min(f p, g p)
+let union f g  = fun p -> #min (f p) (g p)
 let twice f x  = f (f x)                  // ('a -> 'a) -> 'a -> 'a inferred
 
 //// User-written constraints (optional, encourage to leave out to be inferred)
@@ -115,16 +115,16 @@ let add (x : 'a) (y : 'b) : 'c = x + y
 //   'a * 'b -> 'r    -> Broadcasting (Multiplication)
 
 //// GLSL Builtins (any `#name`)
-let _ = #sin(u_time)
-let _ = #length([3.0, 4.0])
-let _ = #min(0.5, 1.0)
-let _ = #mix([1, 0, 0], [0, 0, 1], 0.5)
-let _ = #cross([1, 0, 0], [0, 1, 0])
-let _ = #float(2)
+let _ = #sin u_time
+let _ = #length [3.0, 4.0]
+let _ = #min 0.5 1.0
+let _ = #mix [1, 0, 0] [0, 0, 1] 0.5
+let _ = #cross [1, 0, 0] [0, 1, 0]
+let _ = #float 2
 
 //// Entry point must be `main : vec2 -> vec3`
 let main (coord : vec2) =
   let uv = coord / u_resolution in
-  let d  = #length(uv - [0.5, 0.5]) - 0.3 in
+  let d  = #length (uv - [0.5, 0.5]) - 0.3 in
   if d < 0.0 then [1.0, 0.5, 0.2] else sky
 ```

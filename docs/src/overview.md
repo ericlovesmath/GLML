@@ -23,8 +23,8 @@ type option['a] = Some of 'a | None
 let mandelbrot c =
   let rec mandel z i =
     if i > 150 then None
-    else if #length(z) > 4 then
-      let nu = #log2(#log2(#length(z))) in
+    else if #length z > 4 then
+      let nu = #log2 (#log2 (#length z)) in
       Some ((i - nu) / 150)
     else
       let zx = z.0 * z.0 - z.1 * z.1 in
@@ -36,14 +36,14 @@ let mandelbrot c =
 let main (coord : vec2) =
   let uv =
     let top = 2 * coord - u_resolution in
-    let bot = #min(u_resolution.0, u_resolution.1) in
+    let bot = #min u_resolution.0 u_resolution.1 in
     top / bot
   in
-  let zoom = #exp(#sin(u_time * 0.4) * 4.5 + 3.5) in
+  let zoom = #exp (#sin (u_time * 0.4) * 4.5 + 3.5) in
   let seahorse_valley = [-0.7453, 0.1127] + uv / zoom in
   match mandelbrot seahorse_valley with
   | None   -> [0, 0, 0]
-  | Some n -> #sin(n * [10, 20, 30] + u_time) * 0.5 + 0.5
+  | Some n -> #sin (n * [10, 20, 30] + u_time) * 0.5 + 0.5
 ```
 
 ## Example: GLSL vs GLML
@@ -74,12 +74,12 @@ type shape = Circle of float | Rect of float * float
 
 let sdf_shape (s : shape) = fun p ->
   match s with
-  | Circle r    -> #length(p) - r
+  | Circle r    -> #length p - r
   | Rect (w, h) ->
-    let d = #abs(p) - [w, h] in
-    #length(#max(d, [0, 0])) + #min(#max(d.0, d.1), 0)
+    let d = #abs p - [w, h] in
+    #length (#max d [0, 0]) + #min (#max d.0 d.1) 0
 
-let union f g = fun p -> #min(f p, g p)
+let union f g = fun p -> #min (f p) (g p)
 
 let scene = union (sdf_shape (Circle 0.3)) (sdf_shape (Rect (0.7, 0.1)))
 ```
@@ -115,17 +115,17 @@ type shape =
 let sdf_shape (s : shape) : sdf =
   fun p ->
     match s with
-    | Circle r -> #length(p) - r
+    | Circle r -> #length p - r
     | Rect (w, h) ->
-      let d = #abs(p) - [w, h] in
-      #length(#max(d, [0, 0])) + #min(#max(d.0, d.1), 0)
+      let d = #abs p - [w, h] in
+      #length (#max d [0, 0]) + #min (#max d.0 d.1) 0
 
-let union (f : sdf) (g : sdf) : sdf = fun p -> #min(f p, g p)
+let union (f : sdf) (g : sdf) : sdf = fun p -> #min (f p) (g p)
 
 let scene = union (sdf_shape (Circle 0.3)) (sdf_shape (Rect (0.7, 0.1)))
 
 let uv coord =
-  (2 * coord - u_resolution) / #min(u_resolution.0, u_resolution.1)
+  (2 * coord - u_resolution) / #min u_resolution.0 u_resolution.1
 
 let main (coord : vec2) =
   let p = uv coord in
@@ -133,15 +133,15 @@ let main (coord : vec2) =
   let d = scene p in
 
   let base  = if d > 0 then [0.9, 0.6, 0.3] else [0.65, 0.85, 1.0] in
-  let shade = (1 - #exp(-6 * #abs(d))) * (0.8 + 0.2 * #cos(150 * d)) in
-  let edge  = 1 - #smoothstep(0, 0.01, #abs(d)) in
-  let dm    = #length(p - m) in
-  let ds    = #abs(dm - #abs(scene m)) in
-  let mouse = 1 - #smoothstep(0, 0.005, #min(ds - 0.0025, dm - 0.015)) in
+  let shade = (1 - #exp (-6 * #abs d)) * (0.8 + 0.2 * #cos (150 * d)) in
+  let edge  = 1 - #smoothstep 0 0.01 (#abs d) in
+  let dm    = #length (p - m) in
+  let ds    = #abs (dm - #abs (scene m)) in
+  let mouse = 1 - #smoothstep 0 0.005 (#min (ds - 0.0025) (dm - 0.015)) in
 
   let col = base * shade in
-  let col = #mix(col, [1, 1, 1], edge) in
-  #mix(col, [1, 1, 0], mouse)
+  let col = #mix col [1, 1, 1] edge in
+  #mix col [1, 1, 0] mouse
 ```
 
 

@@ -9,7 +9,7 @@ This is a list of highlighted features you may not have expected to see from an 
 ```glml
 let rec mandel z i =
   if i > 150            then None
-  else if #length(z) > 4 then Some i
+  else if #length z > 4 then Some i
   else mandel (square z + c) (i + 1)
 ```
 
@@ -20,7 +20,7 @@ Arithmetic operators are overloaded across scalars, vectors, and matrices
 ```glml
 2 * [1.0, 2.0, 3.0]                 // [2.0, 4.0, 6.0]
 rotate u_time * uv                  // mat2 * vec2 -> vec2
-#sin(wave + [0, 2, 4]) * 0.3 + 0.7  // rainbow
+#sin (wave + [0, 2, 4]) * 0.3 + 0.7  // rainbow
 ```
 
 ## Integer Literals Promote to Float
@@ -48,7 +48,7 @@ match s with
 The compiler defunctionalizes first class functions into a tag plus a capturing the minimal environment struct. The combinator pattern that makes SDF composition pleasant has zero runtime cost, since the optimizer can aggressively remove these kinds of expressions.
 
 ```glml
-let union (f : sdf) (g : sdf) : sdf = fun p -> #min(f p, g p)
+let union (f : sdf) (g : sdf) : sdf = fun p -> #min (f p) (g p)
 let scale s (f : sdf) : sdf         = fun p -> f (p / s)
 ```
 
@@ -63,5 +63,5 @@ let add a b = a + b
 
 +, -       : 'a -> 'b -> 'r   where Broadcast('a, 'b, 'r)
 *, /       : 'a -> 'b -> 'r   where MulBroadcast('a, 'b, 'r)
-#sin(x)    : 'a -> 'b         where Broadcast('a, float, 'b), GenType('b)
+(#sin x)    : 'a -> 'b         where Broadcast('a, float, 'b), GenType('b)
 ```

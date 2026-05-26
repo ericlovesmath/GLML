@@ -63,7 +63,7 @@ type term_desc =
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
-  | Builtin of Glsl.builtin * term list
+  | Builtin of Glsl.builtin
   | Record of (string * term) list
   | Field of term * string
   | Variant of string * term list

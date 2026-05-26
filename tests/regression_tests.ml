@@ -406,7 +406,7 @@ let%expect_test "return type annotation for function-returning functions" =
   test
     {|
     let palette (a : vec3) (b : vec3) (c : vec3) (d : vec3) : (float -> vec3) =
-      fun t -> a + b * #cos(6.28318 * (c * t + d))
+      fun t -> a + b * #cos (6.28318 * (c * t + d))
     let main (coord : vec2) : vec3 = palette [0.,0.,0.] [0.,0.,0.] [0.,0.,0.] [0.,0.,0.] 0.
     |};
   [%expect
@@ -572,7 +572,7 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
 let%expect_test "regression - partial application stored as top level value" =
   test
     {|
-    let palette (a : vec3) = fun t -> #cos(a * t)
+    let palette (a : vec3) = fun t -> #cos (a * t)
     let warm = palette [0.5, 0.3, 0.1]
     let main (coord : vec2) =
       let a = (warm 2).0 in
@@ -1061,7 +1061,7 @@ let%expect_test "dot accepts mixed int/float vec args" =
     {|
     let f : vec3 -> vec3 =
       fun p ->
-        let n = #dot(p, [0, 0, 0]) in
+        let n = #dot p [0, 0, 0] in
         [n, n, n]
 
     let main uv = [0, 0, 0]

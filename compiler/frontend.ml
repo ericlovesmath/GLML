@@ -118,7 +118,7 @@ type term_desc =
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
-  | Builtin of Glsl.builtin * term list
+  | Builtin of Glsl.builtin
   | Record of (string * term) list
   | Field of term * string
   | Variant of string * term list
@@ -165,8 +165,7 @@ let rec sexp_of_term_desc = function
   | Bop (op, l, r) ->
     List [ Atom (Glsl.string_of_binary_op op); sexp_of_term l; sexp_of_term r ]
   | Index (t, i) -> List [ Atom "index"; sexp_of_term t; Atom (Int.to_string i) ]
-  | Builtin (b, ts) ->
-    List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
+  | Builtin b -> Atom (Glsl.string_of_builtin b)
   | Record fields ->
     let sexp_of_field (f, t) = List [ Atom f; sexp_of_term t ] in
     List (Atom "record" :: List.map fields ~f:sexp_of_field)

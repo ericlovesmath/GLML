@@ -144,7 +144,7 @@ let%expect_test "indexing" =
 ;;
 
 let%expect_test "builtins" =
-  test_term "let v = [ 1.0, 2.0, 3.0 ] in [ #sin(1.0), #dot(v, v), #length(v) ]";
+  test_term "let v = [ 1.0, 2.0, 3.0 ] in [ #sin 1.0, #dot v v, #length v ]";
   [%expect
     {|
     #version 300 es
@@ -162,7 +162,7 @@ let%expect_test "builtins" =
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
     }
     |}];
-  test_term "#cross([1.0, 2.0, 3.0], [0.0, 2.0, 5.0])";
+  test_term "#cross [1.0, 2.0, 3.0] [0.0, 2.0, 5.0]";
   [%expect
     {|
     #version 300 es
@@ -178,15 +178,15 @@ let%expect_test "builtins" =
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
     }
     |}];
-  test_term "#cross([ 1.0, 1.0 ], [ 0.0, 0.0 ])";
+  test_term "#cross [ 1.0, 1.0 ] [ 0.0, 0.0 ]";
   [%expect
     {|
-    [constraint solver] at 1:27-1:61: type mismatch
-      ty: (vec 2 'v)
+    [constraint solver] at 1:27-1:46: type mismatch
+      ty: (vec 2 'v_2)
       ty': (vec 3 float)
       |
-    1 | let main (coord : vec2) = #cross([ 1.0, 1.0 ], [ 0.0, 0.0 ])
-      |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    1 | let main (coord : vec2) = #cross [ 1.0, 1.0 ] [ 0.0, 0.0 ]
+      |                           ^^^^^^^^^^^^^^^^^^^
     |}]
 ;;
 
@@ -586,7 +586,7 @@ let%expect_test "toplevel constant (atomic only)" =
     |}];
   test
     {|
-    let x = #sin(1.0) + #cos(2.0)
+    let x = #sin 1.0 + #cos 2.0
 
     let main (u : vec2) = [x, x, x]
     |};
@@ -1305,7 +1305,7 @@ let%expect_test "ints in float contexts" =
     }
     |}];
   (* int literal passed to builtin expecting float *)
-  test_term "let s = #sin(0) in [s, 0.0, 0.0]";
+  test_term "let s = #sin 0 in [s, 0.0, 0.0]";
   [%expect
     {|
     #version 300 es
@@ -1460,6 +1460,58 @@ let%expect_test "functions in records / structs" =
     out vec4 fragColor;
     vec3 main_pure(vec2 pos) {
         return vec3(12., 0., 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "curried builtins" =
+  test
+    {|
+    let main (coord : vec2) =
+      let m = #min in
+      let a = m coord.0 0.5 in
+      let cap = #min 0.5 in
+      [a, cap coord.1, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 main_pure(vec2 coord) {
+        float anf = coord[0];
+        float a = min(anf, 0.5);
+        float anf_0 = coord[1];
+        float anf_1 = min(0.5, anf_0);
+        return vec3(a, anf_1, 0.);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}];
+  test
+    {|
+    let apply (f : float -> float) (x : float) = f x
+
+    let main (coord : vec2) =
+      [apply #sin coord.0, apply #cos coord.1, 0.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 main_pure(vec2 coord) {
+        float anf_0 = coord[0];
+        float anf_1 = sin(anf_0);
+        float anf_3 = coord[1];
+        float anf_4 = cos(anf_3);
+        return vec3(anf_1, anf_4, 0.);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

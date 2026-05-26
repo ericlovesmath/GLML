@@ -12,14 +12,14 @@ type shape =
 let sdf_shape (s : shape) : sdf =
   fun p ->
     match s with
-    | Circle r -> #length(p) - r
+    | Circle r -> #length p - r
     | Rect (w, h) ->
-      let d = #abs(p) - [w,h] in
-      #length(#max(d, [0, 0])) + #min(#max(d.0, d.1), 0)
+      let d = #abs p - [w,h] in
+      #length (#max d [0, 0]) + #min (#max d.0 d.1) 0
     | Empty -> 1.0
     
 let union (f : sdf) (f' : sdf) : sdf =
-  fun p -> #min(f p, f' p)
+  fun p -> (#min (f p) (f' p))
 
 let scene : sdf =
   let circle = sdf_shape (Circle 0.3) in
@@ -28,7 +28,7 @@ let scene : sdf =
 
 let get_uv coord =
   let top = 2 * coord - u_resolution in
-  let bot = #min(u_resolution.0, u_resolution.1) in
+  let bot = #min u_resolution.0 u_resolution.1 in
   top / bot
 
 let orange = [0.9, 0.6, 0.3]
@@ -45,23 +45,23 @@ let main (coord : vec2) =
 
   // Darken near surface and add rings
   let col =
-    let darken = 1 - #exp(-6 * #abs(d)) in
-    let rings = 0.8 + 0.2 * #cos(150 * d) in
+    let darken = 1 - #exp (-6 * #abs d) in
+    let rings = 0.8 + 0.2 * #cos (150 * d) in
     col * darken * rings
   in
 
   // White outline
-  let col = #mix(col, [1, 1, 1], 1 - #smoothstep(0, 0.01, #abs(d))) in
+  let col = #mix col [1, 1, 1] (1 - #smoothstep 0 0.01 (#abs d)) in
 
   // Mouse interaction logic
   let col =
-    let d = #abs(scene m) in
-    let dm = #length(p - m) in
+    let d = #abs (scene m) in
+    let dm = #length (p - m) in
 
     // Distance circle from mouse to surface + dot at mouse
-    let d = #min(#abs(dm - d) - 0.0025, dm - 0.015) in
+    let d = #min (#abs (dm - d) - 0.0025) (dm - 0.015) in
 
-    #mix(col, [1, 1, 0], 1 - #smoothstep(0, 0.005, d))
+    #mix col [1, 1, 0] (1 - #smoothstep 0 0.005 d)
   in
 
   col

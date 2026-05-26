@@ -11,7 +11,7 @@ The language leans in on ad-hoc polymorphism, arithmetic operators are overloade
 ```glml
 let get_uv coord =
   let top = 2 * coord - u_resolution in
-  let bot = #min(u_resolution.0, u_resolution.1) in
+  let bot = #min u_resolution.0 u_resolution.1 in
   top / bot
 ```
 
@@ -26,7 +26,7 @@ An SDF is a function `vec2 -> float`, mapping a position to its distance to the 
 ```glml
 type sdf = vec2 -> float
 
-let union (f : sdf) (g : sdf) : sdf = fun p -> #min(f p, g p)
+let union (f : sdf) (g : sdf) : sdf = fun p -> #min (f p) (g p)
 let scale s (f : sdf) : sdf         = fun p -> f (p / s)
 let translate o (f : sdf) : sdf     = fun p -> f (p - o)
 ```

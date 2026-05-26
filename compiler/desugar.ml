@@ -152,7 +152,17 @@ let rec desugar_term_desc ~loc (td : Frontend.term_desc) : term_desc =
   | If (c, t, e) -> If (desugar_term c, desugar_term t, desugar_term e)
   | Bop (op, l, r) -> Bop (op, desugar_term l, desugar_term r)
   | Index (t, i) -> Index (desugar_term t, i)
-  | Builtin (b, ts) -> Builtin (b, List.map ~f:desugar_term ts)
+  | Builtin b ->
+    (* Explicitly converting builtins to their curried forms *)
+    let arity = Glsl.arity_of_builtin b in
+    let names = List.init arity ~f:(fun i -> "_eta_" ^ Int.to_string i) in
+    let vars = List.map names ~f:(fun n -> ({ desc = Var n; loc } : term)) in
+    let saturated : term = { desc = Builtin (b, vars); loc } in
+    let wrapped =
+      List.fold_right names ~init:saturated ~f:(fun n acc ->
+        ({ desc = Lam (n, None, acc); loc } : term))
+    in
+    wrapped.desc
   | Record fields -> Record (List.map fields ~f:(fun (s, t) -> s, desugar_term t))
   | Field (t, f) -> Field (desugar_term t, f)
   | Variant (ctor, args) -> Variant (ctor, List.map ~f:desugar_term args)

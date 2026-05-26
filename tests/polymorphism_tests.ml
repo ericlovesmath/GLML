@@ -57,7 +57,7 @@ let%expect_test "int broadcasting with vecs and builtins" =
     {|
     #extern int n
     let main (u : vec2) =
-      let r = #sin(n) in
+      let r = #sin n in
       [r, r, r]
     |};
   [%expect
@@ -67,8 +67,8 @@ let%expect_test "int broadcasting with vecs and builtins" =
     out vec4 fragColor;
     uniform int n;
     vec3 main_pure(vec2 u) {
-        float anf = float(n);
-        float r = sin(anf);
+        float anf_0 = float(n);
+        float r = sin(anf_0);
         return vec3(r, r, r);
     }
     void main() {
@@ -76,7 +76,7 @@ let%expect_test "int broadcasting with vecs and builtins" =
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
     }
     |}];
-  test_term "let r = #abs(5) in [r, r, r]";
+  test_term "let r = #abs 5 in [r, r, r]";
   [%expect
     {|
     #version 300 es
@@ -91,7 +91,7 @@ let%expect_test "int broadcasting with vecs and builtins" =
         fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
     }
     |}];
-  test_term "let r = #min(1, 2) in [r, r, r]";
+  test_term "let r = #min 1 2 in [r, r, r]";
   [%expect
     {|
     #version 300 es
@@ -390,7 +390,7 @@ let%expect_test "constrained polymorphism tests" =
     |}];
   test
     {|
-    let f v = (v - #floor(v)).0
+    let f v = (v - #floor v).0
 
     let main (coord : vec2) =
       let a = f [0.5, 1.5] in

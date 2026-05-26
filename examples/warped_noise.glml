@@ -5,27 +5,27 @@
 
 // Compact noise function
 let smoothNoise (p : vec2) =
-  let i = #floor(p) in
+  let i = #floor p in
   let pf = p - i in
   let inter = pf * pf * (3 - 2 * pf) in
 
   // Hash function using a large sine-based offset
   let v4 = [0, 1, 27, 28] in
   let seed = v4 + i.0 + i.1 * 27 in
-  let hash = #fract(#sin(seed % 6.2831853) * 200000) in
+  let hash = #fract (#sin (seed % 6.2831853) * 200000) in
 
   // Bilinear interpolation logic (expanded from the GLSL mat2/dot trick)
   let col0 = [hash.0, hash.1] in
   let col1 = [hash.2, hash.3] in
   let res_v = col0 * (1.0 - inter.1) + col1 * inter.1 in
-  #dot(res_v, [1.0 - inter.0, inter.0])
+  #dot res_v [1.0 - inter.0, inter.0]
 
 // Fractional Brownian Motion (FBM)
 let fractalNoise p =
-  smoothNoise(p) * 0.5333 +
-  smoothNoise(p * 2) * 0.2667 +
-  smoothNoise(p * 4) * 0.1333 +
-  smoothNoise(p * 8) * 0.0667
+  smoothNoise (p) * 0.5333 +
+  smoothNoise (p * 2) * 0.2667 +
+  smoothNoise (p * 4) * 0.1333 +
+  smoothNoise (p * 8) * 0.0667
 
 // Domain Warping: Feeding noise into noise
 let warpedNoise (p : vec2) =
@@ -34,7 +34,7 @@ let warpedNoise (p : vec2) =
   let y = fractalNoise(p + [m.1, m.0] + x) in
   let z = fractalNoise(p - m - x + y) in
   let warp = [x, y] + [y, z] + [z, x] in
-  let mag = #length([x, y, z]) * 0.25 in
+  let mag = #length [x, y, z] * 0.25 in
   fractalNoise(p + warp + mag)
 
 let main (coord : vec2) =
@@ -45,27 +45,27 @@ let main (coord : vec2) =
   let n2 = warpedNoise(uv * 6 - 0.02) in
 
   // Cheap highlighting (directional derivative approximation)
-  let bump = #max(n2 - n, 0) / 0.02 * 0.7071 in
-  let bump2 = #max(n - n2, 0) / 0.02 * 0.7071 in
+  let bump = #max (n2 - n) 0 / 0.02 * 0.7071 in
+  let bump2 = #max (n - n2) 0 / 0.02 * 0.7071 in
 
   // Sharpen the highlights
-  let b1 = bump * bump + #pow(bump, 4) * 0.5 in
-  let b2 = bump2 * bump2 + #pow(bump2, 4) * 0.5 in
+  let b1 = bump * bump + #pow bump 4 * 0.5 in
+  let b2 = bump2 * bump2 + #pow bump2 4 * 0.5 in
 
   // Base color logic
   let base_col = [1.0, 0.7, 0.6] * [b1, (b1 + b2) * 0.4, b2] * 0.3 + 0.5 in
   let col = n * n * base_col in
 
   // Apply colored spotlights
-  let spot1_dist = #length(uv - 0.65) in
-  let spot2_dist = #length(uv + 0.5) in
+  let spot1_dist = #length (uv - 0.65) in
+  let spot2_dist = #length (uv + 0.5) in
 
   let spot_logic =
     [0.8, 0.4, 1.0] * 0.35 +
-    (([1.0, 0.5, 0.2] * #smoothstep(0, 1, 1 - spot1_dist)) +
-     ([0.2, 0.4, 1.0] * #smoothstep(0, 1, 1 - spot2_dist))) * 5
+    (([1.0, 0.5, 0.2] * #smoothstep 0 1 (1 - spot1_dist)) +
+     ([0.2, 0.4, 1.0] * #smoothstep 0 1 (1 - spot2_dist))) * 5
   in
   let final_col = col * spot_logic in
 
   // Gamma correction
-  #sqrt(#max(final_col, 0))
+  #sqrt (#max final_col 0)

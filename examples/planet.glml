@@ -5,20 +5,20 @@
 type option['a] = Some of 'a | None
 
 let rotate (p : vec2) (angle : float) =
-  let s = #sin(angle) in
-  let c = #cos(angle) in
+  let s = #sin angle in
+  let c = #cos angle in
   [p.0 * c - p.1 * s, p.0 * s + p.1 * c]
 
 // 3D noise using trilinear interpolation
 let noise3d (p : vec3) =
-  let i = #floor(p) in
-  let f = #fract(p) in
+  let i = #floor p in
+  let f = #fract p in
   let u = f * f * (3 - 2 * f) in
 
   // Simple hash-based noise for terrain
   let hash (p : vec3) =
-    let d = #dot(p, [127.1, 311.7, 74.7]) in
-    #fract(#sin(d) * 43758.5453)
+    let d = #dot p [127.1, 311.7, 74.7] in
+    #fract (#sin d * 43758.5453)
   in
 
   // Corner hashes
@@ -32,13 +32,13 @@ let noise3d (p : vec3) =
   let h = hash (i + [1, 1, 1]) in
 
   // Trilinear interpolation
-  let ab = #mix(a, b, u.0) in
-  let cd = #mix(c, d, u.0) in
-  let ef = #mix(e, f, u.0) in
-  let gh = #mix(g, h, u.0) in
-  let abcd = #mix(ab, cd, u.1) in
-  let efgh = #mix(ef, gh, u.1) in
-  #mix(abcd, efgh, u.2)
+  let ab = #mix a b u.0 in
+  let cd = #mix c d u.0 in
+  let ef = #mix e f u.0 in
+  let gh = #mix g h u.0 in
+  let abcd = #mix ab cd u.1 in
+  let efgh = #mix ef gh u.1 in
+  #mix abcd efgh u.2
 
 // Fractal Brownian Motion for rough terrain
 let fbm (p : vec3) =
@@ -50,7 +50,7 @@ let fbm (p : vec3) =
 
 // SDF: sphere with terrain displacement
 let sdPlanet (p : vec3) (radius : float) =
-  let len = #length(p) in
+  let len = #length p in
   let dir = p / len in
   let terrain = fbm (dir * 3) * 0.4 in
   len - radius - terrain
@@ -66,7 +66,7 @@ let getNormal (p : vec3) =
   let dx = map (p + e_x) - map (p - e_x) in
   let dy = map (p + e_y) - map (p - e_y) in
   let dz = map (p + e_z) - map (p - e_z) in
-  #normalize([dx, dy, dz])
+  #normalize [dx, dy, dz]
 
 // Raymarching loop
 let march (ro : vec3) (rd : vec3) : option[float] =
@@ -87,7 +87,7 @@ let mountColor = [0.4, 0.3, 0.2]
 let snowColor = [0.85, 0.85, 0.9]
 
 let main (coord : vec2) =
-  let res_min = #min(u_resolution.0, u_resolution.1) in
+  let res_min = #min u_resolution.0 u_resolution.1 in
   let uv = (coord * 2 - u_resolution) / res_min in
   let mouseUV = (u_mouse * 2 - u_resolution) / res_min in
 
@@ -102,7 +102,7 @@ let main (coord : vec2) =
 
   // Ray setup
   let ro = rotate_by_mouse [0, 0, -4] in
-  let rd = rotate_by_mouse #normalize([uv.0, uv.1, 1.5]) in
+  let rd = rotate_by_mouse (#normalize [uv.0, uv.1, 1.5]) in
 
   // March the ray
   let t = march ro rd in
@@ -113,26 +113,26 @@ let main (coord : vec2) =
     // Hit the planet - compute shading
     let hitPos = ro + rd * t in
     let n = getNormal hitPos in
-    let lightDir = #normalize([1.0, 0.8, -0.5]) in
-    let diff = #max(#dot(n, lightDir), 0) in
+    let lightDir = #normalize [1.0, 0.8, -0.5] in
+    let diff = #max (#dot n lightDir) 0 in
     let ambient = 0.08 in
 
     // Height-based coloring from terrain
-    let dir = hitPos / #length(hitPos) in
+    let dir = hitPos / #length hitPos in
     let rawHeight = fbm (dir * 3.0) in
     let seaLevel = 0.35 in
-    let h_norm = #clamp((rawHeight - seaLevel) / (1 - seaLevel), 0, 1) in
+    let h_norm = #clamp ((rawHeight - seaLevel) / (1 - seaLevel)) 0 1 in
 
     let baseColor = if h_norm < 0.3 then
-      #mix(deepColor, landColor, h_norm / 0.3)
+      #mix deepColor landColor (h_norm / 0.3)
     else if h_norm < 0.6 then
-      #mix(landColor, mountColor, (h_norm - 0.3) / 0.3)
+      #mix landColor mountColor ((h_norm - 0.3) / 0.3)
     else
-      #mix(mountColor, snowColor, (h_norm - 0.6) / 0.4)
+      #mix mountColor snowColor ((h_norm - 0.6) / 0.4)
     in
 
     // Rim lighting for atmosphere
-    let fresnel = 1 - #max(#dot(n, rd * -1), 0) in
+    let fresnel = 1 - #max (#dot n (-rd)) 0 in
     let rim = fresnel * fresnel * fresnel * 0.4 in
     let atmoColor = [0.3, 0.5, 1.0] in
 

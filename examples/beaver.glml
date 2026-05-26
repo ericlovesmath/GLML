@@ -17,43 +17,43 @@ let tooth_yel = [0.92, 0.85, 0.60]
 
 let get_uv coord =
   let top = 2 * coord - u_resolution in
-  let bot = #min(u_resolution.0, u_resolution.1) in
+  let bot = #min u_resolution.0 u_resolution.1 in
   top / bot
 
 // Shift p by offset - used to avoid repeating (p - offset) everywhere
 let at (offset : vec2) (p : vec2) = p - offset
 
 // SDF functions with p last so they work nicely with pipe + partial application
-let ellipse (ab : vec2) (p : vec2) = #length(p / ab) - 1
+let ellipse (ab : vec2) (p : vec2) = #length (p / ab) - 1
 
-let circle (r : float) (p : vec2) = #length(p) - r
+let circle (r : float) (p : vec2) = #length p - r
 
 let box (b : vec2) (p : vec2) =
-  let d = #abs(p) - b in
-  #length(#max(d, [0, 0])) + #min(#max(d.0, d.1), 0)
+  let d = #abs p - b in
+  #length (#max d [0, 0]) + #min (#max d.0 d.1) 0
 
 let rot (a : float) (p : vec2) =
-  let c = #cos(a) in
-  let s = #sin(a) in
+  let c = #cos a in
+  let s = #sin a in
   [c * p.0 - s * p.1, s * p.0 + c * p.1]
 
 let smin (a : float) (b : float) (k : float) =
-  let h = #max(k - #abs(a - b), 0) / k in
-  #min(a, b) - h * h * k * 0.25
+  let h = #max (k - #abs (a - b)) 0 / k in
+  #min a b - h * h * k * 0.25
 
 let smax (a : float) (b : float) (k : float) =
-  let h = #max(k - #abs(a - b), 0) / k in
-  #max(a, b) + h * h * k * 0.25
+  let h = #max (k - #abs (a - b)) 0 / k in
+  #max a b + h * h * k * 0.25
 
 // Paint shape_col inside d < 0, bg outside (anti-aliased edge)
 let paint (d : float) (shape_col : vec3) (bg : vec3) =
-  #mix(shape_col, bg, #smoothstep(-0.005, 0.005, d))
+  #mix shape_col bg (#smoothstep (-0.005) 0.005 d)
 
 // Paint with a soft inner shadow near the edge for depth
 let paint_shaded (d : float) (shape_col : vec3) (shadow_col : vec3) (shadow_depth : float) (bg : vec3) =
-  let base = #mix(shape_col, bg, #smoothstep(-0.005, 0.005, d)) in
-  let shade = #smoothstep(-shadow_depth, 0, d) in
-  #mix(base, #mix(shape_col, shadow_col, shade * 0.55), #smoothstep(0.005, -0.005, d))
+  let base = #mix shape_col bg (#smoothstep (-0.005) 0.005 d) in
+  let shade = #smoothstep (-shadow_depth) 0 d in
+  #mix base (#mix shape_col shadow_col (shade * 0.55)) (#smoothstep 0.005 (-0.005) d)
 
 let main (coord : vec2) =
   let p = get_uv coord / 1.5 in
@@ -61,10 +61,10 @@ let main (coord : vec2) =
   // Tail
   let tp          = p |> at [0.28, -0.28] |> rot (-0.35) in
   let tail        = tp |> ellipse [0.22, 0.085] in
-  let tsx         = #abs(#sin((tp.0 + tp.1) * 38.0)) - 0.55 in
-  let tsy         = #abs(#sin((tp.0 - tp.1) * 38.0)) - 0.55 in
-  let tail_scales = #max(tail + 0.01, #min(tsx, tsy) * 0.015) in
-  let tail_rim    = #max(tail, -(tail + 0.018)) in
+  let tsx         = #abs (#sin ((tp.0 + tp.1) * 38.0)) - 0.55 in
+  let tsy         = #abs (#sin ((tp.0 - tp.1) * 38.0)) - 0.55 in
+  let tail_scales = #max (tail + 0.01) ((#min tsx tsy) * 0.015) in
+  let tail_rim    = #max tail (-(tail + 0.018)) in
 
   // Body, Head, Cheeks
   let body              = p |> at [0.0, -0.16] |> ellipse [0.25, 0.26] in
@@ -72,7 +72,7 @@ let main (coord : vec2) =
   let torso             = smin body head 0.10 in
   let cheek_l           = p |> at [-0.14, 0.11] |> circle 0.10 in
   let cheek_r           = p |> at [ 0.14, 0.11] |> circle 0.10 in
-  let cheeks            = #min(cheek_l, cheek_r) in
+  let cheeks            = #min cheek_l cheek_r in
   let torso_with_cheeks = smin torso cheeks 0.06 in
 
   // Face features
@@ -92,7 +92,7 @@ let main (coord : vec2) =
   // Teeth
   let tooth_l = p |> at [-0.028, 0.035] |> box [0.022, 0.050] in
   let tooth_r = p |> at [ 0.028, 0.035] |> box [0.022, 0.050] in
-  let teeth   = #min(tooth_l, tooth_r) in
+  let teeth   = #min tooth_l tooth_r in
   let groove  = p |> at [0.0, 0.035]    |> box [0.005, 0.050] in
 
   // Nose
@@ -112,13 +112,13 @@ let main (coord : vec2) =
   let brow_r = p |> at [ 0.095, 0.315] |> rot (-0.15) |> ellipse [0.035, 0.010] in
 
   // Background vignette
-  let vig = #smoothstep(0.3, 1.1, #length(p)) in
-  let col = #mix(bg_col, bg_dark, vig) in
+  let vig = #smoothstep 0.3 1.1 (#length p) in
+  let col = #mix bg_col bg_dark vig in
 
   // Ground shadow
   let shadow_d       = p |> at [0.02, -0.45] |> ellipse [0.38, 0.055] in
-  let shadow_falloff = #smoothstep(0.08, -0.02, shadow_d) in
-  let col = #mix(col, [0.06, 0.28, 0.16], shadow_falloff * 0.55) in
+  let shadow_falloff = #smoothstep 0.08 (-0.02) shadow_d in
+  let col = #mix col [0.06, 0.28, 0.16] (shadow_falloff * 0.55) in
 
   // Composing colors
   col

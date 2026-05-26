@@ -441,7 +441,6 @@ and term_vec_p =
       return (Vec (List.length terms, terms)) <??> "vector literal"))
     st
 
-(* NOTE: Builtins should not be special forms, but right now they are not curried so.. *)
 and term_builtin_p =
   fun st ->
   (with_term_loc
@@ -451,8 +450,7 @@ and term_builtin_p =
           | ID s -> Option.try_with (fun () -> Glsl.builtin_of_string s)
           | _ -> None)
       in
-      let%bind args = between `Paren (commas term_p) in
-      return (Builtin (builtin, args)) <??> "builtin call"))
+      return (Builtin builtin) <??> "builtin reference"))
     st
 
 and term_variant_p =
@@ -580,8 +578,10 @@ let%expect_test "term parse tests" =
   test "if true then x else y";
   test "1 * 2 + true && 44 % 10";
   test "v.0";
-  test "#min(1, 2)";
-  test "#exp2(1.)";
+  test "#min 1 2";
+  test "#exp2 1.";
+  test "#sin";
+  test "#min 1.";
   test "Constr";
   test "Constr x";
   test "Constr (x, 2.0)";
@@ -610,8 +610,10 @@ let%expect_test "term parse tests" =
     (if true x y)
     (&& (+ (* 1 2) true) (% 44 10))
     (index v 0)
-    (min 1 2)
-    (exp2 1.)
+    (app (app min 1) 2)
+    (app exp2 1.)
+    sin
+    (app min 1.)
     (Variant Constr)
     (Variant Constr x)
     (Variant Constr x 2.)
@@ -737,7 +739,7 @@ let%expect_test "pipe operator tests" =
   let test = test sexp_of_term term_p in
   test "x |> f";
   test "x |> f |> g";
-  test "1.0 |> fun (x : float) -> #sin(x)";
+  test "1.0 |> fun (x : float) -> #sin x";
   test "x |> f y";
   test "x |> f |> g |> h";
   test "(a + b) |> f";
@@ -745,7 +747,7 @@ let%expect_test "pipe operator tests" =
     {|
     (x |> f)
     ((x |> f) |> g)
-    (1. |> (lambda (x (float)) (sin x)))
+    (1. |> (lambda (x (float)) (app sin x)))
     (x |> (app f y))
     (((x |> f) |> g) |> h)
     ((+ a b) |> f)

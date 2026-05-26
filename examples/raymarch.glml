@@ -5,23 +5,23 @@
 type option['a] = Some of 'a | None
 
 let rotate (p : vec2) (angle : float) =
-  let s = #sin(angle) in
-  let c = #cos(angle) in
+  let s = #sin angle in
+  let c = #cos angle in
   [p.0 * c - p.1 * s, p.0 * s + p.1 * c]
 
 let sMin (a : float) (b : float) =
   let k = 0.1 in
-  let h = #clamp(0.5 + 0.5 * (b - a) / k, 0, 1) in
-  #mix(b, a, h) - k * h * (1 - h)
+  let h = #clamp (0.5 + 0.5 * (b - a) / k) 0 1 in
+  #mix b a h - k * h * (1 - h)
 
 let palette (t : float) =
   let cfg = [0.3, 0.416, 0.557] in
-  #cos((cfg + t) * 6.28318) * 0.5 + 0.5
+  #cos ((cfg + t) * 6.28318) * 0.5 + 0.5
 
 // SDF of Torus, [sdTorus center radius]
 let sdTorus (p : vec3) (t : vec2) =
-  let q = [#length([p.0, p.2]) - t.0, p.1] in
-  #length(q) - t.1
+  let q = [#length [p.0, p.2] - t.0, p.1] in
+  #length q - t.1
 
 let map (p : vec3) =
   // Rotating the object within the scene
@@ -46,13 +46,13 @@ let march (ro : vec3) (rd : vec3) : option[float] =
   march 0.0 0
 
 let main (coord : vec2) =
-  let res_min = #min(u_resolution.0, u_resolution.1) in
+  let res_min = #min u_resolution.0 u_resolution.1 in
   let uv = (coord * 2 - u_resolution) / res_min in
   let mouseUV = (u_mouse * 2 - u_resolution) / res_min in
 
   // Ray setup
   let ro_init = [0, 0, -6] in
-  let rd_init = #normalize([uv.0, uv.1, 1]) in
+  let rd_init = #normalize [uv.0, uv.1, 1] in
 
   // Mouse rotation logic
   let rotX = -mouseUV.1 in
@@ -78,6 +78,6 @@ let main (coord : vec2) =
   in
   
   // Mouse Glow logic
-  let glow = 0.02 / #length(uv - mouseUV) in
+  let glow = 0.02 / #length (uv - mouseUV) in
 
   col + glow
