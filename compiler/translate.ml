@@ -110,7 +110,6 @@ let translate_continue
   let stmts =
     if needs_temps
     then
-      (* TODO: Hm. Not optimizable? *)
       writes
       |> List.map ~f:(fun (n, a) ->
         let tmp = Utils.fresh "_tmp" in
@@ -175,54 +174,27 @@ let translate_function_body body =
   translate_anf ctx body
 ;;
 
-(* TODO: Replace this sad generation logic to some special type in [lift_consts.ml].
-   Right now we have to explicitly fold and expand, but that shouldn't be necessary
-   if we just make a special kind of term that doesn't need inlining.
-
-   But maybe this is just fine...? *)
 let build_const_term body =
-  let subst_atom (subs : (string * term) list) (a : Remove_placeholder.atom) : term =
-    match a.desc with
-    | Var v ->
-      (match List.Assoc.find subs v ~equal:String.equal with
-       | Some t -> t
-       | None -> Var v)
-    | Float f -> Float f
-    | Int i -> Int i
-    | Bool b -> Bool b
+  let rec subst subs (t : term) : term =
+    match t with
+    | Var v -> Map.find subs v |> Option.value ~default:t
+    | Float _ | Int _ | Bool _ -> t
+    | Bop (op, l, r) -> Bop (op, subst subs l, subst subs r)
+    | If (c, a, b) -> If (subst subs c, subst subs a, subst subs b)
+    | App (f, ts) -> App (f, List.map ts ~f:(subst subs))
+    | Builtin (b, ts) -> Builtin (b, List.map ts ~f:(subst subs))
+    | Swizzle (t, s) -> Swizzle (subst subs t, s)
+    | Index (t, i) -> Index (subst subs t, i)
   in
-  let translate_const_term subs (t : Remove_placeholder.term) : term option =
-    let sa = subst_atom subs in
-    match t.desc with
-    | Atom a -> Some (sa a)
-    | Bop (op, l, r) -> Some (Bop (op, sa l, sa r))
-    | Vec (n, ts) ->
-      let ctor =
-        match t.ty with
-        | TyVec (_, TyVec (m, _)) when n = m -> [%string "mat%{n#Int}"]
-        | TyVec (_, TyVec (m, _)) -> [%string "mat%{n#Int}x%{m#Int}"]
-        | _ -> [%string "vec%{n#Int}"]
-      in
-      Some (App (ctor, List.map ~f:sa ts))
-    | Builtin (f, ts) -> Some (Builtin (f, List.map ts ~f:sa))
-    | Record ts ->
-      (match t.ty with
-       | TyRecord s -> Some (App (s, List.map ts ~f:sa))
-       | _ -> raise "Record term does not have type [record]")
-    | Index (a, i) -> Some (Index (sa a, i))
-    | Field (a, f) -> Some (Swizzle (sa a, f))
-    | App _ | If _ | Switch _ -> None
-  in
-  let rec eval_const subs (anf : Remove_placeholder.anf) : term option =
+  let rec go subs (anf : Remove_placeholder.anf) : term option =
     match anf.desc with
-    | Return t -> translate_const_term subs t
-    | Let (v, term, rest) ->
-      (match translate_const_term subs term with
-       | Some glsl_t -> eval_const ((v, glsl_t) :: subs) rest
-       | None -> None)
-    | _ -> None
+    | Return t -> Some (subst subs (to_glsl_term t))
+    | Let (v, bind, rest) ->
+      let bind = subst subs (to_glsl_term bind) in
+      go (Map.set subs ~key:v ~data:bind) rest
+    | Placeholder _ | Loop _ | Continue _ -> None
   in
-  eval_const [] body
+  go String.Map.empty body
 ;;
 
 let translate_exn (Program tops : Remove_placeholder.t) : Glsl.t =
