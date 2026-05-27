@@ -10,8 +10,6 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - Get rid of vec3 or matnxn syntax
 - Allow binary operations and pipes to be used as curried functions
 - Type annotations for arbitrary terms
-- Curried builtin functions for partial application
-- Auto lift `f : float -> float` to work over vecs?
 - Add builtin GLSL function callers or GLSL extern libraries
 - `uintBitsToFloat` instead of fat structs to represent variants, instead storing as uvec4 in raw bits
 - Reuse fields with same type for structs / defunctionalization
@@ -21,7 +19,6 @@ This page contains a dump of current TODO items and unorganized thoughts and tas
 - Potentially some kind of recursive types like `type list['a] = Nil | Cons of 'a * list['a]`
 - Mutual recursion
 - Add a guide or overview to playground
-- Refactor Makefile if needed to shared playground build files, since we rebuild playground on serve
 - Add common GLSL builtins: `#radians` / `#degrees`, `#refract`, `#faceforward`, `#dFdx`, `#dFdy`, `#fwidth`,`#matrixCompMult`, `#transpose`, `#inverse`, `#determinant`
 
 ## Example Ideas

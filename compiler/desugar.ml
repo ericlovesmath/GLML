@@ -163,6 +163,24 @@ let rec desugar_term_desc ~loc (td : Frontend.term_desc) : term_desc =
         ({ desc = Lam (n, None, acc); loc } : term))
     in
     wrapped.desc
+  | BopSection op ->
+    (* (op) => fun x y -> x `op` y *)
+    let l = Utils.fresh "_l" in
+    let r = Utils.fresh "_r" in
+    let x : term = { desc = Var l; loc } in
+    let y : term = { desc = Var r; loc } in
+    let body : term = { desc = Bop (op, x, y); loc } in
+    let inner : term = { desc = Lam (r, None, body); loc } in
+    Lam (l, None, inner)
+  | PipeSection ->
+    (* (|>) => fun x y -> x |> y *)
+    let l = Utils.fresh "_l" in
+    let r = Utils.fresh "_r" in
+    let x : term = { desc = Var l; loc } in
+    let f : term = { desc = Var r; loc } in
+    let body : term = { desc = App (f, x); loc } in
+    let inner : term = { desc = Lam (r, None, body); loc } in
+    Lam (l, None, inner)
   | Record fields -> Record (List.map fields ~f:(fun (s, t) -> s, desugar_term t))
   | Field (t, f) -> Field (desugar_term t, f)
   | Variant (ctor, args) -> Variant (ctor, List.map ~f:desugar_term args)

@@ -64,6 +64,8 @@ type term_desc =
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
   | Builtin of Glsl.builtin
+  | BopSection of Glsl.binary_op
+  | PipeSection
   | Record of (string * term) list
   | Field of term * string
   | Variant of string * term list

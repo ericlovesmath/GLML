@@ -350,6 +350,32 @@ let constrs_p : constr list Chomp.t =
   tok WHERE *> commit list_p <|> return []
 ;;
 
+let term_op_section_p =
+  with_term_loc
+    (between
+       `Paren
+       (let bop_section =
+          satisfy_map (function
+            | ADD -> Some Glsl.Add
+            | SUB -> Some Glsl.Sub
+            | MUL -> Some Glsl.Mul
+            | DIV -> Some Glsl.Div
+            | PERCENT -> Some Glsl.Mod
+            | LANGLE -> Some Glsl.Lt
+            | RANGLE -> Some Glsl.Gt
+            | LEQ -> Some Glsl.Leq
+            | GEQ -> Some Glsl.Geq
+            | EQ -> Some Glsl.Eq
+            | LAND -> Some Glsl.And
+            | LOR -> Some Glsl.Or
+            | _ -> None)
+          >>| fun op -> BopSection op
+        in
+        let pipe_section = tok PIPE *> return PipeSection in
+        bop_section <|> pipe_section))
+  <??> "operator section"
+;;
+
 let rec term_let_p =
   fun st ->
   (with_term_loc
@@ -506,6 +532,7 @@ and term_head_p =
    <|> term_atom_p
    <|> term_number_p
    <|> term_unary_neg_p
+   <|> term_op_section_p
    <|> term_paren_or_tuple_p)
     st
 
@@ -531,7 +558,11 @@ and term_postfix_p =
   in
   let term_arg_base_p =
     (* NOTE: intentionally excludes signed literals to avoid cases like [f -5] *)
-    term_atom_p <|> term_unsigned_number_p <|> term_paren_or_tuple_p <??> "term_arg"
+    term_atom_p
+    <|> term_unsigned_number_p
+    <|> term_op_section_p
+    <|> term_paren_or_tuple_p
+    <??> "term_arg"
   in
   let term_arg_p = postfix_chain term_arg_base_p dot_op_p in
   let app_op_p =

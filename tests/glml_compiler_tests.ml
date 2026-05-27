@@ -1519,3 +1519,34 @@ let%expect_test "curried builtins" =
     }
     |}]
 ;;
+
+let%expect_test "curried binary operators and pipe" =
+  test
+    {|
+    let app = (|>)
+
+    let main (coord : vec2) =
+      let add = (+) in
+      let double = (*) 2 in
+      [add coord.0 1.0, app coord.1 #cos, double coord.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec3 main_pure(vec2 coord) {
+        float anf_0 = coord[0];
+        float anf_1 = (anf_0 + 1.);
+        float anf_2 = coord[1];
+        float anf_4 = cos(anf_2);
+        float anf_5 = coord[0];
+        float anf_6 = (2. * anf_5);
+        return vec3(anf_1, anf_4, anf_6);
+    }
+    void main() {
+        vec3 color = main_pure(gl_FragCoord.xy);
+        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+    }
+    |}]
+;;
