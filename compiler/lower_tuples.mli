@@ -57,7 +57,5 @@ type t = Program of top list [@@deriving sexp_of]
 (** Replaces tuples with records, does not duplicate identical tuple types.
 
     [Frontend.pat] is reused for [Match] arms because [Pattern_match] is shared
-    with the typechecker, but [lower_tuples] ensures no [PatTuple] remains.
-
-    TODO: drop [PatTuple] from [Frontend.pat] entirely *)
+    with the typechecker, but [lower_tuples] ensures no [PatTuple] remains. *)
 val lower : Monomorphize.t -> t Compiler_error.t

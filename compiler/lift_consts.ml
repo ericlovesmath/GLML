@@ -1,18 +1,10 @@
 open Core
 open Remove_placeholder
 
-(* TODO: Caching the intermediary values may be interesting since they are pure functions *)
-
+(* [externs] is the set of names treated as non-constable *)
 let is_constable_atom (externs : String.Set.t) (a : atom) =
   match a.desc with
   | Int _ | Bool _ | Float _ -> true
-  (* TODO: I think there's a bug when you refer to a const var that uses a extern
-
-    #extern vec2 u_resolution
-    let a = u_resolution
-    let b = a
-
-    This will compile [b] as a const, so we have to refactor into a fold *)
   | Var v -> not (Set.mem externs v)
 ;;
 
@@ -34,11 +26,12 @@ let rec is_constable (externs : String.Set.t) (a : anf) =
 ;;
 
 (* Collect the names of [Const] nodes that must be promoted to zero-arg functions *)
-let find_promoted (externs : String.Set.t) (tops : top list) : String.Set.t =
-  List.fold tops ~init:String.Set.empty ~f:(fun acc top ->
+let find_promoted (real_externs : String.Set.t) (tops : top list) : String.Set.t =
+  List.fold tops ~init:real_externs ~f:(fun externs top ->
     match top.desc with
-    | Const (name, anf) when not (is_constable externs anf) -> Set.add acc name
-    | _ -> acc)
+    | Const (name, anf) when not (is_constable externs anf) -> Set.add externs name
+    | _ -> externs)
+  |> Fn.flip Set.diff real_externs
 ;;
 
 let atoms_of_term_desc = function
@@ -93,8 +86,11 @@ let lift_atoms (promoted : String.Set.t) (t : term) : binds * term =
     | App (f, ts) -> App (f, List.map ts ~f:rewrite_atom)
     | Record ts -> Record (List.map ts ~f:rewrite_atom)
     | Field (a, f) -> Field (rewrite_atom a, f)
-    (* TODO: Somewhat dubious about this but I'm too lazy to check *)
-    | If _ | Switch _ -> t.desc
+    | If _ | Switch _ ->
+      Compiler_error.raise
+        ~pass:"lift_consts"
+        ~d:[%message (t : term)]
+        "If/Switch should be handled by rewrite_branching"
   in
   let binds =
     List.map subst ~f:(fun (orig, fresh, a) ->

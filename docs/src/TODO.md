@@ -2,24 +2,22 @@
 
 This page contains a dump of current TODO items and unorganized thoughts and tasks. This will likely stay a mess.
 
-## Tasks / Bugs
+## Tasks
 
 - Inline/fold effectful while loops
 - Inline `main_pure` function into `main` potentially 
-- `vec<_, float>)`
-- Get rid of vec3 or matnxn syntax
-- Allow binary operations and pipes to be used as curried functions
+- `vec<_, float>` syntax for size polymorphism
 - Type annotations for arbitrary terms
 - Add builtin GLSL function callers or GLSL extern libraries
 - `uintBitsToFloat` instead of fat structs to represent variants, instead storing as uvec4 in raw bits
 - Reuse fields with same type for structs / defunctionalization
 - static arrays
 - `when` clause for match statements
-- Add types to new passes like `specialize_params`
 - Potentially some kind of recursive types like `type list['a] = Nil | Cons of 'a * list['a]`
 - Mutual recursion
 - Add a guide or overview to playground
 - Add common GLSL builtins: `#radians` / `#degrees`, `#refract`, `#faceforward`, `#dFdx`, `#dFdy`, `#fwidth`,`#matrixCompMult`, `#transpose`, `#inverse`, `#determinant`
+- Caching the intermediary values for "const" 0 arg functions for lift_consts
 
 ## Example Ideas
 
