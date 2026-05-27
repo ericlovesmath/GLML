@@ -251,12 +251,7 @@ let translate_exn (Program tops : Remove_placeholder.t) : Glsl.t =
         let fields =
           List.map fields ~f:(fun (arg, arg_ty) -> to_glsl_ty top.loc arg_ty, arg)
         in
-        Struct (s, fields)
-      | TypeDef (_, VariantDecl _) ->
-        raise
-          "VariantDecl should have been lowered"
-          ~loc
-          ~d:[%message (top : Remove_placeholder.top)])
+        Struct (s, fields))
   in
   Program tops
 ;;

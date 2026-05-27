@@ -24,10 +24,7 @@ let rec sexp_of_ty = function
   | TyRecord s -> Atom s
 ;;
 
-type type_decl =
-  | RecordDecl of (string * ty) list
-  | VariantDecl of (string * ty list) list
-[@@deriving sexp_of]
+type type_decl = RecordDecl of (string * ty) list [@@deriving sexp_of]
 
 let rec lower_ty (ty : Lower_tuples.ty) : ty =
   match ty with

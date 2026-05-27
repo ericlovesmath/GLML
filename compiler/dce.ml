@@ -126,8 +126,6 @@ let top_refs (top : top) : String.Set.t =
   | Const (_, body) -> anf_refs empty body
   | TypeDef (_, RecordDecl fields) ->
     List.fold (List.map fields ~f:snd) ~init:empty ~f:ty_refs
-  | TypeDef (_, VariantDecl ctors) ->
-    List.fold (List.concat_map ctors ~f:snd) ~init:empty ~f:ty_refs
   | Extern _ -> empty
 ;;
 

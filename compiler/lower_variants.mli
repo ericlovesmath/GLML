@@ -7,10 +7,7 @@ type ty =
   | TyRecord of string
 [@@deriving sexp_of]
 
-type type_decl =
-  | RecordDecl of (string * ty) list
-  | VariantDecl of (string * ty list) list
-[@@deriving sexp_of]
+type type_decl = RecordDecl of (string * ty) list [@@deriving sexp_of]
 
 type atom_desc =
   | Var of string
