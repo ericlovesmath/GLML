@@ -179,7 +179,6 @@ let rec strip t =
   | _ -> ()
 ;;
 
-(* TODO: Make [vecs] and [mats] generalizable sizes *)
 let vecs = String.Map.of_alist_exn [ "vec2", VEC 2; "vec3", VEC 3; "vec4", VEC 4 ]
 
 let mats =

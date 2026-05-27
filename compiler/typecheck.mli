@@ -14,7 +14,6 @@ type term_desc =
   | Lam of string * term
   | App of term * term
   (** [Let] carries deferred [constr list] for monomorphization pass *)
-  (* TODO: Shift constraints to a map in [t] *)
   | Let of Frontend.recur * string * constr list * term * term
   | If of term * term * term
   | Bop of Glsl.binary_op * term * term

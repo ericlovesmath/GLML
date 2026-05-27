@@ -35,7 +35,6 @@ let build_arrow_ty (arg_tys : ty list) (ret_ty : ty) : ty =
   List.fold_right arg_tys ~init:ret_ty ~f:(fun ty acc -> TyArrow (ty, acc))
 ;;
 
-(* TODO: Maybe we can have a reader + writer monad to handle this... *)
 type fn_entry =
   | LambdaEntry of
       { ctor_name : string
