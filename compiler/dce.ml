@@ -22,32 +22,16 @@ let atoms_of_term (t : term) : atom list =
 
 let vars_of_atoms atoms = List.filter_map atoms ~f:var_of_atom |> String.Set.of_list
 
-(** Does [a] contain a [While]/[Set] *)
-let rec effectful_anf (a : anf) =
-  match a.desc with
-  | Set _ | While _ -> true
-  | Return t -> effectful_term t
-  | Let (_, b, t) -> effectful_term b || effectful_anf t
-  | Placeholder (_, t) -> effectful_anf t
-  | Continue -> false
-
-and effectful_term (t : term) =
-  match t.desc with
-  | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Field _ -> false
-  | If (_, t, e) -> effectful_anf t || effectful_anf e
-  | Switch (_, cases) -> List.exists cases ~f:(fun (_, a) -> effectful_anf a)
-;;
-
 (** Backward liveness analysis with simultaneous rewrite *)
 let rec liveness_anf ~(live : String.Set.t) (a : anf) : anf * String.Set.t =
   match a.desc with
-  | Continue -> a, live
+  | Continue args -> { a with desc = Continue args }, vars_of_atoms args
   | Return t ->
     let t, live = liveness_term ~live t in
     { a with desc = Return t }, live
   | Let (v, b, t) ->
     let t, live_t = liveness_anf ~live t in
-    if not (Set.mem live_t v || effectful_term b)
+    if not (Set.mem live_t v)
     then t, Set.remove live_t v
     else (
       let b, live_b = liveness_term ~live b in
@@ -58,25 +42,20 @@ let rec liveness_anf ~(live : String.Set.t) (a : anf) : anf * String.Set.t =
     if Set.mem live_t v
     then { a with desc = Placeholder (v, t) }, Set.remove live_t v
     else t, live_t
-  | Set (v, x, t) ->
-    let t, live_t = liveness_anf ~live t in
-    if Set.mem live_t v
-    then (
-      let live = Set.union (Set.remove live_t v) (vars_of_atoms [ x ]) in
-      { a with desc = Set (v, x, t) }, live)
-    else t, live_t
-  | While (cond, body, tl) ->
-    let tl, live_tl = liveness_anf ~live tl in
+  | Loop (params, body) ->
+    (* Nothing can come after a [Loop], so we compute body liveness to fixed
+       point, subtract param names, then add the variables referenced by inits *)
+    let param_names = String.Set.of_list (List.map params ~f:fst) in
     let rec fix prev =
-      let _, body_live = liveness_anf ~live:prev body in
-      let _, cond_live = liveness_term ~live:prev cond in
-      let next = Set.union cond_live (Set.union body_live live_tl) in
+      let _, live = liveness_anf ~live:prev body in
+      let next = Set.union prev live in
       if Set.equal prev next then prev else fix next
     in
-    let live = fix live_tl in
-    let body, _ = liveness_anf ~live body in
-    let cond, _ = liveness_term ~live cond in
-    { a with desc = While (cond, body, tl) }, live
+    let live_body = fix String.Set.empty in
+    let body, _ = liveness_anf ~live:live_body body in
+    let live_inits = vars_of_atoms (List.map params ~f:snd) in
+    let live = Set.union (Set.diff live_body param_names) live_inits in
+    { a with desc = Loop (params, body) }, live
 
 and liveness_term ~(live : String.Set.t) (t : term) : term * String.Set.t =
   match t.desc with
@@ -106,12 +85,12 @@ let liveness_top (top : top) : top =
   | Extern _ | TypeDef _ -> top
 ;;
 
-let rec ty_refs (acc : String.Set.t) (ty : Lower_tuples.ty) : String.Set.t =
+let rec ty_refs (acc : String.Set.t) (ty : Lower_variants.ty) : String.Set.t =
   match ty with
   | TyFloat | TyInt | TyBool -> acc
   | TyVec (_, t) -> ty_refs acc t
   | TyArrow (a, b) -> ty_refs (ty_refs acc a) b
-  | TyRecord s | TyVariant s -> Set.add acc s
+  | TyRecord s -> Set.add acc s
 ;;
 
 let atom_refs acc (a : atom) =
@@ -133,9 +112,10 @@ and anf_refs acc (a : anf) =
   | Return t -> term_refs acc t
   | Let (_, b, t) -> anf_refs (term_refs acc b) t
   | Placeholder (_, t) -> anf_refs acc t
-  | While (c, b, tl) -> List.fold [ b; tl ] ~init:(term_refs acc c) ~f:anf_refs
-  | Set (_, x, t) -> anf_refs (atom_refs acc x) t
-  | Continue -> acc
+  | Loop (params, body) ->
+    let acc = params |> List.map ~f:snd |> List.fold ~init:acc ~f:atom_refs in
+    anf_refs acc body
+  | Continue args -> List.fold args ~init:acc ~f:atom_refs
 ;;
 
 let top_refs (top : top) : String.Set.t =

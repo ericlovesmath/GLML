@@ -24,9 +24,8 @@ and term =
 and anf_desc =
   | Let of string * term * anf
   | Return of term
-  | While of term * anf * anf
-  | Set of string * atom * anf
-  | Continue
+  | Loop of (string * atom) list * anf
+  | Continue of atom list
 [@@deriving sexp_of]
 
 and anf =
@@ -57,7 +56,7 @@ type top =
 
 type t = Program of top list [@@deriving sexp_of]
 
-(** Removes recursive functions and replaces them with while loops,
+(** Removes recursive functions and replaces them with structured loops,
     with a provided hardcap on the number of iterations so that the
     shader doesn't decide to explode your computer.
 
@@ -82,23 +81,21 @@ type t = Program of top list [@@deriving sexp_of]
 
     After Tail Call:
 
-    // Note TC fails if there are any [fib] in non-return postion
-    let fib_lift (n, acc) =
-      let iters = 0 in
-      while (iters < 1000) {
-        let anf_1 = n = 0 in
-        if anf_1
-          then return acc
-          else
-            let anf_2 = n - 1 in
-            let anf_3 = acc * n in
-            set n = anf_2;
-            set acc = anf_3;
-            set iters = iters + 1;
-      }
-      return <placeholder_value_for_ret_ty>
-
-  NOTE: The actual conversion occurs in [translate], but this step provides
-  the information where relevant to do this
+      let fib_lift (n, acc) =
+        loop (_iter, 0) (n, n) (acc, acc) {
+          let _lim = _iter < 1000 in
+          return
+            (if _lim
+              then
+                let anf_1 = n = 0 in
+                if anf_1
+                  then return acc
+                  else
+                    let anf_2 = n - 1 in
+                    let anf_3 = acc * n in
+                    let _iter_inc = _iter + 1 in
+                    continue (_iter_inc, anf_2, anf_3)
+              else return <placeholder>)
+        }
 *)
 val remove_rec : Anf.t -> t Compiler_error.t

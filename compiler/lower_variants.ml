@@ -1,14 +1,79 @@
 open Core
-open Anf
 open Sexplib.Sexp
-open Lower_tuples
-open Tail_call
-
-(* TODO: Add type for lower_variants to remove variants *)
 
 include Compiler_error.Pass (struct
     let name = "lower_variants"
   end)
+
+(* ===== Types ===== *)
+
+type ty =
+  | TyFloat
+  | TyInt
+  | TyBool
+  | TyVec of int * ty
+  | TyArrow of ty * ty
+  | TyRecord of string
+
+let rec sexp_of_ty = function
+  | TyFloat -> Atom "float"
+  | TyInt -> Atom "int"
+  | TyBool -> Atom "bool"
+  | TyVec (i, t) -> List [ Atom "vec"; Atom (Int.to_string i); sexp_of_ty t ]
+  | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
+  | TyRecord s -> Atom s
+;;
+
+type type_decl =
+  | RecordDecl of (string * ty) list
+  | VariantDecl of (string * ty list) list
+[@@deriving sexp_of]
+
+let rec lower_ty (ty : Lower_tuples.ty) : ty =
+  match ty with
+  | TyVariant s -> TyRecord s
+  | TyArrow (a, b) -> TyArrow (lower_ty a, lower_ty b)
+  | TyVec (n, t) -> TyVec (n, lower_ty t)
+  | TyFloat -> TyFloat
+  | TyInt -> TyInt
+  | TyBool -> TyBool
+  | TyRecord s -> TyRecord s
+;;
+
+type atom_desc =
+  | Var of string
+  | Float of float
+  | Int of int
+  | Bool of bool
+  | Temp
+
+let sexp_of_atom_desc = function
+  | Var v -> Atom v
+  | Float f -> Atom (Float.to_string f)
+  | Int i -> Atom (Int.to_string i)
+  | Bool b -> Atom (Bool.to_string b)
+  | Temp -> Atom "<temp>"
+;;
+
+type atom =
+  { desc : atom_desc
+  ; ty : ty
+  ; loc : Lexer.loc
+  }
+
+let sexp_of_atom t = sexp_of_atom_desc t.desc
+
+let lower_atom_desc : Anf.atom_desc -> atom_desc = function
+  | Var v -> Var v
+  | Float f -> Float f
+  | Int i -> Int i
+  | Bool b -> Bool b
+  | Temp -> Temp
+;;
+
+let lower_atom (a : Anf.atom) : atom =
+  { desc = lower_atom_desc a.desc; ty = lower_ty a.ty; loc = a.loc }
+;;
 
 type term_desc =
   | Atom of atom
@@ -28,14 +93,11 @@ and term =
   ; loc : Lexer.loc
   }
 
-(** TODO: Since we added Temp type in [anf], we should not need to use [set] anymore for lowering.
-    This may also apply in the while loop case of [tail call] *)
 and anf_desc =
   | Let of string * term * anf
   | Return of term
-  | While of term * anf * anf
-  | Set of string * atom * anf
-  | Continue
+  | Loop of (string * atom) list * anf
+  | Continue of atom list
 
 and anf =
   { desc : anf_desc
@@ -72,11 +134,10 @@ and sexp_of_anf_desc = function
   | Let (v, bind, body) ->
     List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_anf body ]
   | Return t -> List [ Atom "return"; sexp_of_term t ]
-  | While (cond, body, after) ->
-    List [ Atom "while"; sexp_of_term cond; sexp_of_anf body; sexp_of_anf after ]
-  | Set (v, bind, body) ->
-    List [ Atom "set"; Atom v; sexp_of_atom bind; sexp_of_anf body ]
-  | Continue -> Atom "continue"
+  | Loop (params, body) ->
+    let sexp_of_param (n, init) = List [ Atom n; sexp_of_atom init ] in
+    List [ Atom "loop"; List (List.map params ~f:sexp_of_param); sexp_of_anf body ]
+  | Continue args -> List (Atom "continue" :: List.map args ~f:sexp_of_atom)
 
 and sexp_of_anf t = sexp_of_anf_desc t.desc
 
@@ -85,7 +146,7 @@ type top_desc =
       { name : string
       ; args : (string * ty) list
       ; body : anf
-      ; ret_ty : Lower_tuples.ty
+      ; ret_ty : ty
       }
   | Const of string * anf
   | Extern of string
@@ -107,37 +168,29 @@ let sexp_of_top_desc = function
 
 type top =
   { desc : top_desc
-  ; ty : Lower_tuples.ty
+  ; ty : ty
   ; loc : Lexer.loc
   }
 
-let sexp_of_top t =
-  List [ sexp_of_top_desc t.desc; Atom ":"; Lower_tuples.sexp_of_ty t.ty ]
-;;
+let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
 
 type t = Program of top list
 
 let sexp_of_t (Program tops) = List (Atom "Program" :: List.map tops ~f:sexp_of_top)
 
-type type_env = type_decl String.Map.t
+(* ================ Lowering =================== *)
 
-let rec lower_ty (ty : ty) : ty =
-  match ty with
-  | TyVariant s -> TyRecord s
-  | TyArrow (a, b) -> TyArrow (lower_ty a, lower_ty b)
-  | TyVec (n, t) -> TyVec (n, lower_ty t)
-  | TyFloat | TyInt | TyBool | TyRecord _ -> ty
-;;
+type type_env = Lower_tuples.type_decl String.Map.t
 
-let find_tag ~loc (ctors : (string * ty list) list) (ctor : string) : int =
+let find_tag ~loc (ctors : (string * Lower_tuples.ty list) list) (ctor : string) : int =
   match List.findi ctors ~f:(fun _ (c, _) -> String.equal c ctor) with
   | Some (i, _) -> i
   | None -> raise "unknown ctor" ~loc ~d:[%message (ctor : string)]
 ;;
 
 (** Lays out a variant constructor's args into the flat record layout used after *)
-let flatten_variant_args ~loc ~ctor ~args (ctors : (string * ty list) list) : atom list =
-  let placeholder ty : atom = { desc = Temp; ty; loc } in
+let flatten_variant_args ~loc ~ctor ~(args : atom list) ctors : atom list =
+  let placeholder ty : atom = { desc = Temp; ty = lower_ty ty; loc } in
   List.concat_map ctors ~f:(fun (c, arg_tys) ->
     if String.equal c ctor then args else List.map arg_tys ~f:placeholder)
 ;;
@@ -146,9 +199,8 @@ let rec map_last_return (k : term -> anf) (anf : anf) : anf =
   match anf.desc with
   | Return term -> k term
   | Let (v, b, t) -> { anf with desc = Let (v, b, map_last_return k t) }
-  | While (c, b, t) -> { anf with desc = While (c, b, map_last_return k t) }
-  | Set (v, a, t) -> { anf with desc = Set (v, a, map_last_return k t) }
-  | Continue -> anf
+  | Loop (params, body) -> { anf with desc = Loop (params, body) }
+  | Continue _ -> anf
 ;;
 
 (* ================ Sub Occurrence Helpers ======================== *)
@@ -156,7 +208,6 @@ let rec map_last_return (k : term -> anf) (anf : anf) : anf =
 (** A sub-occurrence introduced when destructuring a head pattern *)
 type sub_occ =
   { name : string
-  ; atom : Anf.atom
   ; bind : term
   }
 
@@ -181,7 +232,8 @@ let bind_pat_var_tc ~loc ~(occ : Anf.atom) (pat : Frontend.pat) (body : Tail_cal
 let bind_pat_var ~loc ~(occ : Anf.atom) (pat : Frontend.pat) (body : anf) : anf =
   match pat with
   | PatVar v ->
-    let bind : term = { desc = Atom occ; ty = occ.ty; loc } in
+    let lowered = lower_atom occ in
+    let bind : term = { desc = Atom lowered; ty = lowered.ty; loc } in
     { desc = Let (v, bind, body); ty = body.ty; loc }
   | _ -> body
 ;;
@@ -193,12 +245,12 @@ type head =
   | HBool of bool
   | HInt of int
   | HFloat of float
-  | HCtor of string * (ty list[@equal.ignore])
-  | HBracket of int * (ty[@equal.ignore])
-  | HRecord of ((string * ty) list[@equal.ignore])
+  | HCtor of string * (Lower_tuples.ty list[@equal.ignore])
+  | HBracket of int * (Lower_tuples.ty[@equal.ignore])
+  | HRecord of ((string * Lower_tuples.ty) list[@equal.ignore])
 [@@deriving equal]
 
-let head_sub_tys = function
+let head_sub_tys : head -> Lower_tuples.ty list = function
   | HBool _ | HInt _ | HFloat _ -> []
   | HCtor (_, ts) -> ts
   | HBracket (n, x) -> List.init n ~f:(Fn.const x)
@@ -217,7 +269,8 @@ let lookup_record_fields ~loc (tenv : type_env) name =
   | _ -> raise "unknown struct in match" ~loc ~d:[%message (name : string)]
 ;;
 
-let head_of_pat ~loc ~(tenv : type_env) ~(col_ty : ty) : Frontend.pat -> head option
+let head_of_pat ~loc ~(tenv : type_env) ~(col_ty : Lower_tuples.ty)
+  : Frontend.pat -> head option
   = function
   | PatWildcard | PatVar _ -> None
   | PatLitBool b -> Some (HBool b)
@@ -246,9 +299,7 @@ let head_of_pat ~loc ~(tenv : type_env) ~(col_ty : ty) : Frontend.pat -> head op
   | PatTuple _ -> raise "unexpected PatTuple after lower_tuples" ~loc
 ;;
 
-(** Sub-patterns of [pat] under [h]: [Some args] if [pat]'s head equals [h]
-    (wildcards expanded to head arity), [None] if [pat] would be filtered out
-    when specializing on [h]. *)
+(** Sub-patterns of [pat] under [h] *)
 let pat_args ~(h : head) : Frontend.pat -> Frontend.pat list option = function
   | PatWildcard | PatVar _ ->
     Some (List.map (head_sub_tys h) ~f:(Fn.const Frontend.PatWildcard))
@@ -283,7 +334,6 @@ let pat_args ~(h : head) : Frontend.pat -> Frontend.pat list option = function
   | PatTuple _ -> raise "unexpected PatTuple after lower_tuples"
 ;;
 
-(** Distinct heads observed in the first column of [rows], in first-seen order. *)
 let column_heads ~loc ~tenv ~col_ty (rows : (Frontend.pat list * _) list) : head list =
   List.filter_map rows ~f:(function
     | p :: _, _ -> head_of_pat ~loc ~tenv ~col_ty p
@@ -293,7 +343,8 @@ let column_heads ~loc ~tenv ~col_ty (rows : (Frontend.pat list * _) list) : head
   |> List.rev
 ;;
 
-let signature_heads ~loc ~(tenv : type_env) : ty -> head list option = function
+let signature_heads ~loc ~(tenv : type_env) : Lower_tuples.ty -> head list option
+  = function
   | TyBool -> Some [ HBool true; HBool false ]
   | TyVariant name ->
     Some
@@ -303,27 +354,25 @@ let signature_heads ~loc ~(tenv : type_env) : ty -> head list option = function
   | TyInt | TyFloat | TyArrow _ -> None
 ;;
 
-let make_sub_occ ~loc ~hint ~ty ~bind_desc : sub_occ =
+let make_sub_occ ~loc ~hint ~(sub_ty : Lower_tuples.ty) ~bind_desc : sub_occ =
   let name = Utils.fresh ("_lv_" ^ hint) in
-  { name
-  ; atom = { desc = Var name; ty; loc }
-  ; bind = { desc = bind_desc; ty = lower_ty ty; loc }
-  }
+  let lty = lower_ty sub_ty in
+  { name; bind = { desc = bind_desc; ty = lty; loc } }
 ;;
 
 (** Sub-occurrences introduced by destructuring a head pattern. *)
-let sub_occs_for_head ~loc ~(occ : Anf.atom) : head -> sub_occ list = function
+let sub_occs_for_head ~loc ~(occ : atom) : head -> sub_occ list = function
   | HBool _ | HInt _ | HFloat _ -> []
   | HCtor (c, arg_tys) ->
     List.mapi arg_tys ~f:(fun i ty ->
       let f = [%string "%{c}_%{i#Int}"] in
-      make_sub_occ ~loc ~hint:f ~ty ~bind_desc:(Field (occ, f)))
+      make_sub_occ ~loc ~hint:f ~sub_ty:ty ~bind_desc:(Field (occ, f)))
   | HBracket (n, ty) ->
     List.init n ~f:(fun i ->
-      make_sub_occ ~loc ~hint:[%string "v%{i#Int}"] ~ty ~bind_desc:(Index (occ, i)))
+      make_sub_occ ~loc ~hint:[%string "v%{i#Int}"] ~sub_ty:ty ~bind_desc:(Index (occ, i)))
   | HRecord fs ->
     List.map fs ~f:(fun (f, ty) ->
-      make_sub_occ ~loc ~hint:("r_" ^ f) ~ty ~bind_desc:(Field (occ, f)))
+      make_sub_occ ~loc ~hint:("r_" ^ f) ~sub_ty:ty ~bind_desc:(Field (occ, f)))
 ;;
 
 (** Whether [heads] cover the full value domain of [col_ty] *)
@@ -337,16 +386,17 @@ let signature_complete ~loc ~tenv ~col_ty ~heads : bool =
 
 let rec lower_term (tenv : type_env) (term : Tail_call.term) : term =
   let pure desc = ({ desc; ty = lower_ty term.ty; loc = term.loc } : term) in
+  let la = lower_atom in
   match term.desc with
-  | Atom a -> pure (Atom a)
-  | Bop (op, l, r) -> pure (Bop (op, l, r))
-  | Vec (n, ts) -> pure (Vec (n, ts))
-  | Index (t, i) -> pure (Index (t, i))
-  | Builtin (b, ts) -> pure (Builtin (b, ts))
-  | App (f, args) -> pure (App (f, args))
-  | Record args -> pure (Record args)
-  | Field (a, f) -> pure (Field (a, f))
-  | If (c, t, e) -> pure (If (c, lower_anf tenv t, lower_anf tenv e))
+  | Atom a -> pure (Atom (la a))
+  | Bop (op, l, r) -> pure (Bop (op, la l, la r))
+  | Vec (n, ts) -> pure (Vec (n, List.map ts ~f:la))
+  | Index (t, i) -> pure (Index (la t, i))
+  | Builtin (b, ts) -> pure (Builtin (b, List.map ts ~f:la))
+  | App (f, args) -> pure (App (f, List.map args ~f:la))
+  | Record args -> pure (Record (List.map args ~f:la))
+  | Field (a, f) -> pure (Field (la a, f))
+  | If (c, t, e) -> pure (If (la c, lower_anf tenv t, lower_anf tenv e))
   | Variant (ctor, args) ->
     let loc = term.loc in
     let ty_name =
@@ -356,6 +406,7 @@ let rec lower_term (tenv : type_env) (term : Tail_call.term) : term =
     in
     let ctors = lookup_variant_ctors ~loc tenv ty_name in
     let tag_atom : atom = { desc = Int (find_tag ~loc ctors ctor); ty = TyInt; loc } in
+    let args = List.map args ~f:la in
     pure (Record (tag_atom :: flatten_variant_args ~loc ~ctor ~args ctors))
   | Match _ -> raise "match should be handled in lower_anf" ~loc:term.loc
 
@@ -372,24 +423,21 @@ and lower_anf (tenv : type_env) (anf : Tail_call.anf) : anf =
     let tail = lower_anf tenv tail in
     make (Let (v, term, tail))
   | Return term -> make (Return (lower_term tenv term))
-  | While (cond, body, after) ->
-    let cond = lower_term tenv cond in
-    let body = lower_anf tenv body in
-    let after = lower_anf tenv after in
-    make (While (cond, body, after))
-  | Set (v, a, tail) -> make (Set (v, a, lower_anf tenv tail))
-  | Continue -> make Continue
+  | Loop (params, body) ->
+    let params = List.map params ~f:(fun (n, a) -> n, lower_atom a) in
+    make (Loop (params, lower_anf tenv body))
+  | Continue args -> make (Continue (List.map args ~f:lower_atom))
 
 and lower_match
       (tenv : type_env)
       (scrut : Anf.atom)
       (cases : (Frontend.pat * Tail_call.anf) list)
-      (result_ty : ty)
+      (result_ty : Lower_tuples.ty)
       (loc : Lexer.loc)
       (k : term -> anf)
   : anf
   =
-  let result_ty = lower_ty result_ty in
+  let lowered_result_ty = lower_ty result_ty in
   let return_term (t : term) : anf = { desc = Return t; ty = t.ty; loc } in
   let pivot_to_front i xs =
     if i = 0
@@ -403,7 +451,7 @@ and lower_match
   let default_on ~occ rows =
     Pattern_match.Matrix.default ~on_wild_head:(bind_pat_var_tc ~loc ~occ) rows
   in
-  let emit_bool ~(occ : Anf.atom) ~branches ~default =
+  let emit_bool ~(occ : atom) ~branches ~default =
     let find h = List.Assoc.find branches ~equal:equal_head h in
     let arm b =
       match find (HBool b), default with
@@ -411,9 +459,9 @@ and lower_match
       | None, Some d -> d
       | None, None -> raise "bool match: missing arm and no default" ~loc
     in
-    return_term { desc = If (occ, arm true, arm false); ty = result_ty; loc }
+    return_term { desc = If (occ, arm true, arm false); ty = lowered_result_ty; loc }
   in
-  let emit_int ~(occ : Anf.atom) ~branches ~default =
+  let emit_int ~(occ : atom) ~branches ~default =
     let cases =
       List.map branches ~f:(fun (h, b) ->
         match h with
@@ -421,9 +469,9 @@ and lower_match
         | _ -> raise "internal: non-int head under TyInt" ~loc)
     in
     let tail = Option.value_map default ~default:[] ~f:(fun d -> [ Glsl.Default, d ]) in
-    return_term { desc = Switch (occ, cases @ tail); ty = result_ty; loc }
+    return_term { desc = Switch (occ, cases @ tail); ty = lowered_result_ty; loc }
   in
-  let emit_float ~(occ : Anf.atom) ~branches ~default =
+  let emit_float ~(occ : atom) ~branches ~default =
     let init =
       match default with
       | Some d -> d
@@ -439,10 +487,12 @@ and lower_match
       let cmp_atom : atom = { desc = Var cmp_v; ty = TyBool; loc } in
       let f_atom : atom = { desc = Float f_val; ty = TyFloat; loc } in
       let cmp : term = { desc = Bop (Glsl.Eq, occ, f_atom); ty = TyBool; loc } in
-      let if_t : term = { desc = If (cmp_atom, body, acc); ty = result_ty; loc } in
-      { desc = Let (cmp_v, cmp, return_term if_t); ty = result_ty; loc })
+      let if_t : term =
+        { desc = If (cmp_atom, body, acc); ty = lowered_result_ty; loc }
+      in
+      { desc = Let (cmp_v, cmp, return_term if_t); ty = lowered_result_ty; loc })
   in
-  let emit_variant ~ty_name ~(occ : Anf.atom) ~branches ~default =
+  let emit_variant ~ty_name ~(occ : atom) ~branches ~default =
     let ctors = lookup_variant_ctors ~loc tenv ty_name in
     let n = List.length branches in
     let has_default = Option.is_some default in
@@ -469,11 +519,11 @@ and lower_match
       let tag_atom : atom = { desc = Var tag_v; ty = TyInt; loc } in
       let tag : term = { desc = Field (occ, "tag"); ty = TyInt; loc } in
       let sw : term =
-        { desc = Switch (tag_atom, cases @ default_cases); ty = result_ty; loc }
+        { desc = Switch (tag_atom, cases @ default_cases); ty = lowered_result_ty; loc }
       in
-      { desc = Let (tag_v, tag, return_term sw); ty = result_ty; loc }
+      { desc = Let (tag_v, tag, return_term sw); ty = lowered_result_ty; loc }
   in
-  let emit_switch ~(occ : Anf.atom) ~(col_ty : ty) ~branches ~default : anf =
+  let emit_switch ~(occ : atom) ~(col_ty : Lower_tuples.ty) ~branches ~default : anf =
     match col_ty with
     | TyBool -> emit_bool ~occ ~branches ~default
     | TyInt -> emit_int ~occ ~branches ~default
@@ -495,7 +545,7 @@ and lower_match
         bind_pat_var ~loc ~occ pat acc)
     | `Pivot _, [] -> raise "unreachable: pivot exhaustiveness" ~loc
     | `Pivot col_idx, _ :: _ ->
-      let occ, rest =
+      let occ_tc, rest =
         match pivot_to_front col_idx occs with
         | h :: t -> h, t
         | [] -> raise "unreachable: pivot_to_front preserves size" ~loc
@@ -503,27 +553,32 @@ and lower_match
       let rows =
         List.map rows ~f:(fun (pats, body) -> pivot_to_front col_idx pats, body)
       in
-      let col_ty = occ.ty in
+      let col_ty : Lower_tuples.ty = occ_tc.ty in
+      let occ = lower_atom occ_tc in
       let heads = column_heads ~loc ~tenv ~col_ty rows in
       let branches =
         List.map heads ~f:(fun h ->
           let arity = List.length (head_sub_tys h) in
           let spec =
             Pattern_match.Matrix.specialize
-              ~on_wild_head:(bind_pat_var_tc ~loc ~occ)
+              ~on_wild_head:(bind_pat_var_tc ~loc ~occ:occ_tc)
               ~arity
               ~expand:(pat_args ~h)
               rows
           in
           let sub_occs = sub_occs_for_head ~loc ~occ h in
-          let sub_atoms = List.map sub_occs ~f:(fun s -> s.atom) in
+          let sub_atoms_tc =
+            let sub_tys = head_sub_tys h in
+            List.map2_exn sub_occs sub_tys ~f:(fun s ty ->
+              ({ desc = Var s.name; ty; loc } : Anf.atom))
+          in
           let binds = List.map sub_occs ~f:(fun s -> s.name, s.bind) in
-          h, go (sub_atoms @ rest) spec |> bind_lets ~loc binds)
+          h, go (sub_atoms_tc @ rest) spec |> bind_lets ~loc binds)
       in
       let default =
         if signature_complete ~loc ~tenv ~col_ty ~heads
         then None
-        else Some (go rest (default_on ~occ rows))
+        else Some (go rest (default_on ~occ:occ_tc rows))
       in
       emit_switch ~occ ~col_ty ~branches ~default
   in
@@ -546,9 +601,13 @@ let lower_top (tenv : type_env) (top : Tail_call.top) : top =
     let fields = List.map fields ~f:(Tuple2.map_snd ~f:lower_ty) in
     pure (TypeDef (name, RecordDecl fields))
   | Define { name; args; body; ret_ty } ->
-    let args = List.map args ~f:(Tuple2.map_snd ~f:lower_ty) in
-    let ret_ty = lower_ty ret_ty in
-    pure (Define { name; args; body = lower_anf tenv body; ret_ty })
+    pure
+      (Define
+         { name
+         ; args = List.map args ~f:(Tuple2.map_snd ~f:lower_ty)
+         ; body = lower_anf tenv body
+         ; ret_ty = lower_ty ret_ty
+         })
   | Extern v -> pure (Extern v)
   | Const (name, body) -> pure (Const (name, lower_anf tenv body))
 ;;

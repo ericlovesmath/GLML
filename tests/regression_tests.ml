@@ -349,19 +349,23 @@ let%expect_test "regression - placeholder structs and variants in tail position"
     };
     box f_0(bool x) {
         int _iter = 0;
-        while ((_iter < 1000)) {
-            if (x) {
-                vec3 anf = vec3(1., 1., 1.);
-                return box(anf);
+        while (true) {
+            bool _lim_cond = (_iter < 1000);
+            if (_lim_cond) {
+                if (x) {
+                    vec3 anf = vec3(1., 1., 1.);
+                    return box(anf);
+                } else {
+                    int _iter_inc = (_iter + 1);
+                    _iter = _iter_inc;
+                    x = true;
+                    continue;
+                }
             } else {
-                x = true;
-                int _iter_inc = (_iter + 1);
-                _iter = _iter_inc;
-                continue;
+                box _tmp;
+                return _tmp;
             }
         }
-        box _tmp;
-        return _tmp;
     }
     vec3 main_pure(vec2 coord) {
         box anf_0 = f_0(false);

@@ -21,8 +21,7 @@ type value =
 
 type ctx =
   { env : value String.Map.t
-  ; mut : String.Set.t (* names that appear as [Set] targets *)
-  ; records : (string * Lower_tuples.ty) list String.Map.t
+  ; records : (string * Lower_variants.ty) list String.Map.t
   }
 
 let bind ctx v value = { ctx with env = Map.set ctx.env ~key:v ~data:value }
@@ -134,24 +133,6 @@ let broadcast xs ys =
      | Unequal_lengths -> None)
 ;;
 
-let rec collect_set_anf (a : anf) (acc : String.Set.t) : String.Set.t =
-  match a.desc with
-  | Return t -> collect_set_term t acc
-  | Let (_, b, t) -> acc |> collect_set_term b |> collect_set_anf t
-  | Placeholder (_, t) -> collect_set_anf t acc
-  | While (c, b, tl) ->
-    acc |> collect_set_term c |> collect_set_anf b |> collect_set_anf tl
-  | Set (v, _, t) -> collect_set_anf t (Set.add acc v)
-  | Continue -> acc
-
-and collect_set_term (t : term) (acc : String.Set.t) : String.Set.t =
-  match t.desc with
-  | If (_, t, e) -> acc |> collect_set_anf t |> collect_set_anf e
-  | Switch (_, cases) ->
-    List.fold_right cases ~init:acc ~f:(fun (_, a) -> collect_set_anf a)
-  | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Field _ -> acc
-;;
-
 let unexpected_branch (t : term) =
   Err.raise ~loc:t.loc "unexpected branching term" ~d:[%message (t : term)]
 ;;
@@ -171,11 +152,9 @@ let const_all_eq_float ctx (a : atom) (target : float) : bool =
     ~f:(List.for_all ~f:(equal_lit_float target))
 ;;
 
-(** Splat constant [k] across the scalar/vector shape of [t].
-
-    [None] for matrix/record/etc shapes we don't synthesize yet *)
+(** Splat constant [k] across the scalar/vector shape of [t] *)
 let splat (t : term) (k : float) : term_desc option =
-  let scalar : Lower_tuples.ty -> atom_desc option = function
+  let scalar : Lower_variants.ty -> atom_desc option = function
     | TyFloat -> Some (Float k)
     | TyInt -> Some (Int (Float.to_int k))
     | _ -> None
@@ -314,9 +293,9 @@ let simplify_primitive_term ctx (t : term) : term =
   Option.value_map simplified ~default:t ~f:(fun desc -> { t with desc })
 ;;
 
-let abs_of_atom ctx (a : atom) : value =
+let abs_of_atom (a : atom) : value =
   match a.desc with
-  | Var v -> if Set.mem ctx.mut v then Top else Alias v
+  | Var v -> Alias v
   | Int i -> Lit (Int i)
   | Float f -> Lit (Float f)
   | Bool b -> Lit (Bool b)
@@ -324,15 +303,15 @@ let abs_of_atom ctx (a : atom) : value =
 
 let abs_of_term ctx (t : term) : value =
   match t.desc with
-  | Atom a -> abs_of_atom ctx a
-  | Vec (_, atoms) -> Vec (List.map atoms ~f:(abs_of_atom ctx))
+  | Atom a -> abs_of_atom a
+  | Vec (_, atoms) -> Vec (List.map atoms ~f:abs_of_atom)
   | Record atoms ->
     (match t.ty with
      | TyRecord s ->
        (match Map.find ctx.records s with
         | None -> Top
         | Some fields ->
-          (match List.(zip (map ~f:fst fields) (map ~f:(abs_of_atom ctx) atoms)) with
+          (match List.zip (List.map ~f:fst fields) (List.map ~f:abs_of_atom atoms) with
            | Unequal_lengths -> Err.raise "record literal arity mismatch" ~loc:t.loc
            | Ok pairs -> String.Map.of_alist_or_error pairs)
           |> Err.of_or_error ~loc:t.loc
@@ -357,8 +336,8 @@ let abs_of_term ctx (t : term) : value =
 let rec tail_abs ctx (a : anf) : value =
   match a.desc with
   | Return t -> abs_of_term ctx t
-  | Let (_, _, k) | Placeholder (_, k) | While (_, _, k) | Set (_, _, k) -> tail_abs ctx k
-  | Continue -> Top
+  | Let (_, _, k) | Placeholder (_, k) -> tail_abs ctx k
+  | Loop _ | Continue _ -> Top
 ;;
 
 (** Resolve every [Alias _] through [env]; returns a value with no free names *)
@@ -380,9 +359,7 @@ let rec splice (a : anf) ~(k : term -> anf) : anf =
   | Return t -> k t
   | Let (v, t, tl) -> { a with desc = Let (v, t, splice tl ~k) }
   | Placeholder (v, tl) -> { a with desc = Placeholder (v, splice tl ~k) }
-  | While (c, b, tl) -> { a with desc = While (c, b, splice tl ~k) }
-  | Set (v, x, tl) -> { a with desc = Set (v, x, splice tl ~k) }
-  | Continue -> a
+  | Loop _ | Continue _ -> a
 ;;
 
 (** [Picked]: scrutinee was a known constant, this arm is taken.
@@ -393,15 +370,17 @@ type branch_resolution =
 
 let rec rewrite_anf (ctx : ctx) (a : anf) : anf =
   match a.desc with
-  | Continue -> a
+  | Continue args ->
+    let args = List.map args ~f:(rewrite_atom ctx) in
+    { a with desc = Continue args }
   | Return t -> rewrite_return ctx a t
   | Let (v, t, k) -> rewrite_let ctx a v t k
   | Placeholder (v, k) ->
     { a with desc = Placeholder (v, rewrite_anf (bind ctx v Top) k) }
-  | While (cond, body, tl) ->
-    let cond = simplify_primitive_term ctx cond in
-    { a with desc = While (cond, rewrite_anf ctx body, rewrite_anf ctx tl) }
-  | Set (v, x, k) -> { a with desc = Set (v, rewrite_atom ctx x, rewrite_anf ctx k) }
+  | Loop (params, body) ->
+    let params = List.map params ~f:(fun (n, init) -> n, rewrite_atom ctx init) in
+    let ctx = List.fold params ~init:ctx ~f:(fun ctx (n, _) -> bind ctx n Top) in
+    { a with desc = Loop (params, rewrite_anf ctx body) }
 
 and rewrite_return ctx a t =
   match t.desc with
@@ -417,13 +396,13 @@ and rewrite_let ctx a v t k =
     (match resolve_branch ctx t with
      | Picked branch ->
        let branch = rewrite_anf ctx branch in
-       let value = if Set.mem ctx.mut v then Top else tail_abs ctx branch in
+       let value = tail_abs ctx branch in
        let k = rewrite_anf (bind ctx v value) k in
        splice branch ~k:(fun final_t -> { a with desc = Let (v, final_t, k) })
      | Rebuild t -> { a with desc = Let (v, t, rewrite_anf (bind ctx v Top) k) })
   | _ ->
     let t = simplify_primitive_term ctx t in
-    let value = if Set.mem ctx.mut v then Top else abs_of_term ctx t in
+    let value = abs_of_term ctx t in
     { a with desc = Let (v, t, rewrite_anf (bind ctx v value) k) }
 
 and resolve_branch ctx (t : term) : branch_resolution =
@@ -454,30 +433,25 @@ and resolve_branch ctx (t : term) : branch_resolution =
 ;;
 
 let rewrite_top
-      (records : (string * Lower_tuples.ty) list String.Map.t)
+      (records : (string * Lower_variants.ty) list String.Map.t)
       (env : value String.Map.t)
       (top : top)
   : top * value String.Map.t
   =
-  let rewrite anf =
-    rewrite_anf { env; mut = collect_set_anf anf String.Set.empty; records } anf
-  in
+  let rewrite anf = rewrite_anf { env; records } anf in
   match top.desc with
   | Const (name, anf) ->
     let anf = rewrite anf in
     let env =
-      (* Walk the rewritten body with its own local env to compute the tail
-         abs, then [ground] it so the published value carries no escaping
-         name references. *)
       let rec tail_in local_env (a : anf) : value =
-        let ctx = { env = local_env; mut = String.Set.empty; records } in
+        let ctx = { env = local_env; records } in
         match a.desc with
         | Return t -> ground ctx (abs_of_term ctx t)
         | Let (v, t, k) ->
           let value = abs_of_term ctx t in
           tail_in (Map.set local_env ~key:v ~data:value) k
         | Placeholder (_, k) -> tail_in local_env k
-        | While _ | Set _ | Continue -> Top
+        | Loop _ | Continue _ -> Top
       in
       match tail_in env anf with
       | Top -> env
@@ -489,7 +463,7 @@ let rewrite_top
   | Extern _ | TypeDef _ -> top, env
 ;;
 
-let collect_records (tops : top list) : (string * Lower_tuples.ty) list String.Map.t =
+let collect_records (tops : top list) : (string * Lower_variants.ty) list String.Map.t =
   List.filter_map tops ~f:(fun top ->
     match top.desc with
     | TypeDef (name, RecordDecl fields) -> Some (name, fields)

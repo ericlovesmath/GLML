@@ -1,6 +1,4 @@
 open Core
-open Anf
-open Lower_tuples
 open Lower_variants
 open Sexplib.Sexp
 
@@ -19,7 +17,7 @@ let sexp_of_atom_desc = function
 
 type atom =
   { desc : atom_desc
-  ; ty : Lower_tuples.ty
+  ; ty : ty
   ; loc : Lexer.loc
   }
 
@@ -47,9 +45,8 @@ and anf_desc =
   | Let of string * term * anf
   | Placeholder of string * anf
   | Return of term
-  | While of term * anf * anf
-  | Set of string * atom * anf
-  | Continue
+  | Loop of (string * atom) list * anf
+  | Continue of atom list
 
 and anf =
   { desc : anf_desc
@@ -87,11 +84,10 @@ and sexp_of_anf_desc = function
     List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_anf body ]
   | Placeholder (s, body) -> List [ Atom "placeholder"; Atom s; sexp_of_anf body ]
   | Return t -> List [ Atom "return"; sexp_of_term t ]
-  | While (cond, body, after) ->
-    List [ Atom "while"; sexp_of_term cond; sexp_of_anf body; sexp_of_anf after ]
-  | Set (v, bind, body) ->
-    List [ Atom "set"; Atom v; sexp_of_atom bind; sexp_of_anf body ]
-  | Continue -> Atom "continue"
+  | Loop (params, body) ->
+    let sexp_of_param (n, init) = List [ Atom n; sexp_of_atom init ] in
+    List [ Atom "loop"; List (List.map params ~f:sexp_of_param); sexp_of_anf body ]
+  | Continue args -> List (Atom "continue" :: List.map args ~f:sexp_of_atom)
 
 and sexp_of_anf t = sexp_of_anf_desc t.desc
 
@@ -100,7 +96,7 @@ type top_desc =
       { name : string
       ; args : (string * ty) list
       ; body : anf
-      ; ret_ty : Lower_tuples.ty
+      ; ret_ty : ty
       }
   | Const of string * anf
   | Extern of string
@@ -122,13 +118,11 @@ let sexp_of_top_desc = function
 
 type top =
   { desc : top_desc
-  ; ty : Lower_tuples.ty
+  ; ty : ty
   ; loc : Lexer.loc
   }
 
-let sexp_of_top t =
-  List [ sexp_of_top_desc t.desc; Atom ":"; Lower_tuples.sexp_of_ty t.ty ]
-;;
+let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
 
 type t = Program of top list
 
@@ -136,13 +130,13 @@ let sexp_of_t (Program tops) = List (Atom "Program" :: List.map tops ~f:sexp_of_
 
 type bindings = (string * ty) list
 
-(** Prepend a list of (var, term) let-bindings before an anf node. *)
+(** Prepend a list of (var, ty) placeholder bindings before an anf node. *)
 let make_lets (loc : Lexer.loc) (placeholders : bindings) (body : anf) : anf =
   List.fold_right placeholders ~init:body ~f:(fun (v, ty) acc ->
     ({ desc = Placeholder (v, acc); ty; loc } : anf))
 ;;
 
-let remove_atom (atom : Anf.atom) : atom * bindings =
+let remove_atom (atom : Lower_variants.atom) : atom * bindings =
   let pure desc : atom = { desc; ty = atom.ty; loc = atom.loc } in
   match atom.desc with
   | Temp ->
@@ -150,7 +144,7 @@ let remove_atom (atom : Anf.atom) : atom * bindings =
      | TyFloat -> pure (Float 0.0), []
      | TyInt -> pure (Int 0), []
      | TyBool -> pure (Bool false), []
-     | TyVec _ | TyRecord _ | TyVariant _ ->
+     | TyVec _ | TyRecord _ ->
        let name = Utils.fresh "_tmp" in
        pure (Var name), [ name, atom.ty ]
      | TyArrow _ -> failwith "no placeholders for arrow types")
@@ -160,7 +154,7 @@ let remove_atom (atom : Anf.atom) : atom * bindings =
   | Bool b -> pure (Bool b), []
 ;;
 
-let remove_atoms (atoms : Anf.atom list) : atom list * bindings =
+let remove_atoms (atoms : Lower_variants.atom list) : atom list * bindings =
   let atoms, binds = List.unzip (List.map ~f:remove_atom atoms) in
   atoms, List.concat binds
 ;;
@@ -177,16 +171,20 @@ let rec remove_anf (anf : Lower_variants.anf) : anf =
   | Return term ->
     let term, binds = remove_term term in
     make binds (Return term)
-  | While (cond, body, tl) ->
-    let cond, binds = remove_term cond in
+  | Loop (params, body) ->
+    let names, binds =
+      params
+      |> List.map ~f:(fun (n, a) ->
+        let a, b = remove_atom a in
+        (n, a), b)
+      |> List.unzip
+    in
+    let binds = List.concat binds in
     let body = remove_anf body in
-    let after = remove_anf tl in
-    make binds (While (cond, body, after))
-  | Set (v, a, tl) ->
-    let tl = remove_anf tl in
-    let a, binds = remove_atom a in
-    make binds (Set (v, a, tl))
-  | Continue -> { desc = Continue; ty = anf.ty; loc = anf.loc }
+    make binds (Loop (names, body))
+  | Continue args ->
+    let args, binds = remove_atoms args in
+    make binds (Continue args)
 
 and remove_term (term : Lower_variants.term) : term * bindings =
   let pure desc bindings = ({ desc; ty = term.ty; loc = term.loc } : term), bindings in
@@ -215,9 +213,9 @@ and remove_term (term : Lower_variants.term) : term * bindings =
     let t = remove_anf t in
     let f = remove_anf f in
     pure (If (c, t, f)) binds
-  | Record (atoms) ->
+  | Record atoms ->
     let atoms, binds = remove_atoms atoms in
-    pure (Record (atoms)) binds
+    pure (Record atoms) binds
   | Field (a, s) ->
     let a, binds = remove_atom a in
     pure (Field (a, s)) binds

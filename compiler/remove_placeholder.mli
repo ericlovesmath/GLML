@@ -1,3 +1,5 @@
+open Lower_variants
+
 type atom_desc =
   | Var of string
   | Float of float
@@ -7,7 +9,7 @@ type atom_desc =
 
 type atom =
   { desc : atom_desc
-  ; ty : Lower_tuples.ty
+  ; ty : ty
   ; loc : Lexer.loc
   }
 [@@deriving sexp_of]
@@ -27,7 +29,7 @@ type term_desc =
 
 and term =
   { desc : term_desc
-  ; ty : Lower_tuples.ty
+  ; ty : ty
   ; loc : Lexer.loc
   }
 [@@deriving sexp_of]
@@ -36,14 +38,13 @@ and anf_desc =
   | Let of string * term * anf
   | Placeholder of string * anf
   | Return of term
-  | While of term * anf * anf
-  | Set of string * atom * anf
-  | Continue
+  | Loop of (string * atom) list * anf
+  | Continue of atom list
 [@@deriving sexp_of]
 
 and anf =
   { desc : anf_desc
-  ; ty : Lower_tuples.ty
+  ; ty : ty
   ; loc : Lexer.loc
   }
 [@@deriving sexp_of]
@@ -51,18 +52,18 @@ and anf =
 type top_desc =
   | Define of
       { name : string
-      ; args : (string * Lower_tuples.ty) list
+      ; args : (string * ty) list
       ; body : anf
-      ; ret_ty : Lower_tuples.ty
+      ; ret_ty : ty
       }
   | Const of string * anf
   | Extern of string
-  | TypeDef of string * Lower_tuples.type_decl
+  | TypeDef of string * type_decl
 [@@deriving sexp_of]
 
 type top =
   { desc : top_desc
-  ; ty : Lower_tuples.ty
+  ; ty : ty
   ; loc : Lexer.loc
   }
 [@@deriving sexp_of]

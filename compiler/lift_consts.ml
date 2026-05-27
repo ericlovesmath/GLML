@@ -30,7 +30,7 @@ let rec is_constable (externs : String.Set.t) (a : anf) =
   match a.desc with
   | Return t -> is_constable_term externs t
   | Let (_, bind, tl) -> is_constable_term externs bind && is_constable externs tl
-  | Placeholder _ | While _ | Set _ | Continue -> false
+  | Placeholder _ | Loop _ | Continue _ -> false
 ;;
 
 (* Collect the names of [Const] nodes that must be promoted to zero-arg functions *)
@@ -125,18 +125,22 @@ and rewrite_anf (promoted : String.Set.t) (anf : anf) : anf =
     let binds, bind = rewrite_branching promoted bind in
     let tl = rewrite_anf promoted tl in
     make_binds binds { anf with desc = Let (v, bind, tl) }
-  | While (cond, body, tail) ->
-    let binds, cond = lift_atoms promoted cond in
+  | Loop (params, body) ->
+    let binds, params =
+      List.map params ~f:(fun (n, a) ->
+        let b, a = lift_atom promoted a in
+        b, (n, a))
+      |> List.unzip
+    in
+    let binds = List.concat binds in
     let body = rewrite_anf promoted body in
-    let tail = rewrite_anf promoted tail in
-    make_binds binds { anf with desc = While (cond, body, tail) }
-  | Set (v, atom, tl) ->
-    let binds, atom = lift_atom promoted atom in
-    let tl = rewrite_anf promoted tl in
-    make_binds binds { anf with desc = Set (v, atom, tl) }
+    make_binds binds { anf with desc = Loop (params, body) }
+  | Continue args ->
+    let bindss, args = List.map args ~f:(lift_atom promoted) |> List.unzip in
+    let binds = List.concat bindss in
+    make_binds binds { anf with desc = Continue args }
   | Placeholder (v, body) ->
     { anf with desc = Placeholder (v, rewrite_anf promoted body) }
-  | Continue -> anf
 ;;
 
 let rewrite_top (promoted : String.Set.t) (top : top) : top =

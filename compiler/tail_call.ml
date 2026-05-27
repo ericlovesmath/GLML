@@ -28,9 +28,8 @@ and term =
 and anf_desc =
   | Let of string * term * anf
   | Return of term
-  | While of term * anf * anf
-  | Set of string * atom * anf
-  | Continue
+  | Loop of (string * atom) list * anf
+  | Continue of atom list
 
 and anf =
   { desc : anf_desc
@@ -62,11 +61,10 @@ and sexp_of_anf_desc = function
   | Let (v, bind, body) ->
     List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_anf body ]
   | Return t -> List [ Atom "return"; sexp_of_term t ]
-  | While (cond, body, after) ->
-    List [ Atom "while"; sexp_of_term cond; sexp_of_anf body; sexp_of_anf after ]
-  | Set (v, bind, body) ->
-    List [ Atom "set"; Atom v; sexp_of_atom bind; sexp_of_anf body ]
-  | Continue -> Atom "continue"
+  | Loop (params, body) ->
+    let sexp_of_param (n, init) = List [ Atom n; sexp_of_atom init ] in
+    List [ Atom "loop"; List (List.map params ~f:sexp_of_param); sexp_of_anf body ]
+  | Continue args -> List (Atom "continue" :: List.map args ~f:sexp_of_atom)
 
 and sexp_of_anf t = sexp_of_anf_desc t.desc
 
@@ -150,9 +148,7 @@ let contains_call (t : Anf.term) (v : string) : bool =
   contains_call_term t
 ;;
 
-let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : string list)
-  : anf
-  =
+let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) : anf =
   let rec patch (anf : Anf.anf) : anf =
     let atom (desc : atom_desc) = ({ desc; ty = anf.ty; loc = anf.loc } : atom) in
     let pure desc : anf = { desc; ty = anf.ty; loc = anf.loc } in
@@ -168,32 +164,19 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) (args : strin
       pure (Return { desc = Match (scrutinee, cases); ty; loc })
     | Return { desc = App (f, xs); ty = _; loc } when String.equal f name ->
       let tmp = Utils.fresh "_iter_inc" in
-      let inc_iter_continue =
-        let iter_inc : term =
-          let int_atom desc : atom = { desc; ty = TyInt; loc } in
-          { desc = Bop (Add, int_atom (Var iter), int_atom (Int 1)); ty = TyInt; loc }
-        in
-        let continue = pure Continue in
-        let set_iter_to_tmp = pure (Set (iter, atom (Var tmp), continue)) in
-        pure (Let (tmp, iter_inc, set_iter_to_tmp))
+      let iter_inc : term =
+        let int_atom desc : atom = { desc; ty = TyInt; loc } in
+        { desc = Bop (Add, int_atom (Var iter), int_atom (Int 1)); ty = TyInt; loc }
       in
-      let tail =
-        List.fold_right2 args xs ~init:inc_iter_continue ~f:(fun name arg tail ->
-          match arg.desc with
-          | Var v when String.equal v name -> tail
-          | _ -> pure (Set (name, arg, tail)))
-      in
-      (match tail with
-       | Ok res -> res
-       | Unequal_lengths ->
-         raise "args and xs don't match" ~loc ~d:[%message (args : string list)])
+      let cont_args = atom (Var tmp) :: xs in
+      let continue = pure (Continue cont_args) in
+      pure (Let (tmp, iter_inc, continue))
     | Return tail -> pure (Return (of_term tail))
   in
   patch anf
 ;;
 
 let remove_rec_top (top : Anf.top) : top =
-  let atom desc : atom = { desc; ty = top.ty; loc = top.loc } in
   let pure desc = { desc; ty = top.ty; loc = top.loc } in
   match top.desc with
   | Const (v, anf) -> pure (Const (v, of_anf anf))
@@ -206,27 +189,31 @@ let remove_rec_top (top : Anf.top) : top =
   | Define { name; recur = Rec limit; args; body; ret_ty } ->
     let loc = body.loc in
     let iter = Utils.fresh "_iter" in
-    let while_cond : term =
-      let int_atom desc : atom = { desc; ty = TyInt; loc } in
+    let int_atom desc : atom = { desc; ty = TyInt; loc } in
+    let cond : term =
       { desc = Bop (Lt, int_atom (Var iter), int_atom (Int limit)); ty = TyBool; loc }
     in
-    let while_body = patch_tail_anf body name iter (List.map ~f:fst args) in
-    let while_after =
-      let ty = ret_ty in
-      let loc = body.loc in
-      let atom desc = ({ desc; ty; loc } : atom) in
-      let make desc = ({ desc; ty; loc } : term) in
-      let term = make (Atom (atom Temp)) in
-      ({ desc = Return term; ty; loc } : anf)
+    let cond_v = Utils.fresh "_lim_cond" in
+    let bool_atom desc : atom = { desc; ty = TyBool; loc } in
+    let placeholder : anf =
+      let temp : atom = { desc = Temp; ty = ret_ty; loc } in
+      let term : term = { desc = Atom temp; ty = ret_ty; loc } in
+      { desc = Return term; ty = ret_ty; loc }
     in
-    let while_anf : anf =
-      { desc = While (while_cond, while_body, while_after); ty = top.ty; loc }
+    let body = patch_tail_anf body name iter in
+    let guard : anf =
+      let if_desc = If (bool_atom (Var cond_v), body, placeholder) in
+      let if_term : term = { desc = if_desc; ty = ret_ty; loc } in
+      let return_if : anf = { desc = Return if_term; ty = ret_ty; loc } in
+      { desc = Let (cond_v, cond, return_if); ty = ret_ty; loc }
     in
-    let body : anf =
-      let zero : term = { desc = Atom (atom (Int 0)); ty = TyInt; loc } in
-      { desc = Let (iter, zero, while_anf); ty = top.ty; loc }
+    let params =
+      (iter, int_atom (Int 0))
+      :: List.map args ~f:(fun (n, ty) ->
+        n, ({ desc = (Var n : atom_desc); ty; loc } : atom))
     in
-    pure (Define { name; args; body; ret_ty })
+    let loop : anf = { desc = Loop (params, guard); ty = top.ty; loc } in
+    pure (Define { name; args; body = loop; ret_ty })
 ;;
 
 let remove_rec (Program tops : Anf.t) : t Compiler_error.t =

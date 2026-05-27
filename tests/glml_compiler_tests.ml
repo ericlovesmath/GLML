@@ -310,21 +310,25 @@ let%expect_test "recursive functions" =
     out vec4 fragColor;
     int fact(int n, int acc) {
         int _iter = 0;
-        while ((_iter < 1000)) {
-            bool anf = (n == 0);
-            if (anf) {
-                return acc;
+        while (true) {
+            bool _lim_cond = (_iter < 1000);
+            if (_lim_cond) {
+                bool anf = (n == 0);
+                if (anf) {
+                    return acc;
+                } else {
+                    int anf_0 = (n - 1);
+                    int anf_1 = (acc * n);
+                    int _iter_inc = (_iter + 1);
+                    _iter = _iter_inc;
+                    n = anf_0;
+                    acc = anf_1;
+                    continue;
+                }
             } else {
-                int anf_0 = (n - 1);
-                int anf_1 = (acc * n);
-                n = anf_0;
-                acc = anf_1;
-                int _iter_inc = (_iter + 1);
-                _iter = _iter_inc;
-                continue;
+                return 0;
             }
         }
-        return 0;
     }
     vec3 main_pure(vec2 u) {
         int num = fact(5, 1);

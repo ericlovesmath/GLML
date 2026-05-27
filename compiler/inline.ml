@@ -40,10 +40,16 @@ let instantiate ~formals ~actuals ~body =
         let env = bind env v in
         let subst = Map.remove subst v in
         Placeholder (lookup env v, on_anf subst env k)
-      | While (c, b, tl) ->
-        While (on_term subst env c, on_anf subst env b, on_anf subst env tl)
-      | Set (v, x, tl) -> Set (lookup env v, on_atom ~subst ~env x, on_anf subst env tl)
-      | Continue -> Continue
+      | Loop (params, body) ->
+        let inits = List.map params ~f:(fun (n, init) -> n, on_atom ~subst ~env init) in
+        let env, subst, rev_params =
+          List.fold inits ~init:(env, subst, []) ~f:(fun (env, subst, acc) (n, init) ->
+            let env = bind env n in
+            let subst = Map.remove subst n in
+            env, subst, (lookup env n, init) :: acc)
+        in
+        Loop (List.rev rev_params, on_anf subst env body)
+      | Continue args -> Continue (List.map args ~f:(on_atom ~subst ~env))
     in
     { a with desc }
   and on_term subst env (t : term) =
@@ -72,11 +78,10 @@ let instantiate ~formals ~actuals ~body =
 let rec size_anf (a : anf) =
   match a.desc with
   | Return t -> size_term t
-  | Continue -> 0
+  | Continue _ -> 0
   | Let (_, b, tl) -> 1 + size_term b + size_anf tl
   | Placeholder (_, tl) -> size_anf tl
-  | While (_, b, tl) -> 1 + size_anf b + size_anf tl
-  | Set (_, _, tl) -> 1 + size_anf tl
+  | Loop (_, body) -> 1 + size_anf body
 
 and size_term (t : term) =
   match t.desc with
@@ -86,20 +91,19 @@ and size_term (t : term) =
   | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Field _ -> 1
 ;;
 
-(* TODO: Fix [While] inlining, currently just not inlining them *)
-let rec has_while_anf (a : anf) =
+(** Does [a] contain a [Loop] *)
+let rec has_loop_anf (a : anf) =
   match a.desc with
-  | While _ -> true
-  | Return t -> has_while_term t
-  | Let (_, t, k) -> has_while_term t || has_while_anf k
-  | Placeholder (_, k) -> has_while_anf k
-  | Set (_, _, k) -> has_while_anf k
-  | Continue -> false
+  | Loop _ -> true
+  | Return t -> has_loop_term t
+  | Let (_, t, k) -> has_loop_term t || has_loop_anf k
+  | Placeholder (_, k) -> has_loop_anf k
+  | Continue _ -> false
 
-and has_while_term (t : term) =
+and has_loop_term (t : term) =
   match t.desc with
-  | If (_, th, el) -> has_while_anf th || has_while_anf el
-  | Switch (_, cs) -> List.exists cs ~f:(fun (_, b) -> has_while_anf b)
+  | If (_, th, el) -> has_loop_anf th || has_loop_anf el
+  | Switch (_, cs) -> List.exists cs ~f:(fun (_, b) -> has_loop_anf b)
   | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Field _ -> false
 ;;
 
@@ -107,11 +111,10 @@ let count_call_sites (tops : top list) : int String.Map.t =
   let rec on_anf (a : anf) acc =
     match a.desc with
     | Return t -> on_term t acc
-    | Continue -> acc
+    | Continue _ -> acc
     | Let (_, t, tl) -> acc |> on_term t |> on_anf tl
     | Placeholder (_, tl) -> on_anf tl acc
-    | While (c, b, tl) -> acc |> on_term c |> on_anf b |> on_anf tl
-    | Set (_, _, tl) -> on_anf tl acc
+    | Loop (_, body) -> on_anf body acc
   and on_term (t : term) acc =
     match t.desc with
     | App (f, _) ->
@@ -130,7 +133,7 @@ let count_call_sites (tops : top list) : int String.Map.t =
 
 (** Does [body] read any formal via [Field _] or [Switch(Field _, _)]?
     This is used for [case-of-known-constructor] *)
-let projects_formal (formals : (string * Lower_tuples.ty) list) (body : anf) : bool =
+let projects_formal (formals : (string * Lower_variants.ty) list) (body : anf) : bool =
   let formals = String.Set.of_list (List.map formals ~f:fst) in
   let is_formal (a : atom) =
     match a.desc with
@@ -140,11 +143,10 @@ let projects_formal (formals : (string * Lower_tuples.ty) list) (body : anf) : b
   let rec on_anf (a : anf) =
     match a.desc with
     | Return t -> on_term t
-    | Continue -> false
+    | Continue _ -> false
     | Let (_, t, k) -> on_term t || on_anf k
     | Placeholder (_, k) -> on_anf k
-    | While (c, b, tl) -> on_term c || on_anf b || on_anf tl
-    | Set (_, _, k) -> on_anf k
+    | Loop (_, body) -> on_anf body
   and on_term (t : term) =
     match t.desc with
     | Field (a, _) -> is_formal a
@@ -162,7 +164,7 @@ type guard =
   | On_record_actual (* Only inline when actual argument is a literal record *)
 
 type entry =
-  { formals : (string * Lower_tuples.ty) list
+  { formals : (string * Lower_variants.ty) list
   ; body : anf
   ; guard : guard
   }
@@ -172,7 +174,7 @@ let collect_entries (tops : top list) : entry String.Map.t =
   let call_count n = Map.find counts n |> Option.value ~default:0 in
   List.fold tops ~init:String.Map.empty ~f:(fun acc top ->
     match top.desc with
-    | Define { name; args; body; _ } when not (has_while_anf body) ->
+    | Define { name; args; body; _ } when not (has_loop_anf body) ->
       let guard =
         if size_anf body <= 3 || call_count name = 1
         then Some Unconditional
@@ -194,12 +196,12 @@ let collect_record_const_names (tops : top list) : String.Set.t =
       (match t.desc with
        | Record _ -> true
        | _ -> false)
-    | Let (_, _, tl) | Placeholder (_, tl) | Set (_, _, tl) -> returns_record tl
-    | While _ | Continue -> false
+    | Let (_, _, tl) | Placeholder (_, tl) -> returns_record tl
+    | Loop _ | Continue _ -> false
   in
   List.fold tops ~init:String.Set.empty ~f:(fun acc top ->
     match top.desc with
-    | Const (name, body) when (not (has_while_anf body)) && returns_record body ->
+    | Const (name, body) when (not (has_loop_anf body)) && returns_record body ->
       Set.add acc name
     | Define _ | Const _ | Extern _ | TypeDef _ -> acc)
 ;;
@@ -212,9 +214,8 @@ let rec splice ~v ~tl (t : anf) =
     | Return t -> Let (v, t, tl)
     | Let (v', b, t) -> Let (v', b, splice ~v ~tl t)
     | Placeholder (v', t) -> Placeholder (v', splice ~v ~tl t)
-    | While (c, b, t) -> While (c, b, splice ~v ~tl t)
-    | Set (v', x, t) -> Set (v', x, splice ~v ~tl t)
-    | Continue -> Continue
+    | Loop _ -> t.desc
+    | Continue _ -> t.desc
   in
   { t with desc; ty = tl.ty }
 ;;
@@ -252,7 +253,7 @@ let try_inline entries records (t : term) : anf option =
 let rec rewrite_anf entries records (a : anf) : anf =
   let go = rewrite_anf entries records in
   match a.desc with
-  | Continue -> a
+  | Continue _ -> a
   | Return t ->
     (match try_inline entries records t with
      | Some body -> go body
@@ -263,9 +264,7 @@ let rec rewrite_anf entries records (a : anf) : anf =
      | Some body -> go (splice ~v ~tl body)
      | None -> { a with desc = Let (v, rewrite_term entries records t, tl) })
   | Placeholder (v, k) -> { a with desc = Placeholder (v, go k) }
-  | While (c, b, tl) ->
-    { a with desc = While (rewrite_term entries records c, go b, go tl) }
-  | Set (v, x, k) -> { a with desc = Set (v, x, go k) }
+  | Loop (params, body) -> { a with desc = Loop (params, go body) }
 
 and rewrite_term entries records (t : term) : term =
   let go = rewrite_anf entries records in
@@ -295,9 +294,8 @@ let inline (tops : top list) : top list =
 let rec returns_record (a : anf) : bool =
   match a.desc with
   | Return t -> term_returns_record t
-  | Let (_, _, tl) | Placeholder (_, tl) | Set (_, _, tl) | While (_, _, tl) ->
-    returns_record tl
-  | Continue -> false
+  | Let (_, _, tl) | Placeholder (_, tl) -> returns_record tl
+  | Loop _ | Continue _ -> false
 
 and term_returns_record (t : term) : bool =
   match t.desc with
@@ -326,9 +324,8 @@ let rec expose_anf (a : anf) : anf =
        | _ -> Let (v, scrut, k))
     | Return t -> Return (expose_term t)
     | Placeholder (v, k) -> Placeholder (v, expose_anf k)
-    | While (c, b, tl) -> While (expose_term c, expose_anf b, expose_anf tl)
-    | Set (v, x, k) -> Set (v, x, expose_anf k)
-    | Continue -> Continue
+    | Loop (params, body) -> Loop (params, expose_anf body)
+    | Continue args -> Continue args
   in
   { a with desc }
 
