@@ -447,6 +447,8 @@ let rec ty_of (t : Type_system.ty) : ty =
   | TyFloat -> TyFloat
   | TyInt -> TyInt
   | TyBool -> TyBool
+  (* GLSL has no ivec usable as float, so we promote vec int to vec float here *)
+  | TyVec (n, TyInt) -> TyVec (n, TyFloat)
   | TyVec (n, t) -> TyVec (n, ty_of t)
   | TyRecord (n, _) -> TyRecord n
   | TyVariant (n, _) -> TyVariant n
@@ -532,59 +534,6 @@ let top_of_tc (t : Typecheck.top) : top =
       TypeDef (name, VariantDecl ctors)
   in
   { desc; ty; loc = t.loc }
-;;
-
-(* GLSL has no ivec, so any [TyVe c(_, TyInt)] annotation that survived monomorphization
-   has to be rewritten by the previous pass, this just makes the type annotations agree.
-
-   TODO: This is here because is must run after specialization is complete since doing it
-   earlier would mess with the [TyVar] case but I probably want to move it to the previous pass... *)
-let promote_int_vecs : t -> t =
-  let rec promote_ty = function
-    | TyVec (n, TyInt) -> TyVec (n, TyFloat)
-    | TyVec (n, inner) -> TyVec (n, promote_ty inner)
-    | TyArrow (a, b) -> TyArrow (promote_ty a, promote_ty b)
-    | TyTuple ts -> TyTuple (List.map ts ~f:promote_ty)
-    | (TyFloat | TyInt | TyBool | TyRecord _ | TyVariant _) as ty -> ty
-  in
-  let rec promote_term (t : term) : term =
-    let ty = promote_ty t.ty in
-    let desc =
-      match t.desc with
-      | Var _ | Float _ | Int _ | Bool _ -> t.desc
-      | Vec (n, ts) -> Vec (n, List.map ts ~f:promote_term)
-      | Lam (v, body) -> Lam (v, promote_term body)
-      | App (f, x) -> App (promote_term f, promote_term x)
-      | Let (recur, v, bind, body) -> Let (recur, v, promote_term bind, promote_term body)
-      | If (c, tt, e) -> If (promote_term c, promote_term tt, promote_term e)
-      | Bop (op, l, r) -> Bop (op, promote_term l, promote_term r)
-      | Index (inner, i) -> Index (promote_term inner, i)
-      | Builtin (b, ts) -> Builtin (b, List.map ts ~f:promote_term)
-      | Record ts -> Record (List.map ts ~f:promote_term)
-      | Field (inner, f) -> Field (promote_term inner, f)
-      | Variant (ctor, args) -> Variant (ctor, List.map args ~f:promote_term)
-      | Match (scrut, cases) ->
-        Match (promote_term scrut, List.map cases ~f:(Tuple2.map_snd ~f:promote_term))
-      | Tuple ts -> Tuple (List.map ts ~f:promote_term)
-    in
-    { t with desc; ty }
-  in
-  let promote_top (top : top) : top =
-    let ty = promote_ty top.ty in
-    let desc =
-      match top.desc with
-      | Define (recur, v, bind) -> Define (recur, v, promote_term bind)
-      | Extern _ -> top.desc
-      | TypeDef (name, RecordDecl fields) ->
-        let fields = List.map fields ~f:(fun (f, ty) -> f, promote_ty ty) in
-        TypeDef (name, RecordDecl fields)
-      | TypeDef (name, VariantDecl ctors) ->
-        let ctors = List.map ctors ~f:(fun (c, tys) -> c, List.map tys ~f:promote_ty) in
-        TypeDef (name, VariantDecl ctors)
-    in
-    { top with desc; ty }
-  in
-  fun (Program tops) -> Program (List.map tops ~f:promote_top)
 ;;
 
 (** Walk the value tops, assign a fresh name to each unique concrete
@@ -760,7 +709,7 @@ let monomorphize_exn (program : Typecheck.t) : t =
   (* Every concrete TyRecord/TyVariant in the program gets a fresh, hint-derived name *)
   let all_tops_tc = assign_names ~typedef_loc final_value_tops in
   let tops = List.map all_tops_tc ~f:top_of_tc in
-  promote_int_vecs (Program tops)
+  Program tops
 ;;
 
 let monomorphize t = try_with (fun () -> monomorphize_exn t)
