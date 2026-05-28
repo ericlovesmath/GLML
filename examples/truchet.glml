@@ -1,0 +1,40 @@
+#extern vec2 u_resolution
+#extern float u_time
+
+type tile = ArcL | ArcR | Cross | Dot
+
+let hash p = #fract (#sin (#dot p [127.1, 311.7]) * 43758.5)
+
+let pick (i : vec2) : tile =
+  let h = hash (i + #floor u_time) in
+  if      h < 0.32 then ArcL
+  else if h < 0.64 then ArcR
+  else if h < 0.88 then Cross
+  else                  Dot
+
+let sdf (t : tile) (f : vec2) =
+  let arc center = #abs (#length (f - center) - 0.5) in
+  match t with
+  | ArcL  -> #min (arc [-0.5, -0.5]) (arc [ 0.5,  0.5])
+  | ArcR  -> #min (arc [ 0.5, -0.5]) (arc [-0.5,  0.5])
+  | Cross -> #min (#abs f.0) (#abs f.1)
+  | Dot   -> #abs (#length f - 0.3)
+
+let main (coord : vec2) =
+  let res   = #min u_resolution.0 u_resolution.1 in
+  let scale = 12.0 in
+  let uv    = (coord - u_resolution * 0.5) / res * scale in
+
+  let i = #floor uv in
+  let f = uv - i - 0.5 in
+
+  // Anti-aliased lines
+  let width = 0.05 in
+  let dist  = sdf (pick i) f in
+  let line  = 1 - #smoothstep width (width + scale / res) dist in
+
+  // Per-cell cosine palette
+  let pal = #cos (([0.1, 0.4, 0.7] + hash i) * 6.283) * 0.5 + 0.5 in
+  let bg  = [0.05, 0.06, 0.1] in
+
+  #mix bg pal line
