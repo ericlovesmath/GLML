@@ -476,45 +476,6 @@ let%expect_test "compile examples" =
     }
 
 
-    ====== COMPILING EXAMPLE checkerboard.glml ======
-
-    #version 300 es
-    precision highp float;
-    out vec4 fragColor;
-    uniform vec2 u_resolution;
-    uniform float u_time;
-    vec3 main_pure(vec2 coord_0) {
-        vec2 anf_13 = (2. * coord_0);
-        vec2 top_0 = (anf_13 - u_resolution);
-        float anf_0_0 = u_resolution[0];
-        float anf_1_0 = u_resolution[1];
-        float bot_0 = min(anf_0_0, anf_1_0);
-        vec2 uv = (top_0 / bot_0);
-        vec2 anf_3 = (uv * 5.);
-        float anf_4 = (2. * u_time);
-        vec2 anf_5 = vec2(anf_4, 0.);
-        vec2 anf_6 = (anf_3 + anf_5);
-        vec2 c = floor(anf_6);
-        float anf_7 = c[0];
-        float anf_8 = c[1];
-        float checker_sum = (anf_7 + anf_8);
-        float anf_9 = (checker_sum / 2.);
-        float anf_10 = floor(anf_9);
-        float anf_11 = (anf_10 * 2.);
-        float is_even = (checker_sum - anf_11);
-        bool anf_12 = (is_even < 0.5);
-        if (anf_12) {
-            return vec3(0.2, 0.2, 0.2);
-        } else {
-            return vec3(0.8, 0.8, 0.8);
-        }
-    }
-    void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
-    }
-
-
     ====== COMPILING EXAMPLE mandelbrot.glml ======
 
     #version 300 es
@@ -614,35 +575,217 @@ let%expect_test "compile examples" =
     }
 
 
-    ====== COMPILING EXAMPLE mouse_circle.glml ======
+    ====== COMPILING EXAMPLE materials.glml ======
 
     #version 300 es
     precision highp float;
     out vec4 fragColor;
+    float d_sphere(vec3 p_2) {
+        vec3 anf = vec3(0., 1., 0.);
+        vec3 anf_0 = (p_2 - anf);
+        float anf_1 = length(anf_0);
+        return (anf_1 - 1.);
+    }
+    vec2 rot2(float a, vec2 v_0) {
+        float s = sin(a);
+        float c = cos(a);
+        float anf_17 = v_0[0];
+        float anf_18 = (anf_17 * c);
+        float anf_19 = v_0[1];
+        float anf_20 = (anf_19 * s);
+        float anf_21 = (anf_18 - anf_20);
+        float anf_22 = v_0[0];
+        float anf_23 = (anf_22 * s);
+        float anf_24 = v_0[1];
+        float anf_25 = (anf_24 * c);
+        float anf_26 = (anf_23 + anf_25);
+        return vec2(anf_21, anf_26);
+    }
+    float scene(vec3 p_4) {
+        float anf_40 = d_sphere(p_4);
+        float anf_41 = p_4[1];
+        return min(anf_40, anf_41);
+    }
+    float step_0(vec3 rd, vec3 ro, float t, int i) {
+        int _iter = 0;
+        while (true) {
+            bool _lim_cond = (_iter < 1000);
+            if (_lim_cond) {
+                bool anf_69 = (i > 64);
+                if (anf_69) {
+                    return t;
+                } else {
+                    vec3 anf_70 = (rd * t);
+                    vec3 anf_71 = (ro + anf_70);
+                    float d = scene(anf_71);
+                    bool anf_72 = (d < 0.001);
+                    if (anf_72) {
+                        return t;
+                    } else {
+                        bool anf_74 = (t > 20.);
+                        if (anf_74) {
+                            return 20.;
+                        } else {
+                            float anf_75 = (t + d);
+                            int anf_76 = (i + 1);
+                            int _iter_inc = (_iter + 1);
+                            _iter = _iter_inc;
+                            t = anf_75;
+                            i = anf_76;
+                            continue;
+                        }
+                    }
+                }
+            } else {
+                return 0.;
+            }
+        }
+    }
     uniform vec2 u_mouse;
     uniform vec2 u_resolution;
+    vec2 get_uv(vec2 coord) {
+        vec2 anf_77 = (2. * coord);
+        vec2 anf_78 = (anf_77 - u_resolution);
+        float anf_79 = u_resolution[0];
+        float anf_80 = u_resolution[1];
+        float anf_81 = min(anf_79, anf_80);
+        return (anf_78 / anf_81);
+    }
     uniform float u_time;
     vec3 main_pure(vec2 coord_0) {
-        vec2 anf_10 = (2. * coord_0);
-        vec2 top_0 = (anf_10 - u_resolution);
-        float anf_0_0 = u_resolution[0];
-        float anf_1_0 = u_resolution[1];
-        float bot_0 = min(anf_0_0, anf_1_0);
-        vec2 uv = (top_0 / bot_0);
-        vec2 anf_2 = (2. * u_mouse);
-        vec2 anf_3 = (anf_2 - u_resolution);
-        float anf_4 = u_resolution[1];
-        vec2 mouseUV = (anf_3 / anf_4);
-        float anf_5 = (u_time * 2.);
-        float anf_6 = sin(anf_5);
-        float anf_7 = (anf_6 * 0.1);
-        float radius = (anf_7 + 0.15);
-        float anf_8 = distance(uv, mouseUV);
-        bool anf_9 = (anf_8 < radius);
-        if (anf_9) {
-            return vec3(0., 0., 0.5);
+        vec2 uv = get_uv(coord_0);
+        vec2 mouse = get_uv(u_mouse);
+        float anf_105 = mouse[0];
+        float yaw = (anf_105 * -3.1415);
+        float anf_106 = mouse[1];
+        float anf_107 = (anf_106 + 0.5);
+        float anf_108 = min(1.4, anf_107);
+        float pitch = max(0.1, anf_108);
+        vec2 anf_35_2 = vec2(0., -4.);
+        vec2 r_3 = rot2(pitch, anf_35_2);
+        float anf_37_2 = r_3[0];
+        float anf_38_2 = r_3[1];
+        vec2 anf_29_2 = vec2(0., anf_38_2);
+        vec2 r_0_2 = rot2(yaw, anf_29_2);
+        float anf_30_2 = r_0_2[0];
+        float anf_32_2 = r_0_2[1];
+        vec3 ro_0 = vec3(anf_30_2, anf_37_2, anf_32_2);
+        float anf_110 = uv[0];
+        float anf_111 = uv[1];
+        vec2 anf_35_1 = vec2(anf_111, 1.);
+        vec2 r_2 = rot2(pitch, anf_35_1);
+        float anf_37_1 = r_2[0];
+        float anf_38_1 = r_2[1];
+        vec2 anf_29_1 = vec2(anf_110, anf_38_1);
+        vec2 r_0_1 = rot2(yaw, anf_29_1);
+        float anf_30_1 = r_0_1[0];
+        float anf_32_1 = r_0_1[1];
+        vec3 anf_113 = vec3(anf_30_1, anf_37_1, anf_32_1);
+        float anf_16_6 = length(anf_113);
+        vec3 rd_0 = (anf_113 / anf_16_6);
+        float t_0 = step_0(rd_0, ro_0, 0., 0);
+        bool anf_115 = (t_0 >= 20.);
+        if (anf_115) {
+            return vec3(0.05, 0.05, 0.08);
         } else {
-            return vec3(0.5, 0.5, 1.);
+            vec3 anf_116 = (rd_0 * t_0);
+            vec3 p_8 = (ro_0 + anf_116);
+            vec3 anf_42_0 = vec3(0.001, 0., 0.);
+            vec3 anf_43_0 = (p_8 + anf_42_0);
+            float anf_44_0 = scene(anf_43_0);
+            vec3 anf_45_0 = vec3(0.001, 0., 0.);
+            vec3 anf_46_0 = (p_8 - anf_45_0);
+            float anf_47_0 = scene(anf_46_0);
+            float nx_0 = (anf_44_0 - anf_47_0);
+            vec3 anf_48_0 = vec3(0., 0.001, 0.);
+            vec3 anf_49_0 = (p_8 + anf_48_0);
+            float anf_50_0 = scene(anf_49_0);
+            vec3 anf_51_0 = vec3(0., 0.001, 0.);
+            vec3 anf_52_0 = (p_8 - anf_51_0);
+            float anf_53_0 = scene(anf_52_0);
+            float ny_0 = (anf_50_0 - anf_53_0);
+            vec3 anf_54_0 = vec3(0., 0., 0.001);
+            vec3 anf_55_0 = (p_8 + anf_54_0);
+            float anf_56_0 = scene(anf_55_0);
+            vec3 anf_57_0 = vec3(0., 0., 0.001);
+            vec3 anf_58_0 = (p_8 - anf_57_0);
+            float anf_59_0 = scene(anf_58_0);
+            float nz_0 = (anf_56_0 - anf_59_0);
+            vec3 anf_60_0 = vec3(nx_0, ny_0, nz_0);
+            float anf_16_5 = length(anf_60_0);
+            vec3 n_1 = (anf_60_0 / anf_16_5);
+            float anf_117 = sin(u_time);
+            float anf_118 = (2. * anf_117);
+            float anf_119 = cos(u_time);
+            float anf_120 = (2. * anf_119);
+            vec3 light = vec3(anf_118, 4., anf_120);
+            vec3 anf_121 = (light - p_8);
+            float anf_16_4 = length(anf_121);
+            vec3 l_0 = (anf_121 / anf_16_4);
+            vec3 anf_122 = (ro_0 - p_8);
+            float anf_16_3 = length(anf_122);
+            vec3 v_5 = (anf_122 / anf_16_3);
+            float anf_61_0 = d_sphere(p_8);
+            float anf_62_0 = p_8[1];
+            bool anf_63_0 = (anf_61_0 < anf_62_0);
+            if (anf_63_0) {
+                vec3 anf_64_0 = vec3(1., 0.2, 0.5);
+                vec3 anf_65_0 = vec3(0.1, 0., 0.2);
+                float anf_96_0 = dot(n_1, l_0);
+                float diff_0 = max(anf_96_0, 0.);
+                vec3 anf_98_0 = (l_0 + v_5);
+                float anf_16_2 = length(anf_98_0);
+                vec3 h_0 = (anf_98_0 / anf_16_2);
+                float anf_99_0 = dot(n_1, h_0);
+                float anf_100_0 = max(anf_99_0, 0.);
+                float spec_0 = pow(anf_100_0, 64.);
+                vec3 anf_90_0_3 = vec3(12.9898, 78.233, 37.719);
+                float anf_91_0_3 = dot(p_8, anf_90_0_3);
+                float anf_92_0_3 = sin(anf_91_0_3);
+                float anf_93_0_3 = (anf_92_0_3 * 43758.5453);
+                float n_2_3 = fract(anf_93_0_3);
+                vec3 anf_82_2_3 = (p_8 * 10.);
+                float anf_83_2_3 = (u_time * 3.);
+                vec3 anf_84_2_3 = (anf_82_2_3 + anf_83_2_3);
+                vec3 w_2_3 = sin(anf_84_2_3);
+                float anf_85_2_3 = w_2_3[0];
+                float anf_86_2_3 = w_2_3[2];
+                float anf_87_2_3 = (anf_85_2_3 * anf_86_2_3);
+                float anf_88_2_3 = (anf_87_2_3 + 1.);
+                float anf_89_2_3 = (anf_88_2_3 * 0.5);
+                vec3 anf_94_0_3 = mix(anf_64_0, anf_65_0, anf_89_2_3);
+                vec3 anf_95_0_3 = vec3(n_2_3, n_2_3, n_2_3);
+                vec3 anf_101_0 = mix(anf_94_0_3, anf_95_0_3, 0.15);
+                vec3 anf_102_0 = (anf_101_0 * diff_0);
+                vec3 col = (anf_102_0 + spec_0);
+                vec3 anf_124 = vec3(0.4545, 0.4545, 0.4545);
+                return pow(col, anf_124);
+            } else {
+                float anf_96_0 = dot(n_1, l_0);
+                float diff_0 = max(anf_96_0, 0.);
+                float anf_4_0_0 = p_8[0];
+                float anf_5_0_0 = (anf_4_0_0 * 2.);
+                float anf_6_0_0 = floor(anf_5_0_0);
+                float anf_7_0_0 = p_8[1];
+                float anf_8_0_0 = (anf_7_0_0 * 2.);
+                float anf_9_0_0 = floor(anf_8_0_0);
+                float anf_10_0_0 = (anf_6_0_0 + anf_9_0_0);
+                float anf_11_0_0 = p_8[2];
+                float anf_12_0_0 = (anf_11_0_0 * 2.);
+                float anf_13_0_0 = floor(anf_12_0_0);
+                float f_0_0 = (anf_10_0_0 + anf_13_0_0);
+                float anf_14_0_0 = mod(f_0_0, 2.);
+                bool anf_15_0_0 = (anf_14_0_0 < 1.);
+                vec3 anf_97_0;
+                if (anf_15_0_0) {
+                    anf_97_0 = vec3(0.1, 0.1, 0.1);
+                } else {
+                    anf_97_0 = vec3(0.9, 0.9, 0.9);
+                }
+                vec3 col = (anf_97_0 * diff_0);
+                vec3 anf_124 = vec3(0.4545, 0.4545, 0.4545);
+                return pow(col, anf_124);
+            }
         }
     }
     void main() {
@@ -950,37 +1093,6 @@ let%expect_test "compile examples" =
     }
 
 
-    ====== COMPILING EXAMPLE rainbow.glml ======
-
-    #version 300 es
-    precision highp float;
-    out vec4 fragColor;
-    uniform vec2 u_resolution;
-    uniform float u_time;
-    vec3 main_pure(vec2 coord_0) {
-        vec2 anf_10 = (2. * coord_0);
-        vec2 top_0 = (anf_10 - u_resolution);
-        float anf_0_0 = u_resolution[0];
-        float anf_1_0 = u_resolution[1];
-        float bot_0 = min(anf_0_0, anf_1_0);
-        vec2 uv = (top_0 / bot_0);
-        float anf_2 = uv[0];
-        float anf_3 = uv[1];
-        float anf_4 = (anf_2 + anf_3);
-        float anf_5 = (5. * anf_4);
-        float wave = (anf_5 + u_time);
-        vec3 anf_6 = vec3(0., 2., 4.);
-        vec3 anf_7 = (wave + anf_6);
-        vec3 anf_8 = sin(anf_7);
-        vec3 anf_9 = (anf_8 * 0.3);
-        return (anf_9 + 0.7);
-    }
-    void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
-    }
-
-
     ====== COMPILING EXAMPLE raymarch.glml ======
 
     #version 300 es
@@ -1146,79 +1258,6 @@ let%expect_test "compile examples" =
         float anf_93 = length(anf_92);
         float glow = (0.02 / anf_93);
         return (col + glow);
-    }
-    void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
-    }
-
-
-    ====== COMPILING EXAMPLE recursion.glml ======
-
-    #version 300 es
-    precision highp float;
-    out vec4 fragColor;
-    float gcd_m(float a, float b) {
-        int _iter = 0;
-        while (true) {
-            bool _lim_cond = (_iter < 1000);
-            if (_lim_cond) {
-                bool anf = (a < 0.05);
-                if (anf) {
-                    return b;
-                } else {
-                    bool anf_0 = (b < 0.05);
-                    if (anf_0) {
-                        return a;
-                    } else {
-                        bool anf_1 = (a > b);
-                        if (anf_1) {
-                            float anf_2 = (a - b);
-                            int _iter_inc_0 = (_iter + 1);
-                            _iter = _iter_inc_0;
-                            a = anf_2;
-                            continue;
-                        } else {
-                            float anf_3 = (b - a);
-                            int _iter_inc = (_iter + 1);
-                            _iter = _iter_inc;
-                            b = anf_3;
-                            continue;
-                        }
-                    }
-                }
-            } else {
-                return 0.;
-            }
-        }
-    }
-    uniform vec2 u_resolution;
-    uniform float u_time;
-    vec3 main_pure(vec2 coord_0) {
-        float s_0 = sin(u_time);
-        float c_0 = cos(u_time);
-        float anf_4_0 = (-1. * s_0);
-        vec2 anf_5_0 = vec2(c_0, anf_4_0);
-        vec2 anf_6_0 = vec2(s_0, c_0);
-        mat2 anf_10 = mat2(anf_5_0, anf_6_0);
-        vec2 anf_7_0 = (2. * coord_0);
-        vec2 top_0 = (anf_7_0 - u_resolution);
-        float anf_8_0 = u_resolution[0];
-        float anf_9_0 = u_resolution[1];
-        float bot_0 = min(anf_8_0, anf_9_0);
-        vec2 anf_11 = (top_0 / bot_0);
-        vec2 uv = (anf_10 * anf_11);
-        float anf_12 = (u_time * 2.);
-        float anf_13 = sin(anf_12);
-        vec2 anf_14 = (uv * anf_13);
-        vec2 anf_15 = (anf_14 * 2.);
-        vec2 anf_16 = abs(anf_15);
-        float _lv_v0 = anf_16[0];
-        float _lv_v1 = anf_16[1];
-        float res = gcd_m(_lv_v0, _lv_v1);
-        float anf_17 = (res * 0.5);
-        float anf_18 = (1. - res);
-        return vec3(res, anf_17, anf_18);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);

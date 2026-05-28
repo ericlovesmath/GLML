@@ -1,0 +1,118 @@
+#extern vec2 u_resolution
+#extern vec2 u_mouse
+#extern float u_time
+
+type albedo_fn = vec3 -> vec3
+
+type material =
+  | Lambert of albedo_fn
+  | Phong of albedo_fn * float
+
+// --- Constants ---
+let max_steps = 64
+let max_dist  = 20
+let epsilon   = 0.001
+
+// --- Helpers ---
+let normalize (v : vec3) : vec3 = v / #length v
+
+let rot2 (a : float) (v : vec2) : vec2 =
+  let s = #sin a in
+  let c = #cos a in
+  [v.0 * c - v.1 * s, v.0 * s + v.1 * c]
+
+let rotate_yz (a : float) (v : vec3) : vec3 =
+  let r = rot2 a [v.1, v.2] in
+  [v.0, r.0, r.1]
+
+let rotate_xz (a : float) (v : vec3) : vec3 =
+  let r = rot2 a [v.0, v.2] in
+  [r.0, v.1, r.1]
+
+// --- Albedo closures ---
+
+let make_waves (c1 : vec3) (c2 : vec3) (freq : float) (speed : float) : albedo_fn =
+  fun p ->
+    let w = #sin (p * freq + u_time * speed) in
+    (w.0 * w.2 + 1) * 0.5 |> #mix c1 c2
+
+let add_noise (base_fn : albedo_fn) (strength : float) : albedo_fn =
+  fun p ->
+    let n = #fract (#sin (#dot p [12.9898, 78.233, 37.719]) * 43758.5453) in
+    #mix (base_fn p) [n, n, n] strength
+
+let checker_pattern (scale : float) : albedo_fn =
+  fun p ->
+    let f = #floor (p.0 * scale) + #floor (p.1 * scale) + #floor (p.2 * scale) in
+    if f % 2 < 1 then [0.1, 0.1, 0.1] else [0.9, 0.9, 0.9]
+
+// --- Geometry ---
+
+let d_sphere (p : vec3) : float = #length (p - [0, 1, 0]) - 1
+let d_floor  (p : vec3) : float = p.1
+
+let scene (p : vec3) : float = #min (d_sphere p) (d_floor p)
+
+let scene_mat (p : vec3) : material =
+  if d_sphere p < d_floor p then
+    Phong (add_noise (make_waves [1.0, 0.2, 0.5] [0.1, 0.0, 0.2] 10 3) 0.15, 64)
+  else
+    Lambert (checker_pattern 2)
+
+let eval_material (mat : material) (p : vec3) (n : vec3) (l : vec3) (v : vec3) : vec3 =
+  let diff = #max (#dot n l) 0 in
+  match mat with
+  | Lambert albedo -> albedo p * diff
+  | Phong (albedo, shininess) ->
+      let h    = normalize (l + v) in
+      let spec = #pow (#max (#dot n h) 0) shininess in
+      albedo p * diff + spec * [1, 1, 1]
+
+let calc_normal (p : vec3) : vec3 =
+  let e  = epsilon in
+  let nx = scene (p + [e, 0, 0]) - scene (p - [e, 0, 0]) in
+  let ny = scene (p + [0, e, 0]) - scene (p - [0, e, 0]) in
+  let nz = scene (p + [0, 0, e]) - scene (p - [0, 0, e]) in
+  normalize [nx, ny, nz]
+
+let march (ro : vec3) (rd : vec3) : float =
+  let rec step (t : float) (i : int) : float =
+    if i > max_steps then t
+    else
+      let d = scene (ro + rd * t) in
+      if d < epsilon then t
+      else if t > max_dist then max_dist
+      else step (t + d) (i + 1)
+  in
+  step 0 0
+
+// --- Camera ---
+let get_uv (coord : vec2) : vec2 =
+  (2 * coord - u_resolution) / (#min u_resolution.0 u_resolution.1)
+
+// --- Main ---
+let main (coord : vec2) : vec3 =
+  let uv    = get_uv coord in
+  let mouse = get_uv u_mouse in
+
+  let yaw   = mouse.0 * -3.1415 in
+  let pitch = #max 0.1 (#min 1.4 (mouse.1 + 0.5)) in
+
+  // Apply the same camera orientation to any direction/origin
+  let orient (v : vec3) : vec3 = v |> rotate_yz pitch |> rotate_xz yaw in
+
+  let ro = orient [0, 0, -4] in
+  let rd = normalize (orient [uv.0, uv.1, 1]) in
+
+  let t = march ro rd in
+
+  if t >= max_dist then
+    [0.05, 0.05, 0.08]
+  else
+    let p     = ro + rd * t in
+    let n     = calc_normal p in
+    let light = [2 * #sin u_time, 4.0, 2 * #cos u_time] in
+    let l     = normalize (light - p) in
+    let v     = normalize (ro - p) in
+    let col   = eval_material (scene_mat p) p n l v in
+    #pow col [0.4545, 0.4545, 0.4545]
