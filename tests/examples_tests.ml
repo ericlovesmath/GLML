@@ -109,8 +109,6 @@ let%expect_test "compile examples" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    const vec3 bg_col = vec3(0.13, 0.48, 0.3);
-    const vec3 bg_dark = vec3(0.09, 0.36, 0.22);
     const vec3 black = vec3(0.06, 0.04, 0.03);
     const vec3 brown = vec3(0.55, 0.34, 0.16);
     const vec3 brown_dk = vec3(0.38, 0.22, 0.08);
@@ -118,285 +116,359 @@ let%expect_test "compile examples" =
     const vec3 cream = vec3(0.95, 0.89, 0.74);
     const vec3 cream_dk = vec3(0.78, 0.68, 0.5);
     const vec3 drk_brown = vec3(0.22, 0.11, 0.03);
+    const vec3 grass_dk = vec3(0.34, 0.52, 0.22);
+    const vec3 grass_lt = vec3(0.62, 0.78, 0.4);
     float ellipse(vec2 ab, vec2 p_0) {
         vec2 anf = (p_0 / ab);
         float anf_0 = length(anf);
-        return (anf_0 - 1.);
+        float anf_1 = (anf_0 - 1.);
+        float anf_2 = ab[0];
+        float anf_3 = ab[1];
+        float anf_4 = min(anf_2, anf_3);
+        return (anf_1 * anf_4);
     }
     float box(vec2 b, vec2 p_2) {
-        vec2 anf_4 = abs(p_2);
-        vec2 d = (anf_4 - b);
-        vec2 anf_5 = vec2(0., 0.);
-        vec2 anf_6 = max(d, anf_5);
-        float anf_7 = length(anf_6);
-        float anf_8 = d[0];
-        float anf_9 = d[1];
-        float anf_10 = max(anf_8, anf_9);
-        float anf_11 = min(anf_10, 0.);
-        return (anf_7 + anf_11);
+        vec2 anf_10 = abs(p_2);
+        vec2 d = (anf_10 - b);
+        vec2 anf_11 = vec2(0., 0.);
+        vec2 anf_12 = max(d, anf_11);
+        float anf_13 = length(anf_12);
+        float anf_14 = d[0];
+        float anf_15 = d[1];
+        float anf_16 = max(anf_14, anf_15);
+        float anf_17 = min(anf_16, 0.);
+        return (anf_13 + anf_17);
     }
-    vec3 paint_shaded(float d_1, vec3 shape_col_0, vec3 shadow_col, float shadow_depth, vec3 bg_0) {
-        float anf_14 = smoothstep(-0.005, 0.005, d_1);
-        vec3 base = mix(shape_col_0, bg_0, anf_14);
-        float anf_15 = (-1. * shadow_depth);
-        float shade = smoothstep(anf_15, 0., d_1);
-        float anf_16 = (shade * 0.55);
-        vec3 anf_17 = mix(shape_col_0, shadow_col, anf_16);
-        float anf_18 = smoothstep(0.005, -0.005, d_1);
-        return mix(base, anf_17, anf_18);
+    vec3 paint_shaded(float d_2, vec3 shape_col_1, vec3 shadow_col, float shadow_depth, vec3 bg_1) {
+        float anf_18 = smoothstep(-0.0025, 0.0025, d_2);
+        vec3 base = mix(shape_col_1, bg_1, anf_18);
+        float anf_19 = (-1. * shadow_depth);
+        float shade = smoothstep(anf_19, 0., d_2);
+        float anf_20 = (shade * 0.55);
+        vec3 anf_21 = mix(shape_col_1, shadow_col, anf_20);
+        float anf_22 = smoothstep(0.0025, -0.0025, d_2);
+        return mix(base, anf_21, anf_22);
+    }
+    vec3 paint_w(float w, float d_0, vec3 shape_col, vec3 bg) {
+        float anf_23 = (-1. * w);
+        float anf_24 = smoothstep(anf_23, w, d_0);
+        return mix(shape_col, bg, anf_24);
     }
     const vec3 pink = vec3(0.92, 0.62, 0.6);
     vec2 rot(float a, vec2 p_3) {
         float c = cos(a);
         float s = sin(a);
-        float anf_19 = p_3[0];
-        float anf_20 = (c * anf_19);
-        float anf_21 = p_3[1];
-        float anf_22 = (s * anf_21);
-        float anf_23 = (anf_20 - anf_22);
-        float anf_24 = p_3[0];
-        float anf_25 = (s * anf_24);
-        float anf_26 = p_3[1];
-        float anf_27 = (c * anf_26);
-        float anf_28 = (anf_25 + anf_27);
-        return vec2(anf_23, anf_28);
+        float anf_25 = p_3[0];
+        float anf_26 = (c * anf_25);
+        float anf_27 = p_3[1];
+        float anf_28 = (s * anf_27);
+        float anf_29 = (anf_26 - anf_28);
+        float anf_30 = p_3[0];
+        float anf_31 = (s * anf_30);
+        float anf_32 = p_3[1];
+        float anf_33 = (c * anf_32);
+        float anf_34 = (anf_31 + anf_33);
+        return vec2(anf_29, anf_34);
     }
     float smin(float a_0, float b_0, float k) {
-        float anf_29 = (a_0 - b_0);
-        float anf_30 = abs(anf_29);
-        float anf_31 = (k - anf_30);
-        float anf_32 = max(anf_31, 0.);
-        float h = (anf_32 / k);
-        float anf_33 = min(a_0, b_0);
-        float anf_34 = (h * h);
-        float anf_35 = (anf_34 * k);
-        float anf_36 = (anf_35 * 0.25);
-        return (anf_33 - anf_36);
+        float anf_35 = (a_0 - b_0);
+        float anf_36 = abs(anf_35);
+        float anf_37 = (k - anf_36);
+        float anf_38 = max(anf_37, 0.);
+        float h = (anf_38 / k);
+        float anf_39 = min(a_0, b_0);
+        float anf_40 = (h * h);
+        float anf_41 = (anf_40 * k);
+        float anf_42 = (anf_41 * 0.25);
+        return (anf_39 - anf_42);
     }
-    const vec3 tooth_yel = vec3(0.92, 0.85, 0.6);
+    vec3 soft_tint(float d_4, vec3 col_0, float s_1, float f, vec3 bg_3) {
+        float anf_43 = (-1. * f);
+        float anf_44 = smoothstep(0., anf_43, d_4);
+        float anf_45 = (s_1 * anf_44);
+        return mix(bg_3, col_0, anf_45);
+    }
+    const vec3 tooth_yel = vec3(0.94, 0.88, 0.62);
     uniform vec2 u_resolution;
     const vec3 wht = vec3(1., 0.97, 0.93);
     vec3 main_pure(vec2 coord_0) {
-        vec2 anf_37_0 = (2. * coord_0);
-        vec2 top_0 = (anf_37_0 - u_resolution);
-        float anf_38_0 = u_resolution[0];
-        float anf_39_0 = u_resolution[1];
-        float bot_0 = min(anf_38_0, anf_39_0);
-        vec2 anf_40 = (top_0 / bot_0);
-        vec2 p_4 = (anf_40 / 1.5);
-        vec2 anf_41 = vec2(0.28, -0.28);
-        vec2 anf_42 = (p_4 - anf_41);
-        vec2 tp = rot(-0.35, anf_42);
-        vec2 anf_43 = vec2(0.22, 0.085);
-        float tail = ellipse(anf_43, tp);
-        float anf_44 = tp[0];
-        float anf_45 = tp[1];
-        float anf_46 = (anf_44 + anf_45);
-        float anf_47 = (anf_46 * 38.);
-        float anf_48 = sin(anf_47);
-        float anf_49 = abs(anf_48);
-        float tsx = (anf_49 - 0.55);
-        float anf_50 = tp[0];
-        float anf_51 = tp[1];
-        float anf_52 = (anf_50 - anf_51);
-        float anf_53 = (anf_52 * 38.);
-        float anf_54 = sin(anf_53);
-        float anf_55 = abs(anf_54);
-        float tsy = (anf_55 - 0.55);
-        float anf_56 = (tail + 0.01);
-        float anf_57 = min(tsx, tsy);
-        float anf_58 = (anf_57 * 0.015);
-        float tail_scales = max(anf_56, anf_58);
-        float anf_59 = (tail + 0.018);
-        float anf_60 = (-1. * anf_59);
-        float tail_rim = max(tail, anf_60);
-        vec2 anf_61 = vec2(0.25, 0.26);
-        vec2 anf_62 = vec2(0., -0.16);
-        vec2 anf_63 = (p_4 - anf_62);
-        float body = ellipse(anf_61, anf_63);
-        vec2 anf_64 = vec2(0.22, 0.2);
-        vec2 anf_65 = vec2(0., 0.2);
-        vec2 anf_66 = (p_4 - anf_65);
-        float head = ellipse(anf_64, anf_66);
+        vec2 anf_48_0 = (2. * coord_0);
+        vec2 top_0 = (anf_48_0 - u_resolution);
+        float anf_49_0 = u_resolution[0];
+        float anf_50_0 = u_resolution[1];
+        float bot_0 = min(anf_49_0, anf_50_0);
+        vec2 anf_51 = (top_0 / bot_0);
+        vec2 p_4 = (anf_51 / 1.5);
+        float anf_52 = p_4[1];
+        float light = smoothstep(-0.45, 0.4, anf_52);
+        float anf_53 = (light * 0.85);
+        float anf_54 = (anf_53 + 0.1);
+        vec3 body_col = mix(brown_dk, brown_lt, anf_54);
+        float anf_55 = (light * 0.9);
+        float anf_56 = (anf_55 + 0.05);
+        vec3 belly_col = mix(cream_dk, cream, anf_56);
+        float anf_57 = (light * 0.7);
+        float anf_58 = (anf_57 + 0.2);
+        vec3 ear_col = mix(brown_dk, brown, anf_58);
+        float anf_59 = (light * 0.8);
+        float anf_60 = (anf_59 + 0.15);
+        vec3 muzzle_col = mix(cream_dk, cream, anf_60);
+        float anf_61 = p_4[1];
+        float anf_62 = smoothstep(-0.8, 0.8, anf_61);
+        vec3 bg_4 = mix(grass_dk, grass_lt, anf_62);
+        vec2 anf_63 = vec2(0.3, -0.3);
+        vec2 anf_64 = (p_4 - anf_63);
+        vec2 tp = rot(-0.35, anf_64);
+        vec2 anf_65 = vec2(0.22, 0.085);
+        float tail = ellipse(anf_65, tp);
+        float anf_66 = (tail + 0.02);
+        float anf_67 = (-1. * anf_66);
+        float tail_rim = max(tail, anf_67);
+        float anf_68 = tp[0];
+        float anf_69 = tp[1];
+        float anf_70 = (anf_68 + anf_69);
+        float anf_71 = (anf_70 * 38.);
+        float anf_72 = sin(anf_71);
+        float g1 = abs(anf_72);
+        float anf_73 = tp[0];
+        float anf_74 = tp[1];
+        float anf_75 = (anf_73 - anf_74);
+        float anf_76 = (anf_75 * 38.);
+        float anf_77 = sin(anf_76);
+        float g2 = abs(anf_77);
+        float anf_78 = min(g1, g2);
+        float scale_pat = (anf_78 - 0.45);
+        float anf_79 = (tail + 0.012);
+        float anf_80 = (scale_pat * 0.012);
+        float tail_scales = max(anf_79, anf_80);
+        vec2 anf_81 = vec2(0.185, 0.135);
+        vec2 anf_82 = vec2(0., -0.04);
+        vec2 anf_83 = (p_4 - anf_82);
+        float body_top = ellipse(anf_81, anf_83);
+        vec2 anf_84 = vec2(0.26, 0.185);
+        vec2 anf_85 = vec2(0., -0.24);
+        vec2 anf_86 = (p_4 - anf_85);
+        float body_bot = ellipse(anf_84, anf_86);
+        float body = smin(body_top, body_bot, 0.12);
+        vec2 anf_87 = vec2(0.2, 0.18);
+        vec2 anf_88 = vec2(0., 0.18);
+        vec2 anf_89 = (p_4 - anf_88);
+        float head = ellipse(anf_87, anf_89);
         float torso = smin(body, head, 0.1);
-        vec2 anf_67 = vec2(-0.14, 0.11);
-        vec2 anf_68 = (p_4 - anf_67);
-        float anf_1_11 = length(anf_68);
-        float cheek_l = (anf_1_11 - 0.1);
-        vec2 anf_69 = vec2(0.14, 0.11);
-        vec2 anf_70 = (p_4 - anf_69);
-        float anf_1_10 = length(anf_70);
-        float cheek_r = (anf_1_10 - 0.1);
+        vec2 anf_90 = vec2(-0.128, 0.092);
+        vec2 anf_91 = (p_4 - anf_90);
+        float anf_5_13 = length(anf_91);
+        float cheek_l = (anf_5_13 - 0.086);
+        vec2 anf_92 = vec2(0.128, 0.092);
+        vec2 anf_93 = (p_4 - anf_92);
+        float anf_5_12 = length(anf_93);
+        float cheek_r = (anf_5_12 - 0.086);
         float cheeks = min(cheek_l, cheek_r);
         float torso_with_cheeks = smin(torso, cheeks, 0.06);
-        vec2 anf_71 = vec2(0.13, 0.095);
-        vec2 anf_72 = vec2(0., 0.09);
-        vec2 anf_73 = (p_4 - anf_72);
-        float muzzle = ellipse(anf_71, anf_73);
-        vec2 anf_74 = vec2(0.15, 0.17);
-        vec2 anf_75 = vec2(0., -0.2);
-        vec2 anf_76 = (p_4 - anf_75);
-        float belly = ellipse(anf_74, anf_76);
-        vec2 anf_77 = vec2(-0.175, 0.355);
-        vec2 anf_78 = (p_4 - anf_77);
-        float anf_1_9 = length(anf_78);
-        float ear_l = (anf_1_9 - 0.075);
-        vec2 anf_79 = vec2(0.175, 0.355);
-        vec2 anf_80 = (p_4 - anf_79);
-        float anf_1_8 = length(anf_80);
-        float ear_r = (anf_1_8 - 0.075);
-        vec2 anf_81 = vec2(0.035, 0.042);
-        vec2 anf_82 = vec2(-0.175, 0.345);
-        vec2 anf_83 = (p_4 - anf_82);
-        float ear_in_l = ellipse(anf_81, anf_83);
-        vec2 anf_84 = vec2(0.035, 0.042);
-        vec2 anf_85 = vec2(0.175, 0.345);
-        vec2 anf_86 = (p_4 - anf_85);
-        float ear_in_r = ellipse(anf_84, anf_86);
-        vec2 anf_87 = vec2(0.065, 0.09);
-        vec2 anf_88 = vec2(-0.23, -0.09);
-        vec2 anf_89 = (p_4 - anf_88);
-        float arm_l = ellipse(anf_87, anf_89);
-        vec2 anf_90 = vec2(0.065, 0.09);
-        vec2 anf_91 = vec2(0.23, -0.09);
-        vec2 anf_92 = (p_4 - anf_91);
-        float arm_r = ellipse(anf_90, anf_92);
-        vec2 anf_93 = vec2(-0.28, -0.19);
-        vec2 anf_94 = (p_4 - anf_93);
-        float anf_1_7 = length(anf_94);
-        float paw_l = (anf_1_7 - 0.055);
-        vec2 anf_95 = vec2(0.28, -0.19);
+        vec2 anf_94 = vec2(0.115, 0.082);
+        vec2 anf_95 = vec2(0., 0.08);
         vec2 anf_96 = (p_4 - anf_95);
-        float anf_1_6 = length(anf_96);
-        float paw_r = (anf_1_6 - 0.055);
-        vec2 anf_97 = vec2(0.095, 0.048);
-        vec2 anf_98 = vec2(-0.13, -0.42);
-        vec2 anf_99 = (p_4 - anf_98);
-        float foot_l = ellipse(anf_97, anf_99);
-        vec2 anf_100 = vec2(0.095, 0.048);
-        vec2 anf_101 = vec2(0.13, -0.42);
-        vec2 anf_102 = (p_4 - anf_101);
-        float foot_r = ellipse(anf_100, anf_102);
-        vec2 anf_103 = vec2(0.022, 0.05);
-        vec2 anf_104 = vec2(-0.028, 0.035);
-        vec2 anf_105 = (p_4 - anf_104);
-        float tooth_l = box(anf_103, anf_105);
-        vec2 anf_106 = vec2(0.022, 0.05);
-        vec2 anf_107 = vec2(0.028, 0.035);
+        float muzzle = ellipse(anf_94, anf_96);
+        vec2 anf_97 = vec2(-0.118, 0.09);
+        vec2 anf_98 = (p_4 - anf_97);
+        float anf_5_11 = length(anf_98);
+        float blush_l = (anf_5_11 - 0.03);
+        vec2 anf_99 = vec2(0.118, 0.09);
+        vec2 anf_100 = (p_4 - anf_99);
+        float anf_5_10 = length(anf_100);
+        float blush_r = (anf_5_10 - 0.03);
+        vec2 anf_101 = vec2(0.125, 0.09);
+        vec2 anf_102 = vec2(0., -0.1);
+        vec2 anf_103 = (p_4 - anf_102);
+        float belly_top = ellipse(anf_101, anf_103);
+        vec2 anf_104 = vec2(0.16, 0.14);
+        vec2 anf_105 = vec2(0., -0.24);
+        vec2 anf_106 = (p_4 - anf_105);
+        float belly_bot = ellipse(anf_104, anf_106);
+        float belly = smin(belly_top, belly_bot, 0.12);
+        vec2 anf_107 = vec2(-0.155, 0.318);
         vec2 anf_108 = (p_4 - anf_107);
-        float tooth_r = box(anf_106, anf_108);
-        float teeth = min(tooth_l, tooth_r);
-        vec2 anf_109 = vec2(0.005, 0.05);
-        vec2 anf_110 = vec2(0., 0.035);
-        vec2 anf_111 = (p_4 - anf_110);
-        float groove = box(anf_109, anf_111);
-        vec2 anf_112 = vec2(0.038, 0.028);
-        vec2 anf_113 = vec2(0., 0.135);
-        vec2 anf_114 = (p_4 - anf_113);
-        float nose = ellipse(anf_112, anf_114);
-        vec2 anf_115 = vec2(0.012, 0.008);
-        vec2 anf_116 = vec2(-0.012, 0.142);
-        vec2 anf_117 = (p_4 - anf_116);
-        float nose_hi = ellipse(anf_115, anf_117);
-        vec2 anf_118 = vec2(-0.095, 0.255);
+        float anf_5_9 = length(anf_108);
+        float ear_l = (anf_5_9 - 0.065);
+        vec2 anf_109 = vec2(0.155, 0.318);
+        vec2 anf_110 = (p_4 - anf_109);
+        float anf_5_8 = length(anf_110);
+        float ear_r = (anf_5_8 - 0.065);
+        vec2 anf_111 = vec2(0.03, 0.036);
+        vec2 anf_112 = vec2(-0.155, 0.31);
+        vec2 anf_113 = (p_4 - anf_112);
+        float ear_in_l = ellipse(anf_111, anf_113);
+        vec2 anf_114 = vec2(0.03, 0.036);
+        vec2 anf_115 = vec2(0.155, 0.31);
+        vec2 anf_116 = (p_4 - anf_115);
+        float ear_in_r = ellipse(anf_114, anf_116);
+        vec2 anf_117 = vec2(0.045, 0.09);
+        vec2 anf_118 = vec2(-0.13, -0.2);
         vec2 anf_119 = (p_4 - anf_118);
-        float anf_1_5 = length(anf_119);
-        float eye_l = (anf_1_5 - 0.04);
-        vec2 anf_120 = vec2(0.095, 0.255);
-        vec2 anf_121 = (p_4 - anf_120);
-        float anf_1_4 = length(anf_121);
-        float eye_r = (anf_1_4 - 0.04);
-        vec2 anf_122 = vec2(-0.082, 0.27);
+        vec2 anf_120 = rot(-0.7, anf_119);
+        float arm_l = ellipse(anf_117, anf_120);
+        vec2 anf_121 = vec2(0.045, 0.09);
+        vec2 anf_122 = vec2(0.13, -0.2);
         vec2 anf_123 = (p_4 - anf_122);
-        float anf_1_3 = length(anf_123);
-        float hi_l = (anf_1_3 - 0.014);
-        vec2 anf_124 = vec2(0.108, 0.27);
-        vec2 anf_125 = (p_4 - anf_124);
-        float anf_1_2 = length(anf_125);
-        float hi_r = (anf_1_2 - 0.014);
-        vec2 anf_126 = vec2(-0.105, 0.245);
-        vec2 anf_127 = (p_4 - anf_126);
-        float anf_1_1 = length(anf_127);
-        float hi_l2 = (anf_1_1 - 0.006);
-        vec2 anf_128 = vec2(0.085, 0.245);
-        vec2 anf_129 = (p_4 - anf_128);
-        float anf_1_0 = length(anf_129);
-        float hi_r2 = (anf_1_0 - 0.006);
-        vec2 anf_130 = vec2(0.035, 0.01);
-        vec2 anf_131 = vec2(-0.095, 0.315);
-        vec2 anf_132 = (p_4 - anf_131);
-        vec2 anf_133 = rot(0.15, anf_132);
-        float brow_l = ellipse(anf_130, anf_133);
-        vec2 anf_134 = vec2(0.035, 0.01);
-        vec2 anf_135 = vec2(0.095, 0.315);
-        vec2 anf_136 = (p_4 - anf_135);
-        vec2 anf_137 = rot(-0.15, anf_136);
-        float brow_r = ellipse(anf_134, anf_137);
-        float anf_138 = length(p_4);
-        float vig = smoothstep(0.3, 1.1, anf_138);
-        vec3 col = mix(bg_col, bg_dark, vig);
-        vec2 anf_139 = vec2(0.38, 0.055);
-        vec2 anf_140 = vec2(0.02, -0.45);
-        vec2 anf_141 = (p_4 - anf_140);
-        float shadow_d = ellipse(anf_139, anf_141);
-        float shadow_falloff = smoothstep(0.08, -0.02, shadow_d);
-        vec3 anf_142 = vec3(0.06, 0.28, 0.16);
-        float anf_143 = (shadow_falloff * 0.55);
-        vec3 col_0 = mix(col, anf_142, anf_143);
-        float anf_13_25 = smoothstep(-0.005, 0.005, tail);
-        vec3 anf_144 = mix(brown_dk, col_0, anf_13_25);
-        float anf_13_24 = smoothstep(-0.005, 0.005, tail_rim);
-        vec3 anf_145 = mix(drk_brown, anf_144, anf_13_24);
-        float anf_13_23 = smoothstep(-0.005, 0.005, tail_scales);
-        vec3 anf_146 = mix(drk_brown, anf_145, anf_13_23);
-        float anf_13_22 = smoothstep(-0.005, 0.005, foot_l);
-        vec3 anf_147 = mix(drk_brown, anf_146, anf_13_22);
-        float anf_13_21 = smoothstep(-0.005, 0.005, foot_r);
-        vec3 anf_148 = mix(drk_brown, anf_147, anf_13_21);
-        float anf_13_20 = smoothstep(-0.005, 0.005, arm_l);
-        vec3 anf_149 = mix(brown_dk, anf_148, anf_13_20);
-        float anf_13_19 = smoothstep(-0.005, 0.005, arm_r);
-        vec3 anf_150 = mix(brown_dk, anf_149, anf_13_19);
-        vec3 anf_151 = paint_shaded(torso_with_cheeks, brown, brown_dk, 0.08, anf_150);
-        vec3 anf_152 = paint_shaded(belly, cream, cream_dk, 0.05, anf_151);
-        float anf_13_18 = smoothstep(-0.005, 0.005, paw_l);
-        vec3 anf_153 = mix(cream, anf_152, anf_13_18);
-        float anf_13_17 = smoothstep(-0.005, 0.005, paw_r);
-        vec3 anf_154 = mix(cream, anf_153, anf_13_17);
-        float anf_13_16 = smoothstep(-0.005, 0.005, ear_l);
-        vec3 anf_155 = mix(brown, anf_154, anf_13_16);
-        float anf_13_15 = smoothstep(-0.005, 0.005, ear_r);
-        vec3 anf_156 = mix(brown, anf_155, anf_13_15);
-        float anf_13_14 = smoothstep(-0.005, 0.005, ear_in_l);
-        vec3 anf_157 = mix(pink, anf_156, anf_13_14);
-        float anf_13_13 = smoothstep(-0.005, 0.005, ear_in_r);
-        vec3 anf_158 = mix(pink, anf_157, anf_13_13);
-        float anf_13_12 = smoothstep(-0.005, 0.005, muzzle);
-        vec3 anf_159 = mix(cream, anf_158, anf_13_12);
-        float anf_13_11 = smoothstep(-0.005, 0.005, brow_l);
-        vec3 anf_160 = mix(drk_brown, anf_159, anf_13_11);
-        float anf_13_10 = smoothstep(-0.005, 0.005, brow_r);
-        vec3 anf_161 = mix(drk_brown, anf_160, anf_13_10);
-        float anf_13_9 = smoothstep(-0.005, 0.005, teeth);
-        vec3 anf_162 = mix(tooth_yel, anf_161, anf_13_9);
-        float anf_13_8 = smoothstep(-0.005, 0.005, groove);
-        vec3 anf_163 = mix(brown_dk, anf_162, anf_13_8);
-        float anf_13_7 = smoothstep(-0.005, 0.005, nose);
-        vec3 anf_164 = mix(drk_brown, anf_163, anf_13_7);
-        float anf_13_6 = smoothstep(-0.005, 0.005, nose_hi);
-        vec3 anf_165 = mix(brown_lt, anf_164, anf_13_6);
-        float anf_13_5 = smoothstep(-0.005, 0.005, eye_l);
-        vec3 anf_166 = mix(black, anf_165, anf_13_5);
-        float anf_13_4 = smoothstep(-0.005, 0.005, eye_r);
-        vec3 anf_167 = mix(black, anf_166, anf_13_4);
-        float anf_13_3 = smoothstep(-0.005, 0.005, hi_l);
-        vec3 anf_168 = mix(wht, anf_167, anf_13_3);
-        float anf_13_2 = smoothstep(-0.005, 0.005, hi_r);
-        vec3 anf_169 = mix(wht, anf_168, anf_13_2);
-        float anf_13_1 = smoothstep(-0.005, 0.005, hi_l2);
-        vec3 anf_170 = mix(wht, anf_169, anf_13_1);
-        float anf_13_0 = smoothstep(-0.005, 0.005, hi_r2);
-        return mix(wht, anf_170, anf_13_0);
+        vec2 anf_124 = rot(0.7, anf_123);
+        float arm_r = ellipse(anf_121, anf_124);
+        vec2 anf_125 = vec2(-0.055, -0.255);
+        vec2 anf_126 = (p_4 - anf_125);
+        float anf_5_7 = length(anf_126);
+        float paw_l = (anf_5_7 - 0.052);
+        vec2 anf_127 = vec2(0.055, -0.255);
+        vec2 anf_128 = (p_4 - anf_127);
+        float anf_5_6 = length(anf_128);
+        float paw_r = (anf_5_6 - 0.052);
+        vec2 anf_129 = vec2(0.095, 0.048);
+        vec2 anf_130 = vec2(-0.13, -0.42);
+        vec2 anf_131 = (p_4 - anf_130);
+        float foot_l = ellipse(anf_129, anf_131);
+        vec2 anf_132 = vec2(0.095, 0.048);
+        vec2 anf_133 = vec2(0.13, -0.42);
+        vec2 anf_134 = (p_4 - anf_133);
+        float foot_r = ellipse(anf_132, anf_134);
+        vec2 anf_135 = vec2(0.018, 0.04);
+        vec2 anf_136 = vec2(-0.022, 0.022);
+        vec2 anf_137 = (p_4 - anf_136);
+        float tooth_l = box(anf_135, anf_137);
+        vec2 anf_138 = vec2(0.018, 0.04);
+        vec2 anf_139 = vec2(0.022, 0.022);
+        vec2 anf_140 = (p_4 - anf_139);
+        float tooth_r = box(anf_138, anf_140);
+        float teeth = min(tooth_l, tooth_r);
+        vec2 anf_141 = vec2(0.004, 0.04);
+        vec2 anf_142 = vec2(0., 0.022);
+        vec2 anf_143 = (p_4 - anf_142);
+        float groove = box(anf_141, anf_143);
+        vec2 anf_144 = vec2(0.032, 0.024);
+        vec2 anf_145 = vec2(0., 0.122);
+        vec2 anf_146 = (p_4 - anf_145);
+        float nose = ellipse(anf_144, anf_146);
+        vec2 anf_147 = vec2(0.01, 0.007);
+        vec2 anf_148 = vec2(-0.01, 0.128);
+        vec2 anf_149 = (p_4 - anf_148);
+        float nose_hi = ellipse(anf_147, anf_149);
+        vec2 anf_150 = vec2(-0.085, 0.212);
+        vec2 anf_151 = (p_4 - anf_150);
+        float anf_5_5 = length(anf_151);
+        float eye_l = (anf_5_5 - 0.034);
+        vec2 anf_152 = vec2(0.085, 0.212);
+        vec2 anf_153 = (p_4 - anf_152);
+        float anf_5_4 = length(anf_153);
+        float eye_r = (anf_5_4 - 0.034);
+        vec2 anf_154 = vec2(-0.074, 0.224);
+        vec2 anf_155 = (p_4 - anf_154);
+        float anf_5_3 = length(anf_155);
+        float hi_l = (anf_5_3 - 0.012);
+        vec2 anf_156 = vec2(0.096, 0.224);
+        vec2 anf_157 = (p_4 - anf_156);
+        float anf_5_2 = length(anf_157);
+        float hi_r = (anf_5_2 - 0.012);
+        vec2 anf_158 = vec2(-0.094, 0.204);
+        vec2 anf_159 = (p_4 - anf_158);
+        float anf_5_1 = length(anf_159);
+        float hi_l2 = (anf_5_1 - 0.005);
+        vec2 anf_160 = vec2(0.076, 0.204);
+        vec2 anf_161 = (p_4 - anf_160);
+        float anf_5_0 = length(anf_161);
+        float hi_r2 = (anf_5_0 - 0.005);
+        vec2 anf_162 = vec2(0.03, 0.008);
+        vec2 anf_163 = vec2(-0.085, 0.266);
+        vec2 anf_164 = (p_4 - anf_163);
+        vec2 anf_165 = rot(0.2, anf_164);
+        float brow_l = ellipse(anf_162, anf_165);
+        vec2 anf_166 = vec2(0.03, 0.008);
+        vec2 anf_167 = vec2(0.085, 0.266);
+        vec2 anf_168 = (p_4 - anf_167);
+        vec2 anf_169 = rot(-0.2, anf_168);
+        float brow_r = ellipse(anf_166, anf_169);
+        vec2 anf_170 = vec2(-0.115, 0.085);
+        vec2 anf_171 = (p_4 - anf_170);
+        vec2 wp_l = rot(0.05, anf_171);
+        vec2 anf_172 = vec2(0.115, 0.085);
+        vec2 anf_173 = (p_4 - anf_172);
+        vec2 wp_r = rot(-0.05, anf_173);
+        vec2 anf_174 = vec2(0.04, 0.001);
+        vec2 anf_175 = vec2(-0.04, 0.01);
+        vec2 anf_176 = (wp_l - anf_175);
+        float whisk_l1 = box(anf_174, anf_176);
+        vec2 anf_177 = vec2(0.04, 0.001);
+        vec2 anf_178 = vec2(-0.04, -0.01);
+        vec2 anf_179 = (wp_l - anf_178);
+        float whisk_l2 = box(anf_177, anf_179);
+        vec2 anf_180 = vec2(0.04, 0.001);
+        vec2 anf_181 = vec2(0.04, 0.01);
+        vec2 anf_182 = (wp_r - anf_181);
+        float whisk_r1 = box(anf_180, anf_182);
+        vec2 anf_183 = vec2(0.04, 0.001);
+        vec2 anf_184 = vec2(0.04, -0.01);
+        vec2 anf_185 = (wp_r - anf_184);
+        float whisk_r2 = box(anf_183, anf_185);
+        float anf_186 = min(whisk_l1, whisk_l2);
+        float anf_187 = min(whisk_r1, whisk_r2);
+        float whiskers = min(anf_186, anf_187);
+        vec2 anf_188 = vec2(0.165, 0.055);
+        vec2 anf_189 = vec2(0., -0.02);
+        vec2 anf_190 = (p_4 - anf_189);
+        float neck_shadow = ellipse(anf_188, anf_190);
+        vec2 anf_191 = vec2(0.11, 0.05);
+        vec2 anf_192 = vec2(-0.025, 0.28);
+        vec2 anf_193 = (p_4 - anf_192);
+        float head_hilite = ellipse(anf_191, anf_193);
+        vec2 anf_194 = vec2(0.13, 0.06);
+        vec2 anf_195 = vec2(0., -0.3);
+        vec2 anf_196 = (p_4 - anf_195);
+        float belly_shadow = ellipse(anf_194, anf_196);
+        vec2 anf_197 = vec2(0.4, 0.045);
+        vec2 anf_198 = vec2(0.02, -0.46);
+        vec2 anf_199 = (p_4 - anf_198);
+        float shadow_d = ellipse(anf_197, anf_199);
+        float shadow_falloff = smoothstep(0.06, -0.02, shadow_d);
+        vec3 anf_200 = vec3(0.18, 0.28, 0.12);
+        float anf_201 = (shadow_falloff * 0.5);
+        vec3 bg_5 = mix(bg_4, anf_200, anf_201);
+        float anf_202 = max(head_hilite, torso_with_cheeks);
+        float anf_203 = min(blush_l, blush_r);
+        float anf_204 = (-1. * belly);
+        float anf_205 = max(torso_with_cheeks, anf_204);
+        float anf_206 = max(neck_shadow, anf_205);
+        float anf_207 = max(belly_shadow, belly);
+        vec3 anf_208 = paint_w(0.0025, tail, brown_dk, bg_5);
+        vec3 anf_209 = paint_w(0.0025, tail_rim, drk_brown, anf_208);
+        vec3 anf_210 = paint_w(0.0025, tail_scales, drk_brown, anf_209);
+        vec3 anf_211 = paint_w(0.0025, foot_l, drk_brown, anf_210);
+        vec3 anf_212 = paint_w(0.0025, foot_r, drk_brown, anf_211);
+        vec3 anf_213 = paint_shaded(torso_with_cheeks, body_col, brown_dk, 0.08, anf_212);
+        vec3 anf_214 = paint_shaded(belly, belly_col, cream_dk, 0.05, anf_213);
+        vec3 anf_215 = soft_tint(anf_207, brown_dk, 0.18, 0.08, anf_214);
+        vec3 anf_216 = soft_tint(anf_206, brown_dk, 0.35, 0.05, anf_215);
+        float anf_46_0 = smoothstep(0.003, -0.003, anf_203);
+        float anf_47_0 = (0.35 * anf_46_0);
+        vec3 anf_217 = mix(anf_216, pink, anf_47_0);
+        vec3 anf_218 = paint_w(0.0025, arm_l, brown_dk, anf_217);
+        vec3 anf_219 = paint_w(0.0025, arm_r, brown_dk, anf_218);
+        vec3 anf_220 = paint_w(0.0025, paw_l, body_col, anf_219);
+        vec3 anf_221 = paint_w(0.0025, paw_r, body_col, anf_220);
+        vec3 anf_222 = paint_w(0.0025, ear_l, ear_col, anf_221);
+        vec3 anf_223 = paint_w(0.0025, ear_r, ear_col, anf_222);
+        vec3 anf_224 = paint_w(0.0025, ear_in_l, pink, anf_223);
+        vec3 anf_225 = paint_w(0.0025, ear_in_r, pink, anf_224);
+        vec3 anf_226 = paint_w(0.0025, muzzle, muzzle_col, anf_225);
+        vec3 anf_227 = soft_tint(anf_202, wht, 0.18, 0.06, anf_226);
+        vec3 anf_228 = paint_w(0.0025, brow_l, drk_brown, anf_227);
+        vec3 anf_229 = paint_w(0.0025, brow_r, drk_brown, anf_228);
+        vec3 anf_230 = paint_w(0.0025, teeth, tooth_yel, anf_229);
+        vec3 anf_231 = paint_w(0.0025, groove, brown_dk, anf_230);
+        vec3 anf_232 = paint_w(0.0025, nose, drk_brown, anf_231);
+        vec3 anf_233 = paint_w(0.0025, nose_hi, brown_lt, anf_232);
+        vec3 anf_234 = paint_w(0.0025, eye_l, black, anf_233);
+        vec3 anf_235 = paint_w(0.0025, eye_r, black, anf_234);
+        vec3 anf_236 = paint_w(0.003, whiskers, brown_dk, anf_235);
+        vec3 anf_237 = paint_w(0.0025, hi_l, wht, anf_236);
+        vec3 anf_238 = paint_w(0.0025, hi_r, wht, anf_237);
+        vec3 anf_239 = paint_w(0.0025, hi_l2, wht, anf_238);
+        return paint_w(0.0025, hi_r2, wht, anf_239);
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
@@ -454,46 +526,50 @@ let%expect_test "compile examples" =
     };
     option mandel_0(vec2 c, vec2 z, int i) {
         int _iter = 0;
-        while ((_iter < 1000)) {
-            bool anf = (i > 150);
-            if (anf) {
-                return option(1, 0.);
-            } else {
-                float anf_0 = length(z);
-                bool anf_1 = (anf_0 > 4.);
-                if (anf_1) {
-                    float anf_2 = length(z);
-                    float anf_3 = log2(anf_2);
-                    float nu = log2(anf_3);
-                    float anf_4 = float(i);
-                    float anf_5 = (anf_4 - nu);
-                    float anf_6 = (anf_5 / 150.);
-                    return option(0, anf_6);
+        while (true) {
+            bool _lim_cond = (_iter < 1000);
+            if (_lim_cond) {
+                bool anf = (i > 150);
+                if (anf) {
+                    return option(1, 0.);
                 } else {
-                    float anf_7 = z[0];
-                    float anf_8 = z[0];
-                    float anf_9 = (anf_7 * anf_8);
-                    float anf_10 = z[1];
-                    float anf_11 = z[1];
-                    float anf_12 = (anf_10 * anf_11);
-                    float zx = (anf_9 - anf_12);
-                    float anf_13 = z[0];
-                    float anf_14 = (2. * anf_13);
-                    float anf_15 = z[1];
-                    float zy = (anf_14 * anf_15);
-                    vec2 anf_16 = vec2(zx, zy);
-                    vec2 z_prime = (anf_16 + c);
-                    int anf_17 = (i + 1);
-                    z = z_prime;
-                    i = anf_17;
-                    int _iter_inc = (_iter + 1);
-                    _iter = _iter_inc;
-                    continue;
+                    float anf_0 = length(z);
+                    bool anf_1 = (anf_0 > 4.);
+                    if (anf_1) {
+                        float anf_2 = length(z);
+                        float anf_3 = log2(anf_2);
+                        float nu = log2(anf_3);
+                        float anf_4 = float(i);
+                        float anf_5 = (anf_4 - nu);
+                        float anf_6 = (anf_5 / 150.);
+                        return option(0, anf_6);
+                    } else {
+                        float anf_7 = z[0];
+                        float anf_8 = z[0];
+                        float anf_9 = (anf_7 * anf_8);
+                        float anf_10 = z[1];
+                        float anf_11 = z[1];
+                        float anf_12 = (anf_10 * anf_11);
+                        float zx = (anf_9 - anf_12);
+                        float anf_13 = z[0];
+                        float anf_14 = (2. * anf_13);
+                        float anf_15 = z[1];
+                        float zy = (anf_14 * anf_15);
+                        vec2 anf_16 = vec2(zx, zy);
+                        vec2 z_prime = (anf_16 + c);
+                        int anf_17 = (i + 1);
+                        int _iter_inc = (_iter + 1);
+                        _iter = _iter_inc;
+                        z = z_prime;
+                        i = anf_17;
+                        continue;
+                    }
                 }
+            } else {
+                option _tmp;
+                return _tmp;
             }
         }
-        option _tmp;
-        return _tmp;
     }
     uniform vec2 u_resolution;
     uniform float u_time;
@@ -695,42 +771,46 @@ let%expect_test "compile examples" =
     }
     option march_0_0(vec3 rd, vec3 ro, float t, int steps) {
         int _iter = 0;
-        while ((_iter < 1000)) {
-            bool anf_87 = (steps > 120);
-            if (anf_87) {
-                return option(1, 0.);
-            } else {
-                vec3 anf_88 = (rd * t);
-                vec3 anf_89 = (ro + anf_88);
-                float len_7 = length(anf_89);
-                vec3 dir_8 = (anf_89 / len_7);
-                vec3 anf_71_7 = (dir_8 * 3.);
-                float anf_72_7 = fbm(anf_71_7);
-                float terrain_7 = (anf_72_7 * 0.4);
-                float anf_73_7 = (len_7 - 1.5);
-                float d_1 = (anf_73_7 - terrain_7);
-                bool anf_90 = (d_1 < 0.0005);
-                if (anf_90) {
-                    return option(0, t);
+        while (true) {
+            bool _lim_cond = (_iter < 1000);
+            if (_lim_cond) {
+                bool anf_87 = (steps > 120);
+                if (anf_87) {
+                    return option(1, 0.);
                 } else {
-                    bool anf_91 = (t > 50.);
-                    if (anf_91) {
-                        return option(1, 0.);
+                    vec3 anf_88 = (rd * t);
+                    vec3 anf_89 = (ro + anf_88);
+                    float len_7 = length(anf_89);
+                    vec3 dir_8 = (anf_89 / len_7);
+                    vec3 anf_71_7 = (dir_8 * 3.);
+                    float anf_72_7 = fbm(anf_71_7);
+                    float terrain_7 = (anf_72_7 * 0.4);
+                    float anf_73_7 = (len_7 - 1.5);
+                    float d_1 = (anf_73_7 - terrain_7);
+                    bool anf_90 = (d_1 < 0.0005);
+                    if (anf_90) {
+                        return option(0, t);
                     } else {
-                        float anf_92 = (d_1 * 0.8);
-                        float anf_93 = (t + anf_92);
-                        int anf_94 = (steps + 1);
-                        t = anf_93;
-                        steps = anf_94;
-                        int _iter_inc = (_iter + 1);
-                        _iter = _iter_inc;
-                        continue;
+                        bool anf_91 = (t > 50.);
+                        if (anf_91) {
+                            return option(1, 0.);
+                        } else {
+                            float anf_92 = (d_1 * 0.8);
+                            float anf_93 = (t + anf_92);
+                            int anf_94 = (steps + 1);
+                            int _iter_inc = (_iter + 1);
+                            _iter = _iter_inc;
+                            t = anf_93;
+                            steps = anf_94;
+                            continue;
+                        }
                     }
                 }
+            } else {
+                option _tmp;
+                return _tmp;
             }
         }
-        option _tmp;
-        return _tmp;
     }
     const vec3 snowColor = vec3(0.85, 0.85, 0.9);
     uniform vec2 u_mouse;
@@ -943,61 +1023,65 @@ let%expect_test "compile examples" =
     uniform float u_time;
     option march_0_0(vec3 rd, vec3 ro, float t_1, int steps) {
         int _iter = 0;
-        while ((_iter < 1000)) {
-            bool anf_48 = (steps > 80);
-            if (anf_48) {
-                return option(1, 0.);
-            } else {
-                vec3 anf_49 = (rd * t_1);
-                vec3 anf_50 = (ro + anf_49);
-                float angle_0_0 = (u_time * 2.);
-                float anf_32_0 = anf_50[0];
-                float anf_33_0 = anf_50[1];
-                vec2 anf_34_0 = vec2(anf_32_0, anf_33_0);
-                vec2 p_xy_0 = rotate(anf_34_0, angle_0_0);
-                float anf_35_0 = p_xy_0[0];
-                float anf_36_0 = p_xy_0[1];
-                float anf_37_0 = anf_50[2];
-                vec2 anf_40_0 = vec2(anf_36_0, anf_37_0);
-                vec2 p_yz_0 = rotate(anf_40_0, angle_0_0);
-                float anf_42_0 = p_yz_0[0];
-                float anf_43_0 = p_yz_0[1];
-                vec3 p_prime_0_0 = vec3(anf_35_0, anf_42_0, anf_43_0);
-                vec2 anf_44_0 = vec2(1., 0.3);
-                float anf_45_0 = sdTorus(p_prime_0_0, anf_44_0);
-                vec2 anf_46_0 = vec2(2., 0.5);
-                float anf_47_0 = sdTorus(anf_50, anf_46_0);
-                float anf_15_1 = (anf_47_0 - anf_45_0);
-                float anf_16_1 = (0.5 * anf_15_1);
-                float anf_17_1 = (anf_16_1 / 0.1);
-                float anf_18_1 = (0.5 + anf_17_1);
-                float h_1 = clamp(anf_18_1, 0., 1.);
-                float anf_19_1 = mix(anf_47_0, anf_45_0, h_1);
-                float anf_20_1 = (0.1 * h_1);
-                float anf_21_1 = (1. - h_1);
-                float anf_22_1 = (anf_20_1 * anf_21_1);
-                float d = (anf_19_1 - anf_22_1);
-                bool anf_51 = (d < 0.001);
-                if (anf_51) {
-                    return option(0, t_1);
+        while (true) {
+            bool _lim_cond = (_iter < 1000);
+            if (_lim_cond) {
+                bool anf_48 = (steps > 80);
+                if (anf_48) {
+                    return option(1, 0.);
                 } else {
-                    bool anf_52 = (t_1 > 100.);
-                    if (anf_52) {
-                        return option(1, 0.);
+                    vec3 anf_49 = (rd * t_1);
+                    vec3 anf_50 = (ro + anf_49);
+                    float angle_0_0 = (u_time * 2.);
+                    float anf_32_0 = anf_50[0];
+                    float anf_33_0 = anf_50[1];
+                    vec2 anf_34_0 = vec2(anf_32_0, anf_33_0);
+                    vec2 p_xy_0 = rotate(anf_34_0, angle_0_0);
+                    float anf_35_0 = p_xy_0[0];
+                    float anf_36_0 = p_xy_0[1];
+                    float anf_37_0 = anf_50[2];
+                    vec2 anf_40_0 = vec2(anf_36_0, anf_37_0);
+                    vec2 p_yz_0 = rotate(anf_40_0, angle_0_0);
+                    float anf_42_0 = p_yz_0[0];
+                    float anf_43_0 = p_yz_0[1];
+                    vec3 p_prime_0_0 = vec3(anf_35_0, anf_42_0, anf_43_0);
+                    vec2 anf_44_0 = vec2(1., 0.3);
+                    float anf_45_0 = sdTorus(p_prime_0_0, anf_44_0);
+                    vec2 anf_46_0 = vec2(2., 0.5);
+                    float anf_47_0 = sdTorus(anf_50, anf_46_0);
+                    float anf_15_1 = (anf_47_0 - anf_45_0);
+                    float anf_16_1 = (0.5 * anf_15_1);
+                    float anf_17_1 = (anf_16_1 / 0.1);
+                    float anf_18_1 = (0.5 + anf_17_1);
+                    float h_1 = clamp(anf_18_1, 0., 1.);
+                    float anf_19_1 = mix(anf_47_0, anf_45_0, h_1);
+                    float anf_20_1 = (0.1 * h_1);
+                    float anf_21_1 = (1. - h_1);
+                    float anf_22_1 = (anf_20_1 * anf_21_1);
+                    float d = (anf_19_1 - anf_22_1);
+                    bool anf_51 = (d < 0.001);
+                    if (anf_51) {
+                        return option(0, t_1);
                     } else {
-                        float anf_53 = (t_1 + d);
-                        int anf_54 = (steps + 1);
-                        t_1 = anf_53;
-                        steps = anf_54;
-                        int _iter_inc = (_iter + 1);
-                        _iter = _iter_inc;
-                        continue;
+                        bool anf_52 = (t_1 > 100.);
+                        if (anf_52) {
+                            return option(1, 0.);
+                        } else {
+                            float anf_53 = (t_1 + d);
+                            int anf_54 = (steps + 1);
+                            int _iter_inc = (_iter + 1);
+                            _iter = _iter_inc;
+                            t_1 = anf_53;
+                            steps = anf_54;
+                            continue;
+                        }
                     }
                 }
+            } else {
+                option _tmp;
+                return _tmp;
             }
         }
-        option _tmp;
-        return _tmp;
     }
     vec3 main_pure(vec2 coord) {
         float anf_55 = u_resolution[0];
@@ -1076,33 +1160,37 @@ let%expect_test "compile examples" =
     out vec4 fragColor;
     float gcd_m(float a, float b) {
         int _iter = 0;
-        while ((_iter < 1000)) {
-            bool anf = (a < 0.05);
-            if (anf) {
-                return b;
-            } else {
-                bool anf_0 = (b < 0.05);
-                if (anf_0) {
-                    return a;
+        while (true) {
+            bool _lim_cond = (_iter < 1000);
+            if (_lim_cond) {
+                bool anf = (a < 0.05);
+                if (anf) {
+                    return b;
                 } else {
-                    bool anf_1 = (a > b);
-                    if (anf_1) {
-                        float anf_2 = (a - b);
-                        a = anf_2;
-                        int _iter_inc_0 = (_iter + 1);
-                        _iter = _iter_inc_0;
-                        continue;
+                    bool anf_0 = (b < 0.05);
+                    if (anf_0) {
+                        return a;
                     } else {
-                        float anf_3 = (b - a);
-                        b = anf_3;
-                        int _iter_inc = (_iter + 1);
-                        _iter = _iter_inc;
-                        continue;
+                        bool anf_1 = (a > b);
+                        if (anf_1) {
+                            float anf_2 = (a - b);
+                            int _iter_inc_0 = (_iter + 1);
+                            _iter = _iter_inc_0;
+                            a = anf_2;
+                            continue;
+                        } else {
+                            float anf_3 = (b - a);
+                            int _iter_inc = (_iter + 1);
+                            _iter = _iter_inc;
+                            b = anf_3;
+                            continue;
+                        }
                     }
                 }
+            } else {
+                return 0.;
             }
         }
-        return 0.;
     }
     uniform vec2 u_resolution;
     uniform float u_time;
