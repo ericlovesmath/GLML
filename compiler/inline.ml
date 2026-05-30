@@ -209,15 +209,11 @@ let collect_record_const_names (tops : top list) : String.Set.t =
 (* ========== Splicing and inlining ========== *)
 
 let rec splice ~v ~tl (t : anf) =
-  let desc : anf_desc =
-    match t.desc with
-    | Return t -> Let (v, t, tl)
-    | Let (v', b, t) -> Let (v', b, splice ~v ~tl t)
-    | Placeholder (v', t) -> Placeholder (v', splice ~v ~tl t)
-    | Loop _ -> t.desc
-    | Continue _ -> t.desc
-  in
-  { t with desc; ty = tl.ty }
+  match t.desc with
+  | Return rt -> { t with desc = Let (v, rt, tl); ty = tl.ty }
+  | Let (v', b, t') -> { t with desc = Let (v', b, splice ~v ~tl t'); ty = tl.ty }
+  | Placeholder (v', t') -> { t with desc = Placeholder (v', splice ~v ~tl t') }
+  | Loop _ | Continue _ -> { t with ty = tl.ty }
 ;;
 
 let is_known_record records (a : atom) =
@@ -289,65 +285,4 @@ let inline (tops : top list) : top list =
     | Extern _ | TypeDef _ -> top)
 ;;
 
-(* ========== Generalised case-of-known-constructor ========== *)
-
-let rec returns_record (a : anf) : bool =
-  match a.desc with
-  | Return t -> term_returns_record t
-  | Let (_, _, tl) | Placeholder (_, tl) -> returns_record tl
-  | Loop _ | Continue _ -> false
-
-and term_returns_record (t : term) : bool =
-  match t.desc with
-  | Record _ -> true
-  | If (_, t, e) -> returns_record t && returns_record e
-  | Switch (_, cases) -> List.for_all cases ~f:(fun (_, b) -> returns_record b)
-  | _ -> false
-;;
-
-let rec expose_anf (a : anf) : anf =
-  let desc : anf_desc =
-    match a.desc with
-    | Let (v, scrut, k) ->
-      let scrut = expose_term scrut in
-      let k = expose_anf k in
-      (match scrut.desc with
-       | (If _ | Switch _) when term_returns_record scrut ->
-         let arm a = splice ~v ~tl:k a in
-         let scrut_desc : term_desc =
-           match scrut.desc with
-           | If (c, t, f) -> If (c, arm t, arm f)
-           | Switch (s, cs) -> Switch (s, List.map cs ~f:(fun (l, b) -> l, arm b))
-           | _ -> scrut.desc
-         in
-         Return { scrut with desc = scrut_desc; ty = k.ty }
-       | _ -> Let (v, scrut, k))
-    | Return t -> Return (expose_term t)
-    | Placeholder (v, k) -> Placeholder (v, expose_anf k)
-    | Loop (params, body) -> Loop (params, expose_anf body)
-    | Continue args -> Continue args
-  in
-  { a with desc }
-
-and expose_term (t : term) : term =
-  let desc : term_desc =
-    match t.desc with
-    | If (c, t, e) -> If (c, expose_anf t, expose_anf e)
-    | Switch (s, cs) -> Switch (s, List.map cs ~f:(fun (l, b) -> l, expose_anf b))
-    | d -> d
-  in
-  { t with desc }
-;;
-
-(** Rewrites [let v = (if c then K1(...) else K2(...)) in k] into
-   [if c then (let v = K1(...) in k) else (let v = K2(...) in k)], so
-   each copy of [k] sees [v] as a known constr so they later [Const_fold] *)
-let expose_known_constructors (tops : top list) : top list =
-  List.map tops ~f:(fun top ->
-    match top.desc with
-    | Define d -> { top with desc = Define { d with body = expose_anf d.body } }
-    | Const (n, b) -> { top with desc = Const (n, expose_anf b) }
-    | Extern _ | TypeDef _ -> top)
-;;
-
-let rewrite (Program tops : t) : t = Program (inline (expose_known_constructors tops))
+let rewrite (Program tops : t) : t = Program (inline tops)
