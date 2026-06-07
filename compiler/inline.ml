@@ -1,5 +1,5 @@
 open Core
-open Remove_placeholder
+open Anf
 
 (* ========== Instantiating a body ========== *)
 
@@ -36,20 +36,6 @@ let instantiate ~formals ~actuals ~body =
         let env = bind env v in
         let subst = Map.remove subst v in
         Let (lookup env v, t, on_anf subst env k)
-      | Placeholder (v, k) ->
-        let env = bind env v in
-        let subst = Map.remove subst v in
-        Placeholder (lookup env v, on_anf subst env k)
-      | Loop (params, body) ->
-        let inits = List.map params ~f:(fun (n, init) -> n, on_atom ~subst ~env init) in
-        let env, subst, rev_params =
-          List.fold inits ~init:(env, subst, []) ~f:(fun (env, subst, acc) (n, init) ->
-            let env = bind env n in
-            let subst = Map.remove subst n in
-            env, subst, (lookup env n, init) :: acc)
-        in
-        Loop (List.rev rev_params, on_anf subst env body)
-      | Continue args -> Continue (List.map args ~f:(on_atom ~subst ~env))
     in
     { a with desc }
   and on_term subst env (t : term) =
@@ -78,10 +64,7 @@ let instantiate ~formals ~actuals ~body =
 let rec size_anf (a : anf) =
   match a.desc with
   | Return t -> size_term t
-  | Continue _ -> 0
   | Let (_, b, tl) -> 1 + size_term b + size_anf tl
-  | Placeholder (_, tl) -> size_anf tl
-  | Loop (_, body) -> 1 + size_anf body
 
 and size_term (t : term) =
   match t.desc with
@@ -91,30 +74,11 @@ and size_term (t : term) =
   | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Field _ -> 1
 ;;
 
-(** Does [a] contain a [Loop] *)
-let rec has_loop_anf (a : anf) =
-  match a.desc with
-  | Loop _ -> true
-  | Return t -> has_loop_term t
-  | Let (_, t, k) -> has_loop_term t || has_loop_anf k
-  | Placeholder (_, k) -> has_loop_anf k
-  | Continue _ -> false
-
-and has_loop_term (t : term) =
-  match t.desc with
-  | If (_, th, el) -> has_loop_anf th || has_loop_anf el
-  | Switch (_, cs) -> List.exists cs ~f:(fun (_, b) -> has_loop_anf b)
-  | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Field _ -> false
-;;
-
 let count_call_sites (tops : top list) : int String.Map.t =
   let rec on_anf (a : anf) acc =
     match a.desc with
     | Return t -> on_term t acc
-    | Continue _ -> acc
     | Let (_, t, tl) -> acc |> on_term t |> on_anf tl
-    | Placeholder (_, tl) -> on_anf tl acc
-    | Loop (_, body) -> on_anf body acc
   and on_term (t : term) acc =
     match t.desc with
     | App (f, _) ->
@@ -143,10 +107,7 @@ let projects_formal (formals : (string * Lower_variants.ty) list) (body : anf) :
   let rec on_anf (a : anf) =
     match a.desc with
     | Return t -> on_term t
-    | Continue _ -> false
     | Let (_, t, k) -> on_term t || on_anf k
-    | Placeholder (_, k) -> on_anf k
-    | Loop (_, body) -> on_anf body
   and on_term (t : term) =
     match t.desc with
     | Field (a, _) -> is_formal a
@@ -174,7 +135,7 @@ let collect_entries (tops : top list) : entry String.Map.t =
   let call_count n = Map.find counts n |> Option.value ~default:0 in
   List.fold tops ~init:String.Map.empty ~f:(fun acc top ->
     match top.desc with
-    | Define { name; args; body; _ } when not (has_loop_anf body) ->
+    | Define { name; recur = Nonrec; args; body; _ } ->
       let guard =
         if size_anf body <= 3 || call_count name = 1
         then Some Unconditional
@@ -196,13 +157,11 @@ let collect_record_const_names (tops : top list) : String.Set.t =
       (match t.desc with
        | Record _ -> true
        | _ -> false)
-    | Let (_, _, tl) | Placeholder (_, tl) -> returns_record tl
-    | Loop _ | Continue _ -> false
+    | Let (_, _, tl) -> returns_record tl
   in
   List.fold tops ~init:String.Set.empty ~f:(fun acc top ->
     match top.desc with
-    | Const (name, body) when (not (has_loop_anf body)) && returns_record body ->
-      Set.add acc name
+    | Const (name, body) when returns_record body -> Set.add acc name
     | Define _ | Const _ | Extern _ | TypeDef _ -> acc)
 ;;
 
@@ -212,8 +171,6 @@ let rec splice ~v ~tl (t : anf) =
   match t.desc with
   | Return rt -> { t with desc = Let (v, rt, tl); ty = tl.ty }
   | Let (v', b, t') -> { t with desc = Let (v', b, splice ~v ~tl t'); ty = tl.ty }
-  | Placeholder (v', t') -> { t with desc = Placeholder (v', splice ~v ~tl t') }
-  | Loop _ | Continue _ -> { t with ty = tl.ty }
 ;;
 
 let is_known_record records (a : atom) =
@@ -249,7 +206,6 @@ let try_inline entries records (t : term) : anf option =
 let rec rewrite_anf entries records (a : anf) : anf =
   let go = rewrite_anf entries records in
   match a.desc with
-  | Continue _ -> a
   | Return t ->
     (match try_inline entries records t with
      | Some body -> go body
@@ -259,8 +215,6 @@ let rec rewrite_anf entries records (a : anf) : anf =
     (match try_inline entries records t with
      | Some body -> go (splice ~v ~tl body)
      | None -> { a with desc = Let (v, rewrite_term entries records t, tl) })
-  | Placeholder (v, k) -> { a with desc = Placeholder (v, go k) }
-  | Loop (params, body) -> { a with desc = Loop (params, go body) }
 
 and rewrite_term entries records (t : term) : term =
   let go = rewrite_anf entries records in

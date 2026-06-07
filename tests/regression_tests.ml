@@ -362,8 +362,9 @@ let%expect_test "regression - placeholder structs and variants in tail position"
                     continue;
                 }
             } else {
-                box _tmp;
-                return _tmp;
+                vec3 _zero = vec3(0., 0., 0.);
+                box _zero_0 = box(_zero);
+                return _zero_0;
             }
         }
     }
@@ -1228,32 +1229,34 @@ let%expect_test "DFn promotion of fields in user-declared variant type" =
     };
     uniform float u_pick;
     vec3 main_pure(vec2 coord) {
-        bool anf_1 = (u_pick > 0.5);
+        bool anf_6 = (u_pick > 0.5);
         material m_0;
-        if (anf_1) {
+        if (anf_6) {
             DFn w_0 = DFn(0, 3.);
             DFn_0 nw_0 = DFn_0(0, w_0, 0.);
-            DFn_0 _tmp_2;
-            m_0 = material(1, _tmp_2, nw_0, 64.);
+            DFn anf_0_0 = DFn(0, 0.);
+            DFn_0 anf_1_0 = DFn_0(0, anf_0_0, 0.);
+            m_0 = material(1, anf_1_0, nw_0, 64.);
         } else {
-            DFn _tmp_0_0;
-            DFn_0 anf_0_0 = DFn_0(1, _tmp_0_0, 2.);
-            DFn_0 _tmp_1_0;
-            m_0 = material(0, anf_0_0, _tmp_1_0, 0.);
+            DFn anf_2_0 = DFn(0, 0.);
+            DFn_0 anf_3_0 = DFn_0(1, anf_2_0, 2.);
+            DFn anf_4_0 = DFn(0, 0.);
+            DFn_0 anf_5_0 = DFn_0(0, anf_4_0, 0.);
+            m_0 = material(0, anf_3_0, anf_5_0, 0.);
         }
-        vec3 anf_2 = vec3(0., 0., 0.);
+        vec3 anf_7 = vec3(0., 0., 0.);
         int _lv_tag_0_0 = m_0.tag;
         switch (_lv_tag_0_0) {
             case 0: {
                 DFn_0 _lv_Lambert_0_0 = m_0.Lambert_0;
-                return dapply_0(_lv_Lambert_0_0, anf_2);
+                return dapply_0(_lv_Lambert_0_0, anf_7);
                 break;
             }
             default: {
                 DFn_0 _lv_Phong_0_0 = m_0.Phong_0;
                 float _lv_Phong_1_0 = m_0.Phong_1;
-                vec3 anf_3 = dapply_0(_lv_Phong_0_0, anf_2);
-                return (anf_3 * _lv_Phong_1_0);
+                vec3 anf_8 = dapply_0(_lv_Phong_0_0, anf_7);
+                return (anf_8 * _lv_Phong_1_0);
                 break;
             }
         }
@@ -1308,39 +1311,41 @@ let%expect_test "placeholder is wrong type" =
     };
     const vec3 ro = vec3(0., 0., 0.);
     vec3 main_pure(vec2 coord) {
-        hit _tmp_0;
-        option_0 anf_3_0 = option_0(1, _tmp_0);
+        vec3 anf_2_0 = vec3(0., 0., 0.);
+        vec3 anf_3_0 = vec3(0., 0., 0.);
+        hit anf_4_0 = hit(0., anf_2_0, anf_3_0);
+        option_0 anf_5_0 = option_0(1, anf_4_0);
         float b_2 = dot(ro, ro);
-        bool anf_7 = (b_2 < 0.);
-        option anf_2_1;
-        if (anf_7) {
-            anf_2_1 = option(1, 0.);
+        bool anf_8 = (b_2 < 0.);
+        option _lv_scrut_2;
+        if (anf_8) {
+            _lv_scrut_2 = option(1, 0.);
         } else {
             bool anf_0_2 = (b_2 > 0.1);
             if (anf_0_2) {
-                anf_2_1 = option(0, b_2);
+                _lv_scrut_2 = option(0, b_2);
             } else {
                 bool anf_1_2 = (b_2 > 0.01);
                 if (anf_1_2) {
-                    anf_2_1 = option(0, b_2);
+                    _lv_scrut_2 = option(0, b_2);
                 } else {
-                    anf_2_1 = option(1, 0.);
+                    _lv_scrut_2 = option(1, 0.);
                 }
             }
         }
-        int _lv_tag_2 = anf_2_1.tag;
-        option_0 anf_4;
+        int _lv_tag_2 = _lv_scrut_2.tag;
+        option_0 _lv_scrut_0;
         switch (_lv_tag_2) {
             case 1: {
-                anf_4 = anf_3_0;
+                _lv_scrut_0 = anf_5_0;
                 break;
             }
             default: {
-                anf_4 = anf_3_0;
+                _lv_scrut_0 = anf_5_0;
                 break;
             }
         }
-        int _lv_tag_0 = anf_4.tag;
+        int _lv_tag_0 = _lv_scrut_0.tag;
         switch (_lv_tag_0) {
             case 1: {
                 return ro;

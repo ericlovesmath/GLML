@@ -27,18 +27,17 @@
    uncurry
    defunctionalize
    lambda_lift
-
-   ; ANF Form
-   anf
-   tail_call
    lower_variants
-   remove_placeholder
+   anf
+
+   ; Optimization
    inline
    const_fold
    dce
-   lift_consts
 
    ; GLSL Passes
+   lift_consts
+   tail_call
    translate
    patch_main
    glsl)

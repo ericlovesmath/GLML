@@ -17,7 +17,7 @@ let to_glsl_ty (loc : Lexer.loc) (ty : Lower_variants.ty) : ty =
     raise "unexpected type" ~loc ~d:[%message (ty : Lower_variants.ty)]
 ;;
 
-let to_glsl_atom (a : Remove_placeholder.atom) : term =
+let to_glsl_atom (a : Anf.atom) : term =
   match a.desc with
   | Var v -> Var v
   | Float f -> Float f
@@ -25,7 +25,7 @@ let to_glsl_atom (a : Remove_placeholder.atom) : term =
   | Bool b -> Bool b
 ;;
 
-let to_glsl_term (t : Remove_placeholder.term) : term =
+let to_glsl_term (t : Tail_call.term) : term =
   match t.desc with
   | Atom a -> to_glsl_atom a
   | Bop (op, l, r) -> Bop (op, to_glsl_atom l, to_glsl_atom r)
@@ -45,16 +45,14 @@ let to_glsl_term (t : Remove_placeholder.term) : term =
      | _ -> raise "Record term does not have type [record]")
   | Field (a, f) -> Swizzle (to_glsl_atom a, f)
   | App (f, args) -> App (f, List.map args ~f:to_glsl_atom)
-  | If _ ->
-    raise "should be in [translate_anf]" ~d:[%message (t : Remove_placeholder.term)]
-  | Switch _ ->
-    raise "should be in [translate_anf]" ~d:[%message (t : Remove_placeholder.term)]
+  | If _ -> raise "should be in [translate_anf]" ~d:[%message (t : Tail_call.term)]
+  | Switch _ -> raise "should be in [translate_anf]" ~d:[%message (t : Tail_call.term)]
 ;;
 
 let translate_return
-      (translate_sub : Remove_placeholder.anf -> stmt list)
+      (translate_sub : Tail_call.anf -> stmt list)
       (k : term -> stmt)
-      (t : Remove_placeholder.term)
+      (t : Tail_call.term)
   : stmt list
   =
   match t.desc with
@@ -85,10 +83,7 @@ let emit_return ctx t =
   | Some v -> Set (Var v, t)
 ;;
 
-let translate_continue
-      ~(loc : Lexer.loc)
-      (params : string list)
-      (args : Remove_placeholder.atom list)
+let translate_continue ~(loc : Lexer.loc) (params : string list) (args : Anf.atom list)
   : stmt list
   =
   let writes =
@@ -126,7 +121,7 @@ let translate_continue
 let rec translate_let
           (ctx : ctx)
           (v : string)
-          (bind : Remove_placeholder.term)
+          (bind : Tail_call.term)
           (ty : ty)
           (tail : stmt list)
   : stmt list
@@ -138,14 +133,11 @@ let rec translate_let
     (Decl (None, ty, v, None) :: sub) @ tail
   | _ -> Decl (None, ty, v, Some (to_glsl_term bind)) :: tail
 
-and translate_anf (ctx : ctx) (anf : Remove_placeholder.anf) : stmt list =
+and translate_anf (ctx : ctx) (anf : Tail_call.anf) : stmt list =
   match anf.desc with
   | Let (v, bind, body) ->
     let ty = to_glsl_ty bind.loc bind.ty in
     translate_let ctx v bind ty (translate_anf ctx body)
-  | Placeholder (v, body) ->
-    let ty = to_glsl_ty anf.loc anf.ty in
-    Decl (None, ty, v, None) :: translate_anf ctx body
   | Return t -> translate_return (translate_anf ctx) (emit_return ctx) t
   | Loop (params, body) -> translate_loop params body
   | Continue args ->
@@ -153,11 +145,7 @@ and translate_anf (ctx : ctx) (anf : Remove_placeholder.anf) : stmt list =
      | Some names -> translate_continue ~loc:anf.loc names args
      | None -> raise "Continue outside of Loop" ~loc:anf.loc)
 
-and translate_loop
-      (params : (string * Remove_placeholder.atom) list)
-      (body : Remove_placeholder.anf)
-  : stmt list
-  =
+and translate_loop (params : (string * Anf.atom) list) (body : Tail_call.anf) : stmt list =
   let decls =
     List.filter_map params ~f:(fun (name, init) ->
       match init.desc with
@@ -186,20 +174,20 @@ let build_const_term body =
     | Swizzle (t, s) -> Swizzle (subst subs t, s)
     | Index (t, i) -> Index (subst subs t, i)
   in
-  let rec go subs (anf : Remove_placeholder.anf) : term option =
+  let rec go subs (anf : Tail_call.anf) : term option =
     match anf.desc with
     | Return t -> Some (subst subs (to_glsl_term t))
     | Let (v, bind, rest) ->
       let bind = subst subs (to_glsl_term bind) in
       go (Map.set subs ~key:v ~data:bind) rest
-    | Placeholder _ | Loop _ | Continue _ -> None
+    | Loop _ | Continue _ -> None
   in
   go String.Map.empty body
 ;;
 
-let translate_exn (Program tops : Remove_placeholder.t) : Glsl.t =
+let translate_exn (Program tops : Tail_call.t) : Glsl.t =
   let tops =
-    List.map tops ~f:(fun (top : Remove_placeholder.top) ->
+    List.map tops ~f:(fun (top : Tail_call.top) ->
       let loc = top.loc in
       match top.desc with
       | Define { name; args; body; ret_ty } ->

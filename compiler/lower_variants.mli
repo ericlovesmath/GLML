@@ -9,32 +9,21 @@ type ty =
 
 type type_decl = RecordDecl of (string * ty) list [@@deriving sexp_of]
 
-type atom_desc =
+type term_desc =
   | Var of string
   | Float of float
   | Int of int
   | Bool of bool
-  | Temp
-[@@deriving sexp_of]
-
-type atom =
-  { desc : atom_desc
-  ; ty : ty
-  ; loc : Lexer.loc
-  }
-[@@deriving sexp_of]
-
-type term_desc =
-  | Atom of atom
-  | Bop of Glsl.binary_op * atom * atom
-  | Vec of int * atom list
-  | Index of atom * int
-  | Builtin of Glsl.builtin * atom list
-  | App of string * atom list
-  | If of atom * anf * anf
-  | Record of atom list
-  | Field of atom * string
-  | Switch of atom * (Glsl.switch_case * anf) list
+  | Vec of int * term list
+  | App of string * term list
+  | Let of string * term * term
+  | If of term * term * term
+  | Bop of Glsl.binary_op * term * term
+  | Index of term * int
+  | Builtin of Glsl.builtin * term list
+  | Record of term list
+  | Field of term * string
+  | Switch of term * (Glsl.switch_case * term) list
 [@@deriving sexp_of]
 
 and term =
@@ -44,28 +33,15 @@ and term =
   }
 [@@deriving sexp_of]
 
-and anf_desc =
-  | Let of string * term * anf
-  | Return of term
-  | Loop of (string * atom) list * anf
-  | Continue of atom list
-[@@deriving sexp_of]
-
-and anf =
-  { desc : anf_desc
-  ; ty : ty
-  ; loc : Lexer.loc
-  }
-[@@deriving sexp_of]
-
 type top_desc =
   | Define of
       { name : string
+      ; recur : Frontend.recur
       ; args : (string * ty) list
-      ; body : anf
+      ; body : term
       ; ret_ty : ty
       }
-  | Const of string * anf
+  | Const of string * term
   | Extern of string
   | TypeDef of string * type_decl
 [@@deriving sexp_of]
@@ -80,4 +56,4 @@ type top =
 type t = Program of top list [@@deriving sexp_of]
 
 (** Removes variants and replaces them with tagged structs *)
-val lower : Tail_call.t -> t Compiler_error.t
+val lower : Lambda_lift.t -> t Compiler_error.t

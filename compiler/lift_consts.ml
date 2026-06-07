@@ -1,5 +1,5 @@
 open Core
-open Remove_placeholder
+open Anf
 
 (* [externs] is the set of names treated as non-constable *)
 let is_constable_atom (externs : String.Set.t) (a : atom) =
@@ -22,7 +22,6 @@ let rec is_constable (externs : String.Set.t) (a : anf) =
   match a.desc with
   | Return t -> is_constable_term externs t
   | Let (_, bind, tl) -> is_constable_term externs bind && is_constable externs tl
-  | Placeholder _ | Loop _ | Continue _ -> false
 ;;
 
 (* Collect the names of [Const] nodes that must be promoted to zero-arg functions *)
@@ -121,33 +120,17 @@ and rewrite_anf (promoted : String.Set.t) (anf : anf) : anf =
     let binds, bind = rewrite_branching promoted bind in
     let tl = rewrite_anf promoted tl in
     make_binds binds { anf with desc = Let (v, bind, tl) }
-  | Loop (params, body) ->
-    let binds, params =
-      List.map params ~f:(fun (n, a) ->
-        let b, a = lift_atom promoted a in
-        b, (n, a))
-      |> List.unzip
-    in
-    let binds = List.concat binds in
-    let body = rewrite_anf promoted body in
-    make_binds binds { anf with desc = Loop (params, body) }
-  | Continue args ->
-    let bindss, args = List.map args ~f:(lift_atom promoted) |> List.unzip in
-    let binds = List.concat bindss in
-    make_binds binds { anf with desc = Continue args }
-  | Placeholder (v, body) ->
-    { anf with desc = Placeholder (v, rewrite_anf promoted body) }
 ;;
 
 let rewrite_top (promoted : String.Set.t) (top : top) : top =
   match top.desc with
   | Const (name, anf) when Set.mem promoted name ->
     let body = rewrite_anf promoted anf in
-    { top with desc = Define { name; args = []; body; ret_ty = top.ty } }
+    { top with desc = Define { name; recur = Nonrec; args = []; body; ret_ty = top.ty } }
   | Const (name, anf) -> { top with desc = Const (name, rewrite_anf promoted anf) }
-  | Define { name; args; body; ret_ty } ->
+  | Define { name; recur; args; body; ret_ty } ->
     let body = rewrite_anf promoted body in
-    { top with desc = Define { name; args; body; ret_ty } }
+    { top with desc = Define { name; recur; args; body; ret_ty } }
   | Extern _ | TypeDef _ -> top
 ;;
 

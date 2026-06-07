@@ -1,5 +1,5 @@
 open Core
-open Remove_placeholder
+open Anf
 
 module Err = Compiler_error.Pass (struct
     let name = "dce"
@@ -25,7 +25,6 @@ let vars_of_atoms atoms = List.filter_map atoms ~f:var_of_atom |> String.Set.of_
 (** Backward liveness analysis with simultaneous rewrite *)
 let rec liveness_anf ~(live : String.Set.t) (a : anf) : anf * String.Set.t =
   match a.desc with
-  | Continue args -> { a with desc = Continue args }, vars_of_atoms args
   | Return t ->
     let t, live = liveness_term ~live t in
     { a with desc = Return t }, live
@@ -37,25 +36,6 @@ let rec liveness_anf ~(live : String.Set.t) (a : anf) : anf * String.Set.t =
       let b, live_b = liveness_term ~live b in
       let live = Set.union (Set.remove live_t v) live_b in
       { a with desc = Let (v, b, t) }, live)
-  | Placeholder (v, t) ->
-    let t, live_t = liveness_anf ~live t in
-    if Set.mem live_t v
-    then { a with desc = Placeholder (v, t) }, Set.remove live_t v
-    else t, live_t
-  | Loop (params, body) ->
-    (* Nothing can come after a [Loop], so we compute body liveness to fixed
-       point, subtract param names, then add the variables referenced by inits *)
-    let param_names = String.Set.of_list (List.map params ~f:fst) in
-    let rec fix prev =
-      let _, live = liveness_anf ~live:prev body in
-      let next = Set.union prev live in
-      if Set.equal prev next then prev else fix next
-    in
-    let live_body = fix String.Set.empty in
-    let body, _ = liveness_anf ~live:live_body body in
-    let live_inits = vars_of_atoms (List.map params ~f:snd) in
-    let live = Set.union (Set.diff live_body param_names) live_inits in
-    { a with desc = Loop (params, body) }, live
 
 and liveness_term ~(live : String.Set.t) (t : term) : term * String.Set.t =
   match t.desc with
@@ -76,9 +56,9 @@ and liveness_term ~(live : String.Set.t) (t : term) : term * String.Set.t =
 
 let liveness_top (top : top) : top =
   match top.desc with
-  | Define { name; args; body; ret_ty } ->
+  | Define { name; recur; args; body; ret_ty } ->
     let body, _ = liveness_anf ~live:String.Set.empty body in
-    { top with desc = Define { name; args; body; ret_ty } }
+    { top with desc = Define { name; recur; args; body; ret_ty } }
   | Const (name, anf) ->
     let anf, _ = liveness_anf ~live:String.Set.empty anf in
     { top with desc = Const (name, anf) }
@@ -111,17 +91,12 @@ and anf_refs acc (a : anf) =
   match a.desc with
   | Return t -> term_refs acc t
   | Let (_, b, t) -> anf_refs (term_refs acc b) t
-  | Placeholder (_, t) -> anf_refs acc t
-  | Loop (params, body) ->
-    let acc = params |> List.map ~f:snd |> List.fold ~init:acc ~f:atom_refs in
-    anf_refs acc body
-  | Continue args -> List.fold args ~init:acc ~f:atom_refs
 ;;
 
 let top_refs (top : top) : String.Set.t =
   let empty = String.Set.empty in
   match top.desc with
-  | Define { name = _; args; body; ret_ty } ->
+  | Define { name = _; recur = _; args; body; ret_ty } ->
     List.fold (ret_ty :: List.map args ~f:snd) ~init:(anf_refs empty body) ~f:ty_refs
   | Const (_, body) -> anf_refs empty body
   | TypeDef (_, RecordDecl fields) ->

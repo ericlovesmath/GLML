@@ -1,5 +1,6 @@
 open Core
 open Anf
+open Lower_variants
 open Sexplib.Sexp
 
 include Compiler_error.Pass (struct
@@ -16,12 +17,11 @@ type term_desc =
   | If of atom * anf * anf
   | Record of atom list
   | Field of atom * string
-  | Variant of string * atom list
-  | Match of atom * (Frontend.pat * anf) list
+  | Switch of atom * (Glsl.switch_case * anf) list
 
 and term =
   { desc : term_desc
-  ; ty : Lower_tuples.ty
+  ; ty : Lower_variants.ty
   ; loc : Lexer.loc
   }
 
@@ -33,7 +33,7 @@ and anf_desc =
 
 and anf =
   { desc : anf_desc
-  ; ty : Lower_tuples.ty
+  ; ty : Lower_variants.ty
   ; loc : Lexer.loc
   }
 
@@ -49,11 +49,16 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | If (c, t, e) -> List [ Atom "if"; sexp_of_atom c; sexp_of_anf t; sexp_of_anf e ]
   | Record ts -> List (Atom "record" :: List.map ts ~f:sexp_of_atom)
   | Field (t, f) -> List [ Atom "."; sexp_of_atom t; Atom f ]
-  | Variant (ctor, args) ->
-    List (Atom "Variant" :: Atom ctor :: List.map args ~f:sexp_of_atom)
-  | Match (scrutinee, cases) ->
-    let sexp_of_case (pat, body) = List [ Frontend.sexp_of_pat pat; sexp_of_anf body ] in
-    List (Atom "match" :: sexp_of_atom scrutinee :: List.map cases ~f:sexp_of_case)
+  | Switch (tag, cases) ->
+    let sexp_of_case (label, body) =
+      let label =
+        match label with
+        | Glsl.Case i -> Int.to_string i
+        | Glsl.Default -> "default"
+      in
+      List [ Atom label; sexp_of_anf body ]
+    in
+    List (Atom "switch" :: sexp_of_atom tag :: List.map cases ~f:sexp_of_case)
 
 and sexp_of_term t = sexp_of_term_desc t.desc
 
@@ -71,19 +76,17 @@ and sexp_of_anf t = sexp_of_anf_desc t.desc
 type top_desc =
   | Define of
       { name : string
-      ; args : (string * Lower_tuples.ty) list
+      ; args : (string * Lower_variants.ty) list
       ; body : anf
-      ; ret_ty : Lower_tuples.ty
+      ; ret_ty : Lower_variants.ty
       }
   | Const of string * anf
   | Extern of string
-  | TypeDef of string * Lower_tuples.type_decl
+  | TypeDef of string * Lower_variants.type_decl
 
 let sexp_of_top_desc = function
   | Define { name; args; body; ret_ty = _ } ->
-    let args_sexp =
-      List.map args ~f:(fun (v, ty) -> List [ Atom v; Lower_tuples.sexp_of_ty ty ])
-    in
+    let args_sexp = List.map args ~f:(fun (v, ty) -> List [ Atom v; sexp_of_ty ty ]) in
     List
       [ Atom "Define"
       ; List [ Atom "name"; Atom name ]
@@ -92,19 +95,16 @@ let sexp_of_top_desc = function
       ]
   | Const (name, term) -> List [ Atom "Const"; Atom name; sexp_of_anf term ]
   | Extern name -> List [ Atom "Extern"; Atom name ]
-  | TypeDef (name, decl) ->
-    List [ Atom "TypeDef"; Atom name; Lower_tuples.sexp_of_type_decl decl ]
+  | TypeDef (name, decl) -> List [ Atom "TypeDef"; Atom name; sexp_of_type_decl decl ]
 ;;
 
 type top =
   { desc : top_desc
-  ; ty : Lower_tuples.ty
+  ; ty : Lower_variants.ty
   ; loc : Lexer.loc
   }
 
-let sexp_of_top t =
-  List [ sexp_of_top_desc t.desc; Atom ":"; Lower_tuples.sexp_of_ty t.ty ]
-;;
+let sexp_of_top t = List [ sexp_of_top_desc t.desc; Atom ":"; sexp_of_ty t.ty ]
 
 type t = Program of top list
 
@@ -122,9 +122,7 @@ let rec of_term (t : Anf.term) : term =
   | Field (a, f) -> pure (Field (a, f))
   | App (f, xs) -> pure (App (f, xs))
   | If (c, t, f) -> pure (If (c, of_anf t, of_anf f))
-  | Variant (ctor, args) -> pure (Variant (ctor, args))
-  | Match (scrutinee, cases) ->
-    pure (Match (scrutinee, List.map cases ~f:(Tuple2.map_snd ~f:of_anf)))
+  | Switch (s, cases) -> pure (Switch (s, List.map cases ~f:(Tuple2.map_snd ~f:of_anf)))
 
 and of_anf (anf : Anf.anf) : anf =
   let pure desc : anf = { desc; ty = anf.ty; loc = anf.loc } in
@@ -133,24 +131,72 @@ and of_anf (anf : Anf.anf) : anf =
   | Return tail -> pure (Return (of_term tail))
 ;;
 
+type record_tenv = (string * ty) list String.Map.t
+
+(** Typed zero literal for placeholder *)
+let rec zero_atom (tenv : record_tenv) ~loc (ty : ty) : (anf -> anf) * atom =
+  let mk_atom (desc : atom_desc) : atom = { desc; ty; loc } in
+  match ty with
+  | TyFloat -> Fn.id, mk_atom (Float 0.0)
+  | TyInt -> Fn.id, mk_atom (Int 0)
+  | TyBool -> Fn.id, mk_atom (Bool false)
+  | TyVec (n, inner) ->
+    let comps = List.init n ~f:(fun _ -> zero_atom tenv ~loc inner) in
+    let prefixes = List.map comps ~f:fst in
+    let atoms = List.map comps ~f:snd in
+    let v = Utils.fresh "_zero" in
+    let bind : term = { desc = Vec (n, atoms); ty; loc } in
+    let wrap : anf -> anf =
+      fun tail ->
+      let outer : anf = { desc = Let (v, bind, tail); ty = tail.ty; loc } in
+      List.fold_right prefixes ~init:outer ~f:(fun p acc -> p acc)
+    in
+    wrap, mk_atom (Var v)
+  | TyRecord name ->
+    (match Map.find tenv name with
+     | None -> raise "unknown record type in zero_anf" ~loc ~d:[%message (name : string)]
+     | Some fields ->
+       let comps = List.map fields ~f:(fun (_, fty) -> zero_atom tenv ~loc fty) in
+       let prefixes = List.map comps ~f:fst in
+       let atoms = List.map comps ~f:snd in
+       let v = Utils.fresh "_zero" in
+       let bind : term = { desc = Record atoms; ty; loc } in
+       let wrap : anf -> anf =
+         fun tail ->
+         let outer : anf = { desc = Let (v, bind, tail); ty = tail.ty; loc } in
+         List.fold_right prefixes ~init:outer ~f:(fun p acc -> p acc)
+       in
+       wrap, mk_atom (Var v))
+  | TyArrow _ -> raise "no zero for arrow type" ~loc
+;;
+
+let zero_anf (tenv : record_tenv) ~loc (ty : ty) : anf =
+  let prefix, final = zero_atom tenv ~loc ty in
+  let final_term : term = { desc = Atom final; ty; loc } in
+  let final_anf : anf = { desc = Return final_term; ty; loc } in
+  prefix final_anf
+;;
+
+(* ============== Tail-call patching ============== *)
+
 let contains_call (t : Anf.term) (v : string) : bool =
-  let rec contains_call_term (t : Anf.term) : bool =
+  let rec on_term (t : Anf.term) : bool =
     match t.desc with
     | App (f, _) -> String.equal f v
-    | If (_, t, f) -> contains_call_anf t || contains_call_anf f
-    | Match (_, cases) -> List.exists cases ~f:(fun (_, body) -> contains_call_anf body)
-    | _ -> false
-  and contains_call_anf (a : Anf.anf) : bool =
+    | If (_, t, f) -> on_anf t || on_anf f
+    | Switch (_, cases) -> List.exists cases ~f:(fun (_, body) -> on_anf body)
+    | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | Record _ | Field _ -> false
+  and on_anf (a : Anf.anf) : bool =
     match a.desc with
-    | Let (_, b, t) -> contains_call_term b || contains_call_anf t
-    | Return t -> contains_call_term t
+    | Let (_, b, t) -> on_term b || on_anf t
+    | Return t -> on_term t
   in
-  contains_call_term t
+  on_term t
 ;;
 
 let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) : anf =
   let rec patch (anf : Anf.anf) : anf =
-    let atom (desc : atom_desc) = ({ desc; ty = anf.ty; loc = anf.loc } : atom) in
+    let mk_atom (desc : atom_desc) : atom = { desc; ty = anf.ty; loc = anf.loc } in
     let pure desc : anf = { desc; ty = anf.ty; loc = anf.loc } in
     match anf.desc with
     | Let (v, bind, tail) ->
@@ -159,16 +205,16 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) : anf =
       else pure (Let (v, of_term bind, patch tail))
     | Return { desc = If (c, t, f); ty; loc } ->
       pure (Return { desc = If (c, patch t, patch f); ty; loc })
-    | Return { desc = Match (scrutinee, cases); ty; loc } ->
-      let cases = List.map cases ~f:(fun (pat, body) -> pat, patch body) in
-      pure (Return { desc = Match (scrutinee, cases); ty; loc })
+    | Return { desc = Switch (s, cases); ty; loc } ->
+      let cases = List.map cases ~f:(fun (lbl, body) -> lbl, patch body) in
+      pure (Return { desc = Switch (s, cases); ty; loc })
     | Return { desc = App (f, xs); ty = _; loc } when String.equal f name ->
       let tmp = Utils.fresh "_iter_inc" in
+      let int_atom desc : atom = { desc; ty = TyInt; loc } in
       let iter_inc : term =
-        let int_atom desc : atom = { desc; ty = TyInt; loc } in
         { desc = Bop (Add, int_atom (Var iter), int_atom (Int 1)); ty = TyInt; loc }
       in
-      let cont_args = atom (Var tmp) :: xs in
+      let cont_args = mk_atom (Var tmp) :: xs in
       let continue = pure (Continue cont_args) in
       pure (Let (tmp, iter_inc, continue))
     | Return tail -> pure (Return (of_term tail))
@@ -176,7 +222,7 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) : anf =
   patch anf
 ;;
 
-let remove_rec_top (top : Anf.top) : top =
+let remove_rec_top (tenv : record_tenv) (top : Anf.top) : top =
   let pure desc = { desc; ty = top.ty; loc = top.loc } in
   match top.desc with
   | Const (v, anf) -> pure (Const (v, of_anf anf))
@@ -195,14 +241,10 @@ let remove_rec_top (top : Anf.top) : top =
     in
     let cond_v = Utils.fresh "_lim_cond" in
     let bool_atom desc : atom = { desc; ty = TyBool; loc } in
-    let placeholder : anf =
-      let temp : atom = { desc = Temp; ty = ret_ty; loc } in
-      let term : term = { desc = Atom temp; ty = ret_ty; loc } in
-      { desc = Return term; ty = ret_ty; loc }
-    in
-    let body = patch_tail_anf body name iter in
+    let sentinel = zero_anf tenv ~loc ret_ty in
+    let patched = patch_tail_anf body name iter in
     let guard : anf =
-      let if_desc = If (bool_atom (Var cond_v), body, placeholder) in
+      let if_desc = If (bool_atom (Var cond_v), patched, sentinel) in
       let if_term : term = { desc = if_desc; ty = ret_ty; loc } in
       let return_if : anf = { desc = Return if_term; ty = ret_ty; loc } in
       { desc = Let (cond_v, cond, return_if); ty = ret_ty; loc }
@@ -217,5 +259,16 @@ let remove_rec_top (top : Anf.top) : top =
 ;;
 
 let remove_rec (Program tops : Anf.t) : t Compiler_error.t =
-  try_with (fun () -> Program (List.map ~f:remove_rec_top tops))
+  try_with (fun () ->
+    let tenv : record_tenv =
+      tops
+      |> List.filter_map ~f:(fun (top : Anf.top) ->
+        match top.desc with
+        | TypeDef (name, RecordDecl fields) -> Some (name, fields)
+        | _ -> None)
+      |> String.Map.of_alist_or_error
+      |> of_or_error
+      |> ok_exn
+    in
+    Program (List.map tops ~f:(remove_rec_top tenv)))
 ;;

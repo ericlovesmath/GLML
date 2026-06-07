@@ -1,7 +1,7 @@
 (* TODO: Builtin functions *)
 
 open Core
-open Remove_placeholder
+open Anf
 
 module Err = Compiler_error.Pass (struct
     let name = "const_fold"
@@ -336,8 +336,7 @@ let abs_of_term ctx (t : term) : value =
 let rec tail_abs ctx (a : anf) : value =
   match a.desc with
   | Return t -> abs_of_term ctx t
-  | Let (_, _, k) | Placeholder (_, k) -> tail_abs ctx k
-  | Loop _ | Continue _ -> Top
+  | Let (_, _, k) -> tail_abs ctx k
 ;;
 
 (** Resolve every [Alias _] through [env]; returns a value with no free names *)
@@ -358,8 +357,6 @@ let rec splice (a : anf) ~(k : term -> anf) : anf =
   match a.desc with
   | Return t -> k t
   | Let (v, t, tl) -> { a with desc = Let (v, t, splice tl ~k) }
-  | Placeholder (v, tl) -> { a with desc = Placeholder (v, splice tl ~k) }
-  | Loop _ | Continue _ -> a
 ;;
 
 (** [Picked]: scrutinee was a known constant, this arm is taken.
@@ -370,17 +367,8 @@ type branch_resolution =
 
 let rec rewrite_anf (ctx : ctx) (a : anf) : anf =
   match a.desc with
-  | Continue args ->
-    let args = List.map args ~f:(rewrite_atom ctx) in
-    { a with desc = Continue args }
   | Return t -> rewrite_return ctx a t
   | Let (v, t, k) -> rewrite_let ctx a v t k
-  | Placeholder (v, k) ->
-    { a with desc = Placeholder (v, rewrite_anf (bind ctx v Top) k) }
-  | Loop (params, body) ->
-    let params = List.map params ~f:(fun (n, init) -> n, rewrite_atom ctx init) in
-    let ctx = List.fold params ~init:ctx ~f:(fun ctx (n, _) -> bind ctx n Top) in
-    { a with desc = Loop (params, rewrite_anf ctx body) }
 
 and rewrite_return ctx a t =
   match t.desc with
@@ -450,16 +438,14 @@ let rewrite_top
         | Let (v, t, k) ->
           let value = abs_of_term ctx t in
           tail_in (Map.set local_env ~key:v ~data:value) k
-        | Placeholder (_, k) -> tail_in local_env k
-        | Loop _ | Continue _ -> Top
       in
       match tail_in env anf with
       | Top -> env
       | grounded -> Map.set env ~key:name ~data:grounded
     in
     { top with desc = Const (name, anf) }, env
-  | Define { name; args; body; ret_ty } ->
-    { top with desc = Define { name; args; body = rewrite body; ret_ty } }, env
+  | Define { name; recur; args; body; ret_ty } ->
+    { top with desc = Define { name; recur; args; body = rewrite body; ret_ty } }, env
   | Extern _ | TypeDef _ -> top, env
 ;;
 

@@ -14,12 +14,11 @@ module Passes : sig
     | Uncurry
     | Lambda_lift
     | Defunctionalize
-    | Anf
-    | Tail_call
     | Lower_variants
-    | Remove_placeholder
+    | Anf
     | Optimize
     | Lift_consts
+    | Tail_call
     | Translate
     | Patch_main
   [@@deriving sexp_of, enumerate, string]

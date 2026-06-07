@@ -15,12 +15,11 @@ module Passes = struct
       | Uncurry
       | Lambda_lift
       | Defunctionalize
-      | Anf
-      | Tail_call
       | Lower_variants
-      | Remove_placeholder
+      | Anf
       | Optimize
       | Lift_consts
+      | Tail_call
       | Translate
       | Patch_main
     [@@deriving compare, sexp, enumerate, string ~capitalize:"lower sentence case"]
@@ -60,14 +59,10 @@ let compile
   trace Lambda_lift (Lambda_lift.sexp_of_t t);
   let%bind t = Defunctionalize.defunctionalize t in
   trace Defunctionalize (Lambda_lift.sexp_of_t t);
-  let%bind t = Anf.to_anf t in
-  trace Anf (Anf.sexp_of_t t);
-  let%bind t = Tail_call.remove_rec t in
-  trace Tail_call (Tail_call.sexp_of_t t);
   let%bind t = Lower_variants.lower t in
   trace Lower_variants (Lower_variants.sexp_of_t t);
-  let t = Remove_placeholder.remove t in
-  trace Remove_placeholder (Remove_placeholder.sexp_of_t t);
+  let%bind t = Anf.to_anf t in
+  trace Anf (Anf.sexp_of_t t);
   let t =
     if not optimize
     then t
@@ -78,11 +73,13 @@ let compile
         else t |> Inline.rewrite |> Const_fold.rewrite |> Dce.rewrite |> go (n - 1)
       in
       let t = go 3 t in
-      trace Optimize (Remove_placeholder.sexp_of_t t);
+      trace Optimize (Anf.sexp_of_t t);
       t)
   in
   let t = Lift_consts.lift t in
-  trace Lift_consts (Remove_placeholder.sexp_of_t t);
+  trace Lift_consts (Anf.sexp_of_t t);
+  let%bind t = Tail_call.remove_rec t in
+  trace Tail_call (Tail_call.sexp_of_t t);
   let%bind glsl = Translate.translate t in
   trace Translate (Glsl.sexp_of_t glsl);
   let%bind glsl = Patch_main.patch glsl in
