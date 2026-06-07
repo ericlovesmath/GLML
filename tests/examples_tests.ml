@@ -31,7 +31,8 @@ let%expect_test "compile examples" =
         float bot = min(anf_17, anf_18);
         return (top / bot);
     }
-    vec3 main_pure(vec2 coord_0) {
+    void main() {
+        vec2 coord_0 = gl_FragCoord.xy;
         vec2 p_1 = get_uv_m(coord_0);
         vec2 m = get_uv_m(u_mouse);
         float anf_2_6 = length(p_1);
@@ -96,11 +97,10 @@ let%expect_test "compile examples" =
         float anf_40 = smoothstep(0., 0.005, d_2);
         float anf_41 = (1. - anf_40);
         vec3 col_2 = mix(col_1, anf_39, anf_41);
-        return col_2;
-    }
-    void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        float anf_42 = col_2[0];
+        float anf_43 = col_2[1];
+        float anf_44 = col_2[2];
+        fragColor = vec4(anf_42, anf_43, anf_44, 1.);
     }
 
 
@@ -191,7 +191,8 @@ let%expect_test "compile examples" =
     const vec3 tooth_yel = vec3(0.94, 0.88, 0.62);
     uniform vec2 u_resolution;
     const vec3 wht = vec3(1., 0.97, 0.93);
-    vec3 main_pure(vec2 coord_0) {
+    void main() {
+        vec2 coord_0 = gl_FragCoord.xy;
         vec2 anf_48_0 = (2. * coord_0);
         vec2 top_0 = (anf_48_0 - u_resolution);
         float anf_49_0 = u_resolution[0];
@@ -468,11 +469,11 @@ let%expect_test "compile examples" =
         vec3 anf_237 = paint_w(0.0025, hi_l, wht, anf_236);
         vec3 anf_238 = paint_w(0.0025, hi_r, wht, anf_237);
         vec3 anf_239 = paint_w(0.0025, hi_l2, wht, anf_238);
-        return paint_w(0.0025, hi_r2, wht, anf_239);
-    }
-    void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        vec3 color = paint_w(0.0025, hi_r2, wht, anf_239);
+        float anf_240 = color[0];
+        float anf_241 = color[1];
+        float anf_242 = color[2];
+        fragColor = vec4(anf_240, anf_241, anf_242, 1.);
     }
 
 
@@ -534,7 +535,8 @@ let%expect_test "compile examples" =
     }
     uniform vec2 u_resolution;
     uniform float u_time;
-    vec3 main_pure(vec2 coord) {
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
         vec2 anf_19 = (2. * coord);
         vec2 top = (anf_19 - u_resolution);
         float anf_20 = u_resolution[0];
@@ -552,9 +554,10 @@ let%expect_test "compile examples" =
         vec2 anf_18_0 = vec2(0., 0.);
         option _lv_scrut = mandel_0(seahorse_valley, anf_18_0, 0);
         int _lv_tag = _lv_scrut.tag;
+        vec3 color;
         switch (_lv_tag) {
             case 1: {
-                return vec3(0., 0., 0.);
+                color = vec3(0., 0., 0.);
                 break;
             }
             default: {
@@ -564,14 +567,14 @@ let%expect_test "compile examples" =
                 vec3 anf_30 = (anf_29 + u_time);
                 vec3 anf_31 = sin(anf_30);
                 vec3 anf_32 = (anf_31 * 0.5);
-                return (anf_32 + 0.5);
+                color = (anf_32 + 0.5);
                 break;
             }
         }
-    }
-    void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        float anf_33 = color[0];
+        float anf_34 = color[1];
+        float anf_35 = color[2];
+        fragColor = vec4(anf_33, anf_34, anf_35, 1.);
     }
 
 
@@ -724,7 +727,8 @@ let%expect_test "compile examples" =
             }
         }
     }
-    vec3 main_pure(vec2 coord_0) {
+    void main() {
+        vec2 coord_0 = gl_FragCoord.xy;
         vec2 uv = get_uv(coord_0);
         vec2 mouse = get_uv(u_mouse);
         float anf_116 = mouse[0];
@@ -757,8 +761,9 @@ let%expect_test "compile examples" =
         vec3 rd_0 = (anf_124 / anf_16_6);
         float t_0 = step_0(rd_0, ro_0, 0., 0);
         bool anf_126 = (t_0 >= 20.);
+        vec3 color;
         if (anf_126) {
-            return vec3(0.05, 0.05, 0.08);
+            color = vec3(0.05, 0.05, 0.08);
         } else {
             vec3 anf_127 = (rd_0 * t_0);
             vec3 p_8 = (ro_0 + anf_127);
@@ -849,12 +854,12 @@ let%expect_test "compile examples" =
                 }
             }
             vec3 anf_135 = vec3(0.4545, 0.4545, 0.4545);
-            return pow(col, anf_135);
+            color = pow(col, anf_135);
         }
-    }
-    void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        float anf_136 = color[0];
+        float anf_137 = color[1];
+        float anf_138 = color[2];
+        fragColor = vec4(anf_136, anf_137, anf_138, 1.);
     }
 
 
@@ -986,7 +991,8 @@ let%expect_test "compile examples" =
             }
         }
     }
-    vec3 main_pure(vec2 coord) {
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
         vec2 anf_84 = (coord * 2.);
         vec2 anf_85 = (anf_84 - u_resolution);
         float anf_86 = u_resolution[0];
@@ -1000,9 +1006,10 @@ let%expect_test "compile examples" =
         vec3 rd_0 = normalize(anf_91);
         option _lv_scrut = step_0(rd_0, ro_0, 0., 0);
         int _lv_tag = _lv_scrut.tag;
+        vec3 color;
         switch (_lv_tag) {
             case 1: {
-                return vec3(0.02, 0.02, 0.04);
+                color = vec3(0.02, 0.02, 0.04);
                 break;
             }
             default: {
@@ -1048,14 +1055,14 @@ let%expect_test "compile examples" =
                 float anf_99 = (0.85 * diff);
                 float anf_100 = (0.15 + anf_99);
                 vec3 anf_101 = (anf_98 * anf_100);
-                return (anf_101 * fog);
+                color = (anf_101 * fog);
                 break;
             }
         }
-    }
-    void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        float anf_102 = color[0];
+        float anf_103 = color[1];
+        float anf_104 = color[2];
+        fragColor = vec4(anf_102, anf_103, anf_104, 1.);
     }
 
 
@@ -1223,7 +1230,8 @@ let%expect_test "compile examples" =
     const vec3 snowColor = vec3(0.85, 0.85, 0.9);
     uniform vec2 u_mouse;
     uniform vec2 u_resolution;
-    vec3 main_pure(vec2 coord) {
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
         float anf_95 = u_resolution[0];
         float anf_96 = u_resolution[1];
         float res_min = min(anf_95, anf_96);
@@ -1242,9 +1250,10 @@ let%expect_test "compile examples" =
         vec3 rd_0 = rotate_by_mouse_m_0(mouseUV, anf_105);
         option t_0 = march_0_0(rd_0, ro_0, 0., 0);
         int _lv_tag = t_0.tag;
+        vec3 color;
         switch (_lv_tag) {
             case 1: {
-                return vec3(0., 0., 0.);
+                color = vec3(0., 0., 0.);
                 break;
             }
             default: {
@@ -1347,14 +1356,14 @@ let%expect_test "compile examples" =
                 float anf_127 = (anf_126 + 0.08);
                 vec3 anf_128 = (baseColor * anf_127);
                 vec3 anf_129 = (atmoColor * rim);
-                return (anf_128 + anf_129);
+                color = (anf_128 + anf_129);
                 break;
             }
         }
-    }
-    void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        float anf_130 = color[0];
+        float anf_131 = color[1];
+        float anf_132 = color[2];
+        fragColor = vec4(anf_130, anf_131, anf_132, 1.);
     }
 
 
@@ -1460,7 +1469,8 @@ let%expect_test "compile examples" =
             }
         }
     }
-    vec3 main_pure(vec2 coord) {
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
         float anf_55 = u_resolution[0];
         float anf_56 = u_resolution[1];
         float res_min = min(anf_55, anf_56);
@@ -1522,11 +1532,11 @@ let%expect_test "compile examples" =
         vec2 anf_91 = (uv - mouseUV);
         float anf_92 = length(anf_91);
         float glow = (0.02 / anf_92);
-        return (col + glow);
-    }
-    void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        vec3 color = (col + glow);
+        float anf_93 = color[0];
+        float anf_94 = color[1];
+        float anf_95 = color[2];
+        fragColor = vec4(anf_93, anf_94, anf_95, 1.);
     }
 
 
@@ -1553,7 +1563,8 @@ let%expect_test "compile examples" =
     };
     uniform vec2 u_resolution;
     uniform float u_time;
-    vec3 main_pure(vec2 coord) {
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
         float anf_25 = u_resolution[0];
         float anf_26 = u_resolution[1];
         float res = min(anf_25, anf_26);
@@ -1630,11 +1641,11 @@ let%expect_test "compile examples" =
         vec3 anf_40 = (anf_39 * 0.5);
         vec3 pal = (anf_40 + 0.5);
         vec3 bg = vec3(0.05, 0.06, 0.1);
-        return mix(bg, pal, line);
-    }
-    void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        vec3 color = mix(bg, pal, line);
+        float anf_41 = color[0];
+        float anf_42 = color[1];
+        float anf_43 = color[2];
+        fragColor = vec4(anf_41, anf_42, anf_43, 1.);
     }
 
 
@@ -1724,7 +1735,8 @@ let%expect_test "compile examples" =
         vec2 anf_62 = (anf_61 + mag);
         return fractalNoise(anf_62);
     }
-    vec3 main_pure(vec2 coord) {
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
         vec2 anf_63 = (u_resolution * 0.5);
         vec2 anf_64 = (coord - anf_63);
         float anf_65 = u_resolution[1];
@@ -1777,11 +1789,11 @@ let%expect_test "compile examples" =
         vec3 spot_logic = (anf_91 + anf_101);
         vec3 final_col = (col * spot_logic);
         vec3 anf_102 = max(final_col, 0.);
-        return sqrt(anf_102);
-    }
-    void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        vec3 color = sqrt(anf_102);
+        float anf_103 = color[0];
+        float anf_104 = color[1];
+        float anf_105 = color[2];
+        fragColor = vec4(anf_103, anf_104, anf_105, 1.);
     }
     |}]
 ;;

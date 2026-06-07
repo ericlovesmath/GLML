@@ -25,11 +25,9 @@ let%expect_test "basic tuple construction and destructure" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 uv) {
-        return vec4(1., 2., 0., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 uv = gl_FragCoord.xy;
+        fragColor = vec4(1., 2., 0., 1.);
     }
     |}]
 ;;
@@ -58,11 +56,9 @@ let%expect_test "nested tuple destructure" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 uv) {
-        return vec4(1., 2., 3., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 uv = gl_FragCoord.xy;
+        fragColor = vec4(1., 2., 3., 1.);
     }
     |}]
 ;;
@@ -94,11 +90,9 @@ let%expect_test "function returning a tuple" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 uv) {
-        return vec4(1., 0., 0., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 uv = gl_FragCoord.xy;
+        fragColor = vec4(1., 0., 0., 1.);
     }
     |}]
 ;;
@@ -127,11 +121,9 @@ let%expect_test "tuple of vectors" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 uv) {
-        return vec4(1., 1., 0., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 uv = gl_FragCoord.xy;
+        fragColor = vec4(1., 1., 0., 1.);
     }
     |}]
 ;;
@@ -156,11 +148,9 @@ let%expect_test "wildcard inside tuple pattern" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 uv) {
-        return vec4(2., 2., 2., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 uv = gl_FragCoord.xy;
+        fragColor = vec4(2., 2., 2., 1.);
     }
     |}]
 ;;
@@ -186,11 +176,9 @@ let%expect_test "tuple of int promoted to float in vec" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 uv) {
-        return vec4(1., 2., 3., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 uv = gl_FragCoord.xy;
+        fragColor = vec4(1., 2., 3., 1.);
     }
     |}]
 ;;
@@ -221,11 +209,9 @@ let%expect_test "multiple tuples in one file" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 uv) {
-        return vec4(4., 6., 5., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 uv = gl_FragCoord.xy;
+        fragColor = vec4(4., 6., 5., 1.);
     }
     |}]
 ;;
@@ -254,11 +240,9 @@ let%expect_test "multiple of same tuple type in one file" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 uv) {
-        return vec4(4., 6., 0., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 uv = gl_FragCoord.xy;
+        fragColor = vec4(4., 6., 0., 1.);
     }
     |}]
 ;;
@@ -287,11 +271,9 @@ let%expect_test "tuple in record field" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 uv) {
-        return vec4(1., 2., 0., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 uv = gl_FragCoord.xy;
+        fragColor = vec4(1., 2., 0., 1.);
     }
     |}]
 ;;
@@ -343,11 +325,9 @@ let%expect_test "validate 1 tuple doesn't exist" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(1., 1., 1., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(1., 1., 1., 1.);
     }
     |}]
 ;;
@@ -379,13 +359,11 @@ let%expect_test "no clash with records with named fields like _0/_1" =
     precision highp float;
     out vec4 fragColor;
     uniform float u;
-    vec4 main_pure(vec2 uv) {
+    void main() {
+        vec2 uv = gl_FragCoord.xy;
         float anf = (u + 1.);
         float anf_0 = (u + 2.);
-        return vec4(u, anf, anf_0, 1.);
-    }
-    void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        fragColor = vec4(u, anf, anf_0, 1.);
     }
     |}]
 ;;

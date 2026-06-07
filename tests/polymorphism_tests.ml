@@ -8,11 +8,9 @@ let%expect_test "int broadcasting with vecs and builtins" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(1., 1., 1., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(1., 1., 1., 1.);
     }
     |}];
   (* #extern int * vec3 *)
@@ -27,17 +25,15 @@ let%expect_test "int broadcasting with vecs and builtins" =
     precision highp float;
     out vec4 fragColor;
     uniform int n;
-    vec4 main_pure(vec2 u) {
+    void main() {
+        vec2 u = gl_FragCoord.xy;
         float anf = float(n);
         vec3 anf_0 = vec3(0.5, 0.5, 0.5);
         vec3 c = (anf * anf_0);
         float anf_1 = c[0];
         float anf_2 = c[1];
         float anf_3 = c[2];
-        return vec4(anf_1, anf_2, anf_3, 1.);
-    }
-    void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        fragColor = vec4(anf_1, anf_2, anf_3, 1.);
     }
     |}];
   test_term "let n = 2 in n + [0.1, 0.2, 0.3]";
@@ -46,11 +42,9 @@ let%expect_test "int broadcasting with vecs and builtins" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(2.1, 2.2, 2.3, 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(2.1, 2.2, 2.3, 1.);
     }
     |}];
   (* #extern int to unary GenType builtin *)
@@ -66,13 +60,11 @@ let%expect_test "int broadcasting with vecs and builtins" =
     precision highp float;
     out vec4 fragColor;
     uniform int n;
-    vec4 main_pure(vec2 u) {
+    void main() {
+        vec2 u = gl_FragCoord.xy;
         float anf_0 = float(n);
         float r = sin(anf_0);
-        return vec4(r, r, r, 1.);
-    }
-    void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        fragColor = vec4(r, r, r, 1.);
     }
     |}];
   test_term "let r = #abs 5 in [r, r, r]";
@@ -81,12 +73,10 @@ let%expect_test "int broadcasting with vecs and builtins" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        float r = abs(5.);
-        return vec4(r, r, r, 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        float r = abs(5.);
+        fragColor = vec4(r, r, r, 1.);
     }
     |}];
   test_term "let r = #min 1 2 in [r, r, r]";
@@ -95,12 +85,10 @@ let%expect_test "int broadcasting with vecs and builtins" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        float r = min(1., 2.);
-        return vec4(r, r, r, 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        float r = min(1., 2.);
+        fragColor = vec4(r, r, r, 1.);
     }
     |}]
 ;;
@@ -118,11 +106,9 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(1., 0., 0., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(1., 0., 0., 1.);
     }
     |}];
   (* Pair type: two type params *)
@@ -138,11 +124,9 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(1., 0., 0., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(1., 0., 0., 1.);
     }
     |}];
   (* Inferred type args: no explicit annotation on record literal *)
@@ -157,11 +141,9 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(1., 0., 0., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(1., 0., 0., 1.);
     }
     |}];
   (* Deduplication: two functions using box[float] produce only one struct *)
@@ -177,11 +159,9 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(3., 0., 0., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(3., 0., 0., 1.);
     }
     |}];
   (* Error: wrong arity for type application *)
@@ -211,11 +191,9 @@ let%expect_test "parametrized structs" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(1., 0., 0., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(1., 0., 0., 1.);
     }
     |}]
 ;;
@@ -240,11 +218,9 @@ let%expect_test "parametrized variants" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 uv) {
-        return vec4(10., 5., 5., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 uv = gl_FragCoord.xy;
+        fragColor = vec4(10., 5., 5., 1.);
     }
     |}];
   test
@@ -265,12 +241,10 @@ let%expect_test "parametrized variants" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 uv) {
-        float anf_1 = uv[0];
-        return vec4(anf_1, 5.4, 2.3, 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 uv = gl_FragCoord.xy;
+        float anf_1 = uv[0];
+        fragColor = vec4(anf_1, 5.4, 2.3, 1.);
     }
     |}]
 ;;
@@ -297,11 +271,9 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(5., 1., 0., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(5., 1., 0., 1.);
     }
     |}];
   test
@@ -319,11 +291,9 @@ let%expect_test "parametrized variants in functions (explicitly annotated)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(1., 1., 0., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(1., 1., 0., 1.);
     }
     |}]
 ;;
@@ -339,11 +309,9 @@ let%expect_test "constrained polymorphism tests" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(2., 0., 0., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(2., 0., 0., 1.);
     }
     |}];
   test
@@ -358,11 +326,9 @@ let%expect_test "constrained polymorphism tests" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(1., 3., 0., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(1., 3., 0., 1.);
     }
     |}];
   test
@@ -378,7 +344,8 @@ let%expect_test "constrained polymorphism tests" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
         vec2 anf_3 = vec2(0.5, 1.5);
         vec2 anf_1_0 = floor(anf_3);
         vec2 anf_2_0 = (anf_3 - anf_1_0);
@@ -387,10 +354,7 @@ let%expect_test "constrained polymorphism tests" =
         vec3 anf_5 = floor(anf_4);
         vec3 anf_0_0 = (anf_4 - anf_5);
         float b = anf_0_0[0];
-        return vec4(a, b, 0., 1.);
-    }
-    void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        fragColor = vec4(a, b, 0., 1.);
     }
     |}]
 ;;
@@ -408,11 +372,9 @@ let%expect_test "parametric annotations" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(1., 1., 2., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(1., 1., 2., 1.);
     }
     |}]
 ;;
@@ -430,11 +392,9 @@ let%expect_test "where Numeric clause" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(2., 2., 4., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(2., 2., 4., 1.);
     }
     |}]
 ;;
@@ -451,11 +411,9 @@ let%expect_test "where broadcast" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(1.5, 2.5, 3.5, 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(1.5, 2.5, 3.5, 1.);
     }
     |}]
 ;;
@@ -472,11 +430,9 @@ let%expect_test "where mul broadcast" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(2., 4., 6., 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(2., 4., 6., 1.);
     }
     |}]
 ;;
@@ -495,11 +451,9 @@ let%expect_test "multiple where clauses" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(2.5, 3.5, 4.5, 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(2.5, 3.5, 4.5, 1.);
     }
     |}]
 ;;
@@ -518,11 +472,9 @@ let%expect_test "parens around individual where clauses" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(2.5, 3.5, 4.5, 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(2.5, 3.5, 4.5, 1.);
     }
     |}]
 ;;
@@ -540,11 +492,9 @@ let%expect_test "where clause on non-toplevel let" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec4 main_pure(vec2 coord) {
-        return vec4(2.5, 3.5, 4.5, 1.);
-    }
     void main() {
-        fragColor = main_pure(gl_FragCoord.xy);
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(2.5, 3.5, 4.5, 1.);
     }
     |}]
 ;;

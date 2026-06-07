@@ -1,7 +1,4 @@
-(** Takes pure [main : (coord : vec2) -> (color : vec3)] function
-    and replaces it with an impure [main : void -> void] function that
-    uses the real global variables representing location and color.
-
-    [coord] is taken from [gl_FragCoord.xy] while the returned color is
-    [clamp]'d to a [0, 1] range and fixed into global [vec4] [fragColor]. *)
+(** Rewrites the pure [main : vec2 -> vec4] function inplace to
+    impure [main : void -> void] function that uses the real global variables
+    representing location and color *)
 val patch : Glsl.t -> Glsl.t Compiler_error.t
