@@ -15,6 +15,7 @@ type ty =
   | TyVariant of string * (string * ty list) list
   | TyVar of string
   | TyTuple of ty list
+  | TySampler
 [@@deriving sexp_of, equal, compare]
 
 val merge_hint : string -> string -> string

@@ -13,7 +13,7 @@ let%expect_test "int promotion edge cases" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* int variable in vec *)
@@ -28,7 +28,7 @@ let%expect_test "int promotion edge cases" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* int compared with float *)
@@ -55,7 +55,7 @@ let%expect_test "int promotion edge cases" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* int literal in struct with float field *)
@@ -76,7 +76,7 @@ let%expect_test "int promotion edge cases" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* int variable in struct with float field *)
@@ -98,7 +98,7 @@ let%expect_test "int promotion edge cases" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* parametrized struct where non-param field is float, value is int *)
@@ -119,7 +119,7 @@ let%expect_test "int promotion edge cases" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* variant constructor float/int *)
@@ -141,7 +141,7 @@ let%expect_test "int promotion edge cases" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -163,7 +163,7 @@ let%expect_test "regression - polymorphic struct type in function" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   test
@@ -185,7 +185,7 @@ let%expect_test "regression - polymorphic struct type in function" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -211,7 +211,7 @@ let%expect_test "regression - polymorphic variant type in function" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -240,7 +240,7 @@ let%expect_test "removal of term that is does not resolve to a concrete type" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -263,7 +263,7 @@ let%expect_test "field access in let binding (unannotated)" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* Polymorphic usage *)
@@ -286,7 +286,7 @@ let%expect_test "field access in let binding (unannotated)" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* [let x = b.value in x * 2.0 - x]'s type constrained to float through Broadcast *)
@@ -306,7 +306,7 @@ let%expect_test "field access in let binding (unannotated)" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* Same test with IndexAccess *)
@@ -326,7 +326,7 @@ let%expect_test "field access in let binding (unannotated)" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -374,7 +374,7 @@ let%expect_test "regression - placeholder structs and variants in tail position"
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -401,7 +401,7 @@ let%expect_test "regression - no recursive DFn structs from partial application"
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -424,7 +424,7 @@ let%expect_test "return type annotation for function-returning functions" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* simple: one param, return type is (float -> float) *)
@@ -443,7 +443,7 @@ let%expect_test "return type annotation for function-returning functions" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -474,7 +474,7 @@ let%expect_test "regression - defunctionalization closure globals use correct da
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -497,7 +497,7 @@ let%expect_test "toplevel vectors of ints are treated as consts with builtin #fl
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -522,7 +522,7 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* Called with float argument *)
@@ -544,7 +544,7 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   test
@@ -569,7 +569,7 @@ let%expect_test "toplevel let-wrapped lambdas + partial application" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -596,7 +596,7 @@ let%expect_test "regression - partial application stored as top level value" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   test
@@ -617,7 +617,7 @@ let%expect_test "regression - partial application stored as top level value" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -643,7 +643,7 @@ let%expect_test "regression - int promotion through closures / partial applicati
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* fully applied with int args - both promoted at call site *)
@@ -665,7 +665,7 @@ let%expect_test "regression - int promotion through closures / partial applicati
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* int variable captured in closure then passed to float param *)
@@ -689,7 +689,7 @@ let%expect_test "regression - int promotion through closures / partial applicati
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -720,7 +720,7 @@ let%expect_test "regression - inferred type in higher-order local function" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* Float variant: t inferred as float *)
@@ -742,7 +742,7 @@ let%expect_test "regression - inferred type in higher-order local function" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -771,7 +771,7 @@ let%expect_test "closures in records / structs" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -800,7 +800,7 @@ let%expect_test "function in variant, match-bound var used with int arg" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -827,7 +827,7 @@ let%expect_test "struct pattern matching on non-concrete types" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -859,7 +859,7 @@ let%expect_test "regression - vec broadcast against polymorphic param with int-t
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -884,7 +884,7 @@ let%expect_test "regression - wrong DFn return type" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -901,7 +901,7 @@ let%expect_test "main type nomangle if type not concrete" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -932,7 +932,7 @@ let%expect_test "defunctionalize unifies int/float arrow flavors" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   test
@@ -954,7 +954,7 @@ let%expect_test "defunctionalize unifies int/float arrow flavors" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   test
@@ -998,7 +998,7 @@ let%expect_test "defunctionalize unifies int/float arrow flavors" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -1021,7 +1021,7 @@ let%expect_test "promote ints through variant constructor coerce" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -1044,7 +1044,7 @@ let%expect_test "unused HOF with fn-typed param emits empty DFn typedef" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -1071,7 +1071,7 @@ let%expect_test "HOF that applies param but is never called drops wrapper" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -1096,7 +1096,7 @@ let%expect_test "dot accepts mixed int/float vec args" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -1128,7 +1128,7 @@ let%expect_test "DFn promotion when partial-app result flows to HOF param" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -1157,7 +1157,7 @@ let%expect_test "DFn promotion when consume is declared before producer" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -1263,7 +1263,7 @@ let%expect_test "DFn promotion of fields in user-declared variant type" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -1359,7 +1359,7 @@ let%expect_test "placeholder is wrong type" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;

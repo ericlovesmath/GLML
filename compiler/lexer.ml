@@ -32,6 +32,7 @@ type token =
   | BOOL
   | INT
   | FLOAT
+  | SAMPLER
   | TICK
   | TYVAR of string
   | VEC of int
@@ -89,6 +90,7 @@ let string_of_token = function
   | BOOL -> "bool"
   | INT -> "int"
   | FLOAT -> "float"
+  | SAMPLER -> "sampler"
   | TICK -> "`'`"
   | TYVAR v -> Printf.sprintf "'%s" v
   | VEC n -> Printf.sprintf "vec%d" n
@@ -282,6 +284,7 @@ let read_lexeme (t : t) : token Or_error.t =
         | "bool" -> Ok BOOL
         | "int" -> Ok INT
         | "float" -> Ok FLOAT
+        | "sampler" -> Ok SAMPLER
         | "extern" -> Ok EXTERN
         | "type" -> Ok TYPE
         | "of" -> Ok OF
@@ -328,7 +331,7 @@ let%expect_test "lexer" =
   test "bool int float ' 'a 10 s_var let type of |>";
   test "+ - / * # <= >= % && || extern vec2 mat3x3";
   test "1.23 0.45 6. -1.";
-  test "Constructor where";
+  test "Constructor where sampler";
   [%expect
     {|
     (Ok (TRUE FALSE EQ ARROW LPAREN RPAREN DOT LANGLE RANGLE))
@@ -337,7 +340,7 @@ let%expect_test "lexer" =
     (Ok (BOOL INT FLOAT TICK (TYVAR a) (NUMERIC 10) (ID s_var) LET TYPE OF PIPE))
     (Ok (ADD SUB DIV MUL HASH LEQ GEQ PERCENT LAND LOR EXTERN (VEC 2) (MAT 3 3)))
     (Ok ((FLOAT_LIT 1.23) (FLOAT_LIT 0.45) (FLOAT_LIT 6) SUB (FLOAT_LIT 1)))
-    (Ok ((CONSTRUCTOR Constructor) WHERE))
+    (Ok ((CONSTRUCTOR Constructor) WHERE SAMPLER))
     |}];
   test "let{x:int}=match|a->fun->(f<x>*2)";
   [%expect

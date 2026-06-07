@@ -4,7 +4,7 @@ open Type_system
 
 let rec has_tyvar = function
   | TyVar _ -> true
-  | TyFloat | TyInt | TyBool -> false
+  | TyFloat | TyInt | TyBool | TySampler -> false
   | TyVec (_, t) -> has_tyvar t
   | TyArrow (a, b) -> has_tyvar a || has_tyvar b
   | TyRecord (_, fields) -> List.exists fields ~f:(fun (_, t) -> has_tyvar t)

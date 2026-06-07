@@ -12,7 +12,7 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution =
   | (loc, TyVar v, ty) :: con | (loc, ty, TyVar v) :: con ->
     let rec occurs_in = function
       | TyVar v' -> String.equal v v'
-      | TyFloat | TyInt | TyBool -> false
+      | TyFloat | TyInt | TyBool | TySampler -> false
       | TyVec (_, t) -> occurs_in t
       | TyRecord (_, fields) -> List.exists fields ~f:(fun (_, t) -> occurs_in t)
       | TyVariant (_, ctors) ->

@@ -25,6 +25,9 @@ type term_desc =
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
   | Builtin of Glsl.builtin * term list
+  (* [#texture sampler coord]: its own form because the sampler is a name, not a
+     value, so it carries the sampler as a string rather than a [term]. *)
+  | Sample of string * term
   | Record of (string * term) list
   | Field of term * string
   | Variant of string * term list
@@ -71,6 +74,7 @@ let rec sexp_of_term_desc = function
   | Index (t, i) -> List [ Atom "index"; sexp_of_term t; Atom (Int.to_string i) ]
   | Builtin (b, ts) ->
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
+  | Sample (s, coord) -> List [ Atom "texture"; Atom s; sexp_of_term coord ]
   | Record fields ->
     let sexp_of_field (f, t) = List [ Atom f; sexp_of_term t ] in
     List (Atom "record" :: List.map fields ~f:sexp_of_field)
@@ -138,6 +142,7 @@ let rec desugar_term_desc ~loc (td : Frontend.term_desc) : term_desc =
   | Vec (n, ts) -> Vec (n, List.map ~f:desugar_term ts)
   | Lam (v, ty_opt, body) -> Lam (v, ty_opt, desugar_term body)
   | App (f, x) -> App (desugar_term f, desugar_term x)
+  | Sample (sampler, coord) -> Sample (sampler, desugar_term coord)
   | Pipe (l, r) ->
     (* x |> f   =>   f x *)
     App (desugar_term r, desugar_term l)

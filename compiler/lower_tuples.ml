@@ -15,6 +15,7 @@ type ty =
   | TyArrow of ty * ty
   | TyRecord of string
   | TyVariant of string
+  | TySampler
 [@@deriving equal]
 
 let rec sexp_of_ty = function
@@ -25,6 +26,7 @@ let rec sexp_of_ty = function
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
   | TyRecord s -> Atom s
   | TyVariant s -> Atom s
+  | TySampler -> Atom "sampler"
 ;;
 
 type term_desc =
@@ -118,7 +120,7 @@ let collect (tops : Monomorphize.top list) : env =
   in
   let rec walk_ty acc (ty : Monomorphize.ty) =
     match ty with
-    | TyFloat | TyInt | TyBool | TyRecord _ | TyVariant _ -> acc
+    | TyFloat | TyInt | TyBool | TyRecord _ | TyVariant _ | TySampler -> acc
     | TyVec (_, t) -> walk_ty acc t
     | TyArrow (a, b) -> walk_ty (walk_ty acc a) b
     | TyTuple ts -> upsert (List.fold ts ~init:acc ~f:walk_ty) ts
@@ -160,6 +162,7 @@ let rec ty_of (env : env) (ty : Monomorphize.ty) : ty =
   | TyArrow (a, b) -> TyArrow (ty_of env a, ty_of env b)
   | TyRecord s -> TyRecord s
   | TyVariant s -> TyVariant s
+  | TySampler -> TySampler
   | TyTuple ts ->
     (match List.Assoc.find env ts ~equal:equal_shape with
      | Some n -> TyRecord n

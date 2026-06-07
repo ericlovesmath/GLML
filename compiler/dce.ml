@@ -67,7 +67,7 @@ let liveness_top (top : top) : top =
 
 let rec ty_refs (acc : String.Set.t) (ty : Lower_variants.ty) : String.Set.t =
   match ty with
-  | TyFloat | TyInt | TyBool -> acc
+  | TyFloat | TyInt | TyBool | TySampler -> acc
   | TyVec (_, t) -> ty_refs acc t
   | TyArrow (a, b) -> ty_refs (ty_refs acc a) b
   | TyRecord s -> Set.add acc s

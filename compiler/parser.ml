@@ -119,6 +119,7 @@ let ty_singles_p =
     | BOOL -> Some TyBool
     | INT -> Some TyInt
     | FLOAT -> Some TyFloat
+    | SAMPLER -> Some TySampler
     | TYVAR v -> Some (TyVar v)
     | _ -> None)
   <?> "type keyword/variable"
@@ -473,10 +474,17 @@ and term_builtin_p =
      (let%bind _ = tok HASH in
       let%bind builtin =
         satisfy_map (function
-          | ID s -> Option.try_with (fun () -> Glsl.builtin_of_string s)
+          | ID s -> Glsl.builtin_of_string_opt s
           | _ -> None)
       in
-      return (Builtin builtin) <??> "builtin reference"))
+      match builtin with
+      | Glsl.Texture ->
+        commit
+          (let%bind sampler = ident_p in
+           let%map coord = term_head_p in
+           Sample (sampler, coord))
+      | b -> return (Builtin b))
+   <??> "builtin reference")
     st
 
 and term_variant_p =

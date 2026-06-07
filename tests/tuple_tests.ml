@@ -31,7 +31,7 @@ let%expect_test "basic tuple construction and destructure" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -65,7 +65,7 @@ let%expect_test "nested tuple destructure" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -103,7 +103,7 @@ let%expect_test "function returning a tuple" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -136,7 +136,7 @@ let%expect_test "tuple of vectors" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -167,7 +167,7 @@ let%expect_test "wildcard inside tuple pattern" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -199,7 +199,7 @@ let%expect_test "tuple of int promoted to float in vec" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -236,7 +236,7 @@ let%expect_test "multiple tuples in one file" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -270,7 +270,7 @@ let%expect_test "multiple of same tuple type in one file" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -305,7 +305,7 @@ let%expect_test "tuple in record field" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -361,7 +361,7 @@ let%expect_test "validate 1 tuple doesn't exist" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -401,7 +401,7 @@ let%expect_test "no clash with records with named fields like _0/_1" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;

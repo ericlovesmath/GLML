@@ -168,6 +168,7 @@ let rec zero_atom (tenv : record_tenv) ~loc (ty : ty) : (anf -> anf) * atom =
        in
        wrap, mk_atom (Var v))
   | TyArrow _ -> raise "no zero for arrow type" ~loc
+  | TySampler -> raise "no zero for sampler type" ~loc
 ;;
 
 let zero_anf (tenv : record_tenv) ~loc (ty : ty) : anf =

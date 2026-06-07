@@ -13,6 +13,7 @@ let to_glsl_ty (loc : Lexer.loc) (ty : Lower_variants.ty) : ty =
   | TyVec (n, TyFloat) -> TyVec n
   | TyVec (n, TyVec (m, TyFloat)) -> TyMat (n, m)
   | TyRecord s -> TyStruct s
+  | TySampler -> TySampler
   | TyArrow _ | TyVec _ ->
     raise "unexpected type" ~loc ~d:[%message (ty : Lower_variants.ty)]
 ;;

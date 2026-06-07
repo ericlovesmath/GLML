@@ -30,7 +30,7 @@ let signature_heads : ty -> head list option = function
   | TyVec (n, elem) -> [ HBracket (List.init n ~f:(Fn.const elem)) ] |> Some
   | TyRecord (_, fs) -> [ HRecord fs ] |> Some
   | TyTuple ts -> [ HTuple ts ] |> Some
-  | TyInt | TyFloat | TyArrow _ | TyVar _ -> None
+  | TyInt | TyFloat | TyArrow _ | TyVar _ | TySampler -> None
 ;;
 
 (** Head of a non-wild pattern at [col_ty]. Returns [None] for wild/var. *)

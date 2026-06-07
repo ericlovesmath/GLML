@@ -9,6 +9,7 @@ type ty =
   | TyVec of int
   | TyMat of int * int
   | TyStruct of string
+  | TySampler
 [@@deriving sexp_of]
 
 let string_of_ty = function
@@ -20,6 +21,7 @@ let string_of_ty = function
   | TyMat (x, y) when x = y -> "mat" ^ Int.to_string x
   | TyMat (x, y) -> "mat" ^ Int.to_string x ^ "x" ^ Int.to_string y
   | TyStruct s -> s
+  | TySampler -> "sampler2D"
 ;;
 
 type binary_op =
@@ -68,6 +70,7 @@ type builtin =
   | Step
   | Smoothstep
   | Reflect
+  | Texture
 [@@deriving sexp_of, string ~capitalize:"lower sentence case"]
 
 let builtin_of_string_opt s = Option.try_with (fun () -> builtin_of_string s)
@@ -75,7 +78,7 @@ let builtin_of_string_opt s = Option.try_with (fun () -> builtin_of_string s)
 let arity_of_builtin = function
   | Float | Sin | Cos | Tan | Asin | Acos | Atan | Exp | Log | Exp2 | Log2 | Sqrt | Abs
   | Sign | Floor | Ceil | Length | Normalize | Fract -> 1
-  | Pow | Min | Max | Distance | Dot | Cross | Step | Reflect -> 2
+  | Pow | Min | Max | Distance | Dot | Cross | Step | Reflect | Texture -> 2
   | Clamp | Mix | Smoothstep -> 3
 [@@ocamlformat "disable"]
 

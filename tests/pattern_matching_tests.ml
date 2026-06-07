@@ -24,7 +24,7 @@ let%expect_test "bool match" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   test
@@ -91,7 +91,7 @@ let%expect_test "bool match" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -133,7 +133,7 @@ let%expect_test "int match" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   test
@@ -212,7 +212,7 @@ let%expect_test "float match" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* Float match in return position *)
@@ -246,7 +246,7 @@ let%expect_test "float match" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   test
@@ -339,7 +339,7 @@ let%expect_test "variants and matching" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -369,7 +369,7 @@ let%expect_test "variant match in let binding" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -435,7 +435,7 @@ let%expect_test "struct pattern matching" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* Partial: bind one field, ignore rest with _ *)
@@ -458,7 +458,7 @@ let%expect_test "struct pattern matching" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   test
@@ -480,7 +480,7 @@ let%expect_test "struct pattern matching" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   (* Error non-exhaustive *)
@@ -557,7 +557,7 @@ let%expect_test "struct pattern matching" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -593,7 +593,7 @@ let%expect_test "bracket pattern matching" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -626,7 +626,7 @@ let%expect_test "let pattern binding" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -680,7 +680,7 @@ let%expect_test "nested pattern matching with polymorphism" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -708,7 +708,7 @@ let%expect_test "nested pattern matching with literals in records" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}]
 ;;
@@ -808,7 +808,7 @@ let%expect_test "pattern match exhaustiveness edge cases" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   test
@@ -870,7 +870,7 @@ let%expect_test "pattern match exhaustiveness edge cases" =
     }
     void main() {
         vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = clamp(vec4(color.xyz, 1.), 0., 1.);
+        fragColor = vec4(color.xyz, 1.);
     }
     |}];
   test

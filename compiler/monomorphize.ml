@@ -38,6 +38,7 @@ type ty =
   | TyRecord of string
   | TyVariant of string
   | TyTuple of ty list
+  | TySampler
 [@@deriving equal]
 
 let rec sexp_of_ty = function
@@ -49,6 +50,7 @@ let rec sexp_of_ty = function
   | TyRecord s -> Atom s
   | TyVariant s -> Atom s
   | TyTuple ts -> List (Atom "tuple" :: List.map ts ~f:sexp_of_ty)
+  | TySampler -> Atom "sampler"
 ;;
 
 type type_decl =
@@ -154,7 +156,7 @@ let rec subst ~(poly : Type_system.ty) ~(concrete : Type_system.ty)
 let rec is_concrete (ty : Type_system.ty) : bool =
   match ty with
   | TyVar _ -> false
-  | TyFloat | TyInt | TyBool -> true
+  | TyFloat | TyInt | TyBool | TySampler -> true
   | TyVec (_, t) -> is_concrete t
   | TyVariant (_, ctors) ->
     List.for_all ctors ~f:(fun (_, ts) -> List.for_all ts ~f:is_concrete)
@@ -447,6 +449,7 @@ let rec ty_of (t : Type_system.ty) : ty =
   | TyFloat -> TyFloat
   | TyInt -> TyInt
   | TyBool -> TyBool
+  | TySampler -> TySampler
   (* GLSL has no ivec usable as float, so we promote vec int to vec float here *)
   | TyVec (n, TyInt) -> TyVec (n, TyFloat)
   | TyVec (n, t) -> TyVec (n, ty_of t)
@@ -560,7 +563,7 @@ let assign_names ~(typedef_loc : Lexer.loc) (tops : Typecheck.top list)
   let record acc ty = if is_concrete ty then upsert_shape acc ty (hint_of ty) else acc in
   let rec walk_ty acc ty =
     match ty with
-    | TyFloat | TyInt | TyBool | TyVar _ -> acc
+    | TyFloat | TyInt | TyBool | TySampler | TyVar _ -> acc
     | TyVec (_, t) -> walk_ty acc t
     | TyArrow (a, b) -> walk_ty (walk_ty acc a) b
     | TyRecord (_, fields) ->
@@ -597,7 +600,7 @@ let assign_names ~(typedef_loc : Lexer.loc) (tops : Typecheck.top list)
   let lookup_ty ty = List.Assoc.find assignments ~equal:equal_ty ty in
   let rec rty ty =
     match ty with
-    | TyFloat | TyInt | TyBool | TyVar _ -> ty
+    | TyFloat | TyInt | TyBool | TySampler | TyVar _ -> ty
     | TyVec (n, t) -> TyVec (n, rty t)
     | TyArrow (a, b) -> TyArrow (rty a, rty b)
     | TyRecord (h, fields) ->

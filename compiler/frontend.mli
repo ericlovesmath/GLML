@@ -24,6 +24,7 @@ type ty =
   | TyVar of string
   | TyApp of string * ty list
   | TyTuple of ty list
+  | TySampler
 [@@deriving sexp_of, equal]
 
 type constr_desc =
@@ -64,6 +65,7 @@ type term_desc =
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
   | Builtin of Glsl.builtin
+  | Sample of string * term
   | BopSection of Glsl.binary_op
   | PipeSection
   | Record of (string * term) list

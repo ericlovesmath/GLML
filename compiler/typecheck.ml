@@ -220,7 +220,7 @@ let rec is_value (t : Desugar.term) : bool =
   | Variant (_, args) -> List.for_all args ~f:is_value
   | Field (t, _) | Index (t, _) -> is_value t
   | Let (_, _, _, _, _, body) -> is_value body
-  | App _ | If _ | Bop _ | Builtin _ | Match _ -> false
+  | App _ | If _ | Bop _ | Builtin _ | Sample _ | Match _ -> false
 ;;
 
 let rec resolve_stlc_ty ~(loc : Lexer.loc) (env : env) (t : Frontend.ty) : ty =
@@ -269,6 +269,7 @@ let rec resolve_stlc_ty ~(loc : Lexer.loc) (env : env) (t : Frontend.ty) : ty =
   | TyVec (n, t) -> TyVec (n, resolve t)
   | TyVar v -> TyVar v
   | TyTuple ts -> TyTuple (List.map ts ~f:resolve)
+  | TySampler -> TySampler
 ;;
 
 let resolve_constr (env : env) (constr : Frontend.constr) : constr =
@@ -468,7 +469,10 @@ and gen_term (env : env) (t : Desugar.term) : term * constr list * substitution 
       | None -> raise "var not found in type map" ~loc ~d:[%message (v : string)]
     in
     let sub = List.map vs ~f:(fun v -> v, fresh_tyvar ()) in
-    make (Var v) (subst_ty sub ty_scheme) (subst_constraints sub scheme_constrs)
+    let ty = subst_ty sub ty_scheme in
+    if equal_ty ty TySampler
+    then raise "sampler may only be used in #texture" ~loc ~d:[%message (v : string)];
+    make (Var v) ty (subst_constraints sub scheme_constrs)
   | Lam (v, ty_ann, body_stlc) ->
     let ty_v =
       match ty_ann with
@@ -564,6 +568,24 @@ and gen_term (env : env) (t : Desugar.term) : term * constr list * substitution 
     ( { desc = Index (t, i); ty = ret_ty; loc }
     , constr (IndexAccess (t.ty, i, ret_ty)) :: constrs_t
     , sub_t )
+  | Sample (sampler, coord) ->
+    let s_ty =
+      match Map.find env.ctx sampler with
+      | Some (_, _, ty) -> ty
+      | None -> raise "var not found in type map" ~loc ~d:[%message (sampler : string)]
+    in
+    let coord, constrs_coord, sub = gen_term env coord in
+    let coord_ty = TyVec (2, TyFloat) in
+    let constrs =
+      constr (Eq (s_ty, TySampler))
+      :: constr (Coerce (coord.ty, coord_ty))
+      :: constrs_coord
+    in
+    let coord = coerce_term coord.loc coord_ty coord in
+    let s_term : term = { desc = Var sampler; ty = TySampler; loc } in
+    ( { desc = Builtin (Glsl.Texture, [ s_term; coord ]); ty = TyVec (4, TyFloat); loc }
+    , constrs
+    , sub )
   | Builtin (b, args) -> gen_builtin env loc b args
   | Vec (n, args) ->
     let elem_ty = fresh_tyvar () in
@@ -814,20 +836,32 @@ and gen_match
 ;;
 
 let enforce_main_type _env bind ty loc v =
+  (* TODO: Get rid of this Vec3 branch and enforce Vec4 *)
   if not (String.equal v "main")
   then bind, ty
   else (
-    let expected = TyArrow (TyVec (2, TyFloat), TyVec (3, TyFloat)) in
-    let main_constr = { desc = Coerce (ty, expected); loc } in
-    match
-      try Some (Constraint_solver.solve [ main_constr ]) with
-      | Compiler_error.Compile_error _ -> None
-    with
-    | Some (sub, []) ->
-      let bind = subst_term sub bind in
-      let bind = coerce_term bind.loc expected bind in
-      bind, bind.ty
-    | _ -> raise "main must have type vec2 -> vec3" ~loc ~d:[%message (ty : ty)])
+    let try_ret ret =
+      let expected = TyArrow (TyVec (2, TyFloat), TyVec (ret, TyFloat)) in
+      match
+        try Some (Constraint_solver.solve [ { desc = Coerce (ty, expected); loc } ]) with
+        | Compiler_error.Compile_error _ -> None
+      with
+      | Some (sub, []) ->
+        let bind = subst_term sub bind in
+        let bind = coerce_term bind.loc expected bind in
+        Some (bind, bind.ty)
+      | _ -> None
+    in
+    match try_ret 3 with
+    | Some result -> result
+    | None ->
+      (match try_ret 4 with
+       | Some result -> result
+       | None ->
+         raise
+           "main must have type vec2 -> vec3 or vec2 -> vec4"
+           ~loc
+           ~d:[%message (ty : ty)]))
 ;;
 
 let typecheck_impl (Program terms : Desugar.t) : t =
@@ -898,7 +932,7 @@ let typecheck_impl (Program terms : Desugar.t) : t =
         | TypeDef (name, params, AliasDecl ty) ->
           let rec occurs_in (ty : Frontend.ty) =
             match ty with
-            | TyFloat | TyInt | TyBool | TyVec _ | TyVar _ -> false
+            | TyFloat | TyInt | TyBool | TyVec _ | TyVar _ | TySampler -> false
             | TyName s -> String.equal s name
             | TyApp (s, args) -> String.equal s name || List.exists args ~f:occurs_in
             | TyArrow (l, r) -> occurs_in l || occurs_in r

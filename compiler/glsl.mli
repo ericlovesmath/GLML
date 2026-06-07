@@ -6,6 +6,7 @@ type ty =
   | TyVec of int
   | TyMat of int * int
   | TyStruct of string
+  | TySampler
 [@@deriving sexp_of]
 
 type binary_op =
@@ -54,6 +55,7 @@ type builtin =
   | Step
   | Smoothstep
   | Reflect
+  | Texture
 [@@deriving sexp_of, string]
 
 val builtin_of_string_opt : string -> builtin option

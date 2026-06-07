@@ -5,6 +5,7 @@ type ty =
   | TyVec of int * ty
   | TyArrow of ty * ty
   | TyRecord of string
+  | TySampler
 [@@deriving sexp_of]
 
 type type_decl = RecordDecl of (string * ty) list [@@deriving sexp_of]

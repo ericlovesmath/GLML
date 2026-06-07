@@ -60,6 +60,7 @@ type ty =
   | TyVar of string
   | TyApp of string * ty list
   | TyTuple of ty list
+  | TySampler
 [@@deriving equal]
 
 let rec sexp_of_ty = function
@@ -72,6 +73,7 @@ let rec sexp_of_ty = function
   | TyVar v -> Atom ("'" ^ v)
   | TyApp (s, args) -> List (Atom s :: List.map args ~f:sexp_of_ty)
   | TyTuple ts -> List (Atom "tuple" :: List.map ts ~f:sexp_of_ty)
+  | TySampler -> Atom "sampler"
 ;;
 
 type constr_desc =
@@ -119,6 +121,8 @@ type term_desc =
   | Bop of Glsl.binary_op * term * term
   | Index of term * int
   | Builtin of Glsl.builtin
+  (* Dedicated form because the sampler is a name, not a first-class value. *)
+  | Sample of string * term
   | BopSection of Glsl.binary_op
   | PipeSection
   | Record of (string * term) list
@@ -168,6 +172,7 @@ let rec sexp_of_term_desc = function
     List [ Atom (Glsl.string_of_binary_op op); sexp_of_term l; sexp_of_term r ]
   | Index (t, i) -> List [ Atom "index"; sexp_of_term t; Atom (Int.to_string i) ]
   | Builtin b -> Atom (Glsl.string_of_builtin b)
+  | Sample (s, coord) -> List [ Atom "texture"; Atom s; sexp_of_term coord ]
   | BopSection op -> List [ Atom (Glsl.string_of_binary_op op) ]
   | PipeSection -> List [ Atom "|>" ]
   | Record fields ->

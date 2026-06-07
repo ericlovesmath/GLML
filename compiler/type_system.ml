@@ -11,6 +11,7 @@ type ty =
   | TyVariant of (string[@equal.ignore] [@compare.ignore]) * (string * ty list) list
   | TyVar of string
   | TyTuple of ty list
+  | TySampler
 [@@deriving equal, compare]
 
 let merge_hint a b = if String.is_empty a then b else a
@@ -33,6 +34,7 @@ let rec sexp_of_ty = function
        :: List.map ctors ~f:(fun (n, ts) -> List (Atom n :: List.map ts ~f:sexp_of_ty)))
   | TyVar v -> Atom ("'" ^ v)
   | TyTuple ts -> List (Atom "tuple" :: List.map ts ~f:sexp_of_ty)
+  | TySampler -> Atom "sampler"
 ;;
 
 type type_decl =
@@ -88,7 +90,7 @@ let fresh_tyvar () = TyVar (Utils.fresh "v")
 let rec subst_ty (sub : substitution) (ty : ty) : ty =
   match ty with
   | TyVar v -> List.Assoc.find ~equal:String.equal sub v |> Option.value ~default:ty
-  | TyFloat | TyInt | TyBool -> ty
+  | TyFloat | TyInt | TyBool | TySampler -> ty
   | TyVec (n, t) -> TyVec (n, subst_ty sub t)
   | TyVariant (hint, ctors) ->
     TyVariant (hint, List.map ctors ~f:(fun (n, ts) -> n, List.map ts ~f:(subst_ty sub)))
@@ -123,7 +125,7 @@ let compose_sub (s : substitution) (s' : substitution) : substitution =
 
 let rec ftv_of_ty = function
   | TyVar v -> String.Set.singleton v
-  | TyFloat | TyInt | TyBool -> String.Set.empty
+  | TyFloat | TyInt | TyBool | TySampler -> String.Set.empty
   | TyVec (_, t) -> ftv_of_ty t
   | TyRecord (_, fields) ->
     String.Set.union_list (List.map fields ~f:(fun (_, t) -> ftv_of_ty t))

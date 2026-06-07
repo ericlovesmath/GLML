@@ -14,6 +14,7 @@ type ty =
   | TyVec of int * ty
   | TyArrow of ty * ty
   | TyRecord of string
+  | TySampler
 
 let rec sexp_of_ty = function
   | TyFloat -> Atom "float"
@@ -22,6 +23,7 @@ let rec sexp_of_ty = function
   | TyVec (i, t) -> List [ Atom "vec"; Atom (Int.to_string i); sexp_of_ty t ]
   | TyArrow (t, t') -> List [ sexp_of_ty t; Atom "->"; sexp_of_ty t' ]
   | TyRecord s -> Atom s
+  | TySampler -> Atom "sampler"
 ;;
 
 type type_decl = RecordDecl of (string * ty) list [@@deriving sexp_of]
@@ -35,6 +37,7 @@ let rec lower_ty (ty : Lower_tuples.ty) : ty =
   | TyInt -> TyInt
   | TyBool -> TyBool
   | TyRecord s -> TyRecord s
+  | TySampler -> TySampler
 ;;
 
 type term_desc =
@@ -162,6 +165,7 @@ let rec zero_of_ty (tenv : Lower_tuples.type_decl String.Map.t) ~loc (ty : ty) :
      | None ->
        raise "unknown record type in zero_of_ty" ~loc ~d:[%message (name : string)])
   | TyArrow _ -> raise "no zero for arrow type" ~loc
+  | TySampler -> raise "no zero for sampler type" ~loc
 ;;
 
 let flatten_variant_args ~loc ~tenv ~ctor ~(args : term list) ctors : term list =
@@ -234,7 +238,7 @@ let signature_heads ~loc ~(tenv : type_env) : Lower_tuples.ty -> head list optio
     Some (lookup_variant_ctors ~loc tenv name |> List.map ~f:(fun (c, _) -> HCtor c))
   | TyVec (n, _) -> Some [ HBracket n ]
   | TyRecord _ -> Some [ HRecord ]
-  | TyInt | TyFloat | TyArrow _ -> None
+  | TyInt | TyFloat | TyArrow _ | TySampler -> None
 ;;
 
 (* Do [heads] cover the full value domain of [col_ty]? *)
@@ -458,6 +462,7 @@ and lower_match
        | [ (_, body) ] -> body
        | _ -> raise "vec/record match: expected exactly one head" ~loc)
     | TyArrow _ -> raise "cannot match on arrow type" ~loc
+    | TySampler -> raise "cannot match on sampler type" ~loc
   in
   let rec go (occs : occ list) (rows : (Frontend.pat list * term) list) : term =
     match Pattern_match.Matrix.classify rows, occs with

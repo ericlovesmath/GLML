@@ -20,6 +20,7 @@ let rec mangle_ty : ty -> string = function
     if n = m then Printf.sprintf "mat%d" n else Printf.sprintf "mat%dx%d" n m
   | TyVec (n, t) -> Printf.sprintf "vec%d_%s" n (mangle_ty t)
   | TyRecord s | TyVariant s -> s
+  | TySampler -> "sampler"
   | TyArrow (a, b) -> mangle_ty a ^ "_" ^ mangle_ty b
 ;;
 
@@ -625,7 +626,7 @@ let rec ty_struct_deps (ty : ty) : String.Set.t =
   match ty with
   | TyRecord s | TyVariant s -> String.Set.singleton s
   | TyArrow (a, b) -> Set.union (ty_struct_deps a) (ty_struct_deps b)
-  | TyFloat | TyInt | TyBool -> String.Set.empty
+  | TyFloat | TyInt | TyBool | TySampler -> String.Set.empty
   | TyVec (_, t) -> ty_struct_deps t
 ;;
 

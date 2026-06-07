@@ -29,6 +29,7 @@ type token =
   | BOOL
   | INT
   | FLOAT
+  | SAMPLER
   | TICK
   | TYVAR of string
   | VEC of int

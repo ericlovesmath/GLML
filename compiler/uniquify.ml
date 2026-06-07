@@ -44,6 +44,13 @@ let rec uniquify_term (ctx : env) (t : term) : term =
   | Bop (op, t, t') -> pure (Bop (op, aux t, aux t'))
   | Index (t, i) -> pure (Index (aux t, i))
   | Builtin (f, args) -> pure (Builtin (f, aux_list args))
+  | Sample (s, coord) ->
+    let s =
+      Map.find ctx s
+      |> of_option "unbound variable" ~loc:t.loc ~d:[%message (s : string)]
+      |> ok_exn
+    in
+    pure (Sample (s, aux coord))
   | Record fields -> pure (Record (List.map fields ~f:(fun (f, t) -> f, aux t)))
   | Field (t, f) -> pure (Field (aux t, f))
   | Variant (ctor, args) -> pure (Variant (ctor, aux_list args))

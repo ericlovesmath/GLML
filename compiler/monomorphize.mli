@@ -7,6 +7,7 @@ type ty =
   | TyRecord of string
   | TyVariant of string
   | TyTuple of ty list
+  | TySampler
 [@@deriving sexp_of, equal]
 
 type term_desc =
