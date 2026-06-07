@@ -58,11 +58,14 @@ let main (coord : vec2) =
   let uv = (coord * 2 - u_resolution) / #min u_resolution.0 u_resolution.1 in
   let ro = [0, 0, -3] in
   let rd = #normalize [uv.0, uv.1, 1.6] in
-  match march ro rd with
-  | None   -> [0.02, 0.02, 0.04]
-  | Some t ->
-    let n     = normal (ro + rd * t) in
-    let light = #normalize [0.6, 0.8, -0.4] in
-    let diff  = #max (#dot n light) 0 in
-    let fog   = 1 - 0.05 * t in
-    pal (t * 0.2) * (0.15 + 0.85 * diff) * fog
+  let color =
+    match march ro rd with
+    | None   -> [0.02, 0.02, 0.04]
+    | Some t ->
+      let n     = normal (ro + rd * t) in
+      let light = #normalize [0.6, 0.8, -0.4] in
+      let diff  = #max (#dot n light) 0 in
+      let fog   = 1 - 0.05 * t in
+      pal (t * 0.2) * (0.15 + 0.85 * diff) * fog
+  in
+  [color.0, color.1, color.2, 1.0]

@@ -68,4 +68,5 @@ let main (coord : vec2) =
   let final_col = col * spot_logic in
 
   // Gamma correction
-  #sqrt (#max final_col 0)
+  let color = #sqrt (#max final_col 0) in
+  [color.0, color.1, color.2, 1.0]

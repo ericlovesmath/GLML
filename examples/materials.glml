@@ -91,7 +91,7 @@ let get_uv (coord : vec2) : vec2 =
   (2 * coord - u_resolution) / (#min u_resolution.0 u_resolution.1)
 
 // --- Main ---
-let main (coord : vec2) : vec3 =
+let main (coord : vec2) =
   let uv    = get_uv coord in
   let mouse = get_uv u_mouse in
 
@@ -106,13 +106,16 @@ let main (coord : vec2) : vec3 =
 
   let t = march ro rd in
 
-  if t >= max_dist then
-    [0.05, 0.05, 0.08]
-  else
-    let p     = ro + rd * t in
-    let n     = calc_normal p in
-    let light = [2 * #sin u_time, 4.0, 2 * #cos u_time] in
-    let l     = normalize (light - p) in
-    let v     = normalize (ro - p) in
-    let col   = eval_material (scene_mat p) p n l v in
-    #pow col [0.4545, 0.4545, 0.4545]
+  let color =
+    if t >= max_dist then
+      [0.05, 0.05, 0.08]
+    else
+      let p     = ro + rd * t in
+      let n     = calc_normal p in
+      let light = [2 * #sin u_time, 4.0, 2 * #cos u_time] in
+      let l     = normalize (light - p) in
+      let v     = normalize (ro - p) in
+      let col   = eval_material (scene_mat p) p n l v in
+      #pow col [0.4545, 0.4545, 0.4545]
+  in
+  [color.0, color.1, color.2, 1.0]

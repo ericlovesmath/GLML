@@ -836,32 +836,19 @@ and gen_match
 ;;
 
 let enforce_main_type _env bind ty loc v =
-  (* TODO: Get rid of this Vec3 branch and enforce Vec4 *)
   if not (String.equal v "main")
   then bind, ty
   else (
-    let try_ret ret =
-      let expected = TyArrow (TyVec (2, TyFloat), TyVec (ret, TyFloat)) in
-      match
-        try Some (Constraint_solver.solve [ { desc = Coerce (ty, expected); loc } ]) with
-        | Compiler_error.Compile_error _ -> None
-      with
-      | Some (sub, []) ->
-        let bind = subst_term sub bind in
-        let bind = coerce_term bind.loc expected bind in
-        Some (bind, bind.ty)
-      | _ -> None
-    in
-    match try_ret 3 with
-    | Some result -> result
-    | None ->
-      (match try_ret 4 with
-       | Some result -> result
-       | None ->
-         raise
-           "main must have type vec2 -> vec3 or vec2 -> vec4"
-           ~loc
-           ~d:[%message (ty : ty)]))
+    let expected = TyArrow (TyVec (2, TyFloat), TyVec (4, TyFloat)) in
+    match
+      try Some (Constraint_solver.solve [ { desc = Coerce (ty, expected); loc } ]) with
+      | Compiler_error.Compile_error _ -> None
+    with
+    | Some (sub, []) ->
+      let bind = subst_term sub bind in
+      let bind = coerce_term bind.loc expected bind in
+      bind, bind.ty
+    | _ -> raise "main must have type vec2 -> vec4" ~loc ~d:[%message (ty : ty)])
 ;;
 
 let typecheck_impl (Program terms : Desugar.t) : t =

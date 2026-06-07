@@ -33,6 +33,9 @@ let main (coord : vec2) =
   let seahorse_valley = [-0.7453, 0.1127] + uv / zoom in
 
   // Use iteration count as color, black if iteration count exceeded
-  match mandelbrot seahorse_valley with
-  | None -> [ 0, 0, 0 ]
-  | Some n -> #sin (n * [10, 20, 30] + u_time) * 0.5 + 0.5
+  let color =
+    match mandelbrot seahorse_valley with
+    | None -> [ 0, 0, 0 ]
+    | Some n -> #sin (n * [10, 20, 30] + u_time) * 0.5 + 0.5
+  in
+  [color.0, color.1, color.2, 1.0]

@@ -164,8 +164,7 @@ let main (coord : vec2) =
   let shadow_d       = p |> at [0.02, -0.46] |> ellipse [0.40, 0.045] in
   let shadow_falloff = #smoothstep 0.06 (-0.02) shadow_d in
   let bg             = #mix bg [0.18, 0.28, 0.12] (shadow_falloff * 0.50) in
-
-  // -- Composition --
+  let color = // -- Composition --
   bg
   // Tail (behind body)
   |> paint tail        brown_dk
@@ -212,4 +211,5 @@ let main (coord : vec2) =
   |> paint hi_l  wht
   |> paint hi_r  wht
   |> paint hi_l2 wht
-  |> paint hi_r2 wht
+  |> paint hi_r2 wht in
+  [color.0, color.1, color.2, 1.0]

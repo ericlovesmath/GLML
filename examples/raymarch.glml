@@ -79,5 +79,5 @@ let main (coord : vec2) =
   
   // Mouse Glow logic
   let glow = 0.02 / #length (uv - mouseUV) in
-
-  col + glow
+  let color = col + glow in
+  [color.0, color.1, color.2, 1.0]

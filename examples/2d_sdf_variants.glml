@@ -64,4 +64,4 @@ let main (coord : vec2) =
     #mix col [1, 1, 0] (1 - #smoothstep 0 0.005 d)
   in
 
-  col
+  [col.0, col.1, col.2, 1.0]

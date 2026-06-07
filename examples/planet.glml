@@ -107,9 +107,10 @@ let main (coord : vec2) =
   // March the ray
   let t = march ro rd in
 
-  match t with
-  | None -> [0, 0, 0]
-  | Some t ->
+  let color =
+    match t with
+    | None -> [0, 0, 0]
+    | Some t ->
     // Hit the planet - compute shading
     let hitPos = ro + rd * t in
     let n = getNormal hitPos in
@@ -135,5 +136,6 @@ let main (coord : vec2) =
     let fresnel = 1 - #max (#dot n (-rd)) 0 in
     let rim = fresnel * fresnel * fresnel * 0.4 in
     let atmoColor = [0.3, 0.5, 1.0] in
-
     baseColor * (diff * 0.9 + ambient) + atmoColor * rim
+  in
+  [color.0, color.1, color.2, 1.0]

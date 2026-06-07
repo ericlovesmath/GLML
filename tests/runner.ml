@@ -21,7 +21,7 @@ let test ?(dump : Passes.t list = []) source =
 ;;
 
 let test_term ?(dump : Passes.t list = []) s =
-  test ~dump ("let main (coord : vec2) = " ^ s)
+  test ~dump ("let main (coord : vec2) = let c = (" ^ s ^ ") in [c.0, c.1, c.2, 1.0]")
 ;;
 
 let%expect_test "Check glslangValidator status" =

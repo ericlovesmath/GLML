@@ -4,10 +4,9 @@ let%expect_test "bool match" =
   test
     {|
     #extern bool b
-    let main (coord : vec2) =
-      match b with
+    let main (coord : vec2) = let c = (match b with
       | true -> [1.0, 0.0, 0.0]
-      | false -> [0.0, 0.0, 0.0]
+      | false -> [0.0, 0.0, 0.0]) in [c.0, c.1, c.2, 1.0]
     |};
   [%expect
     {|
@@ -15,64 +14,68 @@ let%expect_test "bool match" =
     precision highp float;
     out vec4 fragColor;
     uniform bool b;
-    vec3 main_pure(vec2 coord) {
+    vec4 main_pure(vec2 coord) {
+        vec3 c;
         if (b) {
-            return vec3(1., 0., 0.);
+            c = vec3(1., 0., 0.);
         } else {
-            return vec3(0., 0., 0.);
+            c = vec3(0., 0., 0.);
         }
+        float anf = c[0];
+        float anf_0 = c[1];
+        float anf_1 = c[2];
+        return vec4(anf, anf_0, anf_1, 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}];
   test
     {|
     #extern bool b
-    let main (coord : vec2) =
-      let x = match b with
+    let main (coord : vec2) = let x = match b with
         | true -> 1.0
-      in [x, 0.0, 0.0]
+      in
+      [x, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 4:15-5:22: non-exhaustive match
+    [typecheck] at 3:39-4:22: non-exhaustive match
       missing: (witness false)
       |
-    4 |       let x = match b with
-    5 |         | true -> 1.0
+    3 |     let main (coord : vec2) = let x = match b with
+    4 |         | true -> 1.0
       |
     |}];
   test
     {|
     #extern bool b
-    let main (coord : vec2) =
-      let x = match b with
+    let main (coord : vec2) = let x = match b with
         | true -> 1.0
         | true -> 1.0
         | false -> 1.0
-      in [x, 0.0, 0.0]
+      in
+      [x, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 4:15-7:23: redundant match arm
+    [typecheck] at 3:39-6:23: redundant match arm
       id: 1
       |
-    4 |       let x = match b with
+    3 |     let main (coord : vec2) = let x = match b with
+    4 |         | true -> 1.0
     5 |         | true -> 1.0
-    6 |         | true -> 1.0
-    7 |         | false -> 1.0
+    6 |         | false -> 1.0
       |
     |}];
   test
     {|
     #extern bool b
-    let main (coord : vec2) =
-      let x = match b with
+    let main (coord : vec2) = let x = match b with
         | false -> 1.0
         | _ -> 0.0
-      in [x, 0.0, 0.0]
+      in
+      [x, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
@@ -80,18 +83,17 @@ let%expect_test "bool match" =
     precision highp float;
     out vec4 fragColor;
     uniform bool b;
-    vec3 main_pure(vec2 coord) {
+    vec4 main_pure(vec2 coord) {
         float x;
         if (b) {
             x = 0.;
         } else {
             x = 1.;
         }
-        return vec3(x, 0., 0.);
+        return vec4(x, 0., 0., 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}]
 ;;
@@ -100,12 +102,12 @@ let%expect_test "int match" =
   test
     {|
     #extern int n
-    let main (coord : vec2) =
-      let x = match n with
+    let main (coord : vec2) = let x = match n with
         | 0 -> 0.0
         | 1 -> 1.0
         | _ -> 2.0
-      in [x, 0.0, 0.0]
+      in
+      [x, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
@@ -113,7 +115,7 @@ let%expect_test "int match" =
     precision highp float;
     out vec4 fragColor;
     uniform int n;
-    vec3 main_pure(vec2 coord) {
+    vec4 main_pure(vec2 coord) {
         float x;
         switch (n) {
             case 0: {
@@ -129,51 +131,50 @@ let%expect_test "int match" =
                 break;
             }
         }
-        return vec3(x, 0., 0.);
+        return vec4(x, 0., 0., 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}];
   test
     {|
     #extern int n
-    let main (coord : vec2) =
-      let x = match n with
+    let main (coord : vec2) = let x = match n with
         | 0 -> 0.0
         | 4 -> 0.0
-      in [x, 0.0, 0.0]
+      in
+      [x, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 4:15-6:19: non-exhaustive match
+    [typecheck] at 3:39-5:19: non-exhaustive match
       missing: (witness 1)
       |
-    4 |       let x = match n with
-    5 |         | 0 -> 0.0
-    6 |         | 4 -> 0.0
+    3 |     let main (coord : vec2) = let x = match n with
+    4 |         | 0 -> 0.0
+    5 |         | 4 -> 0.0
       |
     |}];
   test
     {|
     #extern int n
-    let main (coord : vec2) =
-      let x = match n with
+    let main (coord : vec2) = let x = match n with
         | 0 -> 0.0
         | 0 -> 1.0
         | k -> 0.0
-      in [x, 0.0, 0.0]
+      in
+      [x, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 4:15-7:19: redundant match arm
+    [typecheck] at 3:39-6:19: redundant match arm
       id: 1
       |
-    4 |       let x = match n with
-    5 |         | 0 -> 0.0
-    6 |         | 0 -> 1.0
-    7 |         | k -> 0.0
+    3 |     let main (coord : vec2) = let x = match n with
+    4 |         | 0 -> 0.0
+    5 |         | 0 -> 1.0
+    6 |         | k -> 0.0
       |
     |}]
 ;;
@@ -182,12 +183,12 @@ let%expect_test "float match" =
   test
     {|
     #extern float x
-    let main (coord : vec2) =
-      let c = match x with
+    let main (coord : vec2) = let c = match x with
         | 1.0 -> 0.0
         | 2.5 -> 1.0
         | _ -> 2.0
-      in [c, 0.0, 0.0]
+      in
+      [c, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
@@ -195,7 +196,7 @@ let%expect_test "float match" =
     precision highp float;
     out vec4 fragColor;
     uniform float x;
-    vec3 main_pure(vec2 coord) {
+    vec4 main_pure(vec2 coord) {
         bool _lv_cmp_0 = (x == 1.);
         float c;
         if (_lv_cmp_0) {
@@ -208,22 +209,20 @@ let%expect_test "float match" =
                 c = 2.;
             }
         }
-        return vec3(c, 0., 0.);
+        return vec4(c, 0., 0., 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}];
   (* Float match in return position *)
   test
     {|
     #extern float x
-    let main (coord : vec2) =
-      match x with
+    let main (coord : vec2) = let c = (match x with
         | 0.0 -> [1.0, 0.0, 0.0]
         | 1.0 -> [0.0, 1.0, 0.0]
-        | _ -> [0.0, 0.0, 1.0]
+        | _ -> [0.0, 0.0, 1.0]) in [c.0, c.1, c.2, 1.0]
     |};
   [%expect
     {|
@@ -231,80 +230,81 @@ let%expect_test "float match" =
     precision highp float;
     out vec4 fragColor;
     uniform float x;
-    vec3 main_pure(vec2 coord) {
+    vec4 main_pure(vec2 coord) {
         bool _lv_cmp_0 = (x == 0.);
+        vec3 c;
         if (_lv_cmp_0) {
-            return vec3(1., 0., 0.);
+            c = vec3(1., 0., 0.);
         } else {
             bool _lv_cmp = (x == 1.);
             if (_lv_cmp) {
-                return vec3(0., 1., 0.);
+                c = vec3(0., 1., 0.);
             } else {
-                return vec3(0., 0., 1.);
+                c = vec3(0., 0., 1.);
             }
         }
+        float anf = c[0];
+        float anf_0 = c[1];
+        float anf_1 = c[2];
+        return vec4(anf, anf_0, anf_1, 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}];
   test
     {|
     #extern float x
-    let main (coord : vec2) =
-      match x with
+    let main (coord : vec2) = let c = (match x with
         | 0.0 -> [1.0, 0.0, 0.0]
-        | 1.0 -> [0.0, 1.0, 0.0]
+        | 1.0 -> [0.0, 1.0, 0.0]) in [c.0, c.1, c.2, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 4:7-6:33: non-exhaustive match
+    [typecheck] at 3:39-5:34: non-exhaustive match
       missing: (witness 2.)
       |
-    4 |       match x with
-    5 |         | 0.0 -> [1.0, 0.0, 0.0]
-    6 |         | 1.0 -> [0.0, 1.0, 0.0]
+    3 |     let main (coord : vec2) = let c = (match x with
+    4 |         | 0.0 -> [1.0, 0.0, 0.0]
+    5 |         | 1.0 -> [0.0, 1.0, 0.0]) in [c.0, c.1, c.2, 1.0]
       |
     |}];
   test
     {|
     #extern float x
-    let main (coord : vec2) =
-      match x with
+    let main (coord : vec2) = let c = (match x with
         | 0.0 -> [1.0, 0.0, 0.0]
         | 0.0 -> [0.0, 1.0, 0.0]
-        | _ -> [0.0, 0.0, 1.0]
+        | _ -> [0.0, 0.0, 1.0]) in [c.0, c.1, c.2, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 4:7-7:31: redundant match arm
+    [typecheck] at 3:39-6:32: redundant match arm
       id: 1
       |
-    4 |       match x with
-    5 |         | 0.0 -> [1.0, 0.0, 0.0]
-    6 |         | 0.0 -> [0.0, 1.0, 0.0]
-    7 |         | _ -> [0.0, 0.0, 1.0]
+    3 |     let main (coord : vec2) = let c = (match x with
+    4 |         | 0.0 -> [1.0, 0.0, 0.0]
+    5 |         | 0.0 -> [0.0, 1.0, 0.0]
+    6 |         | _ -> [0.0, 0.0, 1.0]) in [c.0, c.1, c.2, 1.0]
       |
     |}];
   test
     {|
     #extern float x
-    let main (coord : vec2) =
-      match x with
+    let main (coord : vec2) = let c = (match x with
         | 0.0 -> [1.0, 0.0, 0.0]
         | -0.0 -> [0.0, 1.0, 0.0]
-        | _ -> [0.0, 0.0, 1.0]
+        | _ -> [0.0, 0.0, 1.0]) in [c.0, c.1, c.2, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 4:7-7:31: redundant match arm
+    [typecheck] at 3:39-6:32: redundant match arm
       id: 1
       |
-    4 |       match x with
-    5 |         | 0.0 -> [1.0, 0.0, 0.0]
-    6 |         | -0.0 -> [0.0, 1.0, 0.0]
-    7 |         | _ -> [0.0, 0.0, 1.0]
+    3 |     let main (coord : vec2) = let c = (match x with
+    4 |         | 0.0 -> [1.0, 0.0, 0.0]
+    5 |         | -0.0 -> [0.0, 1.0, 0.0]
+    6 |         | _ -> [0.0, 0.0, 1.0]) in [c.0, c.1, c.2, 1.0]
       |
     |}]
 ;;
@@ -323,23 +323,21 @@ let%expect_test "variants and matching" =
       | Rect (w, h) -> w * h
       | Empty -> 0.0
 
-    let main (coord : vec2) =
-      let a = area (Circle 2.0) in
+    let main (coord : vec2) = let a = area (Circle 2.0) in
       let b = area (Rect (3.0, 4.0)) in
       let c = area Empty in
-      [a, b, c]
+      [a, b, c, 1.0]
     |};
   [%expect
     {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord) {
-        return vec3(12.56636, 12., 0.);
+    vec4 main_pure(vec2 coord) {
+        return vec4(12.56636, 12., 0., 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}]
 ;;
@@ -351,25 +349,23 @@ let%expect_test "variant match in let binding" =
       | Some of float
       | None
 
-    let main (coord : vec2) =
-      let x = Some 5.0 in
+    let main (coord : vec2) = let x = Some 5.0 in
       let v = match x with
         | Some f -> f
         | None -> 0.0
       in
-      [v, v, v]
+      [v, v, v, 1.0]
     |};
   [%expect
     {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord) {
-        return vec3(5., 5., 5.);
+    vec4 main_pure(vec2 coord) {
+        return vec4(5., 5., 5., 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}]
 ;;
@@ -379,21 +375,20 @@ let%expect_test "variant exhaustive checking and incorrect maching" =
     {|
     type color = | Red | Green | Blue
 
-    let main (coord : vec2) =
-      let v = match Red with
+    let main (coord : vec2) = let v = match Red with
         | Red -> 1.0
         | Blue -> 2.0
       in
-      [v, 0.0, 0.0]
+      [v, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 5:15-7:22: non-exhaustive match
+    [typecheck] at 4:39-6:22: non-exhaustive match
       missing: (witness (Green))
       |
-    5 |       let v = match Red with
-    6 |         | Red -> 1.0
-    7 |         | Blue -> 2.0
+    4 |     let main (coord : vec2) = let v = match Red with
+    5 |         | Red -> 1.0
+    6 |         | Blue -> 2.0
       |
     |}];
   test
@@ -402,17 +397,16 @@ let%expect_test "variant exhaustive checking and incorrect maching" =
       | Circle of float
       | Empty
 
-    let main (coord : vec2) =
-      let s = Circle (1.0, 2.0) in
-      [0.0, 0.0, 0.0]
+    let main (coord : vec2) = let s = Circle (1.0, 2.0) in
+      [0.0, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 7:15-7:32: wrong number of args to constructor
+    [typecheck] at 6:39-6:56: wrong number of args to constructor
       ctor: Circle
       |
-    7 |       let s = Circle (1.0, 2.0) in
-      |               ^^^^^^^^^^^^^^^^^
+    6 |     let main (coord : vec2) = let s = Circle (1.0, 2.0) in
+      |                                       ^^^^^^^^^^^^^^^^^
     |}]
 ;;
 
@@ -421,21 +415,19 @@ let%expect_test "struct pattern matching" =
     {|
     type point = { x : float, y : float }
 
-    let main (uv : vec2) : vec3 =
-      match { x = 1.0, y = 2.0 } with
-      | { x = a, y = b } -> [a, b, 0.0]
+    let main (uv : vec2) = let c = (match { x = 1.0, y = 2.0 } with
+      | { x = a, y = b } -> [a, b, 0.0]) in [c.0, c.1, c.2, 1.0]
     |};
   [%expect
     {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 uv) {
-        return vec3(1., 2., 0.);
+    vec4 main_pure(vec2 uv) {
+        return vec4(1., 2., 0., 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}];
   (* Partial: bind one field, ignore rest with _ *)
@@ -443,44 +435,40 @@ let%expect_test "struct pattern matching" =
     {|
     type rgb = { r : float, g : float, b : float }
 
-    let main (uv : vec2) : vec3 =
-      let c : rgb = { r = 1.0, g = 0.5, b = 0.0 } in
+    let main (uv : vec2) = let c = (let c : rgb = { r = 1.0, g = 0.5, b = 0.0 } in
       match c with
-      | { r = red, _ } -> [red, 0.0, 0.0]
+      | { r = red, _ } -> [red, 0.0, 0.0]) in [c.0, c.1, c.2, 1.0]
     |};
   [%expect
     {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 uv) {
-        return vec3(1., 0., 0.);
+    vec4 main_pure(vec2 uv) {
+        return vec4(1., 0., 0., 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}];
   test
     {|
     type box['a] = { value : 'a }
 
-    let main (uv : vec2) : vec3 =
-      let b = { value = 1.5 } in
+    let main (uv : vec2) = let c = (let b = { value = 1.5 } in
       match b with
-      | { value = v, _ } -> [v, 0.0, 0.0]
+      | { value = v, _ } -> [v, 0.0, 0.0]) in [c.0, c.1, c.2, 1.0]
     |};
   [%expect
     {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 uv) {
-        return vec3(1.5, 0., 0.);
+    vec4 main_pure(vec2 uv) {
+        return vec4(1.5, 0., 0., 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}];
   (* Error non-exhaustive *)
@@ -488,17 +476,16 @@ let%expect_test "struct pattern matching" =
     {|
     type point = { x : float, y : float }
 
-    let main (uv : vec2) : vec3 =
-      let p : point = { x = 1.0, y = 2.0 } in
+    let main (uv : vec2) = let c = (let p : point = { x = 1.0, y = 2.0 } in
       match p with
-      | { x = a } -> [a, 0.0, 0.0]
+      | { x = a } -> [a, 0.0, 0.0]) in [c.0, c.1, c.2, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 6:7-7:35: non-exhaustive record pat
+    [typecheck] at 5:7-6:35: non-exhaustive record pat
       |
-    6 |       match p with
-    7 |       | { x = a } -> [a, 0.0, 0.0]
+    5 |       match p with
+    6 |       | { x = a } -> [a, 0.0, 0.0]) in [c.0, c.1, c.2, 1.0]
       |
     |}];
   (* Error unknown field *)
@@ -506,17 +493,16 @@ let%expect_test "struct pattern matching" =
     {|
     type point = { x : float, y : float }
 
-    let main (uv : vec2) : vec3 =
-      let p : point = { x = 1.0, y = 2.0 } in
+    let main (uv : vec2) = let c = (let p : point = { x = 1.0, y = 2.0 } in
       match p with
-      | { x = a, z = b } -> [a, 0.0, 0.0]
+      | { x = a, z = b } -> [a, 0.0, 0.0]) in [c.0, c.1, c.2, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 6:7-7:42: unknown constructor/field in pattern
+    [typecheck] at 5:7-6:42: unknown constructor/field in pattern
       |
-    6 |       match p with
-    7 |       | { x = a, z = b } -> [a, 0.0, 0.0]
+    5 |       match p with
+    6 |       | { x = a, z = b } -> [a, 0.0, 0.0]) in [c.0, c.1, c.2, 1.0]
       |
     |}];
   (* Error:duplicate field *)
@@ -524,18 +510,17 @@ let%expect_test "struct pattern matching" =
     {|
     type point = { x : float, y : float }
 
-    let main (uv : vec2) : vec3 =
-      let p : point = { x = 1.0, y = 2.0 } in
+    let main (uv : vec2) = let c = (let p : point = { x = 1.0, y = 2.0 } in
       match p with
-      | { x = a, x = b } -> [a, 0.0, 0.0]
+      | { x = a, x = b } -> [a, 0.0, 0.0]) in [c.0, c.1, c.2, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 6:7-7:42: duplicate field
+    [typecheck] at 5:7-6:42: duplicate field
       fname: x
       |
-    6 |       match p with
-    7 |       | { x = a, x = b } -> [a, 0.0, 0.0]
+    5 |       match p with
+    6 |       | { x = a, x = b } -> [a, 0.0, 0.0]) in [c.0, c.1, c.2, 1.0]
       |
     |}];
   (* Field Punning *)
@@ -543,21 +528,19 @@ let%expect_test "struct pattern matching" =
     {|
     type point = { x : float, y : float }
 
-    let main (uv : vec2) : vec3 =
-      match { x = 1.0, y = 2.0 } with
-      | { x = a, y } -> [a, y, 0.0]
+    let main (uv : vec2) = let c = (match { x = 1.0, y = 2.0 } with
+      | { x = a, y } -> [a, y, 0.0]) in [c.0, c.1, c.2, 1.0]
     |};
   [%expect
     {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 uv) {
-        return vec3(1., 2., 0.);
+    vec4 main_pure(vec2 uv) {
+        return vec4(1., 2., 0., 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}]
 ;;
@@ -573,27 +556,25 @@ let%expect_test "bracket pattern matching" =
 
     let h (v : vec2) : float = match v with | [x, y] -> x + y
 
-    let main (coord : vec2) : vec3 =
-      let a = f [coord.0, coord.1, 0.0] in
+    let main (coord : vec2) = let a = f [coord.0, coord.1, 0.0] in
       let b = g [[1.0, 0.0], [0.0, 1.0]] in
       let c = h coord in
-      [a, b, c]
+      [a, b, c, 1.0]
     |};
   [%expect
     {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord) {
+    vec4 main_pure(vec2 coord) {
         float anf = coord[0];
         float _lv_v0_3_0 = coord[0];
         float _lv_v1_3_0 = coord[1];
         float c_0 = (_lv_v0_3_0 + _lv_v1_3_0);
-        return vec3(anf, 2., c_0);
+        return vec4(anf, 2., c_0, 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}]
 ;;
@@ -608,25 +589,23 @@ let%expect_test "let pattern binding" =
       let (Wrap v') = w in
       v + v'
 
-    let main (uv : vec2) =
-      let (x : float) = 2.0 in
+    let main (uv : vec2) = let (x : float) = 2.0 in
       let [u, v] = uv in
-      [x, f (Wrap 1.0), u + v]
+      [x, f (Wrap 1.0), u + v, 1.0]
     |};
   [%expect
     {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 uv) {
+    vec4 main_pure(vec2 uv) {
         float _lv_v0 = uv[0];
         float _lv_v1 = uv[1];
         float anf_1 = (_lv_v0 + _lv_v1);
-        return vec3(2., 2., anf_1);
+        return vec4(2., 2., anf_1, 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}]
 ;;
@@ -640,9 +619,8 @@ let%expect_test "nested pattern matching" =
       | Some 1 -> 1
       | None -> 1
 
-    let main (coord : vec2) : vec3 =
-      let _ = x None in
-      [0.0, 0.0, 0.0]
+    let main (coord : vec2) = let _ = x None in
+      [0.0, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
@@ -666,21 +644,19 @@ let%expect_test "nested pattern matching with polymorphism" =
       | Some None -> 0.0
       | None -> 1.0
 
-    let main (coord : vec2) : vec3 =
-      let v = f (Some (Some 0.5)) in
-      [v, 0.0, 0.0]
+    let main (coord : vec2) = let v = f (Some (Some 0.5)) in
+      [v, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord) {
-        return vec3(0.5, 0., 0.);
+    vec4 main_pure(vec2 coord) {
+        return vec4(0.5, 0., 0., 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}]
 ;;
@@ -690,25 +666,23 @@ let%expect_test "nested pattern matching with literals in records" =
     {|
     type point = { x : float, y : float }
 
-    let main (coord : vec2) : vec3 =
-      let p = { x = 0.0, y = 0.5 } in
+    let main (coord : vec2) = let p = { x = 0.0, y = 0.5 } in
       let v = match p with
         | { x = 0.0, y } -> y
         | { x, y } -> x + y
       in
-      [v, 0.0, 0.0]
+      [v, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord) {
-        return vec3(0.5, 0., 0.);
+    vec4 main_pure(vec2 coord) {
+        return vec4(0.5, 0., 0., 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}]
 ;;
@@ -724,9 +698,8 @@ let%expect_test "nested pattern matching with duplicate arms" =
       | Some _ -> 0
       | None -> -1
 
-    let main (coord : vec2) : vec3 =
-      let _ = f (Some 0) in
-      [0.0, 0.0, 0.0]
+    let main (coord : vec2) = let _ = f (Some 0) in
+      [0.0, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
@@ -751,9 +724,8 @@ let%expect_test "nested pattern matching with non exhaustive bool" =
       | Some true -> 1.0
       | None -> 3.0
 
-    let main (coord : vec2) : vec3 =
-      let _ = f None in
-      [0.0, 0.0, 0.0]
+    let main (coord : vec2) = let _ = f None in
+      [0.0, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
@@ -770,145 +742,136 @@ let%expect_test "nested pattern matching with non exhaustive bool" =
 let%expect_test "pattern match exhaustiveness edge cases" =
   test
     {|
-    let main (coord : vec2) : vec3 =
-      let n = 0 in
+    let main (coord : vec2) = let n = 0 in
       let _ = match n with
         | 0 -> 0
         | 1 -> 1
       in
-      [0.0, 0.0, 0.0]
+      [0.0, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 4:15-6:17: non-exhaustive match
+    [typecheck] at 3:15-5:17: non-exhaustive match
       missing: (witness 2)
       |
-    4 |       let _ = match n with
-    5 |         | 0 -> 0
-    6 |         | 1 -> 1
+    3 |       let _ = match n with
+    4 |         | 0 -> 0
+    5 |         | 1 -> 1
       |
     |}];
   test
     {|
-    let main (coord : vec2) : vec3 =
-      let n = 7 in
+    let main (coord : vec2) = let n = 7 in
       let _ = match n with
         | 0 -> 0
         | x -> x
       in
-      [0.0, 0.0, 0.0]
+      [0.0, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord) {
-        return vec3(0., 0., 0.);
+    vec4 main_pure(vec2 coord) {
+        return vec4(0., 0., 0., 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}];
   test
     {|
-    let main (coord : vec2) : vec3 =
-      let f = 0.0 in
+    let main (coord : vec2) = let f = 0.0 in
       let _ = match f with
         | 0.0 -> 1.0
         | 1.0 -> 2.0
       in
-      [0.0, 0.0, 0.0]
+      [0.0, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 4:15-6:21: non-exhaustive match
+    [typecheck] at 3:15-5:21: non-exhaustive match
       missing: (witness 2.)
       |
-    4 |       let _ = match f with
-    5 |         | 0.0 -> 1.0
-    6 |         | 1.0 -> 2.0
+    3 |       let _ = match f with
+    4 |         | 0.0 -> 1.0
+    5 |         | 1.0 -> 2.0
       |
     |}];
   test
     {|
-    let main (coord : vec2) : vec3 =
-      let b = true in
+    let main (coord : vec2) = let b = true in
       let _ = match b with
         | true -> 1.0
       in
-      [0.0, 0.0, 0.0]
+      [0.0, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 4:15-5:22: non-exhaustive match
+    [typecheck] at 3:15-4:22: non-exhaustive match
       missing: (witness false)
       |
-    4 |       let _ = match b with
-    5 |         | true -> 1.0
+    3 |       let _ = match b with
+    4 |         | true -> 1.0
       |
     |}];
   test
     {|
     type option['a] = Some of 'a | None
 
-    let main (coord : vec2) : vec3 =
-      let v = match Some 1.0 with
+    let main (coord : vec2) = let v = match Some 1.0 with
         | Some _ -> 1.0
         | None -> 0.0
       in
-      [v, 0.0, 0.0]
+      [v, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    vec3 main_pure(vec2 coord) {
-        return vec3(1., 0., 0.);
+    vec4 main_pure(vec2 coord) {
+        return vec4(1., 0., 0., 1.);
     }
     void main() {
-        vec3 color = main_pure(gl_FragCoord.xy);
-        fragColor = vec4(color.xyz, 1.);
+        fragColor = main_pure(gl_FragCoord.xy);
     }
     |}];
   test
     {|
     type point = { x : float, y : float }
 
-    let main (coord : vec2) : vec3 =
-      let p = { x = 0.0, y = 0.5 } in
+    let main (coord : vec2) = let p = { x = 0.0, y = 0.5 } in
       let _ = match p with
         | { x = 0.0, y } -> y
       in
-      [0.0, 0.0, 0.0]
+      [0.0, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 6:15-7:30: non-exhaustive match
+    [typecheck] at 5:15-6:30: non-exhaustive match
       missing: (witness (record (x 1.) (y 0.)))
       |
-    6 |       let _ = match p with
-    7 |         | { x = 0.0, y } -> y
+    5 |       let _ = match p with
+    6 |         | { x = 0.0, y } -> y
       |
     |}];
   test
     {|
-    let main (coord : vec2) : vec3 =
-      let v = [0.0, 1.0] in
+    let main (coord : vec2) = let v = [0.0, 1.0] in
       let _ = match v with
         | [0.0, _] -> 0.0
       in
-      [0.0, 0.0, 0.0]
+      [0.0, 0.0, 0.0, 1.0]
     |};
   [%expect
     {|
-    [typecheck] at 4:15-5:26: non-exhaustive match
+    [typecheck] at 3:15-4:26: non-exhaustive match
       missing: (witness (bracket 1. 0.))
       |
-    4 |       let _ = match v with
-    5 |         | [0.0, _] -> 0.0
+    3 |       let _ = match v with
+    4 |         | [0.0, _] -> 0.0
       |
     |}]
 ;;
