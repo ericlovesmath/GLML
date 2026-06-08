@@ -8,6 +8,9 @@ import raymarchedMaterials from "../../examples/materials.glml?raw";
 import raymarchedPlanet from "../../examples/planet.glml?raw";
 import truchet from "../../examples/truchet.glml?raw";
 
+import golImage from "../../examples/game_of_life.image.glml?raw";
+import golBufferA from "../../examples/game_of_life.buffer_a.glml?raw";
+
 import type { PassName } from "./renderer";
 
 export const EXAMPLES: [string, string][] = [
@@ -27,4 +30,9 @@ export interface MultipassExample {
   passes: Partial<Record<PassName, string>>;
 }
 
-export const MULTIPASS_EXAMPLES: MultipassExample[] = []
+export const MULTIPASS_EXAMPLES: MultipassExample[] = [
+  {
+    name: "Game of Life",
+    passes: { image: golImage, bufferA: golBufferA },
+  },
+];

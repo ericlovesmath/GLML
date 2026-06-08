@@ -477,6 +477,96 @@ let%expect_test "compile examples" =
     }
 
 
+    ====== COMPILING EXAMPLE game_of_life.buffer_a.glml ======
+
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform sampler2D bufferA;
+    uniform int iFrame;
+    uniform vec2 u_resolution;
+    float cell(vec2 p_0) {
+        vec2 anf_3 = (p_0 / u_resolution);
+        vec4 anf_4 = texture(bufferA, anf_3);
+        return anf_4[0];
+    }
+    void main() {
+        vec2 uv = gl_FragCoord.xy;
+        bool anf_6 = (iFrame == 0);
+        bool alive;
+        if (anf_6) {
+            vec2 anf_38 = vec2(12.9898, 78.233);
+            float anf_0_0 = dot(uv, anf_38);
+            float anf_1_0 = sin(anf_0_0);
+            float anf_2_0 = (anf_1_0 * 43758.5453);
+            float anf_7 = fract(anf_2_0);
+            alive = (anf_7 > 0.8);
+        } else {
+            vec2 anf_8 = vec2(-1., -1.);
+            vec2 anf_5_7 = (uv + anf_8);
+            float anf_9 = cell(anf_5_7);
+            vec2 anf_10 = vec2(0., -1.);
+            vec2 anf_5_6 = (uv + anf_10);
+            float anf_11 = cell(anf_5_6);
+            float anf_12 = (anf_9 + anf_11);
+            vec2 anf_13 = vec2(1., -1.);
+            vec2 anf_5_5 = (uv + anf_13);
+            float anf_14 = cell(anf_5_5);
+            float anf_15 = (anf_12 + anf_14);
+            vec2 anf_16 = vec2(-1., 0.);
+            vec2 anf_5_4 = (uv + anf_16);
+            float anf_17 = cell(anf_5_4);
+            float anf_18 = (anf_15 + anf_17);
+            vec2 anf_19 = vec2(1., 0.);
+            vec2 anf_5_3 = (uv + anf_19);
+            float anf_20 = cell(anf_5_3);
+            float anf_21 = (anf_18 + anf_20);
+            vec2 anf_22 = vec2(-1., 1.);
+            vec2 anf_5_2 = (uv + anf_22);
+            float anf_23 = cell(anf_5_2);
+            float anf_24 = (anf_21 + anf_23);
+            vec2 anf_25 = vec2(0., 1.);
+            vec2 anf_5_1 = (uv + anf_25);
+            float anf_26 = cell(anf_5_1);
+            float anf_27 = (anf_24 + anf_26);
+            vec2 anf_28 = vec2(1., 1.);
+            vec2 anf_5_0 = (uv + anf_28);
+            float anf_29 = cell(anf_5_0);
+            float neighbors = (anf_27 + anf_29);
+            bool anf_30 = (neighbors == 3.);
+            float anf_31 = cell(uv);
+            bool anf_32 = (anf_31 == 1.);
+            bool anf_33 = (neighbors == 2.);
+            bool anf_34 = (anf_32 && anf_33);
+            alive = (anf_30 || anf_34);
+        }
+        int v;
+        if (alive) {
+            v = 1;
+        } else {
+            v = 0;
+        }
+        float anf_35 = float(v);
+        float anf_36 = float(v);
+        float anf_37 = float(v);
+        fragColor = vec4(anf_35, anf_36, anf_37, 1.);
+    }
+
+
+    ====== COMPILING EXAMPLE game_of_life.image.glml ======
+
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform sampler2D bufferA;
+    uniform vec2 u_resolution;
+    void main() {
+        vec2 uv = gl_FragCoord.xy;
+        vec2 anf = (uv / u_resolution);
+        fragColor = texture(bufferA, anf);
+    }
+
+
     ====== COMPILING EXAMPLE mandelbrot.glml ======
 
     #version 300 es

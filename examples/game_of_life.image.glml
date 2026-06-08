@@ -1,0 +1,4 @@
+#extern vec2 u_resolution
+#extern sampler bufferA
+
+let main uv = #texture bufferA (uv / u_resolution)

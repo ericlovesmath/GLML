@@ -1,0 +1,25 @@
+// One cell per pixel
+// Seeds random seed on iFrame 0
+// Uses previous frame bufferA to identify next frame
+
+#extern vec2 u_resolution
+#extern int iFrame
+#extern sampler bufferA
+
+let hash (p : vec2) =
+  #fract (#sin (#dot p [12.9898, 78.233]) * 43758.5453)
+
+let cell (p : vec2) = (#texture bufferA (p / u_resolution)).0
+
+let main (uv : vec2) =
+  let at d = cell (uv + d) in
+  let alive =
+    if iFrame = 0 then hash uv > 0.8 else
+    let neighbors =
+      at [-1, -1] + at [0 ,-1] + at [1 ,-1] + at [-1, 0]
+      + at [1, 0] + at [-1, 1] + at [0, 1] + at [1, 1]
+    in
+    neighbors = 3 || (cell uv = 1 && neighbors = 2)
+  in
+  let v = if alive then 1 else 0 in
+  [v, v, v, 1]

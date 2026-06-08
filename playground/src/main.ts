@@ -282,7 +282,7 @@ function fromMultipass(m: MultipassExample): Sources {
 const ALL_EXAMPLES: { name: string; load: () => Sources }[] = [
   ...EXAMPLES.map(([name, src]) => ({ name, load: () => emptyState(src) })),
   ...MULTIPASS_EXAMPLES.map((m) => ({
-    name: `${m.name} (multipass)`,
+    name: `${m.name} (MP)`,
     load: () => fromMultipass(m),
   })),
 ];
