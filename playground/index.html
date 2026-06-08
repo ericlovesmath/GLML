@@ -45,7 +45,7 @@
   </header>
   <div class="main-layout">
 
-    <div class="pane glml-pane">
+    <div class="col glml-pane">
 
       <div class="pane-header">
         <span>GLML</span>
@@ -56,20 +56,22 @@
         <button id="compile-btn">Compile</button>
       </div>
 
+      <div id="tab-bar" class="tab-bar"></div>
+
       <div id="glml-input"></div>
       <div id="vim-status"></div>
     </div>
 
-    <div class="right-column">
+    <div class="col right-column">
 
-      <div class="webgl-pane">
+      <div class="col webgl-pane">
         <div class="pane-header"><span>WebGL Output</span></div>
         <div class="canvas-container">
           <canvas id="gl-canvas"></canvas>
         </div>
       </div>
 
-      <div class="pane glsl-pane">
+      <div class="col glsl-pane">
         <div class="pane-header"><span>GLSL Output</span></div>
         <div class="textarea-wrapper">
           <div id="glsl-output"></div>

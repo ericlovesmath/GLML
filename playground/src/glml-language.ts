@@ -45,7 +45,7 @@ const KEYWORDS = new Set([
 ]);
 
 const PRIMITIVES = new Set([
-  "bool", "int", "float",
+  "bool", "int", "float", "sampler",
   "vec2", "vec3", "vec4",
   "mat2", "mat3", "mat4",
   "mat2x2", "mat2x3", "mat2x4",

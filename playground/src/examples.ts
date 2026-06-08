@@ -8,6 +8,8 @@ import raymarchedMaterials from "../../examples/materials.glml?raw";
 import raymarchedPlanet from "../../examples/planet.glml?raw";
 import truchet from "../../examples/truchet.glml?raw";
 
+import type { PassName } from "./renderer";
+
 export const EXAMPLES: [string, string][] = [
   ["Mandelbrot", mandelbrot],
   ["Metallic Liquid", warpedNoise],
@@ -19,3 +21,10 @@ export const EXAMPLES: [string, string][] = [
   ["Raymarch 3D Materials", raymarchedMaterials],
   ["Truchet Tiling", truchet],
 ];
+
+export interface MultipassExample {
+  name: string;
+  passes: Partial<Record<PassName, string>>;
+}
+
+export const MULTIPASS_EXAMPLES: MultipassExample[] = []
