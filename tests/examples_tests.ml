@@ -1630,6 +1630,137 @@ let%expect_test "compile examples" =
     }
 
 
+    ====== COMPILING EXAMPLE ripples.buffer_a.glml ======
+
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform sampler2D bufferA;
+    uniform vec2 u_mouse;
+    uniform bool u_mouse_down;
+    uniform vec2 u_resolution;
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        vec2 uv_0 = (coord / u_resolution);
+        vec2 px_0 = (1. / u_resolution);
+        vec2 m = (u_mouse / u_resolution);
+        vec4 anf_39 = texture(bufferA, uv_0);
+        float curr = anf_39[0];
+        vec4 anf_1_0 = texture(bufferA, uv_0);
+        float prev = anf_1_0[1];
+        float anf_20 = (2. * curr);
+        float anf_21 = (anf_20 - prev);
+        float _lv_v0_0 = px_0[0];
+        float _lv_v1_0 = px_0[1];
+        vec2 anf_4_0 = vec2(_lv_v0_0, 0.);
+        vec2 anf_0_9 = (uv_0 + anf_4_0);
+        vec4 anf_38 = texture(bufferA, anf_0_9);
+        float anf_5_0 = anf_38[0];
+        float anf_6_0 = (-1. * _lv_v0_0);
+        vec2 anf_7_0 = vec2(anf_6_0, 0.);
+        vec2 anf_0_8 = (uv_0 + anf_7_0);
+        vec4 anf_37 = texture(bufferA, anf_0_8);
+        float anf_8_0 = anf_37[0];
+        float anf_9_0 = (anf_5_0 + anf_8_0);
+        vec2 anf_10_0 = vec2(0., _lv_v1_0);
+        vec2 anf_0_7 = (uv_0 + anf_10_0);
+        vec4 anf_36 = texture(bufferA, anf_0_7);
+        float anf_11_0 = anf_36[0];
+        float anf_12_0 = (anf_9_0 + anf_11_0);
+        float anf_13_0 = (-1. * _lv_v1_0);
+        vec2 anf_14_0 = vec2(0., anf_13_0);
+        vec2 anf_0_6 = (uv_0 + anf_14_0);
+        vec4 anf_35 = texture(bufferA, anf_0_6);
+        float anf_15_0 = anf_35[0];
+        float anf_16_0 = (anf_12_0 + anf_15_0);
+        vec4 anf_34 = texture(bufferA, uv_0);
+        float anf_18_0 = anf_34[0];
+        float anf_19_0 = (4. * anf_18_0);
+        float anf_23 = (anf_16_0 - anf_19_0);
+        float anf_24 = (0.25 * anf_23);
+        float anf_25 = (anf_21 + anf_24);
+        float next = (anf_25 * 0.98);
+        float next_0;
+        if (u_mouse_down) {
+            float anf_26 = distance(uv_0, m);
+            float anf_27 = smoothstep(0.03, 0., anf_26);
+            next_0 = mix(next, 1., anf_27);
+        } else {
+            next_0 = next;
+        }
+        fragColor = vec4(next_0, curr, 0., 1.);
+    }
+
+
+    ====== COMPILING EXAMPLE ripples.image.glml ======
+
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform sampler2D bufferA;
+    const vec4 deep = vec4(0.02, 0.1, 0.2, 1.);
+    const vec3 light = normalize(vec3(0.5, 0.6, 1.));
+    const vec4 shallow = vec4(0.1, 0.45, 0.65, 1.);
+    uniform vec2 u_resolution;
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        vec2 uv = (coord / u_resolution);
+        vec2 px = (1. / u_resolution);
+        float anf_7 = px[0];
+        vec2 anf_8 = vec2(anf_7, 0.);
+        vec2 anf_9 = (uv + anf_8);
+        vec4 anf_46 = texture(bufferA, anf_9);
+        float anf_10 = anf_46[0];
+        float anf_11 = px[0];
+        vec2 anf_12 = vec2(anf_11, 0.);
+        vec2 anf_13 = (uv - anf_12);
+        vec4 anf_45 = texture(bufferA, anf_13);
+        float anf_14 = anf_45[0];
+        float dhdx = (anf_10 - anf_14);
+        float anf_15 = px[1];
+        vec2 anf_16 = vec2(0., anf_15);
+        vec2 anf_17 = (uv + anf_16);
+        vec4 anf_44 = texture(bufferA, anf_17);
+        float anf_18 = anf_44[0];
+        float anf_19 = px[1];
+        vec2 anf_20 = vec2(0., anf_19);
+        vec2 anf_21 = (uv - anf_20);
+        vec4 anf_43 = texture(bufferA, anf_21);
+        float anf_22 = anf_43[0];
+        float dhdy = (anf_18 - anf_22);
+        vec2 anf_23 = vec2(dhdx, dhdy);
+        float grad = length(anf_23);
+        float anf_24 = (-1. * dhdx);
+        float anf_25 = (anf_24 * 4.);
+        float anf_26 = (-1. * dhdy);
+        float anf_27 = (anf_26 * 4.);
+        vec3 anf_28 = vec3(anf_25, anf_27, 1.);
+        vec3 n = normalize(anf_28);
+        vec3 anf_29 = vec3(0., 0., 1.);
+        vec3 anf_30 = (light + anf_29);
+        vec3 half_0 = normalize(anf_30);
+        float anf_31 = dot(n, light);
+        float diff = max(anf_31, 0.);
+        float anf_32 = dot(n, half_0);
+        float anf_33 = max(anf_32, 0.);
+        float spec = pow(anf_33, 60.);
+        vec4 anf_42 = texture(bufferA, uv);
+        float anf_34 = anf_42[0];
+        float anf_6_1 = (0.5 * anf_34);
+        float anf_35 = (0.5 + anf_6_1);
+        float anf_36 = clamp(anf_35, 0., 1.);
+        vec4 wave = mix(deep, shallow, anf_36);
+        float foam = smoothstep(0., 0.04, grad);
+        float anf_6_0 = (0.5 * diff);
+        float anf_37 = (0.5 + anf_6_0);
+        vec4 anf_38 = (wave * anf_37);
+        float anf_39 = (spec * 0.9);
+        vec4 anf_40 = (anf_38 + anf_39);
+        float anf_41 = (foam * 0.2);
+        fragColor = (anf_40 + anf_41);
+    }
+
+
     ====== COMPILING EXAMPLE truchet.glml ======
 
     #version 300 es

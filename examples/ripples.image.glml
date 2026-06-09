@@ -1,0 +1,34 @@
+// Reads [bufferA] (wave height) as heightmap, render surface normal
+
+#extern vec2 u_resolution
+#extern sampler bufferA
+
+let slope   = 4.0
+let deep    = [0.02, 0.10, 0.20, 1.0] // trough color
+let shallow = [0.10, 0.45, 0.65, 1.0] // crest color
+let light   = #normalize [0.5, 0.6, 1.0]
+
+let height (p : vec2) = (#texture bufferA p).0
+
+// Remap [-1, 1] to [0, 1]
+let unorm x = 0.5 + 0.5 * x
+
+let main (coord : vec2) =
+  let uv = coord / u_resolution in
+  let px = 1 / u_resolution in
+
+  let dhdx = height (uv + [px.0, 0]) - height (uv - [px.0, 0]) in
+  let dhdy = height (uv + [0, px.1]) - height (uv - [0, px.1]) in
+  let grad = #length [dhdx, dhdy] in
+
+  // Normal of heightmap
+  let n = #normalize [-dhdx * slope, -dhdy * slope, 1.0] in
+
+  // Phong lighting with soft diffuse
+  let half = #normalize (light + [0, 0, 1]) in
+  let diff = #max (#dot n light) 0 in
+  let spec = #pow (#max (#dot n half) 0) 60 in
+  let wave = #mix deep shallow (#clamp (unorm (height uv)) 0 1) in
+  let foam = #smoothstep 0.0 0.04 grad in
+
+  wave * unorm diff + spec * 0.9 + foam * 0.2

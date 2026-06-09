@@ -1,0 +1,47 @@
+// [.0] returns height this frame, [.1] returns height last frame
+// Becayse the wave equation is second order in time, this is needed
+// to approximate it discretely properly
+
+#extern vec2 u_resolution
+#extern vec2 u_mouse
+#extern bool u_mouse_down
+#extern sampler bufferA
+
+let c      = 0.5  // wave speed
+let zeta   = 0.98 // damping coefficient
+let radius = 0.03 // size of bump on click
+
+// Surface height at [uv] prev frame
+let height_curr (p : vec2) = (#texture bufferA p).0
+
+// Surface height at [uv] prev prev frame
+let height_prev (p : vec2) = (#texture bufferA p).1
+
+// Discrete Laplacian
+let laplacian (uv : vec2) (px : vec2) =
+  let [x, y] = px in
+  let at d = height_curr (uv + d) in
+  at [x, 0] + at [-x, 0] + at [0, y] + at [0, -y] - 4 * at [0, 0]
+
+let main (coord : vec2) =
+  let uv = coord / u_resolution in
+  let px = 1 / u_resolution in
+  let m  = u_mouse / u_resolution in
+  
+  let curr = height_curr uv in
+  let prev = height_prev uv in
+
+  // Verlet integration of the wave equation + damping
+  let next = (2 * curr - prev + c * c * laplacian uv px) * zeta in
+
+  // If mouse clicked, make a small bump
+  let next =
+    if u_mouse_down
+      then
+        #distance uv m
+        |> #smoothstep radius 0
+        |> #mix next 1
+      else next
+  in
+
+  [next, curr, 0, 1]

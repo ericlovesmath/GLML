@@ -10,6 +10,8 @@ import truchet from "../../examples/truchet.glml?raw";
 
 import golImage from "../../examples/game_of_life.image.glml?raw";
 import golBufferA from "../../examples/game_of_life.buffer_a.glml?raw";
+import ripplesImage from "../../examples/ripples.image.glml?raw";
+import ripplesBufferA from "../../examples/ripples.buffer_a.glml?raw";
 
 import type { PassName } from "./renderer";
 
@@ -31,6 +33,10 @@ export interface MultipassExample {
 }
 
 export const MULTIPASS_EXAMPLES: MultipassExample[] = [
+  {
+    name: "Ripples",
+    passes: { image: ripplesImage, bufferA: ripplesBufferA },
+  },
   {
     name: "Game of Life",
     passes: { image: golImage, bufferA: golBufferA },
