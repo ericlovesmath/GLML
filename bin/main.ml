@@ -43,7 +43,9 @@ let compile_command =
          (match output_file with
           | Some path -> Out_channel.write_all path ~data:result
           | None -> print_endline result)
-       | Error err -> eprintf "%s\n" (Glml.Compiler_error.to_string_hum ~source err))
+       | Error err ->
+         eprintf "%s\n" (Glml.Compiler_error.to_string_hum ~source err);
+         exit 1)
 ;;
 
 let list_passes_command =
