@@ -4,6 +4,7 @@ let examples_dir = "../examples"
 
 let test_examples () =
   let glml_files = Stdlib.Sys.readdir examples_dir in
+  Array.sort glml_files ~compare:String.compare;
   Array.iter glml_files ~f:(fun file ->
     let source = In_channel.read_all (Filename.concat examples_dir file) in
     Printf.printf "\n\n====== COMPILING EXAMPLE %s ======\n\n" file;
