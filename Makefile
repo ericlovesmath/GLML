@@ -1,4 +1,4 @@
-.PHONY: all clean bin js playground-deps playground serve test benchmark website
+.PHONY: all clean bin js playground-deps serve test benchmark website
 
 PROFILE := dev
 ifdef RELEASE
@@ -24,17 +24,14 @@ playground-deps: js
 	cp -f _build/default/jsoo/main.bc.js playground/public/
 	cd playground && npm install
 
-playground: playground-deps
+website: playground-deps
 	cd playground && npm run build
+	rm -rf dist
+	mkdir -p dist
+	cp -r playground/dist/. dist/
 
 serve: playground-deps
 	cd playground && npm run dev
-
-website: clean playground
-	dune build $(DUNE_FLAGS) _build/default/docs/preprocessor/main.exe
-	cd docs && mdbook build
-	cp -r docs/book dist
-	cp -r playground/dist dist/playground
 
 test:
 	dune runtest

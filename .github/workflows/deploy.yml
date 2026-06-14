@@ -1,4 +1,4 @@
-name: Deploy Web Playground
+name: Deploy Playground
 on: [push]
 
 jobs:
@@ -21,7 +21,7 @@ jobs:
           # Fallback to the most recent cache if an exact match isn't found
           restore-prefixes-first-match: nix-${{ runner.os }}-
 
-      - name: Build Website
+      - name: Build Playground
         run: nix develop --command make website RELEASE=1
 
       - name: Vercel Build and Deploy
