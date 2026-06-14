@@ -1,0 +1,22 @@
+name: Tests
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Cache Nix Store
+        uses: nix-community/cache-nix-action@v7
+        with:
+          # Use a key based on the OS and the hash of your flake files
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.nix', 'flake.lock', '**/*.opam', 'dune-project') }}
+          # Fallback to the most recent cache if an exact match isn't found
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+
+      - name: Run tests
+        run: nix develop --command make test
