@@ -1,5 +1,0 @@
-(executable
- (name main)
- (libraries glml_compiler yojson re core)
- (preprocess
-  (pps ppx_jane)))

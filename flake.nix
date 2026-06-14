@@ -81,7 +81,6 @@
                 glsl_analyzer
                 glslang
                 nodejs
-                mdbook
               ]);
           };
         };
