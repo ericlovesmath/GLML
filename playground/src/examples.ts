@@ -12,6 +12,8 @@ import golImage from "../../examples/game_of_life.image.glml?raw";
 import golBufferA from "../../examples/game_of_life.buffer_a.glml?raw";
 import ripplesImage from "../../examples/ripples.image.glml?raw";
 import ripplesBufferA from "../../examples/ripples.buffer_a.glml?raw";
+import rdImage from "../../examples/reaction_diffusion.image.glml?raw";
+import rdBufferA from "../../examples/reaction_diffusion.buffer_a.glml?raw";
 
 import type { PassName } from "./renderer";
 
@@ -33,6 +35,10 @@ export interface MultipassExample {
 }
 
 export const MULTIPASS_EXAMPLES: MultipassExample[] = [
+  {
+    name: "Reaction Diffusion",
+    passes: { image: rdImage, bufferA: rdBufferA },
+  },
   {
     name: "Ripples",
     passes: { image: ripplesImage, bufferA: ripplesBufferA },
