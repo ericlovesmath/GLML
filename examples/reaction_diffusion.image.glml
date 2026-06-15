@@ -1,0 +1,34 @@
+// Reaction-Diffusion
+// Displays chemical [B] from [bufferA]
+
+#extern vec2 u_resolution
+#extern sampler bufferA
+
+// Cosine gradient palette
+let colorize =
+  let palette a b c d t = a + b * #cos ((c * t + d) * 6.28318) in
+  palette
+    [0.15, 0.12, 0.22]
+    [0.6, 0.55, 0.5]
+    [1.0, 1.0, 1.0]
+    [0.0, 0.12, 0.28]
+
+// Chemical [B]'s concentration
+let conc (uv : vec2) : float = (#texture bufferA (uv / u_resolution)).1
+
+let main (uv : vec2) =
+  let b = conc uv in
+
+  // Treat concentration of [B] as height
+  let bx = conc (uv + [1, 0]) - conc (uv - [1, 0]) in
+  let by = conc (uv + [0, 1]) - conc (uv - [0, 1]) in
+  let norm = #normalize [-bx * 6, -by * 6, 1.0] in
+
+  // Diffuse lighting, surfaces facing the light are brighter
+  let shade = #normalize [0.4, 0.6, 0.7] |> #dot norm |> #max 0 in
+
+  // Pick a colour based on [B]
+  let col = colorize (b * 2.4) in
+  let col = col * (0.35 + 0.85 * shade) in
+
+  [col.0, col.1, col.2, 1]

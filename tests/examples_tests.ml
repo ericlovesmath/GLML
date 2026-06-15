@@ -1631,6 +1631,170 @@ let%expect_test "compile examples" =
     }
 
 
+    ====== COMPILING EXAMPLE reaction_diffusion.buffer_a.glml ======
+
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform sampler2D bufferA;
+    const vec2 diff = vec2(1., 0.5);
+    uniform int iFrame;
+    uniform vec2 u_mouse;
+    uniform bool u_mouse_down;
+    uniform vec2 u_resolution;
+    vec2 at_0(vec2 uv, vec2 o) {
+        vec2 anf_5 = (o / u_resolution);
+        vec2 anf_6 = (uv + anf_5);
+        vec4 v = texture(bufferA, anf_6);
+        float anf_7 = v[0];
+        float anf_8 = v[1];
+        return vec2(anf_7, anf_8);
+    }
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        vec2 uv = (coord / u_resolution);
+        vec2 anf_9 = vec2(0., 0.);
+        vec2 c = at_0(uv, anf_9);
+        vec2 anf_10 = vec2(0., 1.);
+        vec2 anf_11 = at_0(uv, anf_10);
+        vec2 anf_12 = vec2(0., -1.);
+        vec2 anf_13 = at_0(uv, anf_12);
+        vec2 anf_14 = (anf_11 + anf_13);
+        vec2 anf_15 = vec2(-1., 0.);
+        vec2 anf_16 = at_0(uv, anf_15);
+        vec2 anf_17 = (anf_14 + anf_16);
+        vec2 anf_18 = vec2(1., 0.);
+        vec2 anf_19 = at_0(uv, anf_18);
+        vec2 anf_20 = (anf_17 + anf_19);
+        vec2 anf_21 = (anf_20 * 0.2);
+        vec2 anf_22 = vec2(1., 1.);
+        vec2 anf_23 = at_0(uv, anf_22);
+        vec2 anf_24 = vec2(-1., 1.);
+        vec2 anf_25 = at_0(uv, anf_24);
+        vec2 anf_26 = (anf_23 + anf_25);
+        vec2 anf_27 = vec2(1., -1.);
+        vec2 anf_28 = at_0(uv, anf_27);
+        vec2 anf_29 = (anf_26 + anf_28);
+        vec2 anf_30 = vec2(-1., -1.);
+        vec2 anf_31 = at_0(uv, anf_30);
+        vec2 anf_32 = (anf_29 + anf_31);
+        vec2 anf_33 = (anf_32 * 0.05);
+        vec2 anf_34 = (anf_21 + anf_33);
+        vec2 lap = (anf_34 - c);
+        vec2 anf_35 = vec2(-1., 1.);
+        float anf_36 = c[0];
+        vec2 anf_37 = (anf_35 * anf_36);
+        float anf_38 = c[1];
+        vec2 anf_39 = (anf_37 * anf_38);
+        float anf_40 = c[1];
+        vec2 react = (anf_39 * anf_40);
+        float anf_41 = c[0];
+        float anf_42 = (1. - anf_41);
+        float anf_43 = (0.055 * anf_42);
+        float anf_46 = c[1];
+        float anf_47 = (-0.11699999999999999 * anf_46);
+        vec2 prod = vec2(anf_43, anf_47);
+        vec2 anf_48 = (diff * lap);
+        vec2 anf_49 = (anf_48 + react);
+        vec2 anf_50 = (anf_49 + prod);
+        vec2 next = (c + anf_50);
+        vec2 m = (u_mouse / u_resolution);
+        float paint;
+        if (u_mouse_down) {
+            float anf_52 = distance(uv, m);
+            paint = smoothstep(0.03, 0., anf_52);
+        } else {
+            paint = 0.;
+        }
+        vec2 anf_53 = vec2(0., paint);
+        vec2 anf_54 = (next + anf_53);
+        vec2 next_0 = clamp(anf_54, 0., 1.);
+        bool anf_55 = (iFrame == 0);
+        if (anf_55) {
+            vec2 anf_56 = (uv * 80.);
+            vec2 anf_57 = floor(anf_56);
+            vec2 anf_63 = vec2(12.9898, 78.233);
+            float anf_0_0 = dot(anf_57, anf_63);
+            float anf_1_0 = sin(anf_0_0);
+            float anf_2_0 = (anf_1_0 * 43758.5453);
+            float anf_58 = fract(anf_2_0);
+            bool anf_59 = (anf_58 > 0.96);
+            int seed;
+            if (anf_59) {
+                seed = 1;
+            } else {
+                seed = 0;
+            }
+            float anf_60 = float(seed);
+            fragColor = vec4(1., anf_60, 0., 1.);
+            return;
+        } else {
+            float anf_61 = next_0[0];
+            float anf_62 = next_0[1];
+            fragColor = vec4(anf_61, anf_62, 0., 1.);
+            return;
+        }
+    }
+
+
+    ====== COMPILING EXAMPLE reaction_diffusion.image.glml ======
+
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform sampler2D bufferA;
+    uniform vec2 u_resolution;
+    float conc(vec2 uv) {
+        vec2 anf_9 = (uv / u_resolution);
+        vec4 anf_10 = texture(bufferA, anf_9);
+        return anf_10[1];
+    }
+    void main() {
+        vec2 uv_0 = gl_FragCoord.xy;
+        float b_0 = conc(uv_0);
+        vec2 anf_11 = vec2(1., 0.);
+        vec2 anf_12 = (uv_0 + anf_11);
+        float anf_13 = conc(anf_12);
+        vec2 anf_14 = vec2(1., 0.);
+        vec2 anf_15 = (uv_0 - anf_14);
+        float anf_16 = conc(anf_15);
+        float bx = (anf_13 - anf_16);
+        vec2 anf_17 = vec2(0., 1.);
+        vec2 anf_18 = (uv_0 + anf_17);
+        float anf_19 = conc(anf_18);
+        vec2 anf_20 = vec2(0., 1.);
+        vec2 anf_21 = (uv_0 - anf_20);
+        float anf_22 = conc(anf_21);
+        float by = (anf_19 - anf_22);
+        float anf_23 = (-1. * bx);
+        float anf_24 = (anf_23 * 6.);
+        float anf_25 = (-1. * by);
+        float anf_26 = (anf_25 * 6.);
+        vec3 anf_27 = vec3(anf_24, anf_26, 1.);
+        vec3 norm = normalize(anf_27);
+        vec3 anf_28 = vec3(0.4, 0.6, 0.7);
+        vec3 anf_29 = normalize(anf_28);
+        float anf_30 = dot(norm, anf_29);
+        float shade = max(0., anf_30);
+        float anf_31 = (b_0 * 2.4);
+        vec3 _lv_lctor_0_0 = vec3(0.15, 0.12, 0.22);
+        vec3 _lv_lctor_1_0 = vec3(0.6, 0.55, 0.5);
+        vec3 _lv_lctor_3_0 = vec3(0., 0.12, 0.28);
+        vec3 anf_5_1 = (anf_31 + _lv_lctor_3_0);
+        vec3 anf_6_1 = (anf_5_1 * 6.28318);
+        vec3 anf_7_1 = cos(anf_6_1);
+        vec3 anf_8_1 = (_lv_lctor_1_0 * anf_7_1);
+        vec3 col = (_lv_lctor_0_0 + anf_8_1);
+        float anf_32 = (0.85 * shade);
+        float anf_33 = (0.35 + anf_32);
+        vec3 col_0 = (col * anf_33);
+        float anf_34 = col_0[0];
+        float anf_35 = col_0[1];
+        float anf_36 = col_0[2];
+        fragColor = vec4(anf_34, anf_35, anf_36, 1.);
+    }
+
+
     ====== COMPILING EXAMPLE ripples.buffer_a.glml ======
 
     #version 300 es

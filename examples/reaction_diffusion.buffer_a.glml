@@ -1,0 +1,56 @@
+// Gray-Scott model of Turing patterns
+
+// Channel [.0] contains concentration of chemical [A]
+// Channel [.1] contains concentration of chemical [B]
+// [A] is fed into the world, [B] eats [A] then decays
+
+#extern vec2 u_resolution
+#extern vec2 u_mouse
+#extern bool u_mouse_down
+#extern int iFrame
+#extern sampler bufferA
+
+let hash (p : vec2) : float =
+  #fract (#sin (#dot p [12.9898, 78.233]) * 43758.5453)
+
+let diff = [1.0, 0.5]  // Diffusion speed of [A, B]
+let feed = 0.055       // How fast [A] is generated
+let kill = 0.062       // How fast [B] is decays
+let dt   = 1.0         // Simulation Timestamp
+
+let main (coord : vec2) =
+  let uv = coord / u_resolution in
+
+  // Concentration of [A] and [B] offset by [o]
+  let at (o : vec2) =
+    let v = #texture bufferA (uv + o / u_resolution) in
+    [v.0, v.1]
+  in
+  
+  let c = at [0, 0] in
+  
+  // Laplacian, scaled
+  let lap =
+    (at [0, 1] + at [0, -1] + at [-1, 0] + at [1, 0]) * 0.2
+    + (at [1, 1] + at [-1, 1] + at [1, -1] + at [-1, -1]) * 0.05
+    - c
+  in
+  
+  // A + 2B -> 3B from autocatalytic reaction
+  let react = [-1, 1] * c.0 * c.1 * c.1 in
+
+  // Gray-Scott Model
+  let prod = [feed * (1 - c.0), -(kill + feed) * c.1] in
+  let next = c + (diff * lap + react + prod) * dt in
+  
+  // Paint [B] under mouse
+  let m = u_mouse / u_resolution in
+  let paint = if u_mouse_down then #smoothstep 0.03 0.0 (#distance uv m) else 0.0 in
+  let next = #clamp (next + [0, paint]) 0 1 in
+  
+  // Seed first frame with noise
+  if iFrame = 0 then
+    let seed = if hash (#floor (uv * 80)) > 0.96 then 1 else 0 in
+    [1, seed, 0, 1]
+  else
+    [next.0, next.1, 0, 1]
