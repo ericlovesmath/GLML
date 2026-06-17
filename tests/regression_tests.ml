@@ -514,8 +514,8 @@ let%expect_test "regression - partial application stored as top level value" =
     out vec4 fragColor;
     void main() {
         vec2 coord = gl_FragCoord.xy;
-        vec3 anf_0_1 = vec3(1., 0.6, 0.2);
-        vec3 anf_2 = cos(anf_0_1);
+        vec3 anf_0_0 = vec3(1., 0.6, 0.2);
+        vec3 anf_2 = cos(anf_0_0);
         float a_0 = anf_2[0];
         fragColor = vec4(a_0, 0., 0., 1.);
     }
@@ -839,21 +839,21 @@ let%expect_test "defunctionalize unifies int/float arrow flavors" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
+    struct DFn_0 {
         int tag;
     };
     void main() {
         vec2 uv = gl_FragCoord.xy;
         float anf = uv[0];
         bool anf_0 = (anf > 0.5);
-        DFn f;
+        DFn_0 anf_1;
         if (anf_0) {
-            f = DFn(0);
+            anf_1 = DFn_0(0);
         } else {
-            f = DFn(1);
+            anf_1 = DFn_0(1);
         }
-        vec3 anf_1 = vec3(1., 0., 0.);
-        int _lv_tag_0 = f.tag;
+        vec3 anf_2 = vec3(1., 0., 0.);
+        int _lv_tag_0 = anf_1.tag;
         vec3 c;
         switch (_lv_tag_0) {
             case 0: {
@@ -861,14 +861,14 @@ let%expect_test "defunctionalize unifies int/float arrow flavors" =
                 break;
             }
             default: {
-                c = anf_1;
+                c = anf_2;
                 break;
             }
         }
-        float anf_2 = c[0];
-        float anf_3 = c[1];
-        float anf_4 = c[2];
-        fragColor = vec4(anf_2, anf_3, anf_4, 1.);
+        float anf_3 = c[0];
+        float anf_4 = c[1];
+        float anf_5 = c[2];
+        fragColor = vec4(anf_3, anf_4, anf_5, 1.);
     }
     |}]
 ;;
@@ -1045,19 +1045,25 @@ let%expect_test "DFn promotion of fields in user-declared variant type" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn {
+    struct DFn_1 {
         int tag;
-        float lctor_0;
+        float lctor_2_0;
+        float lctor_4_0;
     };
     struct DFn_0 {
         int tag;
-        DFn lctor_0_0;
-        float lctor_1_0;
+        float lctor_2_0;
+        DFn_1 lctor_3_0;
+        float lctor_4_0;
     };
     vec3 dapply_0(DFn_0 dfn_0, vec3 da_0) {
         int _lv_tag = dfn_0.tag;
         switch (_lv_tag) {
             case 0: {
+                return vec3(0., 0., 0.);
+                break;
+            }
+            case 1: {
                 return vec3(0., 0., 0.);
                 break;
             }
@@ -1076,41 +1082,41 @@ let%expect_test "DFn promotion of fields in user-declared variant type" =
     uniform float u_pick;
     void main() {
         vec2 coord = gl_FragCoord.xy;
-        bool anf_6 = (u_pick > 0.5);
+        bool anf_8 = (u_pick > 0.5);
         material m_0;
-        if (anf_6) {
-            DFn w_0 = DFn(0, 3.);
-            DFn_0 nw_0 = DFn_0(0, w_0, 0.);
-            DFn anf_0_0 = DFn(0, 0.);
-            DFn_0 anf_1_0 = DFn_0(0, anf_0_0, 0.);
-            m_0 = material(1, anf_1_0, nw_0, 64.);
+        if (anf_8) {
+            DFn_1 anf_0_0 = DFn_1(0, 0., 0.);
+            DFn_0 anf_1_0 = DFn_0(0, 0., anf_0_0, 0.);
+            DFn_1 anf_2_0 = DFn_1(0, 3., 0.);
+            DFn_0 anf_3_0 = DFn_0(1, 0., anf_2_0, 0.);
+            m_0 = material(1, anf_1_0, anf_3_0, 64.);
         } else {
-            DFn anf_2_0 = DFn(0, 0.);
-            DFn_0 anf_3_0 = DFn_0(1, anf_2_0, 2.);
-            DFn_0 anf_5_0 = DFn_0(0, anf_2_0, 0.);
-            m_0 = material(0, anf_3_0, anf_5_0, 0.);
+            DFn_1 anf_4_0 = DFn_1(0, 0., 0.);
+            DFn_0 anf_5_0 = DFn_0(2, 0., anf_4_0, 2.);
+            DFn_0 anf_7_0 = DFn_0(0, 0., anf_4_0, 0.);
+            m_0 = material(0, anf_5_0, anf_7_0, 0.);
         }
-        vec3 anf_7 = vec3(0., 0., 0.);
+        vec3 anf_9 = vec3(0., 0., 0.);
         int _lv_tag_0_0 = m_0.tag;
         vec3 c;
         switch (_lv_tag_0_0) {
             case 0: {
                 DFn_0 _lv_Lambert_0_0 = m_0.Lambert_0;
-                c = dapply_0(_lv_Lambert_0_0, anf_7);
+                c = dapply_0(_lv_Lambert_0_0, anf_9);
                 break;
             }
             default: {
                 DFn_0 _lv_Phong_0_0 = m_0.Phong_0;
                 float _lv_Phong_1_0 = m_0.Phong_1;
-                vec3 anf_11 = dapply_0(_lv_Phong_0_0, anf_7);
-                c = (anf_11 * _lv_Phong_1_0);
+                vec3 anf_13 = dapply_0(_lv_Phong_0_0, anf_9);
+                c = (anf_13 * _lv_Phong_1_0);
                 break;
             }
         }
-        float anf_8 = c[0];
-        float anf_9 = c[1];
-        float anf_10 = c[2];
-        fragColor = vec4(anf_8, anf_9, anf_10, 1.);
+        float anf_10 = c[0];
+        float anf_11 = c[1];
+        float anf_12 = c[2];
+        fragColor = vec4(anf_10, anf_11, anf_12, 1.);
     }
     |}]
 ;;

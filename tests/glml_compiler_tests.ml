@@ -625,8 +625,8 @@ let%expect_test "defunctionalization" =
     void main() {
         vec2 pos = gl_FragCoord.xy;
         float anf_1 = pos[1];
-        float anf_4 = pos[0];
-        float r = (anf_1 * anf_4);
+        float anf_3 = pos[0];
+        float r = (anf_1 * anf_3);
         fragColor = vec4(r, r, r, 1.);
     }
     |}];
@@ -769,9 +769,9 @@ let%expect_test "defunctionalization - partial application of first-class functi
     out vec4 fragColor;
     void main() {
         vec2 pos = gl_FragCoord.xy;
-        float anf = pos[0];
-        float anf_0 = pos[1];
-        float r = (anf + anf_0);
+        float anf_0 = pos[0];
+        float anf_2 = pos[1];
+        float r = (anf_0 + anf_2);
         fragColor = vec4(r, r, r, 1.);
     }
     |}];
@@ -792,8 +792,8 @@ let%expect_test "defunctionalization - partial application of first-class functi
     out vec4 fragColor;
     void main() {
         vec2 pos = gl_FragCoord.xy;
-        float anf_0 = pos[0];
-        float r = (3. + anf_0);
+        float anf_3 = pos[0];
+        float r = (3. + anf_3);
         fragColor = vec4(r, r, r, 1.);
     }
     |}];
@@ -813,9 +813,9 @@ let%expect_test "defunctionalization - partial application of first-class functi
     out vec4 fragColor;
     void main() {
         vec2 pos = gl_FragCoord.xy;
-        float anf = pos[0];
-        float anf_1 = pos[1];
-        float r = (anf + anf_1);
+        float anf_0 = pos[0];
+        float anf_2 = pos[1];
+        float r = (anf_0 + anf_2);
         fragColor = vec4(r, r, r, 1.);
     }
     |}];
@@ -1276,9 +1276,9 @@ let%expect_test "curried builtins" =
         vec2 coord = gl_FragCoord.xy;
         float anf = coord[0];
         float a = min(anf, 0.5);
-        float anf_0 = coord[1];
-        float anf_1 = min(0.5, anf_0);
-        fragColor = vec4(a, anf_1, 0., 1.);
+        float anf_1 = coord[1];
+        float anf_2 = min(0.5, anf_1);
+        fragColor = vec4(a, anf_2, 0., 1.);
     }
     |}];
   test
@@ -1323,8 +1323,8 @@ let%expect_test "curried binary operators and pipe" =
         float anf_1 = (anf_0 + 1.);
         float anf_2 = coord[1];
         float anf_4 = cos(anf_2);
-        float anf_6 = (2. * anf_0);
-        fragColor = vec4(anf_1, anf_4, anf_6, 1.);
+        float anf_7 = (2. * anf_0);
+        fragColor = vec4(anf_1, anf_4, anf_7, 1.);
     }
     |}]
 ;;
