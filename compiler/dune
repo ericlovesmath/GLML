@@ -33,6 +33,7 @@
    ; Optimization
    inline
    const_fold
+   cse
    dce
 
    ; GLSL Passes

@@ -547,9 +547,8 @@ let%expect_test "bracket pattern matching" =
     void main() {
         vec2 coord = gl_FragCoord.xy;
         float anf = coord[0];
-        float _lv_v0_3_0 = coord[0];
-        float _lv_v1_3_0 = coord[1];
-        float c_0 = (_lv_v0_3_0 + _lv_v1_3_0);
+        float anf_0 = coord[1];
+        float c_0 = (anf + anf_0);
         fragColor = vec4(anf, 2., c_0, 1.);
     }
     |}]

@@ -37,7 +37,7 @@ type binary_op =
   | Geq
   | And
   | Or
-[@@deriving sexp_of]
+[@@deriving compare, sexp_of]
 
 type builtin =
   | Float
@@ -71,7 +71,7 @@ type builtin =
   | Smoothstep
   | Reflect
   | Texture
-[@@deriving sexp_of, string ~capitalize:"lower sentence case"]
+[@@deriving compare, sexp_of, string ~capitalize:"lower sentence case"]
 
 let builtin_of_string_opt s = Option.try_with (fun () -> builtin_of_string s)
 

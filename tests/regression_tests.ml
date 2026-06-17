@@ -1087,8 +1087,7 @@ let%expect_test "DFn promotion of fields in user-declared variant type" =
         } else {
             DFn anf_2_0 = DFn(0, 0.);
             DFn_0 anf_3_0 = DFn_0(1, anf_2_0, 2.);
-            DFn anf_4_0 = DFn(0, 0.);
-            DFn_0 anf_5_0 = DFn_0(0, anf_4_0, 0.);
+            DFn_0 anf_5_0 = DFn_0(0, anf_2_0, 0.);
             m_0 = material(0, anf_3_0, anf_5_0, 0.);
         }
         vec3 anf_7 = vec3(0., 0., 0.);
@@ -1160,8 +1159,7 @@ let%expect_test "placeholder is wrong type" =
     void main() {
         vec2 coord = gl_FragCoord.xy;
         vec3 anf_2_0 = vec3(0., 0., 0.);
-        vec3 anf_3_0 = vec3(0., 0., 0.);
-        hit anf_4_0 = hit(0., anf_2_0, anf_3_0);
+        hit anf_4_0 = hit(0., anf_2_0, anf_2_0);
         option_0 anf_5_0 = option_0(1, anf_4_0);
         float b_2 = dot(ro, ro);
         bool anf_11 = (b_2 < 0.);

@@ -653,8 +653,7 @@ let%expect_test "defunctionalization" =
         float a = (anf_0 * 2.);
         float anf_2 = pos[1];
         float b = (anf_2 * 3.);
-        float anf_4 = pos[0];
-        float c = (anf_4 * 4.);
+        float c = (anf_0 * 4.);
         fragColor = vec4(a, b, c, 1.);
     }
     |}];
@@ -1324,8 +1323,7 @@ let%expect_test "curried binary operators and pipe" =
         float anf_1 = (anf_0 + 1.);
         float anf_2 = coord[1];
         float anf_4 = cos(anf_2);
-        float anf_5 = coord[0];
-        float anf_6 = (2. * anf_5);
+        float anf_6 = (2. * anf_0);
         fragColor = vec4(anf_1, anf_4, anf_6, 1.);
     }
     |}]

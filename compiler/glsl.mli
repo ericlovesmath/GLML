@@ -22,7 +22,7 @@ type binary_op =
   | Geq
   | And
   | Or
-[@@deriving sexp_of, to_string]
+[@@deriving compare, sexp_of, to_string]
 
 type builtin =
   | Float
@@ -56,7 +56,7 @@ type builtin =
   | Smoothstep
   | Reflect
   | Texture
-[@@deriving sexp_of, string]
+[@@deriving compare, sexp_of, string]
 
 val builtin_of_string_opt : string -> builtin option
 val arity_of_builtin : builtin -> int
