@@ -398,7 +398,7 @@ let rec infer_binding
           (v : string)
           (return_ty : Frontend.ty option)
           (constrs : Frontend.constr list)
-  : term * ty * env * constr list * constr list * substitution
+  : term * ty * env * constr list * constr list * substitution * string list
   =
   let return_ty =
     match return_ty with
@@ -448,10 +448,10 @@ let rec infer_binding
     then generalize ctx deferred ty_bind
     else ([], [], ty_bind), deferred
   in
-  let _, scheme_constrs, _ = scheme in
+  let scheme_vars, scheme_constrs, _ = scheme in
   let ctx = Map.set ctx ~key:v ~data:scheme in
   let env = { env with ctx } in
-  bind, ty_bind, env, scheme_constrs, remaining, sub_bind
+  bind, ty_bind, env, scheme_constrs, remaining, sub_bind, scheme_vars
 
 (** Generate the typed term and constraint set for a term *)
 and gen_term (env : env) (t : Desugar.term) : term * constr list * substitution =
@@ -499,7 +499,7 @@ and gen_term (env : env) (t : Desugar.term) : term * constr list * substitution 
     let composed = compose_sub sub_x sub_f in
     { desc = App (f, x); ty = ret_ty; loc }, constrs, composed
   | Let (recur, v, return_ty, constrs, bind_stlc, body_stlc) ->
-    let bind, _, env, scheme_constrs, remaining, sub_bind =
+    let bind, _, env, scheme_constrs, remaining, sub_bind, _ =
       infer_binding env loc bind_stlc recur v return_ty constrs
     in
     let body, constrs_body, body_sub = gen_term env body_stlc in
@@ -865,15 +865,22 @@ let typecheck_impl (Program terms : Desugar.t) : t =
       ~f:(fun (env, acc) top ->
         match top.desc with
         | Define (recur, v, return_ty, constrs, bind) ->
-          let bind, ty, env, scheme_constrs, remaining, _ =
+          let bind, ty, env, scheme_constrs, remaining, _, scheme_vars =
             infer_binding env top.loc bind recur v return_ty constrs
           in
+          let ambiguous = Set.diff (ftv_of_ty ty) (String.Set.of_list scheme_vars) in
           if not (List.is_empty remaining)
           then
             raise
               "unresolved top-level constraints"
               ~loc:top.loc
               ~d:[%message (remaining : constr list)]
+          else if not (Set.is_empty ambiguous)
+          then
+            raise
+              "ambiguous type, add a type annotation"
+              ~loc:top.loc
+              ~d:[%message (v : string) (ty : ty) (ambiguous : String.Set.t)]
           else (
             let bind, ty = enforce_main_type env bind ty top.loc v in
             let top =
