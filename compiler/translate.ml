@@ -48,27 +48,6 @@ let to_glsl_value (ty : Lower_variants.ty) (vd : Tail_call.value_desc) : term =
   | App (f, args) -> App (f, List.map args ~f:to_glsl_atom)
 ;;
 
-let translate_return
-      (translate_sub : Tail_call.anf -> stmt list)
-      (k : term -> stmt)
-      (t : Tail_call.term)
-  : stmt list
-  =
-  match t.desc with
-  | If (c, t, e) ->
-    let t = translate_sub t in
-    let e = translate_sub e in
-    [ IfStmt (to_glsl_atom c, Block t, Some (Block e)) ]
-  | Switch (tag, cases) ->
-    let cases =
-      List.map cases ~f:(fun (label, case_anf) ->
-        let stmts = translate_sub case_anf in
-        label, stmts @ [ Break ])
-    in
-    [ SwitchStmt (to_glsl_atom tag, cases) ]
-  | Value v -> [ k (to_glsl_value t.ty v) ]
-;;
-
 (** For [assign_to], [None] means that the tail of the block returns from the
     enclosing functions and [Some v] means it initialized [let v] *)
 type ctx =
@@ -117,27 +96,27 @@ let translate_continue ~(loc : Lexer.loc) (params : string list) (args : Anf.ato
   stmts @ [ Continue ]
 ;;
 
-let rec translate_let
-          (ctx : ctx)
-          (v : string)
-          (bind : Tail_call.term)
-          (ty : ty)
-          (tail : stmt list)
-  : stmt list
-  =
-  match bind.desc with
-  | If _ | Switch _ ->
-    let sub_ctx = { ctx with assign_to = Some v } in
-    let sub = translate_return (translate_anf sub_ctx) (emit_return sub_ctx) bind in
-    (Decl (None, ty, v, None) :: sub) @ tail
-  | Value value -> Decl (None, ty, v, Some (to_glsl_value bind.ty value)) :: tail
+let rec translate_term (ctx : ctx) (t : Tail_call.term) : stmt list =
+  let translate = translate_anf ctx in
+  match t.desc with
+  | Value v -> [ emit_return ctx (to_glsl_value t.ty v) ]
+  | If (c, t, e) ->
+    [ IfStmt (to_glsl_atom c, Block (translate t), Some (Block (translate e))) ]
+  | Switch (tag, cases) ->
+    let cases = List.map cases ~f:(fun (l, case) -> l, translate case @ [ Break ]) in
+    [ SwitchStmt (to_glsl_atom tag, cases) ]
 
 and translate_anf (ctx : ctx) (anf : Tail_call.anf) : stmt list =
   match anf.desc with
   | Let (v, bind, body) ->
     let ty = to_glsl_ty bind.loc bind.ty in
-    translate_let ctx v bind ty (translate_anf ctx body)
-  | Return t -> translate_return (translate_anf ctx) (emit_return ctx) t
+    let tail = translate_anf ctx body in
+    (match bind.desc with
+     | Value value -> Decl (None, ty, v, Some (to_glsl_value bind.ty value)) :: tail
+     | If _ | Switch _ ->
+       let sub = translate_term { ctx with assign_to = Some v } bind in
+       (Decl (None, ty, v, None) :: sub) @ tail)
+  | Return t -> translate_term ctx t
   | Loop (params, body) -> translate_loop params body
   | Continue args ->
     (match ctx.loop_params with
