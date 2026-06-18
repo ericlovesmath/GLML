@@ -1,6 +1,10 @@
 open Core
 open Sexplib.Sexp
 
+include Compiler_error.Pass (struct
+    let name = "uncurry"
+  end)
+
 type term_desc =
   | Var of string
   | Float of float
@@ -79,7 +83,7 @@ type t = Program of top list [@@deriving sexp_of]
 let arg_ty (t : Lower_tuples.term) =
   match t.ty with
   | TyArrow (a, _) -> a
-  | _ -> failwith "applying a non function type"
+  | _ -> raise "applying a non-function type" ~d:[%message (t.ty : Lower_tuples.ty)]
 ;;
 
 let rec collect_lams (t : Lower_tuples.term) : (string * Lower_tuples.ty) list * term =
@@ -132,4 +136,6 @@ let uncurry_top (t : Lower_tuples.top) : top =
   { desc; ty = t.ty; loc = t.loc }
 ;;
 
-let uncurry (Lower_tuples.Program tops) : t = Program (List.map tops ~f:uncurry_top)
+let uncurry (Lower_tuples.Program tops) =
+  try_with (fun () -> Program (List.map tops ~f:uncurry_top))
+;;

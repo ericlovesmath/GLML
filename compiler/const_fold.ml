@@ -459,7 +459,7 @@ let collect_records (tops : top list) : (string * Lower_variants.ty) list String
   |> Err.ok_exn
 ;;
 
-let rewrite (Program tops : t) : t =
+let rewrite_exn (Program tops : t) : t =
   let records = collect_records tops in
   let _, tops_rev =
     List.fold tops ~init:(String.Map.empty, []) ~f:(fun (env, acc) top ->
@@ -468,3 +468,5 @@ let rewrite (Program tops : t) : t =
   in
   Program (List.rev tops_rev)
 ;;
+
+let rewrite t = Err.try_with (fun () -> rewrite_exn t)

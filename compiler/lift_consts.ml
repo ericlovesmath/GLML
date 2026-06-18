@@ -134,7 +134,7 @@ let rewrite_top (promoted : String.Set.t) (top : top) : top =
   | Extern _ | TypeDef _ -> top
 ;;
 
-let lift (Program tops : t) : t =
+let lift_exn (Program tops : t) : t =
   let externs =
     List.filter_map tops ~f:(fun top ->
       match top.desc with
@@ -146,3 +146,5 @@ let lift (Program tops : t) : t =
   let tops = List.map ~f:(rewrite_top promoted) tops in
   Program tops
 ;;
+
+let lift t = Compiler_error.try_with (fun () -> lift_exn t)

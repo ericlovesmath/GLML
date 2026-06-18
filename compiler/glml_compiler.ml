@@ -53,7 +53,7 @@ let compile
   trace Monomorphize (Monomorphize.sexp_of_t t);
   let%bind t = Lower_tuples.lower t in
   trace Lower_tuples (Lower_tuples.sexp_of_t t);
-  let t = Uncurry.uncurry t in
+  let%bind t = Uncurry.uncurry t in
   trace Uncurry (Uncurry.sexp_of_t t);
   let%bind t = Lambda_lift.lift t in
   trace Lambda_lift (Lambda_lift.sexp_of_t t);
@@ -63,26 +63,24 @@ let compile
   trace Lower_variants (Lower_variants.sexp_of_t t);
   let%bind t = Anf.to_anf t in
   trace Anf (Anf.sexp_of_t t);
-  let t =
+  let%bind t =
     if not optimize
-    then t
+    then Ok t
     else (
       let rec go n t =
         if n <= 0
-        then t
-        else
-          t
-          |> Inline.rewrite
-          |> Const_fold.rewrite
-          |> Cse.rewrite
-          |> Dce.rewrite
-          |> go (n - 1)
+        then Ok t
+        else (
+          let t = Inline.rewrite t in
+          let%bind t = Const_fold.rewrite t in
+          let t = t |> Cse.rewrite |> Dce.rewrite in
+          go (n - 1) t)
       in
-      let t = go 3 t in
+      let%map t = go 3 t in
       trace Optimize (Anf.sexp_of_t t);
       t)
   in
-  let t = Lift_consts.lift t in
+  let%bind t = Lift_consts.lift t in
   trace Lift_consts (Anf.sexp_of_t t);
   let%bind t = Tail_call.remove_rec t in
   trace Tail_call (Tail_call.sexp_of_t t);

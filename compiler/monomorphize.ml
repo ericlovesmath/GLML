@@ -659,7 +659,7 @@ let assign_names ~(typedef_loc : Lexer.loc) (tops : Typecheck.top list)
         let ctors = rctors ctors in
         ( (TypeDef (name, VariantDecl ([], ctors)) : Typecheck.top_desc)
         , TyVariant (name, ctors) )
-      | _ -> assert false
+      | _ -> raise "non-record/variant key in typedef_top"
     in
     { desc; ty; loc = typedef_loc; scheme_constrs = [] }
   in

@@ -39,4 +39,4 @@ type top =
 
 type t = Program of top list [@@deriving sexp_of]
 
-val uncurry : Lower_tuples.t -> t
+val uncurry : Lower_tuples.t -> t Compiler_error.t
