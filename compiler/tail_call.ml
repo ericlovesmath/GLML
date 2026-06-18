@@ -7,16 +7,19 @@ include Compiler_error.Pass (struct
     let name = "tail_call"
   end)
 
-type term_desc =
+type value_desc =
   | Atom of atom
   | Bop of Glsl.binary_op * atom * atom
   | Vec of int * atom list
   | Index of atom * int
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list
-  | If of atom * anf * anf
   | Record of atom list
   | Field of atom * string
+
+and term_desc =
+  | Value of value_desc
+  | If of atom * anf * anf
   | Switch of atom * (Glsl.switch_case * anf) list
 
 and term =
@@ -37,7 +40,7 @@ and anf =
   ; loc : Lexer.loc
   }
 
-let rec sexp_of_term_desc : term_desc -> Sexp.t = function
+let sexp_of_value_desc : value_desc -> Sexp.t = function
   | Atom a -> sexp_of_atom a
   | Bop (op, l, r) ->
     List [ Atom (Glsl.string_of_binary_op op); sexp_of_atom l; sexp_of_atom r ]
@@ -46,9 +49,13 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | Builtin (b, ts) ->
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_atom)
   | App (f, args) -> List (Atom f :: List.map args ~f:sexp_of_atom)
-  | If (c, t, e) -> List [ Atom "if"; sexp_of_atom c; sexp_of_anf t; sexp_of_anf e ]
   | Record ts -> List (Atom "record" :: List.map ts ~f:sexp_of_atom)
   | Field (t, f) -> List [ Atom "."; sexp_of_atom t; Atom f ]
+;;
+
+let rec sexp_of_term_desc : term_desc -> Sexp.t = function
+  | Value vd -> sexp_of_value_desc vd
+  | If (c, t, e) -> List [ Atom "if"; sexp_of_atom c; sexp_of_anf t; sexp_of_anf e ]
   | Switch (tag, cases) ->
     let sexp_of_case (label, body) =
       let label =
@@ -113,14 +120,14 @@ let sexp_of_t (Program tops) = List (Atom "Program" :: List.map tops ~f:sexp_of_
 let rec of_term (t : Anf.term) : term =
   let pure desc : term = { desc; ty = t.ty; loc = t.loc } in
   match t.desc with
-  | Atom a -> pure (Atom a)
-  | Bop (bop, a, a') -> pure (Bop (bop, a, a'))
-  | Vec (n, ts) -> pure (Vec (n, ts))
-  | Index (a, n) -> pure (Index (a, n))
-  | Builtin (b, ts) -> pure (Builtin (b, ts))
-  | Record ts -> pure (Record ts)
-  | Field (a, f) -> pure (Field (a, f))
-  | App (f, xs) -> pure (App (f, xs))
+  | Atom a -> pure (Value (Atom a))
+  | Bop (bop, a, a') -> pure (Value (Bop (bop, a, a')))
+  | Vec (n, ts) -> pure (Value (Vec (n, ts)))
+  | Index (a, n) -> pure (Value (Index (a, n)))
+  | Builtin (b, ts) -> pure (Value (Builtin (b, ts)))
+  | Record ts -> pure (Value (Record ts))
+  | Field (a, f) -> pure (Value (Field (a, f)))
+  | App (f, xs) -> pure (Value (App (f, xs)))
   | If (c, t, f) -> pure (If (c, of_anf t, of_anf f))
   | Switch (s, cases) -> pure (Switch (s, List.map cases ~f:(Tuple2.map_snd ~f:of_anf)))
 
@@ -145,7 +152,7 @@ let rec zero_atom (tenv : record_tenv) ~loc (ty : ty) : (anf -> anf) * atom =
     let prefixes = List.map comps ~f:fst in
     let atoms = List.map comps ~f:snd in
     let v = Utils.fresh "_zero" in
-    let bind : term = { desc = Vec (n, atoms); ty; loc } in
+    let bind : term = { desc = Value (Vec (n, atoms)); ty; loc } in
     let wrap : anf -> anf =
       fun tail ->
       let outer : anf = { desc = Let (v, bind, tail); ty = tail.ty; loc } in
@@ -160,7 +167,7 @@ let rec zero_atom (tenv : record_tenv) ~loc (ty : ty) : (anf -> anf) * atom =
        let prefixes = List.map comps ~f:fst in
        let atoms = List.map comps ~f:snd in
        let v = Utils.fresh "_zero" in
-       let bind : term = { desc = Record atoms; ty; loc } in
+       let bind : term = { desc = Value (Record atoms); ty; loc } in
        let wrap : anf -> anf =
          fun tail ->
          let outer : anf = { desc = Let (v, bind, tail); ty = tail.ty; loc } in
@@ -173,7 +180,7 @@ let rec zero_atom (tenv : record_tenv) ~loc (ty : ty) : (anf -> anf) * atom =
 
 let zero_anf (tenv : record_tenv) ~loc (ty : ty) : anf =
   let prefix, final = zero_atom tenv ~loc ty in
-  let final_term : term = { desc = Atom final; ty; loc } in
+  let final_term : term = { desc = Value (Atom final); ty; loc } in
   let final_anf : anf = { desc = Return final_term; ty; loc } in
   prefix final_anf
 ;;
@@ -213,7 +220,10 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) : anf =
       let tmp = Utils.fresh "_iter_inc" in
       let int_atom desc : atom = { desc; ty = TyInt; loc } in
       let iter_inc : term =
-        { desc = Bop (Add, int_atom (Var iter), int_atom (Int 1)); ty = TyInt; loc }
+        { desc = Value (Bop (Add, int_atom (Var iter), int_atom (Int 1)))
+        ; ty = TyInt
+        ; loc
+        }
       in
       let cont_args = mk_atom (Var tmp) :: xs in
       let continue = pure (Continue cont_args) in
@@ -238,7 +248,10 @@ let remove_rec_top (tenv : record_tenv) (top : Anf.top) : top =
     let iter = Utils.fresh "_iter" in
     let int_atom desc : atom = { desc; ty = TyInt; loc } in
     let cond : term =
-      { desc = Bop (Lt, int_atom (Var iter), int_atom (Int limit)); ty = TyBool; loc }
+      { desc = Value (Bop (Lt, int_atom (Var iter), int_atom (Int limit)))
+      ; ty = TyBool
+      ; loc
+      }
     in
     let cond_v = Utils.fresh "_lim_cond" in
     let bool_atom desc : atom = { desc; ty = TyBool; loc } in

@@ -1,15 +1,19 @@
 open Anf
 
-type term_desc =
+type value_desc =
   | Atom of atom
   | Bop of Glsl.binary_op * atom * atom
   | Vec of int * atom list
   | Index of atom * int
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list
-  | If of atom * anf * anf
   | Record of atom list
   | Field of atom * string
+[@@deriving sexp_of]
+
+and term_desc =
+  | Value of value_desc
+  | If of atom * anf * anf
   | Switch of atom * (Glsl.switch_case * anf) list
 [@@deriving sexp_of]
 

@@ -26,13 +26,13 @@ let to_glsl_atom (a : Anf.atom) : term =
   | Bool b -> Bool b
 ;;
 
-let to_glsl_term (t : Tail_call.term) : term =
-  match t.desc with
+let to_glsl_value (ty : Lower_variants.ty) (vd : Tail_call.value_desc) : term =
+  match vd with
   | Atom a -> to_glsl_atom a
   | Bop (op, l, r) -> Bop (op, to_glsl_atom l, to_glsl_atom r)
   | Vec (n, ts) ->
     let ctor =
-      match t.ty with
+      match ty with
       | TyVec (_, TyVec (m, _)) when n = m -> [%string "mat%{n#Int}"]
       | TyVec (_, TyVec (m, _)) -> [%string "mat%{n#Int}x%{m#Int}"]
       | _ -> [%string "vec%{n#Int}"]
@@ -41,13 +41,11 @@ let to_glsl_term (t : Tail_call.term) : term =
   | Index (t, i) -> Index (to_glsl_atom t, i)
   | Builtin (f, args) -> Builtin (f, List.map args ~f:to_glsl_atom)
   | Record args ->
-    (match t.ty with
+    (match ty with
      | TyRecord s -> App (s, List.map args ~f:to_glsl_atom)
      | _ -> raise "Record term does not have type [record]")
   | Field (a, f) -> Swizzle (to_glsl_atom a, f)
   | App (f, args) -> App (f, List.map args ~f:to_glsl_atom)
-  | If _ -> raise "should be in [translate_anf]" ~d:[%message (t : Tail_call.term)]
-  | Switch _ -> raise "should be in [translate_anf]" ~d:[%message (t : Tail_call.term)]
 ;;
 
 let translate_return
@@ -68,7 +66,7 @@ let translate_return
         label, stmts @ [ Break ])
     in
     [ SwitchStmt (to_glsl_atom tag, cases) ]
-  | _ -> [ k (to_glsl_term t) ]
+  | Value v -> [ k (to_glsl_value t.ty v) ]
 ;;
 
 (** For [assign_to], [None] means that the tail of the block returns from the
@@ -132,7 +130,7 @@ let rec translate_let
     let sub_ctx = { ctx with assign_to = Some v } in
     let sub = translate_return (translate_anf sub_ctx) (emit_return sub_ctx) bind in
     (Decl (None, ty, v, None) :: sub) @ tail
-  | _ -> Decl (None, ty, v, Some (to_glsl_term bind)) :: tail
+  | Value value -> Decl (None, ty, v, Some (to_glsl_value bind.ty value)) :: tail
 
 and translate_anf (ctx : ctx) (anf : Tail_call.anf) : stmt list =
   match anf.desc with
@@ -177,10 +175,12 @@ let build_const_term body =
   in
   let rec go subs (anf : Tail_call.anf) : term option =
     match anf.desc with
-    | Return t -> Some (subst subs (to_glsl_term t))
-    | Let (v, bind, rest) ->
-      let bind = subst subs (to_glsl_term bind) in
+    | Return { desc = Value vd; ty; _ } -> Some (subst subs (to_glsl_value ty vd))
+    | Let (v, { desc = Value vd; ty; _ }, rest) ->
+      let bind = subst subs (to_glsl_value ty vd) in
       go (Map.set subs ~key:v ~data:bind) rest
+    | Return { desc = If _ | Switch _; _ } | Let (_, { desc = If _ | Switch _; _ }, _) ->
+      None
     | Loop _ | Continue _ -> None
   in
   go String.Map.empty body
