@@ -130,11 +130,7 @@ let%expect_test "builtins" =
     out vec4 fragColor;
     void main() {
         vec2 coord = gl_FragCoord.xy;
-        vec3 v = vec3(1., 2., 3.);
-        float anf = sin(1.);
-        float anf_0 = dot(v, v);
-        float anf_1 = length(v);
-        fragColor = vec4(anf, anf_0, anf_1, 1.);
+        fragColor = vec4(0.8414709848078965, 14., 3.7416573867739413, 1.);
     }
     |}];
   test_term "#cross [1.0, 2.0, 3.0] [0.0, 2.0, 5.0]";
@@ -145,13 +141,7 @@ let%expect_test "builtins" =
     out vec4 fragColor;
     void main() {
         vec2 coord = gl_FragCoord.xy;
-        vec3 anf = vec3(1., 2., 3.);
-        vec3 anf_0 = vec3(0., 2., 5.);
-        vec3 c = cross(anf, anf_0);
-        float anf_1 = c[0];
-        float anf_2 = c[1];
-        float anf_3 = c[2];
-        fragColor = vec4(anf_1, anf_2, anf_3, 1.);
+        fragColor = vec4(4., -5., 2., 1.);
     }
     |}];
   test_term "#cross [ 1.0, 1.0 ] [ 0.0, 0.0 ]";
@@ -521,10 +511,9 @@ let%expect_test "toplevel constant (atomic only)" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    const float x = (sin(1.) + cos(2.));
     void main() {
         vec2 u = gl_FragCoord.xy;
-        fragColor = vec4(x, x, x, 1.);
+        fragColor = vec4(0.4253241482607541, 0.4253241482607541, 0.4253241482607541, 1.);
     }
     |}]
 ;;

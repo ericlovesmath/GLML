@@ -75,8 +75,7 @@ let%expect_test "int broadcasting with vecs and builtins" =
     out vec4 fragColor;
     void main() {
         vec2 coord = gl_FragCoord.xy;
-        float r = abs(5.);
-        fragColor = vec4(r, r, r, 1.);
+        fragColor = vec4(5., 5., 5., 1.);
     }
     |}];
   test_term "let r = #min 1 2 in [r, r, r]";
@@ -87,8 +86,7 @@ let%expect_test "int broadcasting with vecs and builtins" =
     out vec4 fragColor;
     void main() {
         vec2 coord = gl_FragCoord.xy;
-        float r = min(1., 2.);
-        fragColor = vec4(r, r, r, 1.);
+        fragColor = vec4(1., 1., 1., 1.);
     }
     |}]
 ;;
@@ -346,15 +344,7 @@ let%expect_test "constrained polymorphism tests" =
     out vec4 fragColor;
     void main() {
         vec2 coord = gl_FragCoord.xy;
-        vec2 anf_3 = vec2(0.5, 1.5);
-        vec2 anf_1_0 = floor(anf_3);
-        vec2 anf_2_0 = (anf_3 - anf_1_0);
-        float a = anf_2_0[0];
-        vec3 anf_4 = vec3(0.5, 1.5, 2.5);
-        vec3 anf_5 = floor(anf_4);
-        vec3 anf_0_0 = (anf_4 - anf_5);
-        float b = anf_0_0[0];
-        fragColor = vec4(a, b, 0., 1.);
+        fragColor = vec4(0.5, 0.5, 0., 1.);
     }
     |}]
 ;;

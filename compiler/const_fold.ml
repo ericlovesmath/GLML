@@ -1,5 +1,3 @@
-(* TODO: Builtin functions *)
-
 open Core
 open Anf
 
@@ -40,6 +38,12 @@ let equal_lit_float (target : float) (l : literal) : bool =
   | Float f -> Float.equal f target
   | Int i -> Float.equal (Float.of_int i) target
   | Bool _ -> false
+;;
+
+let float_of_lit : literal -> float option = function
+  | Int i -> Some (Float.of_int i)
+  | Float f -> Some f
+  | Bool _ -> None
 ;;
 
 let lit_of_desc : atom_desc -> literal option = function
@@ -145,6 +149,26 @@ let inner_ty_of (t : term) =
   | other -> other
 ;;
 
+let lit_of_float ~(ty : Lower_variants.ty) (f : float) : literal =
+  match ty with
+  | TyInt -> Int (Float.to_int f)
+  | _ -> Float f
+;;
+
+let term_of_lits (t : term) (ls : literal list) : term_desc =
+  match ls with
+  | [ l ] -> Atom (atom_of_lit l ~ty:t.ty ~loc:t.loc)
+  | ls ->
+    let atoms = List.map ls ~f:(atom_of_lit ~ty:(inner_ty_of t) ~loc:t.loc) in
+    Vec (List.length ls, atoms)
+;;
+
+(** Constant float components of [a] if every component is statically known *)
+let floats_of (ctx : ctx) (a : atom) : float list option =
+  Option.bind (const_components ctx a) ~f:(fun ls ->
+    Option.all (List.map ls ~f:float_of_lit))
+;;
+
 let const_all_eq_float ctx (a : atom) (target : float) : bool =
   Option.value_map
     (const_components ctx a)
@@ -178,12 +202,8 @@ let try_fold_bop ctx (t : term) : term_desc option =
     let%bind xs = const_components ctx a in
     let%bind ys = const_components ctx b in
     let%bind pairs = broadcast xs ys in
-    let%map ls = List.map pairs ~f:(fun (x, y) -> fold_bop op x y) |> Option.all in
-    (match ls with
-     | [ l ] -> Atom (atom_of_lit l ~ty:t.ty ~loc:t.loc)
-     | ls ->
-       let atoms = List.map ls ~f:(atom_of_lit ~ty:(inner_ty_of t) ~loc:t.loc) in
-       Vec (List.length ls, atoms))
+    let%bind ls = Option.all (List.map pairs ~f:(Tuple2.uncurry (fold_bop op))) in
+    Some (term_of_lits t ls)
   | _ -> None
 ;;
 
@@ -214,24 +234,116 @@ let try_identity_bop ctx (t : term) : term_desc option =
   | _ -> None
 ;;
 
+(** Elementwise builtins on float scalar *)
+let eval_elementwise (b : Glsl.builtin) (args : float list) : float option =
+  match b, args with
+  | Sin, [ x ] -> Some (Float.sin x)
+  | Cos, [ x ] -> Some (Float.cos x)
+  | Tan, [ x ] -> Some (Float.tan x)
+  | Asin, [ x ] -> Some (Float.asin x)
+  | Acos, [ x ] -> Some (Float.acos x)
+  | Atan, [ x ] -> Some (Float.atan x)
+  | Exp, [ x ] -> Some (Float.exp x)
+  | Log, [ x ] -> Some (Float.log x)
+  | Exp2, [ x ] -> Some Float.(2. ** x)
+  | Log2, [ x ] -> Some (Float.log2 x)
+  | Sqrt, [ x ] -> Some (Float.sqrt x)
+  | Abs, [ x ] -> Some (Float.abs x)
+  | Sign, [ x ] -> Some (Sign.to_float (Float.sign_exn x))
+  | Floor, [ x ] -> Some (Float.round_down x)
+  | Ceil, [ x ] -> Some (Float.round_up x)
+  | Fract, [ x ] -> Some Float.(x - round_down x)
+  | Pow, [ x; e ] -> Some Float.(x ** e)
+  | Min, [ x; y ] -> Some (Float.min x y)
+  | Max, [ x; y ] -> Some (Float.max x y)
+  | Step, [ edge; x ] -> Some (if Float.(x < edge) then 0. else 1.)
+  | Clamp, [ x; lo; hi ] -> Some (Float.clamp_exn x ~min:lo ~max:hi)
+  | Mix, [ x; y; a ] -> Some Float.((x * (1. - a)) + (y * a))
+  | Smoothstep, [ e; e'; x ] ->
+    let t = Float.clamp_exn Float.((x - e) / (e' - e)) ~min:0. ~max:1. in
+    Some Float.(t * t * (3. - (2. * t)))
+  | _ -> None
+;;
+
+(** Vector-reducing builtins *)
+let eval_reduction (b : Glsl.builtin) (args : float list list) : float list option =
+  let open Option.Let_syntax in
+  let zip a b =
+    match List.zip a b with
+    | Ok pairs -> Some pairs
+    | Unequal_lengths -> None
+  in
+  let dot a b = zip a b >>| List.sum (module Float) ~f:(Tuple2.uncurry ( *. )) in
+  let length v = Option.map (dot v v) ~f:Float.sqrt in
+  match b, args with
+  | Length, [ v ] -> length v >>| List.singleton
+  | Distance, [ a; b ] ->
+    let%bind diff = zip a b in
+    let%bind l = length (List.map diff ~f:(Tuple2.uncurry ( -. ))) in
+    Some [ l ]
+  | Dot, [ a; b ] ->
+    let%map d = dot a b in
+    [ d ]
+  | Cross, [ [ ax; ay; az ]; [ bx; by; bz ] ] ->
+    Some [ (ay *. bz) -. (az *. by); (az *. bx) -. (ax *. bz); (ax *. by) -. (ay *. bx) ]
+  | Normalize, [ v ] ->
+    let%bind len = length v in
+    if Float.equal len 0. then None else Some (List.map v ~f:(fun x -> x /. len))
+  | Reflect, [ i; n ] ->
+    let%bind d = dot n i in
+    let%bind pairs = zip i n in
+    Some (List.map pairs ~f:(fun (ii, ni) -> ii -. (2. *. d *. ni)))
+  | _ -> None
+;;
+
+(** Broadcast per-argument component lists to a common length *)
+let broadcast_all (args : 'a list list) : 'a list list option =
+  let n = List.fold args ~init:1 ~f:(fun n xs -> Int.max n (List.length xs)) in
+  List.map args ~f:(function
+    | [ x ] -> Some (List.init n ~f:(Fn.const x))
+    | xs when Int.equal (List.length xs) n -> Some xs
+    | _ -> None)
+  |> Option.all
+;;
+
+(** Evaluate a builtin whose arguments are all constant *)
+let try_eval_builtin ctx (t : term) (b : Glsl.builtin) (args : atom list)
+  : term_desc option
+  =
+  let open Option.Let_syntax in
+  let%bind comps = List.map args ~f:(floats_of ctx) |> Option.all in
+  let elementwise =
+    let%bind broadcasted = broadcast_all comps in
+    let%bind per_component = List.transpose broadcasted in
+    List.map per_component ~f:(eval_elementwise b) |> Option.all
+  in
+  let%bind results = Option.first_some elementwise (eval_reduction b comps) in
+  if List.for_all results ~f:Float.is_finite
+  then Some (term_of_lits t (List.map results ~f:(lit_of_float ~ty:(inner_ty_of t))))
+  else None
+;;
+
 let try_fold_builtin ctx (t : term) : term_desc option =
   match t.desc with
   | Builtin (b, args) ->
-    let is k x = const_all_eq_float ctx x k in
-    (match b, args with
-     | Float, [ a ] ->
-       (match const_components ctx a with
-        | Some [ Int n ] ->
-          Some (Atom (atom_of_lit (Float (Float.of_int n)) ~ty:t.ty ~loc:t.loc))
-        | _ -> None)
-     | Pow, [ _; e ] when is 0. e -> splat t 1.
-     | Pow, [ x; e ] when is 1. e -> Some (Atom x)
-     | Pow, [ x; e ] when is 2. e -> Some (Bop (Mul, x, x))
-     | Pow, [ x; e ] when is 0.5 e -> Some (Builtin (Sqrt, [ x ]))
-     | Sin, [ a ] when is 0. a -> splat t 0.
-     | Cos, [ a ] when is 0. a -> splat t 1.
-     | (Min | Max), [ a; b ] when equal_atom a b -> Some (Atom a)
-     | _ -> None)
+    let identity =
+      let is k x = const_all_eq_float ctx x k in
+      match b, args with
+      | Float, [ a ] ->
+        (match const_components ctx a with
+         | Some [ Int n ] ->
+           Some (Atom (atom_of_lit (Float (Float.of_int n)) ~ty:t.ty ~loc:t.loc))
+         | _ -> None)
+      | Pow, [ _; e ] when is 0. e -> splat t 1.
+      | Pow, [ x; e ] when is 1. e -> Some (Atom x)
+      | Pow, [ x; e ] when is 2. e -> Some (Bop (Mul, x, x))
+      | Pow, [ x; e ] when is 0.5 e -> Some (Builtin (Sqrt, [ x ]))
+      | Sin, [ a ] when is 0. a -> splat t 0.
+      | Cos, [ a ] when is 0. a -> splat t 1.
+      | (Min | Max), [ a; b ] when equal_atom a b -> Some (Atom a)
+      | _ -> None
+    in
+    Option.first_some (try_eval_builtin ctx t b args) identity
   | _ -> None
 ;;
 

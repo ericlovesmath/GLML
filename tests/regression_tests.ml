@@ -514,10 +514,7 @@ let%expect_test "regression - partial application stored as top level value" =
     out vec4 fragColor;
     void main() {
         vec2 coord = gl_FragCoord.xy;
-        vec3 anf_0_0 = vec3(1., 0.6, 0.2);
-        vec3 anf_2 = cos(anf_0_0);
-        float a_0 = anf_2[0];
-        fragColor = vec4(a_0, 0., 0., 1.);
+        fragColor = vec4(0.54030230586813977, 0., 0., 1.);
     }
     |}];
   test
@@ -1148,71 +1145,9 @@ let%expect_test "placeholder is wrong type" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct hit {
-        float t;
-        vec3 n;
-        vec3 m;
-    };
-    struct option {
-        int tag;
-        float Some_0;
-    };
-    struct option_0 {
-        int tag;
-        hit Some_0;
-    };
-    const vec3 ro = vec3(0., 0., 0.);
     void main() {
         vec2 coord = gl_FragCoord.xy;
-        vec3 anf_2_0 = vec3(0., 0., 0.);
-        hit anf_4_0 = hit(0., anf_2_0, anf_2_0);
-        option_0 anf_5_0 = option_0(1, anf_4_0);
-        float b_2 = dot(ro, ro);
-        bool anf_11 = (b_2 < 0.);
-        option _lv_scrut_2;
-        if (anf_11) {
-            _lv_scrut_2 = option(1, 0.);
-        } else {
-            bool anf_0_2 = (b_2 > 0.1);
-            if (anf_0_2) {
-                _lv_scrut_2 = option(0, b_2);
-            } else {
-                bool anf_1_2 = (b_2 > 0.01);
-                if (anf_1_2) {
-                    _lv_scrut_2 = option(0, b_2);
-                } else {
-                    _lv_scrut_2 = option(1, 0.);
-                }
-            }
-        }
-        int _lv_tag_2 = _lv_scrut_2.tag;
-        option_0 _lv_scrut_0;
-        switch (_lv_tag_2) {
-            case 1: {
-                _lv_scrut_0 = anf_5_0;
-                break;
-            }
-            default: {
-                _lv_scrut_0 = anf_5_0;
-                break;
-            }
-        }
-        int _lv_tag_0 = _lv_scrut_0.tag;
-        vec3 c;
-        switch (_lv_tag_0) {
-            case 1: {
-                c = ro;
-                break;
-            }
-            default: {
-                c = ro;
-                break;
-            }
-        }
-        float anf_6 = c[0];
-        float anf_7 = c[1];
-        float anf_8 = c[2];
-        fragColor = vec4(anf_6, anf_7, anf_8, 1.);
+        fragColor = vec4(0., 0., 0., 1.);
     }
     |}]
 ;;
