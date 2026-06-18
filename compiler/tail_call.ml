@@ -204,7 +204,6 @@ let contains_call (t : Anf.term) (v : string) : bool =
 
 let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) : anf =
   let rec patch (anf : Anf.anf) : anf =
-    let mk_atom (desc : atom_desc) : atom = { desc; ty = anf.ty; loc = anf.loc } in
     let pure desc : anf = { desc; ty = anf.ty; loc = anf.loc } in
     match anf.desc with
     | Let (v, bind, tail) ->
@@ -225,7 +224,7 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) : anf =
         ; loc
         }
       in
-      let cont_args = mk_atom (Var tmp) :: xs in
+      let cont_args = int_atom (Var tmp) :: xs in
       let continue = pure (Continue cont_args) in
       pure (Let (tmp, iter_inc, continue))
     | Return tail -> pure (Return (of_term tail))

@@ -1412,3 +1412,55 @@ let%expect_test "float coercercion" =
     }
     |}]
 ;;
+
+let%expect_test "tail call loop counter typed wrong" =
+  test
+    {|
+    let main (uv : vec2) =
+      let rec go (t : float) (bd : float) (bt : float) =
+        if t > 1.0 then [bd, bt] else go (t + 0.02) 1.0 bd
+      in
+      let c = go 0.0 99.0 0.0 in
+      [c.0, c.1, 1.0, 1.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    vec2 go_0(float t, float bd, float bt) {
+        int _iter = 0;
+        while (true) {
+            bool _lim_cond = (_iter < 1000);
+            if (_lim_cond) {
+                bool anf = (t > 1.);
+                if (anf) {
+                    return vec2(bd, bt);
+                } else {
+                    float anf_0 = (t + 0.02);
+                    int _iter_inc = (_iter + 1);
+                    int _tmp = _iter_inc;
+                    float _tmp_0 = anf_0;
+                    float _tmp_1 = 1.;
+                    float _tmp_2 = bd;
+                    _iter = _tmp;
+                    t = _tmp_0;
+                    bd = _tmp_1;
+                    bt = _tmp_2;
+                    continue;
+                }
+            } else {
+                vec2 _zero = vec2(0., 0.);
+                return _zero;
+            }
+        }
+    }
+    void main() {
+        vec2 uv = gl_FragCoord.xy;
+        vec2 c = go_0(0., 99., 0.);
+        float anf_1 = c[0];
+        float anf_2 = c[1];
+        fragColor = vec4(anf_1, anf_2, 1., 1.);
+    }
+    |}]
+;;
