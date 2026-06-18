@@ -155,13 +155,8 @@ type registry =
 
 let empty_registry = { by_arrow = String.Map.empty; by_variant = String.Map.empty }
 
-type global_kind =
-  | GlobalFn of { arity : int } (** top-level Define with a direct Lam *)
-  | ClosureVal (** top-level Define with fn type but not a direct Lam *)
-  | GlobalNonFn (** extern or non-fn define *)
-
 type ctx =
-  { globals : global_kind String.Map.t
+  { arities : int String.Map.t (** top-level function name => arity *)
   ; global_tys : ty String.Map.t
   ; env : ty String.Map.t
   }
@@ -171,14 +166,14 @@ let entry_loc = function
   | GlobalEntry e -> e.loc
 ;;
 
-let collect_globals tops =
+(** Only [Define]'s are relevant heads of an application, a non-fn const or
+    extern uniform can be neither applied nor a fn-typed value,
+    So we can safely just record each function's arity *)
+let collect_arities tops =
   List.filter_map tops ~f:(fun (top : Lambda_lift.top) ->
     match top.desc with
-    | Define { name; args; _ } -> Some (name, GlobalFn { arity = List.length args })
-    | Const (name, term) when is_fn_ty term.ty -> Some (name, ClosureVal)
-    | Const (name, _) -> Some (name, GlobalNonFn)
-    | Extern name -> Some (name, GlobalNonFn)
-    | TypeDef _ -> None)
+    | Define { name; args; _ } -> Some (name, List.length args)
+    | Const _ | Extern _ | TypeDef _ -> None)
   |> String.Map.of_alist_or_error
   |> of_or_error
   |> ok_exn
@@ -340,7 +335,7 @@ let rec rewrite_term
     then (
       match Map.find ctx.env v with
       | Some new_ty -> reg, { t with ty = new_ty }
-      | None when Map.mem ctx.globals v ->
+      | None when Map.mem ctx.arities v ->
         let reg, info, ctor_name = add_global_entry reg t.ty v t.loc in
         reg, mk ~loc:t.loc (Variant (ctor_name, [])) (TyVariant info.variant_name)
       | None -> reg, t)
@@ -348,7 +343,7 @@ let rec rewrite_term
   | App (f, args) ->
     let reg, args = rw_list reg args in
     (match f.desc with
-     | Var v when Map.mem ctx.globals v -> rewrite_global_app ctx reg t f v args
+     | Var v when Map.mem ctx.arities v -> rewrite_global_app ctx reg t f v args
      | _ when is_fn_ty f.ty -> rewrite_value_app ctx reg t f args
      | _ ->
        let reg, f = rewrite_term ctx true reg f in
@@ -417,25 +412,8 @@ and rewrite_global_app
       (args : Lambda_lift.term list)
   : registry * Lambda_lift.term
   =
-  match Map.find ctx.globals v with
-  | Some ClosureVal ->
-    (* Evaluates to a closure value: route through dapply instead of calling by name *)
-    let reg, info = get_or_create_info reg f.ty in
-    let actual_info =
-      match Map.find ctx.global_tys v with
-      | Some (TyVariant vname) ->
-        Map.find reg.by_variant vname |> Option.value ~default:info
-      | _ -> info
-    in
-    let apply_ty =
-      build_arrow_ty
-        (TyVariant actual_info.variant_name :: actual_info.arg_tys)
-        actual_info.ret_ty
-    in
-    let apply_var = mk ~loc:f.loc (Var actual_info.apply_name) apply_ty in
-    let f = { f with ty = TyVariant actual_info.variant_name } in
-    reg, { t with desc = App (apply_var, f :: args); ty = actual_info.ret_ty }
-  | Some (GlobalFn { arity = f_arity }) when is_fn_ty t.ty ->
+  match Map.find ctx.arities v with
+  | Some f_arity when is_fn_ty t.ty ->
     if List.length args < f_arity
     then (
       (* True partial application *)
@@ -973,19 +951,30 @@ let topo_sort (all_tops : Lambda_lift.top list) : Lambda_lift.t =
   Program (List.filter_map labels ~f:(Map.find by_key))
 ;;
 
+(** Sometimes a [Const] is a function, so we inline every [fn]-typed const into its
+    uses so that it won't be a named value under stratified defunctionalization! *)
+let inline_fn_consts (tops : top list) : top list =
+  List.fold tops ~init:(String.Map.empty, []) ~f:(fun (subs, acc) top ->
+    let top = map_top_term ~f:(subst subs) top in
+    match top.desc with
+    | Const (name, term) when is_fn_ty term.ty -> Map.set subs ~key:name ~data:term, acc
+    | _ -> subs, top :: acc)
+  |> snd
+  |> List.rev
+;;
+
 let defunctionalize (Program tops : Lambda_lift.t) : Lambda_lift.t Compiler_error.t =
-  let globals = collect_globals tops in
+  let tops = inline_fn_consts tops in
+  let arities = collect_arities tops in
   let (reg, _), rewritten_tops =
     List.fold_map
       tops
       ~init:(empty_registry, String.Map.empty)
       ~f:(fun (reg, global_tys) top ->
-        let ctx = { globals; global_tys; env = String.Map.empty } in
+        let ctx = { arities; global_tys; env = String.Map.empty } in
         let reg, top = rewrite_top ctx reg top in
         let global_tys =
           match top.desc with
-          | Const (name, term) when Map.mem globals name ->
-            Map.set global_tys ~key:name ~data:term.ty
           | Define { name; body; _ } -> Map.set global_tys ~key:name ~data:body.ty
           | _ -> global_tys
         in

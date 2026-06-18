@@ -410,8 +410,8 @@ let%expect_test "regression - defunctionalization closure globals use correct da
     out vec4 fragColor;
     void main() {
         vec2 coord = gl_FragCoord.xy;
-        float anf = coord[0];
-        float d = (0.5 + anf);
+        float anf_0 = coord[0];
+        float d = (0.5 + anf_0);
         fragColor = vec4(d, 0., 0., 1.);
     }
     |}]
@@ -1148,6 +1148,217 @@ let%expect_test "placeholder is wrong type" =
     void main() {
         vec2 coord = gl_FragCoord.xy;
         fragColor = vec4(0., 0., 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "closure global passed to a higher-order function" =
+  test
+    {|
+    type sdf = vec2 -> float
+    let star (ignore : int) : sdf = fun p -> p.1
+    let base = star 1
+    let render (f : sdf) (p : vec2) =
+      let bg = [0.85, 0.55, 0.3, 1.0] in
+      bg * f p
+    let main (uv : vec2) = render base uv
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        vec2 uv = gl_FragCoord.xy;
+        vec4 bg_0 = vec4(0.85, 0.55, 0.3, 1.);
+        float anf_1 = uv[1];
+        fragColor = (bg_0 * anf_1);
+    }
+    |}]
+;;
+
+let%expect_test "closure global captured into closures at differing depths" =
+  test
+    {|
+    type sdf = vec2 -> float
+    let star (r : float) : sdf = fun p -> #length p - r
+    let translate (off : vec2) (f : sdf) : sdf = fun p -> f (p - off)
+    let onion (k : float) (f : sdf) : sdf = fun p -> #abs (f p) - k
+    let base = star 0.45
+    let pick (idx : float) : sdf =
+      if idx < 0.5 then base
+      else if idx < 1.5 then translate [0.3, 0.0] base
+      else onion 0.1 (onion 0.05 base)
+    let render (f : sdf) (p : vec2) = let d = f p in [d, d, d]
+    let main (coord : vec2) =
+      let c = render (pick coord.0) coord in
+      [c.0, c.1, c.2, 1.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    struct DFn_2 {
+        int tag;
+        float lctor_5_0;
+        float lctor_6_0;
+        float lctor_8_0;
+    };
+    struct DFn_1 {
+        int tag;
+        float lctor_5_0;
+        float lctor_6_0;
+        vec2 lctor_7_0;
+        DFn_2 lctor_7_1;
+        float lctor_8_0;
+        float lctor_9_0;
+        DFn_2 lctor_9_1;
+    };
+    struct DFn_0 {
+        int tag;
+        float lctor_5_0;
+        float lctor_6_0;
+        vec2 lctor_7_0;
+        DFn_2 lctor_7_1;
+        float lctor_8_0;
+        float lctor_9_0;
+        DFn_2 lctor_9_1;
+        float lctor_10_0;
+        DFn_1 lctor_10_1;
+    };
+    float dapply_2(DFn_2 dfn, vec2 da) {
+        int _lv_tag = dfn.tag;
+        switch (_lv_tag) {
+            case 0: {
+                float _lv_lctor_5_0 = dfn.lctor_5_0;
+                float anf = length(da);
+                return (anf - _lv_lctor_5_0);
+                break;
+            }
+            case 1: {
+                float _lv_lctor_6_0 = dfn.lctor_6_0;
+                float anf_0 = length(da);
+                return (anf_0 - _lv_lctor_6_0);
+                break;
+            }
+            default: {
+                float _lv_lctor_8_0 = dfn.lctor_8_0;
+                float anf_1 = length(da);
+                return (anf_1 - _lv_lctor_8_0);
+                break;
+            }
+        }
+    }
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        float anf_16 = coord[0];
+        bool anf_17 = (anf_16 < 0.5);
+        DFn_0 anf_41;
+        if (anf_17) {
+            vec2 anf_18 = vec2(0., 0.);
+            DFn_2 anf_19 = DFn_2(0, 0., 0., 0.);
+            DFn_1 anf_24 = DFn_1(0, 0., 0., anf_18, anf_19, 0., 0., anf_19);
+            anf_41 = DFn_0(0, 0.45, 0., anf_18, anf_19, 0., 0., anf_19, 0., anf_24);
+        } else {
+            bool anf_26 = (anf_16 < 1.5);
+            if (anf_26) {
+                vec2 anf_27 = vec2(0.3, 0.);
+                DFn_2 anf_28 = DFn_2(1, 0., 0.45, 0.);
+                DFn_2 anf_29 = DFn_2(0, 0., 0., 0.);
+                vec2 anf_30 = vec2(0., 0.);
+                DFn_1 anf_33 = DFn_1(0, 0., 0., anf_30, anf_29, 0., 0., anf_29);
+                anf_41 = DFn_0(2, 0., 0., anf_27, anf_28, 0., 0., anf_29, 0., anf_33);
+            } else {
+                vec2 anf_34 = vec2(0., 0.);
+                DFn_2 anf_35 = DFn_2(0, 0., 0., 0.);
+                DFn_2 anf_39 = DFn_2(2, 0., 0., 0.45);
+                DFn_1 anf_40 = DFn_1(4, 0., 0., anf_34, anf_35, 0., 0.05, anf_39);
+                anf_41 = DFn_0(5, 0., 0., anf_34, anf_35, 0., 0., anf_35, 0.1, anf_40);
+            }
+        }
+        int _lv_tag_1_1 = anf_41.tag;
+        float d_0;
+        switch (_lv_tag_1_1) {
+            case 0: {
+                float _lv_lctor_5_0_1_1 = anf_41.lctor_5_0;
+                float anf_8_1 = length(coord);
+                d_0 = (anf_8_1 - _lv_lctor_5_0_1_1);
+                break;
+            }
+            case 1: {
+                float _lv_lctor_6_0_1_1 = anf_41.lctor_6_0;
+                float anf_9_1 = length(coord);
+                d_0 = (anf_9_1 - _lv_lctor_6_0_1_1);
+                break;
+            }
+            case 2: {
+                vec2 _lv_lctor_7_0_0_1 = anf_41.lctor_7_0;
+                DFn_2 _lv_lctor_7_1_0_1 = anf_41.lctor_7_1;
+                vec2 anf_10_1 = (coord - _lv_lctor_7_0_0_1);
+                d_0 = dapply_2(_lv_lctor_7_1_0_1, anf_10_1);
+                break;
+            }
+            case 3: {
+                float _lv_lctor_8_0_1_1 = anf_41.lctor_8_0;
+                float anf_11_1 = length(coord);
+                d_0 = (anf_11_1 - _lv_lctor_8_0_1_1);
+                break;
+            }
+            case 4: {
+                float _lv_lctor_9_0_0_1 = anf_41.lctor_9_0;
+                DFn_2 _lv_lctor_9_1_0_1 = anf_41.lctor_9_1;
+                float anf_12_1 = dapply_2(_lv_lctor_9_1_0_1, coord);
+                float anf_13_1 = abs(anf_12_1);
+                d_0 = (anf_13_1 - _lv_lctor_9_0_0_1);
+                break;
+            }
+            default: {
+                float _lv_lctor_10_0_1 = anf_41.lctor_10_0;
+                DFn_1 _lv_lctor_10_1_1 = anf_41.lctor_10_1;
+                int _lv_tag_0_2 = _lv_lctor_10_1_1.tag;
+                float anf_14_1;
+                switch (_lv_tag_0_2) {
+                    case 0: {
+                        float _lv_lctor_5_0_0_2 = _lv_lctor_10_1_1.lctor_5_0;
+                        float anf_2_2 = length(coord);
+                        anf_14_1 = (anf_2_2 - _lv_lctor_5_0_0_2);
+                        break;
+                    }
+                    case 1: {
+                        float _lv_lctor_6_0_0_2 = _lv_lctor_10_1_1.lctor_6_0;
+                        float anf_3_2 = length(coord);
+                        anf_14_1 = (anf_3_2 - _lv_lctor_6_0_0_2);
+                        break;
+                    }
+                    case 2: {
+                        vec2 _lv_lctor_7_0_3 = _lv_lctor_10_1_1.lctor_7_0;
+                        DFn_2 _lv_lctor_7_1_3 = _lv_lctor_10_1_1.lctor_7_1;
+                        vec2 anf_4_2 = (coord - _lv_lctor_7_0_3);
+                        anf_14_1 = dapply_2(_lv_lctor_7_1_3, anf_4_2);
+                        break;
+                    }
+                    case 3: {
+                        float _lv_lctor_8_0_0_2 = _lv_lctor_10_1_1.lctor_8_0;
+                        float anf_5_2 = length(coord);
+                        anf_14_1 = (anf_5_2 - _lv_lctor_8_0_0_2);
+                        break;
+                    }
+                    default: {
+                        float _lv_lctor_9_0_3 = _lv_lctor_10_1_1.lctor_9_0;
+                        DFn_2 _lv_lctor_9_1_3 = _lv_lctor_10_1_1.lctor_9_1;
+                        float anf_6_2 = dapply_2(_lv_lctor_9_1_3, coord);
+                        float anf_7_2 = abs(anf_6_2);
+                        anf_14_1 = (anf_7_2 - _lv_lctor_9_0_3);
+                        break;
+                    }
+                }
+                float anf_15_1 = abs(anf_14_1);
+                d_0 = (anf_15_1 - _lv_lctor_10_0_1);
+                break;
+            }
+        }
+        fragColor = vec4(d_0, d_0, d_0, 1.);
     }
     |}]
 ;;
