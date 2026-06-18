@@ -329,6 +329,29 @@ let resolve_subtype_bounds (deferred : constr list) : substitution =
     if equal_lowers lowers lowers' then lowers else fix lowers'
   in
   let lowers = fix lowers in
+  (* Variables we know must be float (coerced, broadcast involving float, or indexing vec/mat *)
+  let float_vars =
+    let rec is_float fv = function
+      | TyFloat -> true
+      | TyVar v -> Set.mem fv v
+      | TyVec (_, t) -> is_float fv t
+      | _ -> false
+    in
+    let step fv =
+      List.fold deferred ~init:fv ~f:(fun acc c ->
+        match c.desc with
+        | Coerce (a, TyVar b) when is_float acc a -> Set.add acc b
+        | (Broadcast (a, b, TyVar r) | MulBroadcast (a, b, TyVar r))
+          when is_float acc a || is_float acc b -> Set.add acc r
+        | IndexAccess (_, _, TyVar r) -> Set.add acc r
+        | _ -> acc)
+    in
+    let rec fix fv =
+      let fv' = step fv in
+      if Set.equal fv fv' then fv else fix fv'
+    in
+    fix String.Set.empty
+  in
   Set.union (Map.key_set lowers) (Map.key_set uppers)
   |> Set.to_list
   |> List.filter_map ~f:(fun v ->
@@ -339,9 +362,10 @@ let resolve_subtype_bounds (deferred : constr list) : substitution =
         | t -> t
       in
       let lows = List.map lows ~f:promote_vec_lb in
+      let widen_if_float t = if Set.mem float_vars v then widen_numeric t else t in
       (match lub_of lows with
-       | Some t -> Some (v, t)
-       | None -> List.hd lows |> Option.map ~f:(fun t -> v, t))
+       | Some t -> Some (v, widen_if_float t)
+       | None -> List.hd lows |> Option.map ~f:(fun t -> v, widen_if_float t))
     | None, Some us ->
       us
       |> List.dedup_and_sort ~compare:compare_ty

@@ -1362,3 +1362,53 @@ let%expect_test "closure global captured into closures at differing depths" =
     }
     |}]
 ;;
+
+let%expect_test "float coercercion" =
+  test
+    {|
+    type option['a] = Some of 'a | None
+    let main (uv : vec2) =
+      match None with
+      | None -> [1.0, 1.0, 1.0, 1.0]
+      | Some t -> let c = #cos t in [c, 1, 1, 1]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        vec2 uv = gl_FragCoord.xy;
+        fragColor = vec4(1., 1., 1., 1.);
+    }
+    |}];
+  test_term "let f x = let c = #cos x in [c, 1, 1] in f 0.5";
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(0.87758256189037276, 1., 1., 1.);
+    }
+    |}];
+  test
+    {|
+    type option['a] = Some of 'a | None
+    let main (coord : vec2) =
+      match Some 0.5 with
+      | None -> [0.0, 0.0, 0.0, 0.0]
+      | Some t -> let col = [0.3, 0.2, 0.5] * t in [col.0, col.1, col.2, 1]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(0.15, 0.1, 0.25, 1.);
+    }
+    |}]
+;;
