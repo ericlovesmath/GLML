@@ -44,6 +44,7 @@ let to_glsl_value (ty : Lower_variants.ty) (vd : Tail_call.value_desc) : term =
     (match ty with
      | TyRecord s -> App (s, List.map args ~f:to_glsl_atom)
      | _ -> raise "Record term does not have type [record]")
+  | Init_struct _ -> raise "Init_struct must be emitted as statements"
   | Field (a, f) -> Swizzle (to_glsl_atom a, f)
   | App (f, args) -> App (f, List.map args ~f:to_glsl_atom)
 ;;
@@ -59,6 +60,11 @@ let emit_return ctx t =
   match ctx.assign_to with
   | None -> Return (Some t)
   | Some v -> Set (Var v, t)
+;;
+
+(** Write only the named fields of [v], leaving the rest GLSL-default *)
+let set_fields (v : string) (fields : (string * Anf.atom) list) : stmt list =
+  List.map fields ~f:(fun (f, a) -> Set (Swizzle (Var v, f), to_glsl_atom a))
 ;;
 
 let translate_continue ~(loc : Lexer.loc) (params : string list) (args : Anf.atom list)
@@ -99,6 +105,13 @@ let translate_continue ~(loc : Lexer.loc) (params : string list) (args : Anf.ato
 let rec translate_term (ctx : ctx) (t : Tail_call.term) : stmt list =
   let translate = translate_anf ctx in
   match t.desc with
+  | Value (Init_struct fields) ->
+    (match ctx.assign_to with
+     | Some v -> set_fields v fields
+     | None ->
+       let tmp = Utils.fresh "_mk" in
+       (Decl (None, to_glsl_ty t.loc t.ty, tmp, None) :: set_fields tmp fields)
+       @ [ Return (Some (Var tmp)) ])
   | Value v -> [ emit_return ctx (to_glsl_value t.ty v) ]
   | If (c, t, e) ->
     [ IfStmt (to_glsl_atom c, Block (translate t), Some (Block (translate e))) ]
@@ -112,6 +125,8 @@ and translate_anf (ctx : ctx) (anf : Tail_call.anf) : stmt list =
     let ty = to_glsl_ty bind.loc bind.ty in
     let tail = translate_anf ctx body in
     (match bind.desc with
+     | Value (Init_struct fields) ->
+       (Decl (None, ty, v, None) :: set_fields v fields) @ tail
      | Value value -> Decl (None, ty, v, Some (to_glsl_value bind.ty value)) :: tail
      | If _ | Switch _ ->
        let sub = translate_term { ctx with assign_to = Some v } bind in

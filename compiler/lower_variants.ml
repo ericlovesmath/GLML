@@ -15,6 +15,7 @@ type ty =
   | TyArrow of ty * ty
   | TyRecord of string
   | TySampler
+[@@deriving equal]
 
 let rec sexp_of_ty = function
   | TyFloat -> Atom "float"
@@ -40,6 +41,39 @@ let rec lower_ty (ty : Lower_tuples.ty) : ty =
   | TySampler -> TySampler
 ;;
 
+(* ======= Variant payload slot sharing ======= *)
+
+(* GLSL-identifier encoding of a slot type *)
+let field_name (ty : ty) (k : int) : string =
+  let rec ty_short (ty : ty) : string =
+    match ty with
+    | TyFloat -> "f"
+    | TyInt -> "i"
+    | TyBool -> "b"
+    | TyVec (n, t) -> [%string "v%{n#Int}%{ty_short t}"]
+    | TyRecord s -> "r" ^ s
+    | TyArrow _ -> "fn"
+    | TySampler -> "samp"
+  in
+  [%string "p%{ty_short ty}_%{k#Int}"]
+;;
+
+(** Slot [(name, type)] for each argument of one constructor *)
+let assign (arg_tys : Lower_tuples.ty list) : (string * ty) list =
+  List.folding_map arg_tys ~init:[] ~f:(fun seen raw ->
+    let ty = lower_ty raw in
+    let k = List.count seen ~f:(equal_ty ty) in
+    ty :: seen, (field_name ty k, ty))
+;;
+
+(* Needed union of every constructor's slots *)
+let slot_layout (ctors : (string * Lower_tuples.ty list) list) : (string * ty) list =
+  ctors
+  |> List.map ~f:snd
+  |> List.concat_map ~f:assign
+  |> List.stable_dedup ~compare:(fun (n1, _) (n2, _) -> String.compare n1 n2)
+;;
+
 type term_desc =
   | Var of string
   | Float of float
@@ -53,6 +87,7 @@ type term_desc =
   | Index of term * int
   | Builtin of Glsl.builtin * term list
   | Record of term list
+  | Init_struct of (string * term) list
   | Field of term * string
   | Switch of term * (Glsl.switch_case * term) list
 
@@ -78,6 +113,9 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | Builtin (b, ts) ->
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_term)
   | Record ts -> List (Atom "record" :: List.map ts ~f:sexp_of_term)
+  | Init_struct fields ->
+    let sexp_of_field (f, t) = List [ Atom f; sexp_of_term t ] in
+    List (Atom "init_struct" :: List.map fields ~f:sexp_of_field)
   | Field (t, f) -> List [ Atom "."; sexp_of_term t; Atom f ]
   | Switch (tag, cases) ->
     let sexp_of_case (label, body) =
@@ -141,38 +179,17 @@ let find_tag ~loc (ctors : (string * Lower_tuples.ty list) list) (ctor : string)
   | None -> raise "unknown ctor" ~loc ~d:[%message (ctor : string)]
 ;;
 
-let rec zero_of_ty (tenv : Lower_tuples.type_decl String.Map.t) ~loc (ty : ty) : term =
-  let mk desc = ({ desc; ty; loc } : term) in
-  match ty with
-  | TyFloat -> mk (Float 0.0)
-  | TyInt -> mk (Int 0)
-  | TyBool -> mk (Bool false)
-  | TyVec (n, ts) ->
-    let ts = zero_of_ty tenv ~loc ts in
-    mk (Vec (n, List.init n ~f:(Fn.const ts)))
-  | TyRecord name ->
-    (match Map.find tenv name with
-     | Some (RecordDecl fs) ->
-       let fs = List.map fs ~f:(fun (_, fty) -> zero_of_ty tenv ~loc (lower_ty fty)) in
-       mk (Record fs)
-     | Some (VariantDecl ctors) ->
-       let tag : term = { desc = Int 0; ty = TyInt; loc } in
-       let ctors =
-         List.concat_map ctors ~f:(fun (_, arg_tys) ->
-           List.map arg_tys ~f:(fun t -> zero_of_ty tenv ~loc (lower_ty t)))
-       in
-       mk (Record (tag :: ctors))
-     | None ->
-       raise "unknown record type in zero_of_ty" ~loc ~d:[%message (name : string)])
-  | TyArrow _ -> raise "no zero for arrow type" ~loc
-  | TySampler -> raise "no zero for sampler type" ~loc
-;;
-
-let flatten_variant_args ~loc ~tenv ~ctor ~(args : term list) ctors : term list =
-  List.concat_map ctors ~f:(fun (c, arg_tys) ->
-    if String.equal c ctor
-    then args
-    else List.map arg_tys ~f:(fun ty -> zero_of_ty tenv ~loc (lower_ty ty)))
+(** The (slot-name, value) pairs initialized by constructing [ctor] with [args] *)
+let variant_fields ~loc ~ctor ~(args : term list) ctors : (string * term) list =
+  let tag : term = { desc = Int (find_tag ~loc ctors ctor); ty = TyInt; loc } in
+  let slot_names =
+    ctors
+    |> List.Assoc.find ~equal:String.equal ctor
+    |> Option.value ~default:[]
+    |> assign
+    |> List.map ~f:fst
+  in
+  ("tag", tag) :: List.zip_exn slot_names args
 ;;
 
 (* If [pat] is [PatVar v], wrap [body] in [let v = occ in body] *)
@@ -290,9 +307,8 @@ let rec lower_term (tenv : type_env) (term : Lambda_lift.term) : term =
       | _ -> raise "expected variant type" ~loc
     in
     let ctors = lookup_variant_ctors ~loc tenv ty_name in
-    let tag_atom : term = { desc = Int (find_tag ~loc ctors ctor); ty = TyInt; loc } in
     let args = List.map args ~f:(lower_term tenv) in
-    pure (Record (tag_atom :: flatten_variant_args ~loc ~tenv ~ctor ~args ctors))
+    pure (Init_struct (variant_fields ~loc ~ctor ~args ctors))
   | Match (scrut, cases) ->
     let scrut_lowered = lower_term tenv scrut in
     let cases = List.map cases ~f:(fun (pat, body) -> pat, lower_term tenv body) in
@@ -370,9 +386,9 @@ and lower_match
     match h with
     | HBool _ | HInt _ | HFloat _ -> []
     | HCtor c ->
-      ctor_arg_tys ~col_ty:occ.ty c
-      |> List.mapi ~f:(fun i ty ->
-        let f = [%string "%{c}_%{i#Int}"] in
+      let arg_tys = ctor_arg_tys ~col_ty:occ.ty c in
+      List.zip_exn arg_tys (assign arg_tys)
+      |> List.map ~f:(fun (ty, (f, _)) ->
         project ~hint:f ~bind_desc:(Field (parent, f)) ty)
     | HBracket n ->
       let elem =
@@ -518,11 +534,7 @@ let lower_top (tenv : type_env) (top : Lambda_lift.top) : top =
   let pure desc = ({ desc; ty = lower_ty top.ty; loc = top.loc } : top) in
   match top.desc with
   | TypeDef (name, VariantDecl ctors) ->
-    let flat_fields =
-      List.concat_map ctors ~f:(fun (ctor, arg_tys) ->
-        List.mapi arg_tys ~f:(fun i t -> [%string "%{ctor}_%{i#Int}"], lower_ty t))
-    in
-    pure (TypeDef (name, RecordDecl (("tag", TyInt) :: flat_fields)))
+    pure (TypeDef (name, RecordDecl (("tag", TyInt) :: slot_layout ctors)))
   | TypeDef (name, RecordDecl fields) ->
     let fields = List.map fields ~f:(Tuple2.map_snd ~f:lower_ty) in
     pure (TypeDef (name, RecordDecl fields))

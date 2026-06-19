@@ -23,6 +23,7 @@ type term_desc =
   | Index of term * int
   | Builtin of Glsl.builtin * term list
   | Record of term list
+  | Init_struct of (string * term) list
   | Field of term * string
   | Switch of term * (Glsl.switch_case * term) list
 [@@deriving sexp_of]

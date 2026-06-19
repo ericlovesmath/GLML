@@ -23,6 +23,7 @@ type term_desc =
   | App of string * atom list
   | If of atom * anf * anf
   | Record of atom list
+  | Init_struct of (string * atom) list
   | Field of atom * string
   | Switch of atom * (Glsl.switch_case * anf) list
 [@@deriving sexp_of]

@@ -845,9 +845,9 @@ let%expect_test "defunctionalize unifies int/float arrow flavors" =
         bool anf_0 = (anf > 0.5);
         DFn_0 anf_1;
         if (anf_0) {
-            anf_1 = DFn_0(0);
+            anf_1.tag = 0;
         } else {
-            anf_1 = DFn_0(1);
+            anf_1.tag = 1;
         }
         vec3 anf_2 = vec3(1., 0., 0.);
         int _lv_tag_0 = anf_1.tag;
@@ -1044,14 +1044,12 @@ let%expect_test "DFn promotion of fields in user-declared variant type" =
     out vec4 fragColor;
     struct DFn_1 {
         int tag;
-        float lctor_2_0;
-        float lctor_4_0;
+        float pf_0;
     };
     struct DFn_0 {
         int tag;
-        float lctor_2_0;
-        DFn_1 lctor_3_0;
-        float lctor_4_0;
+        float pf_0;
+        DFn_1 prDFn_1_0;
     };
     vec3 dapply_0(DFn_0 dfn_0, vec3 da_0) {
         int _lv_tag = dfn_0.tag;
@@ -1072,48 +1070,52 @@ let%expect_test "DFn promotion of fields in user-declared variant type" =
     }
     struct material {
         int tag;
-        DFn_0 Lambert_0;
-        DFn_0 Phong_0;
-        float Phong_1;
+        DFn_0 prDFn_0_0;
+        float pf_0;
     };
     uniform float u_pick;
     void main() {
         vec2 coord = gl_FragCoord.xy;
-        bool anf_8 = (u_pick > 0.5);
+        bool anf_3 = (u_pick > 0.5);
         material m_0;
-        if (anf_8) {
-            DFn_1 anf_0_0 = DFn_1(0, 0., 0.);
-            DFn_0 anf_1_0 = DFn_0(0, 0., anf_0_0, 0.);
-            DFn_1 anf_2_0 = DFn_1(0, 3., 0.);
-            DFn_0 anf_3_0 = DFn_0(1, 0., anf_2_0, 0.);
-            m_0 = material(1, anf_1_0, anf_3_0, 64.);
+        if (anf_3) {
+            DFn_1 anf_0_0;
+            anf_0_0.tag = 0;
+            anf_0_0.pf_0 = 3.;
+            DFn_0 anf_1_0;
+            anf_1_0.tag = 1;
+            anf_1_0.prDFn_1_0 = anf_0_0;
+            m_0.tag = 1;
+            m_0.prDFn_0_0 = anf_1_0;
+            m_0.pf_0 = 64.;
         } else {
-            DFn_1 anf_4_0 = DFn_1(0, 0., 0.);
-            DFn_0 anf_5_0 = DFn_0(2, 0., anf_4_0, 2.);
-            DFn_0 anf_7_0 = DFn_0(0, 0., anf_4_0, 0.);
-            m_0 = material(0, anf_5_0, anf_7_0, 0.);
+            DFn_0 anf_2_0;
+            anf_2_0.tag = 2;
+            anf_2_0.pf_0 = 2.;
+            m_0.tag = 0;
+            m_0.prDFn_0_0 = anf_2_0;
         }
-        vec3 anf_9 = vec3(0., 0., 0.);
+        vec3 anf_4 = vec3(0., 0., 0.);
         int _lv_tag_0_0 = m_0.tag;
         vec3 c;
         switch (_lv_tag_0_0) {
             case 0: {
-                DFn_0 _lv_Lambert_0_0 = m_0.Lambert_0;
-                c = dapply_0(_lv_Lambert_0_0, anf_9);
+                DFn_0 _lv_prDFn_0_0_1 = m_0.prDFn_0_0;
+                c = dapply_0(_lv_prDFn_0_0_1, anf_4);
                 break;
             }
             default: {
-                DFn_0 _lv_Phong_0_0 = m_0.Phong_0;
-                float _lv_Phong_1_0 = m_0.Phong_1;
-                vec3 anf_13 = dapply_0(_lv_Phong_0_0, anf_9);
-                c = (anf_13 * _lv_Phong_1_0);
+                DFn_0 _lv_prDFn_0_0_0_0 = m_0.prDFn_0_0;
+                float _lv_pf_0_1_0 = m_0.pf_0;
+                vec3 anf_8 = dapply_0(_lv_prDFn_0_0_0_0, anf_4);
+                c = (anf_8 * _lv_pf_0_1_0);
                 break;
             }
         }
-        float anf_10 = c[0];
-        float anf_11 = c[1];
-        float anf_12 = c[2];
-        fragColor = vec4(anf_10, anf_11, anf_12, 1.);
+        float anf_5 = c[0];
+        float anf_6 = c[1];
+        float anf_7 = c[2];
+        fragColor = vec4(anf_5, anf_6, anf_7, 1.);
     }
     |}]
 ;;
@@ -1201,51 +1203,40 @@ let%expect_test "closure global captured into closures at differing depths" =
     out vec4 fragColor;
     struct DFn_2 {
         int tag;
-        float lctor_5_0;
-        float lctor_6_0;
-        float lctor_8_0;
+        float pf_0;
     };
     struct DFn_1 {
         int tag;
-        float lctor_5_0;
-        float lctor_6_0;
-        vec2 lctor_7_0;
-        DFn_2 lctor_7_1;
-        float lctor_8_0;
-        float lctor_9_0;
-        DFn_2 lctor_9_1;
+        float pf_0;
+        vec2 pv2f_0;
+        DFn_2 prDFn_2_0;
     };
     struct DFn_0 {
         int tag;
-        float lctor_5_0;
-        float lctor_6_0;
-        vec2 lctor_7_0;
-        DFn_2 lctor_7_1;
-        float lctor_8_0;
-        float lctor_9_0;
-        DFn_2 lctor_9_1;
-        float lctor_10_0;
-        DFn_1 lctor_10_1;
+        float pf_0;
+        vec2 pv2f_0;
+        DFn_2 prDFn_2_0;
+        DFn_1 prDFn_1_0;
     };
     float dapply_2(DFn_2 dfn, vec2 da) {
         int _lv_tag = dfn.tag;
         switch (_lv_tag) {
             case 0: {
-                float _lv_lctor_5_0 = dfn.lctor_5_0;
+                float _lv_pf_0 = dfn.pf_0;
                 float anf = length(da);
-                return (anf - _lv_lctor_5_0);
+                return (anf - _lv_pf_0);
                 break;
             }
             case 1: {
-                float _lv_lctor_6_0 = dfn.lctor_6_0;
+                float _lv_pf_0_0 = dfn.pf_0;
                 float anf_0 = length(da);
-                return (anf_0 - _lv_lctor_6_0);
+                return (anf_0 - _lv_pf_0_0);
                 break;
             }
             default: {
-                float _lv_lctor_8_0 = dfn.lctor_8_0;
+                float _lv_pf_0_1 = dfn.pf_0;
                 float anf_1 = length(da);
-                return (anf_1 - _lv_lctor_8_0);
+                return (anf_1 - _lv_pf_0_1);
                 break;
             }
         }
@@ -1254,107 +1245,111 @@ let%expect_test "closure global captured into closures at differing depths" =
         vec2 coord = gl_FragCoord.xy;
         float anf_16 = coord[0];
         bool anf_17 = (anf_16 < 0.5);
-        DFn_0 anf_41;
+        DFn_0 anf_24;
         if (anf_17) {
-            vec2 anf_18 = vec2(0., 0.);
-            DFn_2 anf_19 = DFn_2(0, 0., 0., 0.);
-            DFn_1 anf_24 = DFn_1(0, 0., 0., anf_18, anf_19, 0., 0., anf_19);
-            anf_41 = DFn_0(0, 0.45, 0., anf_18, anf_19, 0., 0., anf_19, 0., anf_24);
+            anf_24.tag = 0;
+            anf_24.pf_0 = 0.45;
         } else {
-            bool anf_26 = (anf_16 < 1.5);
-            if (anf_26) {
-                vec2 anf_27 = vec2(0.3, 0.);
-                DFn_2 anf_28 = DFn_2(1, 0., 0.45, 0.);
-                DFn_2 anf_29 = DFn_2(0, 0., 0., 0.);
-                vec2 anf_30 = vec2(0., 0.);
-                DFn_1 anf_33 = DFn_1(0, 0., 0., anf_30, anf_29, 0., 0., anf_29);
-                anf_41 = DFn_0(2, 0., 0., anf_27, anf_28, 0., 0., anf_29, 0., anf_33);
+            bool anf_19 = (anf_16 < 1.5);
+            if (anf_19) {
+                vec2 anf_20 = vec2(0.3, 0.);
+                DFn_2 anf_21;
+                anf_21.tag = 1;
+                anf_21.pf_0 = 0.45;
+                anf_24.tag = 2;
+                anf_24.pv2f_0 = anf_20;
+                anf_24.prDFn_2_0 = anf_21;
             } else {
-                vec2 anf_34 = vec2(0., 0.);
-                DFn_2 anf_35 = DFn_2(0, 0., 0., 0.);
-                DFn_2 anf_39 = DFn_2(2, 0., 0., 0.45);
-                DFn_1 anf_40 = DFn_1(4, 0., 0., anf_34, anf_35, 0., 0.05, anf_39);
-                anf_41 = DFn_0(5, 0., 0., anf_34, anf_35, 0., 0., anf_35, 0.1, anf_40);
+                DFn_2 anf_22;
+                anf_22.tag = 2;
+                anf_22.pf_0 = 0.45;
+                DFn_1 anf_23;
+                anf_23.tag = 4;
+                anf_23.pf_0 = 0.05;
+                anf_23.prDFn_2_0 = anf_22;
+                anf_24.tag = 5;
+                anf_24.pf_0 = 0.1;
+                anf_24.prDFn_1_0 = anf_23;
             }
         }
-        int _lv_tag_1_1 = anf_41.tag;
+        int _lv_tag_1_1 = anf_24.tag;
         float d_0;
         switch (_lv_tag_1_1) {
             case 0: {
-                float _lv_lctor_5_0_1_1 = anf_41.lctor_5_0;
+                float _lv_pf_0_6_1 = anf_24.pf_0;
                 float anf_8_1 = length(coord);
-                d_0 = (anf_8_1 - _lv_lctor_5_0_1_1);
+                d_0 = (anf_8_1 - _lv_pf_0_6_1);
                 break;
             }
             case 1: {
-                float _lv_lctor_6_0_1_1 = anf_41.lctor_6_0;
+                float _lv_pf_0_7_1 = anf_24.pf_0;
                 float anf_9_1 = length(coord);
-                d_0 = (anf_9_1 - _lv_lctor_6_0_1_1);
+                d_0 = (anf_9_1 - _lv_pf_0_7_1);
                 break;
             }
             case 2: {
-                vec2 _lv_lctor_7_0_0_1 = anf_41.lctor_7_0;
-                DFn_2 _lv_lctor_7_1_0_1 = anf_41.lctor_7_1;
-                vec2 anf_10_1 = (coord - _lv_lctor_7_0_0_1);
-                d_0 = dapply_2(_lv_lctor_7_1_0_1, anf_10_1);
+                vec2 _lv_pv2f_0_0_1 = anf_24.pv2f_0;
+                DFn_2 _lv_prDFn_2_0_1_1 = anf_24.prDFn_2_0;
+                vec2 anf_10_1 = (coord - _lv_pv2f_0_0_1);
+                d_0 = dapply_2(_lv_prDFn_2_0_1_1, anf_10_1);
                 break;
             }
             case 3: {
-                float _lv_lctor_8_0_1_1 = anf_41.lctor_8_0;
+                float _lv_pf_0_8_1 = anf_24.pf_0;
                 float anf_11_1 = length(coord);
-                d_0 = (anf_11_1 - _lv_lctor_8_0_1_1);
+                d_0 = (anf_11_1 - _lv_pf_0_8_1);
                 break;
             }
             case 4: {
-                float _lv_lctor_9_0_0_1 = anf_41.lctor_9_0;
-                DFn_2 _lv_lctor_9_1_0_1 = anf_41.lctor_9_1;
-                float anf_12_1 = dapply_2(_lv_lctor_9_1_0_1, coord);
+                float _lv_pf_0_9_1 = anf_24.pf_0;
+                DFn_2 _lv_prDFn_2_0_2_1 = anf_24.prDFn_2_0;
+                float anf_12_1 = dapply_2(_lv_prDFn_2_0_2_1, coord);
                 float anf_13_1 = abs(anf_12_1);
-                d_0 = (anf_13_1 - _lv_lctor_9_0_0_1);
+                d_0 = (anf_13_1 - _lv_pf_0_9_1);
                 break;
             }
             default: {
-                float _lv_lctor_10_0_1 = anf_41.lctor_10_0;
-                DFn_1 _lv_lctor_10_1_1 = anf_41.lctor_10_1;
-                int _lv_tag_0_2 = _lv_lctor_10_1_1.tag;
+                float _lv_pf_0_10_1 = anf_24.pf_0;
+                DFn_1 _lv_prDFn_1_0_1 = anf_24.prDFn_1_0;
+                int _lv_tag_0_2 = _lv_prDFn_1_0_1.tag;
                 float anf_14_1;
                 switch (_lv_tag_0_2) {
                     case 0: {
-                        float _lv_lctor_5_0_0_2 = _lv_lctor_10_1_1.lctor_5_0;
+                        float _lv_pf_0_2_2 = _lv_prDFn_1_0_1.pf_0;
                         float anf_2_2 = length(coord);
-                        anf_14_1 = (anf_2_2 - _lv_lctor_5_0_0_2);
+                        anf_14_1 = (anf_2_2 - _lv_pf_0_2_2);
                         break;
                     }
                     case 1: {
-                        float _lv_lctor_6_0_0_2 = _lv_lctor_10_1_1.lctor_6_0;
+                        float _lv_pf_0_3_2 = _lv_prDFn_1_0_1.pf_0;
                         float anf_3_2 = length(coord);
-                        anf_14_1 = (anf_3_2 - _lv_lctor_6_0_0_2);
+                        anf_14_1 = (anf_3_2 - _lv_pf_0_3_2);
                         break;
                     }
                     case 2: {
-                        vec2 _lv_lctor_7_0_3 = _lv_lctor_10_1_1.lctor_7_0;
-                        DFn_2 _lv_lctor_7_1_3 = _lv_lctor_10_1_1.lctor_7_1;
-                        vec2 anf_4_2 = (coord - _lv_lctor_7_0_3);
-                        anf_14_1 = dapply_2(_lv_lctor_7_1_3, anf_4_2);
+                        vec2 _lv_pv2f_0_3 = _lv_prDFn_1_0_1.pv2f_0;
+                        DFn_2 _lv_prDFn_2_0_5 = _lv_prDFn_1_0_1.prDFn_2_0;
+                        vec2 anf_4_2 = (coord - _lv_pv2f_0_3);
+                        anf_14_1 = dapply_2(_lv_prDFn_2_0_5, anf_4_2);
                         break;
                     }
                     case 3: {
-                        float _lv_lctor_8_0_0_2 = _lv_lctor_10_1_1.lctor_8_0;
+                        float _lv_pf_0_4_2 = _lv_prDFn_1_0_1.pf_0;
                         float anf_5_2 = length(coord);
-                        anf_14_1 = (anf_5_2 - _lv_lctor_8_0_0_2);
+                        anf_14_1 = (anf_5_2 - _lv_pf_0_4_2);
                         break;
                     }
                     default: {
-                        float _lv_lctor_9_0_3 = _lv_lctor_10_1_1.lctor_9_0;
-                        DFn_2 _lv_lctor_9_1_3 = _lv_lctor_10_1_1.lctor_9_1;
-                        float anf_6_2 = dapply_2(_lv_lctor_9_1_3, coord);
+                        float _lv_pf_0_5_2 = _lv_prDFn_1_0_1.pf_0;
+                        DFn_2 _lv_prDFn_2_0_0_2 = _lv_prDFn_1_0_1.prDFn_2_0;
+                        float anf_6_2 = dapply_2(_lv_prDFn_2_0_0_2, coord);
                         float anf_7_2 = abs(anf_6_2);
-                        anf_14_1 = (anf_7_2 - _lv_lctor_9_0_3);
+                        anf_14_1 = (anf_7_2 - _lv_pf_0_5_2);
                         break;
                     }
                 }
                 float anf_15_1 = abs(anf_14_1);
-                d_0 = (anf_15_1 - _lv_lctor_10_0_1);
+                d_0 = (anf_15_1 - _lv_pf_0_10_1);
                 break;
             }
         }

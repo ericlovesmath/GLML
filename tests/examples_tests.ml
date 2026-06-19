@@ -50,27 +50,27 @@ let%expect_test "compile examples" =
         float anf_21_4 = min(anf_20_4, 0.);
         float anf_63_1 = (anf_17_4 + anf_21_4);
         float d_0 = min(anf_62_1, anf_63_1);
-        bool anf_114 = (d_0 > 0.);
+        bool anf_94 = (d_0 > 0.);
         vec3 col;
-        if (anf_114) {
+        if (anf_94) {
             col = orange;
         } else {
             col = blue;
         }
-        float anf_115 = abs(d_0);
-        float anf_116 = (-6. * anf_115);
-        float anf_117 = exp(anf_116);
-        float darken = (1. - anf_117);
-        float anf_118 = (150. * d_0);
-        float anf_119 = cos(anf_118);
-        float anf_120 = (0.2 * anf_119);
-        float rings = (0.8 + anf_120);
-        vec3 anf_121 = (col * darken);
-        vec3 col_0 = (anf_121 * rings);
-        vec3 anf_122 = vec3(1., 1., 1.);
-        float anf_124 = smoothstep(0., 0.01, anf_115);
-        float anf_125 = (1. - anf_124);
-        vec3 col_1 = mix(col_0, anf_122, anf_125);
+        float anf_95 = abs(d_0);
+        float anf_96 = (-6. * anf_95);
+        float anf_97 = exp(anf_96);
+        float darken = (1. - anf_97);
+        float anf_98 = (150. * d_0);
+        float anf_99 = cos(anf_98);
+        float anf_100 = (0.2 * anf_99);
+        float rings = (0.8 + anf_100);
+        vec3 anf_101 = (col * darken);
+        vec3 col_0 = (anf_101 * rings);
+        vec3 anf_102 = vec3(1., 1., 1.);
+        float anf_104 = smoothstep(0., 0.01, anf_95);
+        float anf_105 = (1. - anf_104);
+        vec3 col_1 = mix(col_0, anf_102, anf_105);
         float anf_22_3 = length(m);
         float anf_84_0 = (anf_22_3 - 0.3);
         vec2 anf_33_2 = abs(m);
@@ -82,23 +82,23 @@ let%expect_test "compile examples" =
         float anf_40_2 = max(anf_38_2, anf_39_2);
         float anf_41_2 = min(anf_40_2, 0.);
         float anf_85_0 = (anf_37_2 + anf_41_2);
-        float anf_151 = min(anf_84_0, anf_85_0);
-        float d_1 = abs(anf_151);
-        vec2 anf_152 = (p_1 - m);
-        float dm = length(anf_152);
-        float anf_153 = (dm - d_1);
-        float anf_154 = abs(anf_153);
-        float anf_155 = (anf_154 - 0.0025);
-        float anf_156 = (dm - 0.015);
-        float d_2 = min(anf_155, anf_156);
-        vec3 anf_157 = vec3(1., 1., 0.);
-        float anf_158 = smoothstep(0., 0.005, d_2);
-        float anf_159 = (1. - anf_158);
-        vec3 col_2 = mix(col_1, anf_157, anf_159);
-        float anf_160 = col_2[0];
-        float anf_161 = col_2[1];
-        float anf_162 = col_2[2];
-        fragColor = vec4(anf_160, anf_161, anf_162, 1.);
+        float anf_111 = min(anf_84_0, anf_85_0);
+        float d_1 = abs(anf_111);
+        vec2 anf_112 = (p_1 - m);
+        float dm = length(anf_112);
+        float anf_113 = (dm - d_1);
+        float anf_114 = abs(anf_113);
+        float anf_115 = (anf_114 - 0.0025);
+        float anf_116 = (dm - 0.015);
+        float d_2 = min(anf_115, anf_116);
+        vec3 anf_117 = vec3(1., 1., 0.);
+        float anf_118 = smoothstep(0., 0.005, d_2);
+        float anf_119 = (1. - anf_118);
+        vec3 col_2 = mix(col_1, anf_117, anf_119);
+        float anf_120 = col_2[0];
+        float anf_121 = col_2[1];
+        float anf_122 = col_2[2];
+        fragColor = vec4(anf_120, anf_121, anf_122, 1.);
     }
 
 
@@ -793,7 +793,7 @@ let%expect_test "compile examples" =
     out vec4 fragColor;
     struct option {
         int tag;
-        float Some_0;
+        float pf_0;
     };
     option mandel_0(vec2 c, vec2 z, int i) {
         int _iter = 0;
@@ -802,7 +802,9 @@ let%expect_test "compile examples" =
             if (_lim_cond) {
                 bool anf = (i > 150);
                 if (anf) {
-                    return option(1, 0.);
+                    option _mk_0;
+                    _mk_0.tag = 1;
+                    return _mk_0;
                 } else {
                     float anf_0 = length(z);
                     bool anf_1 = (anf_0 > 4.);
@@ -812,7 +814,10 @@ let%expect_test "compile examples" =
                         float anf_4 = float(i);
                         float anf_5 = (anf_4 - nu);
                         float anf_6 = (anf_5 / 150.);
-                        return option(0, anf_6);
+                        option _mk;
+                        _mk.tag = 0;
+                        _mk.pf_0 = anf_6;
+                        return _mk;
                     } else {
                         float anf_7 = z[0];
                         float anf_9 = (anf_7 * anf_7);
@@ -865,9 +870,9 @@ let%expect_test "compile examples" =
                 break;
             }
             default: {
-                float _lv_Some_0 = _lv_scrut.Some_0;
+                float _lv_pf_0 = _lv_scrut.pf_0;
                 vec3 anf_28 = vec3(10., 20., 30.);
-                vec3 anf_29 = (_lv_Some_0 * anf_28);
+                vec3 anf_29 = (_lv_pf_0 * anf_28);
                 vec3 anf_30 = (anf_29 + u_time);
                 vec3 anf_31 = sin(anf_30);
                 vec3 anf_32 = (anf_31 * 0.5);
@@ -889,21 +894,18 @@ let%expect_test "compile examples" =
     out vec4 fragColor;
     struct DFn_1 {
         int tag;
-        vec3 lctor_2_0;
-        vec3 lctor_2_1;
-        float lctor_2_2;
-        float lctor_2_3;
-        float lctor_4_0;
+        vec3 pv3f_0;
+        vec3 pv3f_1;
+        float pf_0;
+        float pf_1;
     };
     struct DFn_0 {
         int tag;
-        vec3 lctor_2_0;
-        vec3 lctor_2_1;
-        float lctor_2_2;
-        float lctor_2_3;
-        DFn_1 lctor_3_0;
-        float lctor_3_1;
-        float lctor_4_0;
+        vec3 pv3f_0;
+        vec3 pv3f_1;
+        float pf_0;
+        float pf_1;
+        DFn_1 prDFn_1_0;
     };
     float d_sphere(vec3 p_2) {
         vec3 anf = vec3(0., 1., 0.);
@@ -913,9 +915,8 @@ let%expect_test "compile examples" =
     }
     struct material {
         int tag;
-        DFn_0 Lambert_0;
-        DFn_0 Phong_0;
-        float Phong_1;
+        DFn_0 prDFn_0_0;
+        float pf_0;
     };
     vec2 rot2(float a, vec2 v_0) {
         float s = sin(a);
@@ -940,27 +941,27 @@ let%expect_test "compile examples" =
         while (true) {
             bool _lim_cond = (_iter < 1000);
             if (_lim_cond) {
-                bool anf_76 = (i > 64);
-                if (anf_76) {
+                bool anf_57 = (i > 64);
+                if (anf_57) {
                     return t;
                 } else {
-                    vec3 anf_77 = (rd * t);
-                    vec3 anf_78 = (ro + anf_77);
-                    float d = scene(anf_78);
-                    bool anf_79 = (d < 0.001);
-                    if (anf_79) {
+                    vec3 anf_58 = (rd * t);
+                    vec3 anf_59 = (ro + anf_58);
+                    float d = scene(anf_59);
+                    bool anf_60 = (d < 0.001);
+                    if (anf_60) {
                         return t;
                     } else {
-                        bool anf_81 = (t > 20.);
-                        if (anf_81) {
+                        bool anf_62 = (t > 20.);
+                        if (anf_62) {
                             return 20.;
                         } else {
-                            float anf_82 = (t + d);
-                            int anf_83 = (i + 1);
+                            float anf_63 = (t + d);
+                            int anf_64 = (i + 1);
                             int _iter_inc = (_iter + 1);
                             _iter = _iter_inc;
-                            t = anf_82;
-                            i = anf_83;
+                            t = anf_63;
+                            i = anf_64;
                             continue;
                         }
                     }
@@ -973,105 +974,105 @@ let%expect_test "compile examples" =
     uniform vec2 u_mouse;
     uniform vec2 u_resolution;
     vec2 get_uv(vec2 coord) {
-        vec2 anf_84 = (2. * coord);
-        vec2 anf_85 = (anf_84 - u_resolution);
-        float anf_86 = u_resolution[0];
-        float anf_87 = u_resolution[1];
-        float anf_88 = min(anf_86, anf_87);
-        return (anf_85 / anf_88);
+        vec2 anf_65 = (2. * coord);
+        vec2 anf_66 = (anf_65 - u_resolution);
+        float anf_67 = u_resolution[0];
+        float anf_68 = u_resolution[1];
+        float anf_69 = min(anf_67, anf_68);
+        return (anf_66 / anf_69);
     }
     uniform float u_time;
     vec3 dapply_0(DFn_0 dfn_0, vec3 da_0) {
         int _lv_tag_0 = dfn_0.tag;
         switch (_lv_tag_0) {
             case 0: {
-                vec3 _lv_lctor_2_0_0 = dfn_0.lctor_2_0;
-                vec3 _lv_lctor_2_1_0 = dfn_0.lctor_2_1;
-                float _lv_lctor_2_2_0 = dfn_0.lctor_2_2;
-                float _lv_lctor_2_3_0 = dfn_0.lctor_2_3;
-                vec3 anf_109 = (da_0 * _lv_lctor_2_2_0);
-                float anf_110 = (u_time * _lv_lctor_2_3_0);
-                vec3 anf_111 = (anf_109 + anf_110);
-                vec3 w = sin(anf_111);
-                float anf_112 = w[0];
-                float anf_113 = w[2];
-                float anf_114 = (anf_112 * anf_113);
-                float anf_115 = (anf_114 + 1.);
-                float anf_116 = (anf_115 * 0.5);
-                return mix(_lv_lctor_2_0_0, _lv_lctor_2_1_0, anf_116);
+                vec3 _lv_pv3f_0_0 = dfn_0.pv3f_0;
+                vec3 _lv_pv3f_1_0 = dfn_0.pv3f_1;
+                float _lv_pf_0_1 = dfn_0.pf_0;
+                float _lv_pf_1_0 = dfn_0.pf_1;
+                vec3 anf_90 = (da_0 * _lv_pf_0_1);
+                float anf_91 = (u_time * _lv_pf_1_0);
+                vec3 anf_92 = (anf_90 + anf_91);
+                vec3 w = sin(anf_92);
+                float anf_93 = w[0];
+                float anf_94 = w[2];
+                float anf_95 = (anf_93 * anf_94);
+                float anf_96 = (anf_95 + 1.);
+                float anf_97 = (anf_96 * 0.5);
+                return mix(_lv_pv3f_0_0, _lv_pv3f_1_0, anf_97);
                 break;
             }
             case 1: {
-                DFn_1 _lv_lctor_3_0 = dfn_0.lctor_3_0;
-                float _lv_lctor_3_1 = dfn_0.lctor_3_1;
-                vec3 anf_117 = vec3(12.9898, 78.233, 37.719);
-                float anf_118 = dot(da_0, anf_117);
-                float anf_119 = sin(anf_118);
-                float anf_120 = (anf_119 * 43758.5453);
-                float n = fract(anf_120);
-                int _lv_tag_2 = _lv_lctor_3_0.tag;
-                vec3 anf_121;
+                DFn_1 _lv_prDFn_1_0 = dfn_0.prDFn_1_0;
+                float _lv_pf_0_2 = dfn_0.pf_0;
+                vec3 anf_98 = vec3(12.9898, 78.233, 37.719);
+                float anf_99 = dot(da_0, anf_98);
+                float anf_100 = sin(anf_99);
+                float anf_101 = (anf_100 * 43758.5453);
+                float n = fract(anf_101);
+                int _lv_tag_2 = _lv_prDFn_1_0.tag;
+                vec3 anf_102;
                 switch (_lv_tag_2) {
                     case 0: {
-                        vec3 _lv_lctor_2_0_1 = _lv_lctor_3_0.lctor_2_0;
-                        vec3 _lv_lctor_2_1_1 = _lv_lctor_3_0.lctor_2_1;
-                        float _lv_lctor_2_2_1 = _lv_lctor_3_0.lctor_2_2;
-                        float _lv_lctor_2_3_1 = _lv_lctor_3_0.lctor_2_3;
-                        vec3 anf_89_0 = (da_0 * _lv_lctor_2_2_1);
-                        float anf_90_0 = (u_time * _lv_lctor_2_3_1);
-                        vec3 anf_91_0 = (anf_89_0 + anf_90_0);
-                        vec3 w_0 = sin(anf_91_0);
-                        float anf_92_0 = w_0[0];
-                        float anf_93_0 = w_0[2];
-                        float anf_94_0 = (anf_92_0 * anf_93_0);
-                        float anf_95_0 = (anf_94_0 + 1.);
-                        float anf_96_0 = (anf_95_0 * 0.5);
-                        anf_121 = mix(_lv_lctor_2_0_1, _lv_lctor_2_1_1, anf_96_0);
+                        vec3 _lv_pv3f_0_1 = _lv_prDFn_1_0.pv3f_0;
+                        vec3 _lv_pv3f_1_1 = _lv_prDFn_1_0.pv3f_1;
+                        float _lv_pf_0_5 = _lv_prDFn_1_0.pf_0;
+                        float _lv_pf_1_1 = _lv_prDFn_1_0.pf_1;
+                        vec3 anf_70_0 = (da_0 * _lv_pf_0_5);
+                        float anf_71_0 = (u_time * _lv_pf_1_1);
+                        vec3 anf_72_0 = (anf_70_0 + anf_71_0);
+                        vec3 w_0 = sin(anf_72_0);
+                        float anf_73_0 = w_0[0];
+                        float anf_74_0 = w_0[2];
+                        float anf_75_0 = (anf_73_0 * anf_74_0);
+                        float anf_76_0 = (anf_75_0 + 1.);
+                        float anf_77_0 = (anf_76_0 * 0.5);
+                        anf_102 = mix(_lv_pv3f_0_1, _lv_pv3f_1_1, anf_77_0);
                         break;
                     }
                     default: {
-                        float _lv_lctor_4_0_1 = _lv_lctor_3_0.lctor_4_0;
-                        float anf_97_0 = da_0[0];
-                        float anf_98_0 = (anf_97_0 * _lv_lctor_4_0_1);
-                        float anf_99_0 = floor(anf_98_0);
-                        float anf_100_0 = da_0[1];
-                        float anf_101_0 = (anf_100_0 * _lv_lctor_4_0_1);
-                        float anf_102_0 = floor(anf_101_0);
-                        float anf_103_0 = (anf_99_0 + anf_102_0);
-                        float anf_104_0 = da_0[2];
-                        float anf_105_0 = (anf_104_0 * _lv_lctor_4_0_1);
-                        float anf_106_0 = floor(anf_105_0);
-                        float f_0 = (anf_103_0 + anf_106_0);
-                        float anf_107_0 = mod(f_0, 2.);
-                        bool anf_108_0 = (anf_107_0 < 1.);
-                        if (anf_108_0) {
-                            anf_121 = vec3(0.1, 0.1, 0.1);
+                        float _lv_pf_0_0_0 = _lv_prDFn_1_0.pf_0;
+                        float anf_78_0 = da_0[0];
+                        float anf_79_0 = (anf_78_0 * _lv_pf_0_0_0);
+                        float anf_80_0 = floor(anf_79_0);
+                        float anf_81_0 = da_0[1];
+                        float anf_82_0 = (anf_81_0 * _lv_pf_0_0_0);
+                        float anf_83_0 = floor(anf_82_0);
+                        float anf_84_0 = (anf_80_0 + anf_83_0);
+                        float anf_85_0 = da_0[2];
+                        float anf_86_0 = (anf_85_0 * _lv_pf_0_0_0);
+                        float anf_87_0 = floor(anf_86_0);
+                        float f_0 = (anf_84_0 + anf_87_0);
+                        float anf_88_0 = mod(f_0, 2.);
+                        bool anf_89_0 = (anf_88_0 < 1.);
+                        if (anf_89_0) {
+                            anf_102 = vec3(0.1, 0.1, 0.1);
                         } else {
-                            anf_121 = vec3(0.9, 0.9, 0.9);
+                            anf_102 = vec3(0.9, 0.9, 0.9);
                         }
                         break;
                     }
                 }
-                vec3 anf_122 = vec3(n, n, n);
-                return mix(anf_121, anf_122, _lv_lctor_3_1);
+                vec3 anf_103 = vec3(n, n, n);
+                return mix(anf_102, anf_103, _lv_pf_0_2);
                 break;
             }
             default: {
-                float _lv_lctor_4_0_0 = dfn_0.lctor_4_0;
-                float anf_123 = da_0[0];
-                float anf_124 = (anf_123 * _lv_lctor_4_0_0);
-                float anf_125 = floor(anf_124);
-                float anf_126 = da_0[1];
-                float anf_127 = (anf_126 * _lv_lctor_4_0_0);
-                float anf_128 = floor(anf_127);
-                float anf_129 = (anf_125 + anf_128);
-                float anf_130 = da_0[2];
-                float anf_131 = (anf_130 * _lv_lctor_4_0_0);
-                float anf_132 = floor(anf_131);
-                float f = (anf_129 + anf_132);
-                float anf_133 = mod(f, 2.);
-                bool anf_134 = (anf_133 < 1.);
-                if (anf_134) {
+                float _lv_pf_0_3 = dfn_0.pf_0;
+                float anf_104 = da_0[0];
+                float anf_105 = (anf_104 * _lv_pf_0_3);
+                float anf_106 = floor(anf_105);
+                float anf_107 = da_0[1];
+                float anf_108 = (anf_107 * _lv_pf_0_3);
+                float anf_109 = floor(anf_108);
+                float anf_110 = (anf_106 + anf_109);
+                float anf_111 = da_0[2];
+                float anf_112 = (anf_111 * _lv_pf_0_3);
+                float anf_113 = floor(anf_112);
+                float f = (anf_110 + anf_113);
+                float anf_114 = mod(f, 2.);
+                bool anf_115 = (anf_114 < 1.);
+                if (anf_115) {
                     return vec3(0.1, 0.1, 0.1);
                 } else {
                     return vec3(0.9, 0.9, 0.9);
@@ -1084,12 +1085,12 @@ let%expect_test "compile examples" =
         vec2 coord_0 = gl_FragCoord.xy;
         vec2 uv = get_uv(coord_0);
         vec2 mouse = get_uv(u_mouse);
-        float anf_144 = mouse[0];
-        float yaw = (anf_144 * -3.1415);
-        float anf_145 = mouse[1];
-        float anf_146 = (anf_145 + 0.5);
-        float anf_147 = min(1.4, anf_146);
-        float pitch = max(0.1, anf_147);
+        float anf_125 = mouse[0];
+        float yaw = (anf_125 * -3.1415);
+        float anf_126 = mouse[1];
+        float anf_127 = (anf_126 + 0.5);
+        float anf_128 = min(1.4, anf_127);
+        float pitch = max(0.1, anf_128);
         vec2 anf_23_2 = vec2(0., -4.);
         vec2 r_3 = rot2(pitch, anf_23_2);
         float anf_25_2 = r_3[0];
@@ -1099,27 +1100,27 @@ let%expect_test "compile examples" =
         float anf_18_2 = r_0_2[0];
         float anf_20_2 = r_0_2[1];
         vec3 ro_0 = vec3(anf_18_2, anf_25_2, anf_20_2);
-        float anf_149 = uv[0];
-        float anf_150 = uv[1];
-        vec2 anf_23_1 = vec2(anf_150, 1.);
+        float anf_130 = uv[0];
+        float anf_131 = uv[1];
+        vec2 anf_23_1 = vec2(anf_131, 1.);
         vec2 r_2 = rot2(pitch, anf_23_1);
         float anf_25_1 = r_2[0];
         float anf_26_1 = r_2[1];
-        vec2 anf_17_1 = vec2(anf_149, anf_26_1);
+        vec2 anf_17_1 = vec2(anf_130, anf_26_1);
         vec2 r_0_1 = rot2(yaw, anf_17_1);
         float anf_18_1 = r_0_1[0];
         float anf_20_1 = r_0_1[1];
-        vec3 anf_152 = vec3(anf_18_1, anf_25_1, anf_20_1);
-        float anf_4_6 = length(anf_152);
-        vec3 rd_0 = (anf_152 / anf_4_6);
+        vec3 anf_133 = vec3(anf_18_1, anf_25_1, anf_20_1);
+        float anf_4_6 = length(anf_133);
+        vec3 rd_0 = (anf_133 / anf_4_6);
         float t_0 = step_0(rd_0, ro_0, 0., 0);
-        bool anf_154 = (t_0 >= 20.);
+        bool anf_135 = (t_0 >= 20.);
         vec3 color;
-        if (anf_154) {
+        if (anf_135) {
             color = vec3(0.05, 0.05, 0.08);
         } else {
-            vec3 anf_155 = (rd_0 * t_0);
-            vec3 p_8 = (ro_0 + anf_155);
+            vec3 anf_136 = (rd_0 * t_0);
+            vec3 p_8 = (ro_0 + anf_136);
             vec3 anf_30_0 = vec3(0.001, 0., 0.);
             vec3 anf_31_0 = (p_8 + anf_30_0);
             float anf_32_0 = scene(anf_31_0);
@@ -1141,70 +1142,77 @@ let%expect_test "compile examples" =
             vec3 anf_48_0 = vec3(nx_0, ny_0, nz_0);
             float anf_4_5 = length(anf_48_0);
             vec3 n_1 = (anf_48_0 / anf_4_5);
-            float anf_156 = sin(u_time);
-            float anf_157 = (2. * anf_156);
-            float anf_158 = cos(u_time);
-            float anf_159 = (2. * anf_158);
-            vec3 light = vec3(anf_157, 4., anf_159);
-            vec3 anf_160 = (light - p_8);
-            float anf_4_4 = length(anf_160);
-            vec3 l_0 = (anf_160 / anf_4_4);
-            vec3 anf_161 = (ro_0 - p_8);
-            float anf_4_3 = length(anf_161);
-            vec3 v_5 = (anf_161 / anf_4_3);
+            float anf_137 = sin(u_time);
+            float anf_138 = (2. * anf_137);
+            float anf_139 = cos(u_time);
+            float anf_140 = (2. * anf_139);
+            vec3 light = vec3(anf_138, 4., anf_140);
+            vec3 anf_141 = (light - p_8);
+            float anf_4_4 = length(anf_141);
+            vec3 l_0 = (anf_141 / anf_4_4);
+            vec3 anf_142 = (ro_0 - p_8);
+            float anf_4_3 = length(anf_142);
+            vec3 v_5 = (anf_142 / anf_4_3);
             float anf_49_0 = d_sphere(p_8);
             float anf_50_0 = p_8[1];
             bool anf_51_0 = (anf_49_0 < anf_50_0);
-            material anf_162;
+            material anf_143;
             if (anf_51_0) {
-                vec3 anf_52_0 = vec3(0., 0., 0.);
-                DFn_1 anf_56_0 = DFn_1(0, anf_52_0, anf_52_0, 0., 0., 0.);
-                DFn_0 anf_57_0 = DFn_0(0, anf_52_0, anf_52_0, 0., 0., anf_56_0, 0., 0.);
-                vec3 anf_60_0 = vec3(1., 0.2, 0.5);
-                vec3 anf_61_0 = vec3(0.1, 0., 0.2);
-                DFn_1 anf_62_0 = DFn_1(0, anf_60_0, anf_61_0, 10., 3., 0.);
-                DFn_0 anf_63_0 = DFn_0(1, anf_52_0, anf_52_0, 0., 0., anf_62_0, 0.15, 0.);
-                anf_162 = material(1, anf_57_0, anf_63_0, 64.);
+                vec3 anf_52_0 = vec3(1., 0.2, 0.5);
+                vec3 anf_53_0 = vec3(0.1, 0., 0.2);
+                DFn_1 anf_54_0;
+                anf_54_0.tag = 0;
+                anf_54_0.pv3f_0 = anf_52_0;
+                anf_54_0.pv3f_1 = anf_53_0;
+                anf_54_0.pf_0 = 10.;
+                anf_54_0.pf_1 = 3.;
+                DFn_0 anf_55_0;
+                anf_55_0.tag = 1;
+                anf_55_0.prDFn_1_0 = anf_54_0;
+                anf_55_0.pf_0 = 0.15;
+                anf_143.tag = 1;
+                anf_143.prDFn_0_0 = anf_55_0;
+                anf_143.pf_0 = 64.;
             } else {
-                vec3 anf_64_0 = vec3(0., 0., 0.);
-                DFn_1 anf_68_0 = DFn_1(0, anf_64_0, anf_64_0, 0., 0., 0.);
-                DFn_0 anf_69_0 = DFn_0(2, anf_64_0, anf_64_0, 0., 0., anf_68_0, 0., 2.);
-                DFn_0 anf_75_0 = DFn_0(0, anf_64_0, anf_64_0, 0., 0., anf_68_0, 0., 0.);
-                anf_162 = material(0, anf_69_0, anf_75_0, 0.);
+                DFn_0 anf_56_0;
+                anf_56_0.tag = 2;
+                anf_56_0.pf_0 = 2.;
+                anf_143.tag = 0;
+                anf_143.prDFn_0_0 = anf_56_0;
             }
-            float anf_135_0 = dot(n_1, l_0);
-            float diff_0 = max(anf_135_0, 0.);
-            int _lv_tag_1_0 = anf_162.tag;
+            float anf_116_0 = dot(n_1, l_0);
+            float diff_0 = max(anf_116_0, 0.);
+            int _lv_tag_1_0 = anf_143.tag;
             vec3 col;
             switch (_lv_tag_1_0) {
                 case 0: {
-                    DFn_0 _lv_Lambert_0_0 = anf_162.Lambert_0;
-                    vec3 anf_136_0 = dapply_0(_lv_Lambert_0_0, p_8);
-                    col = (anf_136_0 * diff_0);
+                    DFn_0 _lv_prDFn_0_0_1 = anf_143.prDFn_0_0;
+                    vec3 anf_117_0 = dapply_0(_lv_prDFn_0_0_1, p_8);
+                    col = (anf_117_0 * diff_0);
                     break;
                 }
                 default: {
-                    DFn_0 _lv_Phong_0_0 = anf_162.Phong_0;
-                    float _lv_Phong_1_0 = anf_162.Phong_1;
-                    vec3 anf_137_0 = (l_0 + v_5);
-                    float anf_4_2 = length(anf_137_0);
-                    vec3 h_0 = (anf_137_0 / anf_4_2);
-                    float anf_138_0 = dot(n_1, h_0);
-                    float anf_139_0 = max(anf_138_0, 0.);
-                    float spec_0 = pow(anf_139_0, _lv_Phong_1_0);
-                    vec3 anf_140_0 = dapply_0(_lv_Phong_0_0, p_8);
-                    vec3 anf_141_0 = (anf_140_0 * diff_0);
-                    col = (anf_141_0 + spec_0);
+                    DFn_0 _lv_prDFn_0_0_0_0 = anf_143.prDFn_0_0;
+                    float _lv_pf_0_4_0 = anf_143.pf_0;
+                    vec3 anf_118_0 = (l_0 + v_5);
+                    float anf_4_2 = length(anf_118_0);
+                    vec3 h_0 = (anf_118_0 / anf_4_2);
+                    float anf_119_0 = dot(n_1, h_0);
+                    float anf_120_0 = max(anf_119_0, 0.);
+                    float spec_0 = pow(anf_120_0, _lv_pf_0_4_0);
+                    vec3 anf_121_0 = dapply_0(_lv_prDFn_0_0_0_0, p_8);
+                    vec3 anf_122_0 = (anf_121_0 * diff_0);
+                    col = (anf_122_0 + spec_0);
                     break;
                 }
             }
-            vec3 anf_163 = vec3(0.4545, 0.4545, 0.4545);
-            color = pow(col, anf_163);
+            vec3 anf_144 = vec3(0.4545, 0.4545, 0.4545);
+            color = pow(col, anf_144);
         }
-        float anf_164 = color[0];
-        float anf_165 = color[1];
-        float anf_166 = color[2];
-        fragColor = vec4(anf_164, anf_165, anf_166, 1.);
+        float anf_145 = color[0];
+        float anf_146 = color[1];
+        float anf_147 = color[2];
+        fragColor = vec4(anf_145, anf_146, anf_147, 1.);
     }
 
 
@@ -1259,7 +1267,7 @@ let%expect_test "compile examples" =
     }
     struct option {
         int tag;
-        float Some_0;
+        float pf_0;
     };
     uniform vec2 u_resolution;
     uniform float u_time;
@@ -1299,7 +1307,9 @@ let%expect_test "compile examples" =
             if (_lim_cond_0) {
                 bool anf_53 = (i >= 128);
                 if (anf_53) {
-                    return option(1, 0.);
+                    option _mk_1;
+                    _mk_1.tag = 1;
+                    return _mk_1;
                 } else {
                     vec3 anf_54 = (rd * t);
                     vec3 anf_55 = (ro + anf_54);
@@ -1308,11 +1318,16 @@ let%expect_test "compile examples" =
                     float dt = max(anf_56, 0.00025);
                     bool anf_58 = (d < 0.0005);
                     if (anf_58) {
-                        return option(0, t);
+                        option _mk_0;
+                        _mk_0.tag = 0;
+                        _mk_0.pf_0 = t;
+                        return _mk_0;
                     } else {
                         bool anf_59 = (t > 20.);
                         if (anf_59) {
-                            return option(1, 0.);
+                            option _mk;
+                            _mk.tag = 1;
+                            return _mk;
                         } else {
                             float anf_60 = (t + dt);
                             int anf_61 = (i + 1);
@@ -1352,8 +1367,8 @@ let%expect_test "compile examples" =
                 break;
             }
             default: {
-                float _lv_Some_0 = _lv_scrut.Some_0;
-                vec3 anf_92 = (rd_0 * _lv_Some_0);
+                float _lv_pf_0 = _lv_scrut.pf_0;
+                vec3 anf_92 = (rd_0 * _lv_pf_0);
                 vec3 anf_93 = (ro_0 + anf_92);
                 vec3 anf_62_0 = vec3(0.0005, 0., 0.);
                 vec3 anf_63_0 = (anf_93 + anf_62_0);
@@ -1378,9 +1393,9 @@ let%expect_test "compile examples" =
                 vec3 light = vec3(0.55708601453115547, 0.74278135270820733, -0.37139067635410367);
                 float anf_95 = dot(n_0, light);
                 float diff = max(anf_95, 0.);
-                float anf_96 = (0.05 * _lv_Some_0);
+                float anf_96 = (0.05 * _lv_pf_0);
                 float fog = (1. - anf_96);
-                float anf_97 = (_lv_Some_0 * 0.2);
+                float anf_97 = (_lv_pf_0 * 0.2);
                 vec3 anf_25_0 = vec3(0.2, 0.4, 0.6);
                 vec3 anf_26_0 = (anf_25_0 + anf_97);
                 vec3 anf_27_0 = (anf_26_0 * 6.283);
@@ -1478,7 +1493,7 @@ let%expect_test "compile examples" =
     }
     struct option {
         int tag;
-        float Some_0;
+        float pf_0;
     };
     vec2 rotate(vec2 p, float angle) {
         float s = sin(angle);
@@ -1520,7 +1535,9 @@ let%expect_test "compile examples" =
             if (_lim_cond) {
                 bool anf_87 = (steps > 120);
                 if (anf_87) {
-                    return option(1, 0.);
+                    option _mk_1;
+                    _mk_1.tag = 1;
+                    return _mk_1;
                 } else {
                     vec3 anf_88 = (rd * t);
                     vec3 anf_89 = (ro + anf_88);
@@ -1533,11 +1550,16 @@ let%expect_test "compile examples" =
                     float d_1 = (anf_73_7 - terrain_7);
                     bool anf_90 = (d_1 < 0.0005);
                     if (anf_90) {
-                        return option(0, t);
+                        option _mk_0;
+                        _mk_0.tag = 0;
+                        _mk_0.pf_0 = t;
+                        return _mk_0;
                     } else {
                         bool anf_91 = (t > 50.);
                         if (anf_91) {
-                            return option(1, 0.);
+                            option _mk;
+                            _mk.tag = 1;
+                            return _mk;
                         } else {
                             float anf_92 = (d_1 * 0.8);
                             float anf_93 = (t + anf_92);
@@ -1586,8 +1608,8 @@ let%expect_test "compile examples" =
                 break;
             }
             default: {
-                float _lv_Some_0 = t_0.Some_0;
-                vec3 anf_106 = (rd_0 * _lv_Some_0);
+                float _lv_pf_0 = t_0.pf_0;
+                vec3 anf_106 = (rd_0 * _lv_pf_0);
                 vec3 hitPos = (ro_0 + anf_106);
                 vec3 e_x_0 = vec3(0.002, 0., 0.);
                 vec3 e_y_0 = vec3(0., 0.002, 0.);
@@ -1702,7 +1724,7 @@ let%expect_test "compile examples" =
     out vec4 fragColor;
     struct option {
         int tag;
-        float Some_0;
+        float pf_0;
     };
     vec2 rotate(vec2 p, float angle) {
         float s = sin(angle);
@@ -1740,7 +1762,9 @@ let%expect_test "compile examples" =
             if (_lim_cond) {
                 bool anf_48 = (steps > 80);
                 if (anf_48) {
-                    return option(1, 0.);
+                    option _mk_1;
+                    _mk_1.tag = 1;
+                    return _mk_1;
                 } else {
                     vec3 anf_49 = (rd * t_1);
                     vec3 anf_50 = (ro + anf_49);
@@ -1773,11 +1797,16 @@ let%expect_test "compile examples" =
                     float d = (anf_19_1 - anf_22_1);
                     bool anf_51 = (d < 0.001);
                     if (anf_51) {
-                        return option(0, t_1);
+                        option _mk_0;
+                        _mk_0.tag = 0;
+                        _mk_0.pf_0 = t_1;
+                        return _mk_0;
                     } else {
                         bool anf_52 = (t_1 > 100.);
                         if (anf_52) {
-                            return option(1, 0.);
+                            option _mk;
+                            _mk.tag = 1;
+                            return _mk;
                         } else {
                             float anf_53 = (t_1 + d);
                             int anf_54 = (steps + 1);
@@ -1844,8 +1873,8 @@ let%expect_test "compile examples" =
                 break;
             }
             default: {
-                float _lv_Some_0 = _lv_scrut.Some_0;
-                float anf_90 = (_lv_Some_0 * 0.3);
+                float _lv_pf_0 = _lv_scrut.pf_0;
+                float anf_90 = (_lv_pf_0 * 0.3);
                 vec3 cfg_0 = vec3(0.3, 0.416, 0.557);
                 vec3 anf_1_0 = (cfg_0 + anf_90);
                 vec3 anf_2_0 = (anf_1_0 * 6.28318);
@@ -2186,17 +2215,17 @@ let%expect_test "compile examples" =
         bool anf_22_0 = (h_0 < 0.32);
         tile anf_31;
         if (anf_22_0) {
-            anf_31 = tile(0);
+            anf_31.tag = 0;
         } else {
             bool anf_23_0 = (h_0 < 0.64);
             if (anf_23_0) {
-                anf_31 = tile(1);
+                anf_31.tag = 1;
             } else {
                 bool anf_24_0 = (h_0 < 0.88);
                 if (anf_24_0) {
-                    anf_31 = tile(2);
+                    anf_31.tag = 2;
                 } else {
-                    anf_31 = tile(3);
+                    anf_31.tag = 3;
                 }
             }
         }

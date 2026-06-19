@@ -14,7 +14,8 @@ let is_constable_term (externs : String.Set.t) (t : term) =
   | Vec (_, atoms) | Builtin (_, atoms) | Record atoms ->
     List.for_all ~f:(is_constable_atom externs) atoms
   | Index (a, _) | Field (a, _) -> is_constable_atom externs a
-  | App _ | If _ | Switch _ -> false
+  (* TODO: Wire [Init_struct] to be constable, but this in theory never happens? *)
+  | Init_struct _ | App _ | If _ | Switch _ -> false
   | Atom a -> is_constable_atom externs a
 ;;
 
@@ -37,6 +38,7 @@ let atoms_of_term_desc = function
   | Atom a -> [ a ]
   | Bop (_, l, r) -> [ l; r ]
   | Vec (_, ts) | Builtin (_, ts) | App (_, ts) | Record ts -> ts
+  | Init_struct fields -> List.map fields ~f:snd
   | Index (a, _) | Field (a, _) -> [ a ]
   | If _ | Switch _ -> []
 ;;
@@ -84,6 +86,8 @@ let lift_atoms (promoted : String.Set.t) (t : term) : binds * term =
     | Builtin (b, ts) -> Builtin (b, List.map ts ~f:rewrite_atom)
     | App (f, ts) -> App (f, List.map ts ~f:rewrite_atom)
     | Record ts -> Record (List.map ts ~f:rewrite_atom)
+    | Init_struct fields ->
+      Init_struct (List.map fields ~f:(fun (n, a) -> n, rewrite_atom a))
     | Field (a, f) -> Field (rewrite_atom a, f)
     | If _ | Switch _ ->
       Compiler_error.raise

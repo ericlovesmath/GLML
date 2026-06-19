@@ -15,6 +15,7 @@ type value_desc =
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list
   | Record of atom list
+  | Init_struct of (string * atom) list
   | Field of atom * string
 
 and term_desc =
@@ -50,6 +51,9 @@ let sexp_of_value_desc : value_desc -> Sexp.t = function
     List (Atom (Glsl.string_of_builtin b) :: List.map ts ~f:sexp_of_atom)
   | App (f, args) -> List (Atom f :: List.map args ~f:sexp_of_atom)
   | Record ts -> List (Atom "record" :: List.map ts ~f:sexp_of_atom)
+  | Init_struct fields ->
+    let sexp_of_field (f, a) = List [ Atom f; sexp_of_atom a ] in
+    List (Atom "init_struct" :: List.map fields ~f:sexp_of_field)
   | Field (t, f) -> List [ Atom "."; sexp_of_atom t; Atom f ]
 ;;
 
@@ -126,6 +130,7 @@ let rec of_term (t : Anf.term) : term =
   | Index (a, n) -> pure (Value (Index (a, n)))
   | Builtin (b, ts) -> pure (Value (Builtin (b, ts)))
   | Record ts -> pure (Value (Record ts))
+  | Init_struct fs -> pure (Value (Init_struct fs))
   | Field (a, f) -> pure (Value (Field (a, f)))
   | App (f, xs) -> pure (Value (App (f, xs)))
   | If (c, t, f) -> pure (If (c, of_anf t, of_anf f))
@@ -193,7 +198,8 @@ let contains_call (t : Anf.term) (v : string) : bool =
     | App (f, _) -> String.equal f v
     | If (_, t, f) -> on_anf t || on_anf f
     | Switch (_, cases) -> List.exists cases ~f:(fun (_, body) -> on_anf body)
-    | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | Record _ | Field _ -> false
+    | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | Record _ | Init_struct _ | Field _ ->
+      false
   and on_anf (a : Anf.anf) : bool =
     match a.desc with
     | Let (_, b, t) -> on_term b || on_anf t

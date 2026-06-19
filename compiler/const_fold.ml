@@ -384,6 +384,7 @@ let normalize_atoms ctx (t : term) : term =
     | Builtin (b, atoms) -> Builtin (b, List.map atoms ~f:rw)
     | App (n, atoms) -> App (n, List.map atoms ~f:rw)
     | Record atoms -> Record (List.map atoms ~f:rw)
+    | Init_struct fields -> Init_struct (List.map fields ~f:(fun (n, a) -> n, rw a))
     | Bop (op, a, b) -> Bop (op, rw a, rw b)
     | Index (a, i) -> Index (rw a, i)
     | Field (a, n) -> Field (rw a, n)
@@ -399,7 +400,7 @@ let simplify_primitive_term ctx (t : term) : term =
     | Bop _ -> Option.first_some (try_fold_bop ctx t) (try_identity_bop ctx t)
     | Builtin _ -> try_fold_builtin ctx t
     | Index _ | Field _ -> try_project ctx t
-    | Atom _ | Vec _ | App _ | Record _ -> None
+    | Atom _ | Vec _ | App _ | Record _ | Init_struct _ -> None
     | If _ | Switch _ -> unexpected_branch t
   in
   Option.value_map simplified ~default:t ~f:(fun desc -> { t with desc })
@@ -430,6 +431,14 @@ let abs_of_term ctx (t : term) : value =
           |> Err.ok_exn
           |> fun m -> Fields m)
      | _ -> Err.raise "Record does not have type record" ~loc:t.loc)
+  | Init_struct fields ->
+    (* Only the set slots are known, unset slots fall back to [Top] *)
+    fields
+    |> List.map ~f:(fun (n, a) -> n, abs_of_atom a)
+    |> String.Map.of_alist_or_error
+    |> Err.of_or_error ~loc:t.loc
+    |> Err.ok_exn
+    |> fun m -> Fields m
   | Field (a, name) ->
     lookup ctx a
     |> Option.bind ~f:(function

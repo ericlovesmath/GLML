@@ -8,6 +8,7 @@ type value_desc =
   | Builtin of Glsl.builtin * atom list
   | App of string * atom list
   | Record of atom list
+  | Init_struct of (string * atom) list
   | Field of atom * string
 [@@deriving sexp_of]
 

@@ -50,6 +50,7 @@ let instantiate ~formals ~actuals ~body =
       | App (n, xs) -> App (n, List.map xs ~f:atom)
       | If (c, t, e) -> If (atom c, on_anf subst env t, on_anf subst env e)
       | Record xs -> Record (List.map xs ~f:atom)
+      | Init_struct fields -> Init_struct (List.map fields ~f:(fun (n, a) -> n, atom a))
       | Field (a, n) -> Field (atom a, n)
       | Switch (a, cases) ->
         Switch (atom a, List.map cases ~f:(fun (l, b) -> l, on_anf subst env b))
@@ -71,7 +72,7 @@ and size_term (t : term) =
   | If (_, th, e) -> 1 + size_anf th + size_anf e
   | Switch (_, cs) -> 1 + List.sum (module Int) cs ~f:(fun (_, a) -> size_anf a)
   | Atom _ -> 0
-  | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Field _ -> 1
+  | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Init_struct _ | Field _ -> 1
 ;;
 
 let count_call_sites (tops : top list) : int String.Map.t =
@@ -87,7 +88,8 @@ let count_call_sites (tops : top list) : int String.Map.t =
         | Some n -> n + 1)
     | If (_, t, e) -> on_anf t acc |> on_anf e
     | Switch (_, cases) -> List.fold_right cases ~init:acc ~f:(fun (_, b) -> on_anf b)
-    | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | Record _ | Field _ -> acc
+    | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | Record _ | Init_struct _ | Field _ ->
+      acc
   in
   List.fold tops ~init:String.Map.empty ~f:(fun acc top ->
     match top.desc with
@@ -113,7 +115,8 @@ let projects_formal (formals : (string * Lower_variants.ty) list) (body : anf) :
     | Field (a, _) -> is_formal a
     | Switch (s, cases) -> is_formal s || List.exists cases ~f:(fun (_, b) -> on_anf b)
     | If (_, t, e) -> on_anf t || on_anf e
-    | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ -> false
+    | Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Init_struct _ ->
+      false
   in
   on_anf body
 ;;
@@ -155,7 +158,7 @@ let collect_record_const_names (tops : top list) : String.Set.t =
     match a.desc with
     | Return t ->
       (match t.desc with
-       | Record _ -> true
+       | Record _ | Init_struct _ -> true
        | _ -> false)
     | Let (_, _, tl) -> returns_record tl
   in
@@ -181,7 +184,7 @@ let is_known_record records (a : atom) =
 
 let track_record_binding records v (t : term) : String.Set.t =
   match t.desc with
-  | Record _ -> Set.add records v
+  | Record _ | Init_struct _ -> Set.add records v
   | Atom a when is_known_record records a -> Set.add records v
   | Field (a, _) when is_known_record records a ->
     (match t.ty with
@@ -222,8 +225,15 @@ and rewrite_term entries records (t : term) : term =
     match t.desc with
     | If (c, t, e) -> If (c, go t, go e)
     | Switch (s, cases) -> Switch (s, List.map cases ~f:(fun (l, b) -> l, go b))
-    | (Atom _ | Bop _ | Vec _ | Index _ | Builtin _ | App _ | Record _ | Field _) as d ->
-      d
+    | ( Atom _
+      | Bop _
+      | Vec _
+      | Index _
+      | Builtin _
+      | App _
+      | Record _
+      | Init_struct _
+      | Field _ ) as d -> d
   in
   { t with desc }
 ;;

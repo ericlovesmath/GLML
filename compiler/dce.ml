@@ -17,6 +17,7 @@ let atoms_of_term (t : term) : atom list =
   | Atom a | Index (a, _) | Field (a, _) -> [ a ]
   | Bop (_, l, r) -> [ l; r ]
   | Vec (_, atoms) | Builtin (_, atoms) | Record atoms | App (_, atoms) -> atoms
+  | Init_struct fields -> List.map fields ~f:snd
   | If _ | Switch _ -> []
 ;;
 

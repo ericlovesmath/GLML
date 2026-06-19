@@ -36,6 +36,7 @@ type term_desc =
   | App of string * atom list
   | If of atom * anf * anf
   | Record of atom list
+  | Init_struct of (string * atom) list
   | Field of atom * string
   | Switch of atom * (Glsl.switch_case * anf) list
 
@@ -66,6 +67,9 @@ let rec sexp_of_term_desc : term_desc -> Sexp.t = function
   | App (f, args) -> List (Atom f :: List.map args ~f:sexp_of_atom)
   | If (c, t, e) -> List [ Atom "if"; sexp_of_atom c; sexp_of_anf t; sexp_of_anf e ]
   | Record ts -> List (Atom "record" :: List.map ts ~f:sexp_of_atom)
+  | Init_struct fields ->
+    let sexp_of_field (f, a) = List [ Atom f; sexp_of_atom a ] in
+    List (Atom "init_struct" :: List.map fields ~f:sexp_of_field)
   | Field (t, f) -> List [ Atom "."; sexp_of_atom t; Atom f ]
   | Switch (tag, cases) ->
     let sexp_of_case (label, body) =
@@ -159,6 +163,9 @@ let rec normalize (expr : Lower_variants.term) : anf =
       let e = normalize e in
       pure (If (c, t, e)))
   | Record args -> atomize_list args (fun atoms -> pure (Record atoms))
+  | Init_struct fields ->
+    let names, vals = List.unzip fields in
+    atomize_list vals (fun atoms -> pure (Init_struct (List.zip_exn names atoms)))
   | Field (t, f) -> atomize t (fun a -> pure (Field (a, f)))
   | Switch (s, cases) ->
     atomize s (fun s ->

@@ -19,6 +19,7 @@ module Key = struct
       | Builtin of Glsl.builtin * atom list
       | App of string * atom list
       | Record of atom list
+      | Init_struct of (string * atom) list
       | Field of atom * string
     [@@deriving compare, sexp_of]
   end
@@ -51,6 +52,8 @@ let key_of_term (t : term) : Key.t option =
   | Builtin (b, atoms) -> Some (Key.Builtin (b, List.map atoms ~f))
   | App (name, atoms) -> Some (Key.App (name, List.map atoms ~f))
   | Record atoms -> Some (Key.Record (List.map atoms ~f))
+  | Init_struct fields ->
+    Some (Key.Init_struct (List.map fields ~f:(fun (n, a) -> n, f a)))
   | Field (a, fld) -> Some (Key.Field (f a, fld))
   | Atom _ | If _ | Switch _ -> None
 ;;
@@ -86,6 +89,7 @@ let canonize_term ~subst (t : term) : term =
     | Builtin (b, atoms) -> Builtin (b, List.map atoms ~f)
     | App (name, atoms) -> App (name, List.map atoms ~f)
     | Record atoms -> Record (List.map atoms ~f)
+    | Init_struct fields -> Init_struct (List.map fields ~f:(fun (n, a) -> n, f a))
     | Field (a, field) -> Field (f a, field)
     | If _ | Switch _ -> t.desc
   in
