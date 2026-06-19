@@ -14,6 +14,8 @@ import ripplesImage from "../../examples/ripples.image.glml?raw";
 import ripplesBufferA from "../../examples/ripples.buffer_a.glml?raw";
 import rdImage from "../../examples/reaction_diffusion.image.glml?raw";
 import rdBufferA from "../../examples/reaction_diffusion.buffer_a.glml?raw";
+import bezierImage from "../../examples/bezier.image.glml?raw";
+import bezierBufferA from "../../examples/bezier.buffer_a.glml?raw";
 
 import type { PassName } from "./renderer";
 
@@ -46,5 +48,9 @@ export const MULTIPASS_EXAMPLES: MultipassExample[] = [
   {
     name: "Game of Life",
     passes: { image: golImage, bufferA: golBufferA },
+  },
+  {
+    name: "Bezier Curves",
+    passes: { image: bezierImage, bufferA: bezierBufferA },
   },
 ];

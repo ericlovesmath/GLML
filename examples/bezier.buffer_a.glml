@@ -1,0 +1,47 @@
+// Control points are stored in the first 4 texels of [bufferA],
+// using first two coordinates in the texel.
+// Logic for controling the control points live here as well.
+
+#extern vec2 u_resolution
+#extern vec2 u_mouse
+#extern bool u_mouse_down
+#extern int  iFrame
+#extern sampler bufferA
+
+let grab = 0.06 // how close the cursor must be to pick up a point
+
+// Read control point [i] from its dedicated texel center
+let read (i : float) =
+  let v = #texture bufferA ([i + 0.5, 0.5] / u_resolution) in
+  [v.0, v.1]
+
+// Starting layout
+let init = function
+  | 0.0 -> [0.20, 0.30]
+  | 1.0 -> [0.35, 0.80]
+  | 2.0 -> [0.65, 0.20]
+  | _ ->   [0.80, 0.70]
+
+let main (coord : vec2) =
+  let id  = #floor coord.0 in
+  let row = #floor coord.1 in
+
+  if row < 1 && id < 4 then
+    if iFrame = 0 then
+      let p = init id in
+      [p.0, p.1, 0, 1]
+    else
+      let m = u_mouse / u_resolution in
+      
+      let scale p = [p.0 * (u_resolution.0 / u_resolution.1), p.1] in
+
+      // Distance from each point to the cursor
+      let dist i = #distance (scale (read i)) (scale m) in
+      
+      let d = dist 0 |> #min (dist 1) |> #min (dist 2) |> #min (dist 3) in
+
+      let grabbed = u_mouse_down && dist id <= d && dist id < grab in
+      let next = if grabbed then m else read id in
+      [next.0, next.1, 0, 1]
+  else
+    [0, 0, 0, 1]

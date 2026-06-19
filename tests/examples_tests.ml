@@ -460,6 +460,244 @@ let%expect_test "compile examples" =
     }
 
 
+    ====== COMPILING EXAMPLE bezier.buffer_a.glml ======
+
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform sampler2D bufferA;
+    uniform int iFrame;
+    uniform vec2 u_mouse;
+    uniform bool u_mouse_down;
+    uniform vec2 u_resolution;
+    vec2 read(float i) {
+        float anf = (i + 0.5);
+        vec2 anf_0 = vec2(anf, 0.5);
+        vec2 anf_1 = (anf_0 / u_resolution);
+        vec4 v = texture(bufferA, anf_1);
+        float anf_2 = v[0];
+        float anf_3 = v[1];
+        return vec2(anf_2, anf_3);
+    }
+    vec2 scale_m_0(vec2 p) {
+        float anf_4 = p[0];
+        float anf_5 = u_resolution[0];
+        float anf_6 = u_resolution[1];
+        float anf_7 = (anf_5 / anf_6);
+        float anf_8 = (anf_4 * anf_7);
+        float anf_9 = p[1];
+        return vec2(anf_8, anf_9);
+    }
+    float dist_0(vec2 m, float i_0) {
+        vec2 anf_10 = read(i_0);
+        vec2 anf_11 = scale_m_0(anf_10);
+        vec2 anf_12 = scale_m_0(m);
+        return distance(anf_11, anf_12);
+    }
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        float anf_13 = coord[0];
+        float id = floor(anf_13);
+        float anf_14 = coord[1];
+        float row = floor(anf_14);
+        bool anf_15 = (row < 1.);
+        bool anf_16 = (id < 4.);
+        bool anf_17 = (anf_15 && anf_16);
+        if (anf_17) {
+            bool anf_18 = (iFrame == 0);
+            if (anf_18) {
+                bool _lv_cmp_1_0 = (id == 0.);
+                vec2 p_0;
+                if (_lv_cmp_1_0) {
+                    p_0 = vec2(0.2, 0.3);
+                } else {
+                    bool _lv_cmp_0_0 = (id == 1.);
+                    if (_lv_cmp_0_0) {
+                        p_0 = vec2(0.35, 0.8);
+                    } else {
+                        bool _lv_cmp_2 = (id == 2.);
+                        if (_lv_cmp_2) {
+                            p_0 = vec2(0.65, 0.2);
+                        } else {
+                            p_0 = vec2(0.8, 0.7);
+                        }
+                    }
+                }
+                float anf_19 = p_0[0];
+                float anf_20 = p_0[1];
+                fragColor = vec4(anf_19, anf_20, 0., 1.);
+                return;
+            } else {
+                vec2 m = (u_mouse / u_resolution);
+                float anf_21 = dist_0(m, 3.);
+                float anf_22 = dist_0(m, 2.);
+                float anf_23 = dist_0(m, 1.);
+                float anf_24 = dist_0(m, 0.);
+                float anf_25 = min(anf_23, anf_24);
+                float anf_26 = min(anf_22, anf_25);
+                float d = min(anf_21, anf_26);
+                float anf_27 = dist_0(m, id);
+                bool anf_28 = (anf_27 <= d);
+                bool anf_29 = (u_mouse_down && anf_28);
+                bool anf_31 = (anf_27 < 0.06);
+                bool grabbed = (anf_29 && anf_31);
+                vec2 next;
+                if (grabbed) {
+                    next = m;
+                } else {
+                    next = read(id);
+                }
+                float anf_32 = next[0];
+                float anf_33 = next[1];
+                fragColor = vec4(anf_32, anf_33, 0., 1.);
+                return;
+            }
+        } else {
+            fragColor = vec4(0., 0., 0., 1.);
+            return;
+        }
+    }
+
+
+    ====== COMPILING EXAMPLE bezier.image.glml ======
+
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    const vec4 bg = vec4(0.04, 0.05, 0.08, 1.);
+    uniform sampler2D bufferA;
+    const vec4 cool = vec4(0.35, 0.62, 0.85, 1.);
+    vec4 disc_m_0(vec2 ap_0, vec4 col_0, float r, vec2 p_0, vec4 acc_0) {
+        float dd = distance(ap_0, p_0);
+        float anf = (r + 0.002);
+        float anf_0 = smoothstep(r, anf, dd);
+        float anf_1 = (1. - anf_0);
+        return mix(acc_0, col_0, anf_1);
+    }
+    float sd_segment(vec2 p, vec2 a_0, vec2 b_0) {
+        vec2 pa = (p - a_0);
+        vec2 ba = (b_0 - a_0);
+        float anf_4 = dot(pa, ba);
+        float anf_5 = dot(ba, ba);
+        float anf_6 = (anf_4 / anf_5);
+        float h = clamp(anf_6, 0., 1.);
+        vec2 anf_7 = (ba * h);
+        vec2 anf_8 = (pa - anf_7);
+        return length(anf_8);
+    }
+    vec4 stroke_m_0(vec2 ap_0, vec4 col, float w, vec2 s0, vec2 s1, vec4 acc) {
+        float d_1 = sd_segment(ap_0, s0, s1);
+        float anf_9 = (w + 0.0015);
+        float anf_10 = smoothstep(w, anf_9, d_1);
+        float anf_11 = (1. - anf_10);
+        return mix(acc, col, anf_11);
+    }
+    struct tuple {
+        vec2 _0;
+        vec2 _1;
+        vec2 _2;
+        vec2 _3;
+        vec2 _4;
+        vec2 _5;
+    };
+    tuple decasteljau(vec2 p0, vec2 p1, vec2 p2, vec2 p3, float t) {
+        vec2 a = mix(p0, p1, t);
+        vec2 b = mix(p1, p2, t);
+        vec2 c = mix(p2, p3, t);
+        vec2 d = mix(a, b, t);
+        vec2 e = mix(b, c, t);
+        vec2 f = mix(d, e, t);
+        return tuple(a, b, c, d, e, f);
+    }
+    float go_0(vec2 ap, vec2 p0_0, vec2 p1_0, vec2 p2_0, vec2 p3_0, float t_0, float best) {
+        int _iter = 0;
+        while (true) {
+            bool _lim_cond = (_iter < 1000);
+            if (_lim_cond) {
+                bool anf_12 = (t_0 >= 1.);
+                if (anf_12) {
+                    return best;
+                } else {
+                    float anf_13 = (t_0 + 0.02);
+                    float tn = min(anf_13, 1.);
+                    tuple _lv_scrut_0 = decasteljau(p0_0, p1_0, p2_0, p3_0, t_0);
+                    vec2 _lv_r_u5_0 = _lv_scrut_0._5;
+                    tuple _lv_scrut = decasteljau(p0_0, p1_0, p2_0, p3_0, tn);
+                    vec2 _lv_r_u5 = _lv_scrut._5;
+                    float anf_14 = sd_segment(ap, _lv_r_u5_0, _lv_r_u5);
+                    float anf_15 = min(best, anf_14);
+                    int _iter_inc = (_iter + 1);
+                    _iter = _iter_inc;
+                    t_0 = tn;
+                    best = anf_15;
+                    continue;
+                }
+            } else {
+                return 0.;
+            }
+        }
+    }
+    uniform vec2 u_resolution;
+    vec2 load(float i) {
+        float anf_16 = (i + 0.5);
+        vec2 anf_17 = vec2(anf_16, 0.5);
+        vec2 anf_18 = (anf_17 / u_resolution);
+        vec4 v = texture(bufferA, anf_18);
+        float anf_19 = v[0];
+        float anf_20 = v[1];
+        return vec2(anf_19, anf_20);
+    }
+    uniform float u_time;
+    const vec4 warm = vec4(1., 0.72, 0.28, 1.);
+    const vec4 level1 = vec4(0.571, 0.65399999999999991, 0.6562, 1.);
+    const vec4 level2 = vec4(0.7855, 0.68699999999999994, 0.46809999999999996, 1.);
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        vec2 ap_0 = (coord / u_resolution);
+        vec2 p0_1 = load(0.);
+        vec2 p1_1 = load(1.);
+        vec2 p2_1 = load(2.);
+        vec2 p3_1 = load(3.);
+        float anf_27 = (u_time * 0.9);
+        float anf_28 = cos(anf_27);
+        float anf_29 = (0.5 * anf_28);
+        float t_1 = (0.5 - anf_29);
+        tuple _lv_scrut_1 = decasteljau(p0_1, p1_1, p2_1, p3_1, t_1);
+        vec2 _lv_r_u0_1 = _lv_scrut_1._0;
+        vec2 _lv_r_u1_1 = _lv_scrut_1._1;
+        vec2 _lv_r_u2_1 = _lv_scrut_1._2;
+        vec2 _lv_r_u3_1 = _lv_scrut_1._3;
+        vec2 _lv_r_u4_1 = _lv_scrut_1._4;
+        vec2 _lv_r_u5_1 = _lv_scrut_1._5;
+        vec4 anf_30 = vec4(0.12249999999999998, 0.217, 0.2975, 0.35);
+        vec4 anf_33 = stroke_m_0(ap_0, anf_30, 0.0014, p0_1, p1_1, bg);
+        vec4 anf_34 = stroke_m_0(ap_0, anf_30, 0.0014, p1_1, p2_1, anf_33);
+        vec4 anf_35 = stroke_m_0(ap_0, anf_30, 0.0014, p2_1, p3_1, anf_34);
+        vec4 anf_36 = stroke_m_0(ap_0, level1, 0.0012, _lv_r_u0_1, _lv_r_u1_1, anf_35);
+        vec4 anf_37 = stroke_m_0(ap_0, level1, 0.0012, _lv_r_u1_1, _lv_r_u2_1, anf_36);
+        vec4 anf_38 = stroke_m_0(ap_0, level2, 0.0012, _lv_r_u3_1, _lv_r_u4_1, anf_37);
+        float cd_0 = go_0(ap_0, p0_1, p1_1, p2_1, p3_1, 0., 99.);
+        float anf_21_0 = (cd_0 + 0.0035);
+        float anf_22_0 = (0.0035 / anf_21_0);
+        vec4 anf_23_0 = (warm * anf_22_0);
+        vec4 glow_0 = (anf_23_0 * 0.5);
+        vec4 anf_24_0 = (anf_38 + glow_0);
+        float anf_25_0 = smoothstep(0.0035, 0.006, cd_0);
+        float anf_26_0 = (1. - anf_25_0);
+        vec4 anf_39 = mix(anf_24_0, warm, anf_26_0);
+        vec4 anf_40 = disc_m_0(ap_0, level1, 0.007, _lv_r_u0_1, anf_39);
+        vec4 anf_41 = disc_m_0(ap_0, level1, 0.007, _lv_r_u1_1, anf_40);
+        vec4 anf_42 = disc_m_0(ap_0, level1, 0.007, _lv_r_u2_1, anf_41);
+        vec4 anf_43 = disc_m_0(ap_0, level2, 0.007, _lv_r_u3_1, anf_42);
+        vec4 anf_44 = disc_m_0(ap_0, level2, 0.007, _lv_r_u4_1, anf_43);
+        vec4 anf_45 = disc_m_0(ap_0, warm, 0.012, _lv_r_u5_1, anf_44);
+        vec4 anf_46 = disc_m_0(ap_0, warm, 0.018, p0_1, anf_45);
+        vec4 anf_47 = disc_m_0(ap_0, cool, 0.018, p1_1, anf_46);
+        vec4 anf_48 = disc_m_0(ap_0, cool, 0.018, p2_1, anf_47);
+        fragColor = disc_m_0(ap_0, warm, 0.018, p3_1, anf_48);
+    }
+
+
     ====== COMPILING EXAMPLE game_of_life.buffer_a.glml ======
 
     #version 300 es
