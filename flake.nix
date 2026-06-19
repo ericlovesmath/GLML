@@ -16,7 +16,7 @@
     }@inputs:
     let
       # Uses <package>.opam to solve dependencies from
-      package = "GLML";
+      package = "glml";
 
       # Opam packages used in developer mode
       devOpamPackagesQuery = {

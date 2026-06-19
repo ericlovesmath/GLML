@@ -1,5 +1,6 @@
 (library
  (name glml_compiler)
+ (public_name glml)
  (modules
    ; General Utilities and Entry Point
    utils

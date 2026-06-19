@@ -1,6 +1,6 @@
 (lang dune 3.17)
 
-(name GLML)
+(name glml)
 
 (generate_opam_files true)
 
@@ -16,7 +16,7 @@
 (documentation https://github.com/ericlovesmath/GLML)
 
 (package
- (name GLML)
+ (name glml)
  (synopsis "Functional DSL targetting GLSL")
  (description "Functional DSL targetting GLSL")
  (depends
