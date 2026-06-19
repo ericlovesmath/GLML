@@ -183,8 +183,7 @@ let find_tag ~loc (ctors : (string * Lower_tuples.ty list) list) (ctor : string)
 let variant_fields ~loc ~ctor ~(args : term list) ctors : (string * term) list =
   let tag : term = { desc = Int (find_tag ~loc ctors ctor); ty = TyInt; loc } in
   let slot_names =
-    ctors
-    |> List.Assoc.find ~equal:String.equal ctor
+    List.Assoc.find ~equal:String.equal ctors ctor
     |> Option.value ~default:[]
     |> assign
     |> List.map ~f:fst
