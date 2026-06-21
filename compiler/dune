@@ -32,6 +32,7 @@
    anf
 
    ; Optimization
+   case_of_case
    inline
    const_fold
    cse

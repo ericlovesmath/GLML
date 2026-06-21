@@ -71,7 +71,7 @@ let compile
         if n <= 0
         then Ok t
         else (
-          let t = Inline.rewrite t in
+          let t = t |> Case_of_case.rewrite |> Inline.rewrite in
           let%bind t = Const_fold.rewrite t in
           let t = t |> Cse.rewrite |> Dce.rewrite in
           go (n - 1) t)

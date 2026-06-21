@@ -836,36 +836,17 @@ let%expect_test "defunctionalize unifies int/float arrow flavors" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_0 {
-        int tag;
-    };
     void main() {
         vec2 uv = gl_FragCoord.xy;
         float anf = uv[0];
         bool anf_0 = (anf > 0.5);
-        DFn_0 anf_1;
         if (anf_0) {
-            anf_1.tag = 0;
+            fragColor = vec4(0., 0., 0., 1.);
+            return;
         } else {
-            anf_1.tag = 1;
+            fragColor = vec4(1., 0., 0., 1.);
+            return;
         }
-        vec3 anf_2 = vec3(1., 0., 0.);
-        int _lv_tag_0 = anf_1.tag;
-        vec3 c;
-        switch (_lv_tag_0) {
-            case 0: {
-                c = vec3(0., 0., 0.);
-                break;
-            }
-            default: {
-                c = anf_2;
-                break;
-            }
-        }
-        float anf_3 = c[0];
-        float anf_4 = c[1];
-        float anf_5 = c[2];
-        fragColor = vec4(anf_3, anf_4, anf_5, 1.);
     }
     |}]
 ;;
@@ -1042,80 +1023,52 @@ let%expect_test "DFn promotion of fields in user-declared variant type" =
     #version 300 es
     precision highp float;
     out vec4 fragColor;
-    struct DFn_1 {
-        int tag;
-        float pf_0;
-    };
-    struct DFn_0 {
-        int tag;
-        float pf_0;
-        DFn_1 prDFn_1_0;
-    };
-    vec3 dapply_0(DFn_0 dfn_0, vec3 da_0) {
-        int _lv_tag = dfn_0.tag;
-        switch (_lv_tag) {
-            case 0: {
-                return vec3(0., 0., 0.);
-                break;
-            }
-            case 1: {
-                return vec3(0., 0., 0.);
-                break;
-            }
-            default: {
-                return vec3(0., 0., 0.);
-                break;
-            }
-        }
-    }
-    struct material {
-        int tag;
-        DFn_0 prDFn_0_0;
-        float pf_0;
-    };
     uniform float u_pick;
     void main() {
         vec2 coord = gl_FragCoord.xy;
         bool anf_3 = (u_pick > 0.5);
-        material m_0;
         if (anf_3) {
-            DFn_1 anf_0_0;
-            anf_0_0.tag = 0;
-            anf_0_0.pf_0 = 3.;
-            DFn_0 anf_1_0;
-            anf_1_0.tag = 1;
-            anf_1_0.prDFn_1_0 = anf_0_0;
-            m_0.tag = 1;
-            m_0.prDFn_0_0 = anf_1_0;
-            m_0.pf_0 = 64.;
+            fragColor = vec4(0., 0., 0., 1.);
+            return;
         } else {
-            DFn_0 anf_2_0;
-            anf_2_0.tag = 2;
-            anf_2_0.pf_0 = 2.;
-            m_0.tag = 0;
-            m_0.prDFn_0_0 = anf_2_0;
+            fragColor = vec4(0., 0., 0., 1.);
+            return;
         }
-        vec3 anf_4 = vec3(0., 0., 0.);
-        int _lv_tag_0_0 = m_0.tag;
-        vec3 c;
-        switch (_lv_tag_0_0) {
-            case 0: {
-                DFn_0 _lv_prDFn_0_0_1 = m_0.prDFn_0_0;
-                c = dapply_0(_lv_prDFn_0_0_1, anf_4);
-                break;
-            }
-            default: {
-                DFn_0 _lv_prDFn_0_0_0_0 = m_0.prDFn_0_0;
-                float _lv_pf_0_1_0 = m_0.pf_0;
-                vec3 anf_8 = dapply_0(_lv_prDFn_0_0_0_0, anf_4);
-                c = (anf_8 * _lv_pf_0_1_0);
-                break;
-            }
+    }
+    |}]
+;;
+
+let%expect_test "devirtualize closure built across a merge" =
+  (* Two distinct closures of the same arrow are selected by a runtime [if] and
+     applied after the merge. [case_of_case] floats only the application into the arms
+     (sharing the prefix [coord.0] and the [vec4 ...] suffix via a join var), so the
+     existing loop devirtualizes both: no [dapply], no tag [switch], no closure struct. *)
+  test
+    {|
+    #extern float u_pick
+    let main (coord : vec2) =
+      let f = if u_pick > 0.5 then (fun x -> x * 2.0) else (fun x -> x + 1.0) in
+      let r = f coord.0 in
+      [r, r, r, 1.0]
+    |};
+  [%expect {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform float u_pick;
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        bool anf = (u_pick > 0.5);
+        float anf_1 = coord[0];
+        if (anf) {
+            float r = (anf_1 * 2.);
+            fragColor = vec4(r, r, r, 1.);
+            return;
+        } else {
+            float r = (anf_1 + 1.);
+            fragColor = vec4(r, r, r, 1.);
+            return;
         }
-        float anf_5 = c[0];
-        float anf_6 = c[1];
-        float anf_7 = c[2];
-        fragColor = vec4(anf_5, anf_6, anf_7, 1.);
     }
     |}]
 ;;
