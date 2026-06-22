@@ -71,13 +71,16 @@ type builtin =
   | Smoothstep
   | Reflect
   | Texture
+  | Dfdx [@stringable.rename "dFdx"]
+  | Dfdy [@stringable.rename "dFdy"]
+  | Fwidth
 [@@deriving compare, sexp_of, string ~capitalize:"lower sentence case"]
 
 let builtin_of_string_opt s = Option.try_with (fun () -> builtin_of_string s)
 
 let arity_of_builtin = function
   | Float | Sin | Cos | Tan | Asin | Acos | Atan | Exp | Log | Exp2 | Log2 | Sqrt | Abs
-  | Sign | Floor | Ceil | Length | Normalize | Fract -> 1
+  | Sign | Floor | Ceil | Length | Normalize | Fract | Dfdx | Dfdy | Fwidth -> 1
   | Pow | Min | Max | Distance | Dot | Cross | Step | Reflect | Texture -> 2
   | Clamp | Mix | Smoothstep -> 3
 [@@ocamlformat "disable"]

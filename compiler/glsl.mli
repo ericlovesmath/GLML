@@ -56,6 +56,9 @@ type builtin =
   | Smoothstep
   | Reflect
   | Texture
+  | Dfdx
+  | Dfdy
+  | Fwidth
 [@@deriving compare, sexp_of, string]
 
 val builtin_of_string_opt : string -> builtin option

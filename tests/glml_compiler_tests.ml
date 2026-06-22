@@ -1317,3 +1317,37 @@ let%expect_test "curried binary operators and pipe" =
     }
     |}]
 ;;
+
+let%expect_test "fragment derivative builtins" =
+  test_term
+    "let g = #dFdx coord in let h = #dFdy coord in [ #fwidth g.0, h.1, #dFdx g.1 ]";
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        vec2 g = dFdx(coord);
+        vec2 h = dFdy(coord);
+        float anf = g[0];
+        float anf_0 = fwidth(anf);
+        float anf_1 = h[1];
+        float anf_2 = g[1];
+        float anf_3 = dFdx(anf_2);
+        fragColor = vec4(anf_0, anf_1, anf_3, 1.);
+    }
+    |}];
+  (* derivative of constant is zero *)
+  test_term "[ #dFdx 5.0, #dFdy 2.0, #fwidth 7.0 ]";
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(0., 0., 0., 1.);
+    }
+    |}]
+;;

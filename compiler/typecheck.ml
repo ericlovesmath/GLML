@@ -688,7 +688,7 @@ and gen_builtin
       ; constr (Eq (t', TyVec (3, TyFloat)))
       ; constr (Eq (ty, TyVec (3, TyFloat)))
       ]
-    | Normalize, [ t ] | Fract, [ t ] ->
+    | (Normalize | Fract | Dfdx | Dfdy | Fwidth), [ t ] ->
       let bt = fresh_tyvar () in
       [ constr (Broadcast (t, TyFloat, bt))
       ; constr (HasClass (GenType, bt))

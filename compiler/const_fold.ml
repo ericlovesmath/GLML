@@ -262,6 +262,7 @@ let eval_elementwise (b : Glsl.builtin) (args : float list) : float option =
   | Smoothstep, [ e; e'; x ] ->
     let t = Float.clamp_exn Float.((x - e) / (e' - e)) ~min:0. ~max:1. in
     Some Float.(t * t * (3. - (2. * t)))
+  | (Dfdx | Dfdy | Fwidth), [ _ ] -> Some 0.
   | _ -> None
 ;;
 
