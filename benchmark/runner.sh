@@ -1,6 +1,4 @@
 #!/usr/bin/env sh
 
-export BENCHMARKS_RUNNER=TRUE
-export BENCH_LIB=./bench
-
-dune exec --profile release -- ./bench_runner.exe -run-without-cross-library-inlining "$@" -quota 5s
+# core_bench timing for the GLML, verbose
+dune exec --profile release -- ./bench_runner.exe -quota 5s -v "$@"

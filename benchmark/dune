@@ -1,11 +1,4 @@
-(library
- (name bench)
- (modules bench)
- (library_flags -linkall)
- (preprocess (pps ppx_bench))
- (libraries glml_compiler core))
-
 (executable
  (name bench_runner)
  (modules bench_runner)
- (libraries bench core_bench.inline_benchmarks))
+ (libraries glml_compiler core core_bench core_unix.command_unix))
