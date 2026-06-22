@@ -5,7 +5,7 @@
 (generate_opam_files true)
 
 (source
- (github ericlovesmath/GLML))
+ (github glml-lang/GLML))
 
 (authors "Eric Lee <me@ericchanlee.com>")
 
@@ -13,7 +13,7 @@
 
 (license MIT)
 
-(documentation https://github.com/ericlovesmath/GLML)
+(documentation https://www.glml-lang.com/)
 
 (package
  (name glml)
