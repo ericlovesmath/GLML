@@ -25,14 +25,14 @@ let%expect_test "optimizer shrinks output" =
     2d_sdf_variants.glml                    16337     2727   -83.3%
     beaver.glml                             19384    14128   -27.1%
     bezier.buffer_a.glml                     3302     2866   -13.2%
-    bezier.image.glml                        8428     5071   -39.8%
+    bezier.image.glml                        8152     4843   -40.6%
     game_of_life.buffer_a.glml               2293     2213    -3.5%
     game_of_life.image.glml                   234      234    +0.0%
-    mandelbrot.glml                          3835     3055   -20.3%
-    materials.glml                          13772     7481   -45.7%
-    menger_sponge.glml                       9259     6925   -25.2%
-    planet.glml                             11930    10817    -9.3%
-    raymarch.glml                            7042     5939   -15.7%
+    mandelbrot.glml                          3499     2739   -21.7%
+    materials.glml                          13496     7209   -46.6%
+    menger_sponge.glml                       8615     6301   -26.9%
+    planet.glml                             11618    10481    -9.8%
+    raymarch.glml                            6726     5519   -17.9%
     reaction_diffusion.buffer_a.glml         3881     2994   -22.9%
     reaction_diffusion.image.glml            2683     1660   -38.1%
     ripples.buffer_a.glml                    2326     1818   -21.8%

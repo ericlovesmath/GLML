@@ -28,7 +28,13 @@ and term =
 and anf_desc =
   | Let of string * term * anf
   | Return of term
-  | Loop of (string * atom) list * anf
+  | Loop of
+      { counter : string
+      ; limit : int
+      ; params : string list
+      ; body : anf
+      ; on_exceed : anf
+      }
   | Continue of atom list
 [@@deriving sexp_of]
 

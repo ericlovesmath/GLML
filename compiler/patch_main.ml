@@ -15,7 +15,6 @@ let rec rewrite_returns (ss : stmt list) : stmt list =
       [ SwitchStmt (s, List.map cases ~f:(fun (l, body) -> l, rewrite_returns body)) ]
     | Block ss -> [ Block (rewrite_returns ss) ]
     | For (i, c, u, b) -> [ For (i, c, u, rewrite_stmt b) ]
-    | WhileStmt (c, b) -> [ WhileStmt (c, rewrite_stmt b) ]
     | other -> [ other ])
 
 and rewrite_stmt (s : stmt) : stmt =

@@ -132,22 +132,17 @@ and translate_anf (ctx : ctx) (anf : Tail_call.anf) : stmt list =
        let sub = translate_term { ctx with assign_to = Some v } bind in
        (Decl (None, ty, v, None) :: sub) @ tail)
   | Return t -> translate_term ctx t
-  | Loop (params, body) -> translate_loop params body
+  | Loop { counter; limit; params; body; on_exceed } ->
+    let init = Decl (None, TyInt, counter, Some (Int 0)) in
+    let cond = Bop (Lt, Var counter, Int limit) in
+    let step = Set (Var counter, Bop (Add, Var counter, Int 1)) in
+    let ctx = { assign_to = None; loop_params = Some params } in
+    let after = translate_anf { assign_to = None; loop_params = None } on_exceed in
+    For (init, cond, step, Block (translate_anf ctx body)) :: after
   | Continue args ->
     (match ctx.loop_params with
      | Some names -> translate_continue ~loc:anf.loc names args
      | None -> raise "Continue outside of Loop" ~loc:anf.loc)
-
-and translate_loop (params : (string * Anf.atom) list) (body : Tail_call.anf) : stmt list =
-  let decls =
-    List.filter_map params ~f:(fun (name, init) ->
-      match init.desc with
-      | Var v when String.equal v name -> None
-      | _ ->
-        Some (Decl (None, to_glsl_ty init.loc init.ty, name, Some (to_glsl_atom init))))
-  in
-  let ctx = { assign_to = None; loop_params = Some (List.map params ~f:fst) } in
-  decls @ [ WhileStmt (Bool true, Block (translate_anf ctx body)) ]
 ;;
 
 let translate_function_body body =

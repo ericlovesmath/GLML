@@ -610,32 +610,25 @@ let%expect_test "compile examples" =
         return tuple(a, b, c, d, e, f);
     }
     float go_0(vec2 ap, vec2 p0_0, vec2 p1_0, vec2 p2_0, vec2 p3_0, float t_0, float best) {
-        int _iter = 0;
-        while (true) {
-            bool _lim_cond = (_iter < 1000);
-            if (_lim_cond) {
-                bool anf_12 = (t_0 >= 1.);
-                if (anf_12) {
-                    return best;
-                } else {
-                    float anf_13 = (t_0 + 0.02);
-                    float tn = min(anf_13, 1.);
-                    tuple _lv_scrut_0 = decasteljau(p0_0, p1_0, p2_0, p3_0, t_0);
-                    vec2 _lv_r_u5_0 = _lv_scrut_0._5;
-                    tuple _lv_scrut = decasteljau(p0_0, p1_0, p2_0, p3_0, tn);
-                    vec2 _lv_r_u5 = _lv_scrut._5;
-                    float anf_14 = sd_segment(ap, _lv_r_u5_0, _lv_r_u5);
-                    float anf_15 = min(best, anf_14);
-                    int _iter_inc = (_iter + 1);
-                    _iter = _iter_inc;
-                    t_0 = tn;
-                    best = anf_15;
-                    continue;
-                }
+        for (int i_0 = 0; (i_0 < 1000); i_0 = (i_0 + 1)) {
+            bool anf_12 = (t_0 >= 1.);
+            if (anf_12) {
+                return best;
             } else {
-                return 0.;
+                float anf_13 = (t_0 + 0.02);
+                float tn = min(anf_13, 1.);
+                tuple _lv_scrut_0 = decasteljau(p0_0, p1_0, p2_0, p3_0, t_0);
+                vec2 _lv_r_u5_0 = _lv_scrut_0._5;
+                tuple _lv_scrut = decasteljau(p0_0, p1_0, p2_0, p3_0, tn);
+                vec2 _lv_r_u5 = _lv_scrut._5;
+                float anf_14 = sd_segment(ap, _lv_r_u5_0, _lv_r_u5);
+                float anf_15 = min(best, anf_14);
+                t_0 = tn;
+                best = anf_15;
+                continue;
             }
         }
+        return 0.;
     }
     uniform vec2 u_resolution;
     vec2 load(float i) {
@@ -796,51 +789,44 @@ let%expect_test "compile examples" =
         float pf_0;
     };
     option mandel_0(vec2 c, vec2 z, int i) {
-        int _iter = 0;
-        while (true) {
-            bool _lim_cond = (_iter < 1000);
-            if (_lim_cond) {
-                bool anf = (i > 150);
-                if (anf) {
-                    option _mk_0;
-                    _mk_0.tag = 1;
-                    return _mk_0;
-                } else {
-                    float anf_0 = length(z);
-                    bool anf_1 = (anf_0 > 4.);
-                    if (anf_1) {
-                        float anf_3 = log2(anf_0);
-                        float nu = log2(anf_3);
-                        float anf_4 = float(i);
-                        float anf_5 = (anf_4 - nu);
-                        float anf_6 = (anf_5 / 150.);
-                        option _mk;
-                        _mk.tag = 0;
-                        _mk.pf_0 = anf_6;
-                        return _mk;
-                    } else {
-                        float anf_7 = z[0];
-                        float anf_9 = (anf_7 * anf_7);
-                        float anf_10 = z[1];
-                        float anf_12 = (anf_10 * anf_10);
-                        float zx = (anf_9 - anf_12);
-                        float anf_14 = (2. * anf_7);
-                        float zy = (anf_14 * anf_10);
-                        vec2 anf_16 = vec2(zx, zy);
-                        vec2 z_prime = (anf_16 + c);
-                        int anf_17 = (i + 1);
-                        int _iter_inc = (_iter + 1);
-                        _iter = _iter_inc;
-                        z = z_prime;
-                        i = anf_17;
-                        continue;
-                    }
-                }
+        for (int i_0 = 0; (i_0 < 1000); i_0 = (i_0 + 1)) {
+            bool anf = (i > 150);
+            if (anf) {
+                option _mk_0;
+                _mk_0.tag = 1;
+                return _mk_0;
             } else {
-                option _zero = option(0, 0.);
-                return _zero;
+                float anf_0 = length(z);
+                bool anf_1 = (anf_0 > 4.);
+                if (anf_1) {
+                    float anf_3 = log2(anf_0);
+                    float nu = log2(anf_3);
+                    float anf_4 = float(i);
+                    float anf_5 = (anf_4 - nu);
+                    float anf_6 = (anf_5 / 150.);
+                    option _mk;
+                    _mk.tag = 0;
+                    _mk.pf_0 = anf_6;
+                    return _mk;
+                } else {
+                    float anf_7 = z[0];
+                    float anf_9 = (anf_7 * anf_7);
+                    float anf_10 = z[1];
+                    float anf_12 = (anf_10 * anf_10);
+                    float zx = (anf_9 - anf_12);
+                    float anf_14 = (2. * anf_7);
+                    float zy = (anf_14 * anf_10);
+                    vec2 anf_16 = vec2(zx, zy);
+                    vec2 z_prime = (anf_16 + c);
+                    int anf_17 = (i + 1);
+                    z = z_prime;
+                    i = anf_17;
+                    continue;
+                }
             }
         }
+        option _zero = option(0, 0.);
+        return _zero;
     }
     uniform vec2 u_resolution;
     uniform float u_time;
@@ -917,39 +903,32 @@ let%expect_test "compile examples" =
         return min(anf_28, anf_29);
     }
     float step_0(vec3 rd, vec3 ro, float t, int i) {
-        int _iter = 0;
-        while (true) {
-            bool _lim_cond = (_iter < 1000);
-            if (_lim_cond) {
-                bool anf_57 = (i > 64);
-                if (anf_57) {
+        for (int i_0 = 0; (i_0 < 1000); i_0 = (i_0 + 1)) {
+            bool anf_57 = (i > 64);
+            if (anf_57) {
+                return t;
+            } else {
+                vec3 anf_58 = (rd * t);
+                vec3 anf_59 = (ro + anf_58);
+                float d = scene(anf_59);
+                bool anf_60 = (d < 0.001);
+                if (anf_60) {
                     return t;
                 } else {
-                    vec3 anf_58 = (rd * t);
-                    vec3 anf_59 = (ro + anf_58);
-                    float d = scene(anf_59);
-                    bool anf_60 = (d < 0.001);
-                    if (anf_60) {
-                        return t;
+                    bool anf_62 = (t > 20.);
+                    if (anf_62) {
+                        return 20.;
                     } else {
-                        bool anf_62 = (t > 20.);
-                        if (anf_62) {
-                            return 20.;
-                        } else {
-                            float anf_63 = (t + d);
-                            int anf_64 = (i + 1);
-                            int _iter_inc = (_iter + 1);
-                            _iter = _iter_inc;
-                            t = anf_63;
-                            i = anf_64;
-                            continue;
-                        }
+                        float anf_63 = (t + d);
+                        int anf_64 = (i + 1);
+                        t = anf_63;
+                        i = anf_64;
+                        continue;
                     }
                 }
-            } else {
-                return 0.;
             }
         }
+        return 0.;
     }
     uniform vec2 u_mouse;
     uniform vec2 u_resolution;
@@ -1106,48 +1085,41 @@ let%expect_test "compile examples" =
     precision highp float;
     out vec4 fragColor;
     float menger(vec3 p_1, float dist, float scale, int n) {
-        int _iter = 0;
-        while (true) {
-            bool _lim_cond = (_iter < 1000);
-            if (_lim_cond) {
-                bool anf_1 = (n == 0);
-                if (anf_1) {
-                    return dist;
-                } else {
-                    vec3 anf_2 = (p_1 * scale);
-                    vec3 anf_4 = (anf_2 / 2.);
-                    vec3 anf_5 = floor(anf_4);
-                    vec3 anf_6 = (2. * anf_5);
-                    vec3 anf_7 = (anf_2 - anf_6);
-                    vec3 cell = (anf_7 - 1.);
-                    float next = (scale * 3.);
-                    vec3 anf_8 = abs(cell);
-                    vec3 anf_9 = (3. * anf_8);
-                    vec3 anf_10 = (1. - anf_9);
-                    vec3 r = abs(anf_10);
-                    float anf_11 = r[0];
-                    float anf_12 = r[1];
-                    float anf_13 = max(anf_11, anf_12);
-                    float anf_15 = r[2];
-                    float anf_16 = max(anf_12, anf_15);
-                    float anf_17 = min(anf_13, anf_16);
-                    float anf_20 = max(anf_15, anf_11);
-                    float anf_21 = min(anf_17, anf_20);
-                    float anf_22 = (anf_21 - 1.);
-                    float cross = (anf_22 / next);
-                    float anf_23 = max(dist, cross);
-                    int anf_24 = (n - 1);
-                    int _iter_inc = (_iter + 1);
-                    _iter = _iter_inc;
-                    dist = anf_23;
-                    scale = next;
-                    n = anf_24;
-                    continue;
-                }
+        for (int i_0 = 0; (i_0 < 1000); i_0 = (i_0 + 1)) {
+            bool anf_1 = (n == 0);
+            if (anf_1) {
+                return dist;
             } else {
-                return 0.;
+                vec3 anf_2 = (p_1 * scale);
+                vec3 anf_4 = (anf_2 / 2.);
+                vec3 anf_5 = floor(anf_4);
+                vec3 anf_6 = (2. * anf_5);
+                vec3 anf_7 = (anf_2 - anf_6);
+                vec3 cell = (anf_7 - 1.);
+                float next = (scale * 3.);
+                vec3 anf_8 = abs(cell);
+                vec3 anf_9 = (3. * anf_8);
+                vec3 anf_10 = (1. - anf_9);
+                vec3 r = abs(anf_10);
+                float anf_11 = r[0];
+                float anf_12 = r[1];
+                float anf_13 = max(anf_11, anf_12);
+                float anf_15 = r[2];
+                float anf_16 = max(anf_12, anf_15);
+                float anf_17 = min(anf_13, anf_16);
+                float anf_20 = max(anf_15, anf_11);
+                float anf_21 = min(anf_17, anf_20);
+                float anf_22 = (anf_21 - 1.);
+                float cross = (anf_22 / next);
+                float anf_23 = max(dist, cross);
+                int anf_24 = (n - 1);
+                dist = anf_23;
+                scale = next;
+                n = anf_24;
+                continue;
             }
         }
+        return 0.;
     }
     struct option {
         int tag;
@@ -1185,49 +1157,42 @@ let%expect_test "compile examples" =
         return menger(q_0, box, 1., 4);
     }
     option step_0(vec3 rd, vec3 ro, float t, int i) {
-        int _iter_0 = 0;
-        while (true) {
-            bool _lim_cond_0 = (_iter_0 < 1000);
-            if (_lim_cond_0) {
-                bool anf_53 = (i >= 128);
-                if (anf_53) {
-                    option _mk_1;
-                    _mk_1.tag = 1;
-                    return _mk_1;
+        for (int i_1 = 0; (i_1 < 1000); i_1 = (i_1 + 1)) {
+            bool anf_53 = (i >= 128);
+            if (anf_53) {
+                option _mk_1;
+                _mk_1.tag = 1;
+                return _mk_1;
+            } else {
+                vec3 anf_54 = (rd * t);
+                vec3 anf_55 = (ro + anf_54);
+                float d = scene(anf_55);
+                float anf_56 = (d * 0.85);
+                float dt = max(anf_56, 0.00025);
+                bool anf_58 = (d < 0.0005);
+                if (anf_58) {
+                    option _mk_0;
+                    _mk_0.tag = 0;
+                    _mk_0.pf_0 = t;
+                    return _mk_0;
                 } else {
-                    vec3 anf_54 = (rd * t);
-                    vec3 anf_55 = (ro + anf_54);
-                    float d = scene(anf_55);
-                    float anf_56 = (d * 0.85);
-                    float dt = max(anf_56, 0.00025);
-                    bool anf_58 = (d < 0.0005);
-                    if (anf_58) {
-                        option _mk_0;
-                        _mk_0.tag = 0;
-                        _mk_0.pf_0 = t;
-                        return _mk_0;
+                    bool anf_59 = (t > 20.);
+                    if (anf_59) {
+                        option _mk;
+                        _mk.tag = 1;
+                        return _mk;
                     } else {
-                        bool anf_59 = (t > 20.);
-                        if (anf_59) {
-                            option _mk;
-                            _mk.tag = 1;
-                            return _mk;
-                        } else {
-                            float anf_60 = (t + dt);
-                            int anf_61 = (i + 1);
-                            int _iter_inc_0 = (_iter_0 + 1);
-                            _iter_0 = _iter_inc_0;
-                            t = anf_60;
-                            i = anf_61;
-                            continue;
-                        }
+                        float anf_60 = (t + dt);
+                        int anf_61 = (i + 1);
+                        t = anf_60;
+                        i = anf_61;
+                        continue;
                     }
                 }
-            } else {
-                option _zero = option(0, 0.);
-                return _zero;
             }
         }
+        option _zero = option(0, 0.);
+        return _zero;
     }
     void main() {
         vec2 coord = gl_FragCoord.xy;
@@ -1413,54 +1378,47 @@ let%expect_test "compile examples" =
         return vec3(anf_68, anf_69, anf_70);
     }
     option march_0_0(vec3 rd, vec3 ro, float t, int steps) {
-        int _iter = 0;
-        while (true) {
-            bool _lim_cond = (_iter < 1000);
-            if (_lim_cond) {
-                bool anf_87 = (steps > 120);
-                if (anf_87) {
-                    option _mk_1;
-                    _mk_1.tag = 1;
-                    return _mk_1;
+        for (int i_0 = 0; (i_0 < 1000); i_0 = (i_0 + 1)) {
+            bool anf_87 = (steps > 120);
+            if (anf_87) {
+                option _mk_1;
+                _mk_1.tag = 1;
+                return _mk_1;
+            } else {
+                vec3 anf_88 = (rd * t);
+                vec3 anf_89 = (ro + anf_88);
+                float len_7 = length(anf_89);
+                vec3 dir_8 = (anf_89 / len_7);
+                vec3 anf_71_7 = (dir_8 * 3.);
+                float anf_72_7 = fbm(anf_71_7);
+                float terrain_7 = (anf_72_7 * 0.4);
+                float anf_73_7 = (len_7 - 1.5);
+                float d_1 = (anf_73_7 - terrain_7);
+                bool anf_90 = (d_1 < 0.0005);
+                if (anf_90) {
+                    option _mk_0;
+                    _mk_0.tag = 0;
+                    _mk_0.pf_0 = t;
+                    return _mk_0;
                 } else {
-                    vec3 anf_88 = (rd * t);
-                    vec3 anf_89 = (ro + anf_88);
-                    float len_7 = length(anf_89);
-                    vec3 dir_8 = (anf_89 / len_7);
-                    vec3 anf_71_7 = (dir_8 * 3.);
-                    float anf_72_7 = fbm(anf_71_7);
-                    float terrain_7 = (anf_72_7 * 0.4);
-                    float anf_73_7 = (len_7 - 1.5);
-                    float d_1 = (anf_73_7 - terrain_7);
-                    bool anf_90 = (d_1 < 0.0005);
-                    if (anf_90) {
-                        option _mk_0;
-                        _mk_0.tag = 0;
-                        _mk_0.pf_0 = t;
-                        return _mk_0;
+                    bool anf_91 = (t > 50.);
+                    if (anf_91) {
+                        option _mk;
+                        _mk.tag = 1;
+                        return _mk;
                     } else {
-                        bool anf_91 = (t > 50.);
-                        if (anf_91) {
-                            option _mk;
-                            _mk.tag = 1;
-                            return _mk;
-                        } else {
-                            float anf_92 = (d_1 * 0.8);
-                            float anf_93 = (t + anf_92);
-                            int anf_94 = (steps + 1);
-                            int _iter_inc = (_iter + 1);
-                            _iter = _iter_inc;
-                            t = anf_93;
-                            steps = anf_94;
-                            continue;
-                        }
+                        float anf_92 = (d_1 * 0.8);
+                        float anf_93 = (t + anf_92);
+                        int anf_94 = (steps + 1);
+                        t = anf_93;
+                        steps = anf_94;
+                        continue;
                     }
                 }
-            } else {
-                option _zero = option(0, 0.);
-                return _zero;
             }
         }
+        option _zero = option(0, 0.);
+        return _zero;
     }
     const vec3 snowColor = vec3(0.85, 0.85, 0.9);
     uniform vec2 u_mouse;
@@ -1640,73 +1598,66 @@ let%expect_test "compile examples" =
     uniform vec2 u_resolution;
     uniform float u_time;
     option march_0_0(vec3 rd, vec3 ro, float t_1, int steps) {
-        int _iter = 0;
-        while (true) {
-            bool _lim_cond = (_iter < 1000);
-            if (_lim_cond) {
-                bool anf_48 = (steps > 80);
-                if (anf_48) {
-                    option _mk_1;
-                    _mk_1.tag = 1;
-                    return _mk_1;
+        for (int i = 0; (i < 1000); i = (i + 1)) {
+            bool anf_48 = (steps > 80);
+            if (anf_48) {
+                option _mk_1;
+                _mk_1.tag = 1;
+                return _mk_1;
+            } else {
+                vec3 anf_49 = (rd * t_1);
+                vec3 anf_50 = (ro + anf_49);
+                float angle_0_0 = (u_time * 2.);
+                float anf_32_0 = anf_50[0];
+                float anf_33_0 = anf_50[1];
+                vec2 anf_34_0 = vec2(anf_32_0, anf_33_0);
+                vec2 p_xy_0 = rotate(anf_34_0, angle_0_0);
+                float anf_35_0 = p_xy_0[0];
+                float anf_36_0 = p_xy_0[1];
+                float anf_37_0 = anf_50[2];
+                vec2 anf_40_0 = vec2(anf_36_0, anf_37_0);
+                vec2 p_yz_0 = rotate(anf_40_0, angle_0_0);
+                float anf_42_0 = p_yz_0[0];
+                float anf_43_0 = p_yz_0[1];
+                vec3 p_prime_0_0 = vec3(anf_35_0, anf_42_0, anf_43_0);
+                vec2 anf_44_0 = vec2(1., 0.3);
+                float anf_45_0 = sdTorus(p_prime_0_0, anf_44_0);
+                vec2 anf_46_0 = vec2(2., 0.5);
+                float anf_47_0 = sdTorus(anf_50, anf_46_0);
+                float anf_15_1 = (anf_47_0 - anf_45_0);
+                float anf_16_1 = (0.5 * anf_15_1);
+                float anf_17_1 = (anf_16_1 / 0.1);
+                float anf_18_1 = (0.5 + anf_17_1);
+                float h_1 = clamp(anf_18_1, 0., 1.);
+                float anf_19_1 = mix(anf_47_0, anf_45_0, h_1);
+                float anf_20_1 = (0.1 * h_1);
+                float anf_21_1 = (1. - h_1);
+                float anf_22_1 = (anf_20_1 * anf_21_1);
+                float d = (anf_19_1 - anf_22_1);
+                bool anf_51 = (d < 0.001);
+                if (anf_51) {
+                    option _mk_0;
+                    _mk_0.tag = 0;
+                    _mk_0.pf_0 = t_1;
+                    return _mk_0;
                 } else {
-                    vec3 anf_49 = (rd * t_1);
-                    vec3 anf_50 = (ro + anf_49);
-                    float angle_0_0 = (u_time * 2.);
-                    float anf_32_0 = anf_50[0];
-                    float anf_33_0 = anf_50[1];
-                    vec2 anf_34_0 = vec2(anf_32_0, anf_33_0);
-                    vec2 p_xy_0 = rotate(anf_34_0, angle_0_0);
-                    float anf_35_0 = p_xy_0[0];
-                    float anf_36_0 = p_xy_0[1];
-                    float anf_37_0 = anf_50[2];
-                    vec2 anf_40_0 = vec2(anf_36_0, anf_37_0);
-                    vec2 p_yz_0 = rotate(anf_40_0, angle_0_0);
-                    float anf_42_0 = p_yz_0[0];
-                    float anf_43_0 = p_yz_0[1];
-                    vec3 p_prime_0_0 = vec3(anf_35_0, anf_42_0, anf_43_0);
-                    vec2 anf_44_0 = vec2(1., 0.3);
-                    float anf_45_0 = sdTorus(p_prime_0_0, anf_44_0);
-                    vec2 anf_46_0 = vec2(2., 0.5);
-                    float anf_47_0 = sdTorus(anf_50, anf_46_0);
-                    float anf_15_1 = (anf_47_0 - anf_45_0);
-                    float anf_16_1 = (0.5 * anf_15_1);
-                    float anf_17_1 = (anf_16_1 / 0.1);
-                    float anf_18_1 = (0.5 + anf_17_1);
-                    float h_1 = clamp(anf_18_1, 0., 1.);
-                    float anf_19_1 = mix(anf_47_0, anf_45_0, h_1);
-                    float anf_20_1 = (0.1 * h_1);
-                    float anf_21_1 = (1. - h_1);
-                    float anf_22_1 = (anf_20_1 * anf_21_1);
-                    float d = (anf_19_1 - anf_22_1);
-                    bool anf_51 = (d < 0.001);
-                    if (anf_51) {
-                        option _mk_0;
-                        _mk_0.tag = 0;
-                        _mk_0.pf_0 = t_1;
-                        return _mk_0;
+                    bool anf_52 = (t_1 > 100.);
+                    if (anf_52) {
+                        option _mk;
+                        _mk.tag = 1;
+                        return _mk;
                     } else {
-                        bool anf_52 = (t_1 > 100.);
-                        if (anf_52) {
-                            option _mk;
-                            _mk.tag = 1;
-                            return _mk;
-                        } else {
-                            float anf_53 = (t_1 + d);
-                            int anf_54 = (steps + 1);
-                            int _iter_inc = (_iter + 1);
-                            _iter = _iter_inc;
-                            t_1 = anf_53;
-                            steps = anf_54;
-                            continue;
-                        }
+                        float anf_53 = (t_1 + d);
+                        int anf_54 = (steps + 1);
+                        t_1 = anf_53;
+                        steps = anf_54;
+                        continue;
                     }
                 }
-            } else {
-                option _zero = option(0, 0.);
-                return _zero;
             }
         }
+        option _zero = option(0, 0.);
+        return _zero;
     }
     void main() {
         vec2 coord = gl_FragCoord.xy;

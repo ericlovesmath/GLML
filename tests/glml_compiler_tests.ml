@@ -259,26 +259,19 @@ let%expect_test "recursive functions" =
     precision highp float;
     out vec4 fragColor;
     int fact(int n, int acc) {
-        int _iter = 0;
-        while (true) {
-            bool _lim_cond = (_iter < 1000);
-            if (_lim_cond) {
-                bool anf = (n == 0);
-                if (anf) {
-                    return acc;
-                } else {
-                    int anf_0 = (n - 1);
-                    int anf_1 = (acc * n);
-                    int _iter_inc = (_iter + 1);
-                    _iter = _iter_inc;
-                    n = anf_0;
-                    acc = anf_1;
-                    continue;
-                }
+        for (int i = 0; (i < 1000); i = (i + 1)) {
+            bool anf = (n == 0);
+            if (anf) {
+                return acc;
             } else {
-                return 0;
+                int anf_0 = (n - 1);
+                int anf_1 = (acc * n);
+                n = anf_0;
+                acc = anf_1;
+                continue;
             }
         }
+        return 0;
     }
     void main() {
         vec2 u = gl_FragCoord.xy;

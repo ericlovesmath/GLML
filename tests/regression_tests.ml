@@ -298,25 +298,18 @@ let%expect_test "regression - placeholder structs and variants in tail position"
         vec3 v;
     };
     box f_0(bool x) {
-        int _iter = 0;
-        while (true) {
-            bool _lim_cond = (_iter < 1000);
-            if (_lim_cond) {
-                if (x) {
-                    vec3 anf = vec3(1., 1., 1.);
-                    return box(anf);
-                } else {
-                    int _iter_inc = (_iter + 1);
-                    _iter = _iter_inc;
-                    x = true;
-                    continue;
-                }
+        for (int i = 0; (i < 1000); i = (i + 1)) {
+            if (x) {
+                vec3 anf = vec3(1., 1., 1.);
+                return box(anf);
             } else {
-                vec3 _zero = vec3(0., 0., 0.);
-                box _zero_0 = box(_zero);
-                return _zero_0;
+                x = true;
+                continue;
             }
         }
+        vec3 _zero = vec3(0., 0., 0.);
+        box _zero_0 = box(_zero);
+        return _zero_0;
     }
     void main() {
         vec2 coord = gl_FragCoord.xy;
@@ -1377,31 +1370,23 @@ let%expect_test "tail call loop counter typed wrong" =
     precision highp float;
     out vec4 fragColor;
     vec2 go_0(float t, float bd, float bt) {
-        int _iter = 0;
-        while (true) {
-            bool _lim_cond = (_iter < 1000);
-            if (_lim_cond) {
-                bool anf = (t > 1.);
-                if (anf) {
-                    return vec2(bd, bt);
-                } else {
-                    float anf_0 = (t + 0.02);
-                    int _iter_inc = (_iter + 1);
-                    int _tmp = _iter_inc;
-                    float _tmp_0 = anf_0;
-                    float _tmp_1 = 1.;
-                    float _tmp_2 = bd;
-                    _iter = _tmp;
-                    t = _tmp_0;
-                    bd = _tmp_1;
-                    bt = _tmp_2;
-                    continue;
-                }
+        for (int i = 0; (i < 1000); i = (i + 1)) {
+            bool anf = (t > 1.);
+            if (anf) {
+                return vec2(bd, bt);
             } else {
-                vec2 _zero = vec2(0., 0.);
-                return _zero;
+                float anf_0 = (t + 0.02);
+                float _tmp = anf_0;
+                float _tmp_0 = 1.;
+                float _tmp_1 = bd;
+                t = _tmp;
+                bd = _tmp_0;
+                bt = _tmp_1;
+                continue;
             }
         }
+        vec2 _zero = vec2(0., 0.);
+        return _zero;
     }
     void main() {
         vec2 uv = gl_FragCoord.xy;

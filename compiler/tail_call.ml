@@ -32,7 +32,13 @@ and term =
 and anf_desc =
   | Let of string * term * anf
   | Return of term
-  | Loop of (string * atom) list * anf
+  | Loop of
+      { counter : string
+      ; limit : int
+      ; params : string list
+      ; body : anf
+      ; on_exceed : anf
+      }
   | Continue of atom list
 
 and anf =
@@ -77,9 +83,15 @@ and sexp_of_anf_desc = function
   | Let (v, bind, body) ->
     List [ Atom "let"; Atom v; sexp_of_term bind; sexp_of_anf body ]
   | Return t -> List [ Atom "return"; sexp_of_term t ]
-  | Loop (params, body) ->
-    let sexp_of_param (n, init) = List [ Atom n; sexp_of_atom init ] in
-    List [ Atom "loop"; List (List.map params ~f:sexp_of_param); sexp_of_anf body ]
+  | Loop { counter; limit; params; body; on_exceed } ->
+    List
+      [ Atom "loop"
+      ; List [ Atom "counter"; Atom counter ]
+      ; List [ Atom "limit"; Atom (Int.to_string limit) ]
+      ; List [ Atom "params"; List (List.map params ~f:(fun n -> (Atom n : Sexp.t))) ]
+      ; List [ Atom "body"; sexp_of_anf body ]
+      ; List [ Atom "on_exceed"; sexp_of_anf on_exceed ]
+      ]
   | Continue args -> List (Atom "continue" :: List.map args ~f:sexp_of_atom)
 
 and sexp_of_anf t = sexp_of_anf_desc t.desc
@@ -208,7 +220,7 @@ let contains_call (t : Anf.term) (v : string) : bool =
   on_term t
 ;;
 
-let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) : anf =
+let patch_tail_anf (anf : Anf.anf) (name : string) : anf =
   let rec patch (anf : Anf.anf) : anf =
     let pure desc : anf = { desc; ty = anf.ty; loc = anf.loc } in
     match anf.desc with
@@ -221,18 +233,7 @@ let patch_tail_anf (anf : Anf.anf) (name : string) (iter : string) : anf =
     | Return { desc = Switch (s, cases); ty; loc } ->
       let cases = List.map cases ~f:(fun (lbl, body) -> lbl, patch body) in
       pure (Return { desc = Switch (s, cases); ty; loc })
-    | Return { desc = App (f, xs); ty = _; loc } when String.equal f name ->
-      let tmp = Utils.fresh "_iter_inc" in
-      let int_atom desc : atom = { desc; ty = TyInt; loc } in
-      let iter_inc : term =
-        { desc = Value (Bop (Add, int_atom (Var iter), int_atom (Int 1)))
-        ; ty = TyInt
-        ; loc
-        }
-      in
-      let cont_args = int_atom (Var tmp) :: xs in
-      let continue = pure (Continue cont_args) in
-      pure (Let (tmp, iter_inc, continue))
+    | Return { desc = App (f, xs); _ } when String.equal f name -> pure (Continue xs)
     | Return tail -> pure (Return (of_term tail))
   in
   patch anf
@@ -250,30 +251,16 @@ let remove_rec_top (tenv : record_tenv) (top : Anf.top) : top =
     raise "main may not be recursive" ~loc:top.loc
   | Define { name; recur = Rec limit; args; body; ret_ty } ->
     let loc = body.loc in
-    let iter = Utils.fresh "_iter" in
-    let int_atom desc : atom = { desc; ty = TyInt; loc } in
-    let cond : term =
-      { desc = Value (Bop (Lt, int_atom (Var iter), int_atom (Int limit)))
-      ; ty = TyBool
+    let counter = Utils.fresh "i" in
+    let sentinel = zero_anf tenv ~loc ret_ty in
+    let body = patch_tail_anf body name in
+    let params = List.map args ~f:fst in
+    let loop : anf =
+      { desc = Loop { counter; limit; params; body; on_exceed = sentinel }
+      ; ty = top.ty
       ; loc
       }
     in
-    let cond_v = Utils.fresh "_lim_cond" in
-    let bool_atom desc : atom = { desc; ty = TyBool; loc } in
-    let sentinel = zero_anf tenv ~loc ret_ty in
-    let patched = patch_tail_anf body name iter in
-    let guard : anf =
-      let if_desc = If (bool_atom (Var cond_v), patched, sentinel) in
-      let if_term : term = { desc = if_desc; ty = ret_ty; loc } in
-      let return_if : anf = { desc = Return if_term; ty = ret_ty; loc } in
-      { desc = Let (cond_v, cond, return_if); ty = ret_ty; loc }
-    in
-    let params =
-      (iter, int_atom (Int 0))
-      :: List.map args ~f:(fun (n, ty) ->
-        n, ({ desc = (Var n : atom_desc); ty; loc } : atom))
-    in
-    let loop : anf = { desc = Loop (params, guard); ty = top.ty; loc } in
     pure (Define { name; args; body = loop; ret_ty })
 ;;
 
