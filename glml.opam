@@ -6,9 +6,9 @@ maintainer: ["Eric Lee <me@ericchanlee.com>"]
 authors: ["Eric Lee <me@ericchanlee.com>"]
 license: "MIT"
 tags: ["graphics" "shader" "DSL" "GLSL" "GLML" "compiler" "playground"]
-homepage: "https://github.com/ericlovesmath/GLML"
-doc: "https://github.com/ericlovesmath/GLML"
-bug-reports: "https://github.com/ericlovesmath/GLML/issues"
+homepage: "https://github.com/glml-lang/GLML"
+doc: "https://www.glml-lang.com/"
+bug-reports: "https://github.com/glml-lang/GLML/issues"
 depends: [
   "dune" {>= "3.17"}
   "ocaml"
@@ -34,4 +34,4 @@ build: [
     "@doc" {with-doc}
   ]
 ]
-dev-repo: "git+https://github.com/ericlovesmath/GLML.git"
+dev-repo: "git+https://github.com/glml-lang/GLML.git"
