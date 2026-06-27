@@ -8,6 +8,7 @@ type type_decl =
 
 type term_desc =
   | Var of string
+  | Qual of string * string
   | Float of float
   | Int of int
   | Bool of bool
@@ -38,9 +39,11 @@ type top_desc =
   | Extern of ty * string
   (* TypeDef (var, params, type) *)
   | TypeDef of string * string list * type_decl
+  | Module of string * top list
+  | Open of string
 [@@deriving sexp_of]
 
-type top =
+and top =
   { desc : top_desc
   ; loc : Lexer.loc
   }

@@ -214,6 +214,9 @@ let generalize (ctx : context) (deferred : constr list) (ty : ty)
 let rec is_value (t : Desugar.term) : bool =
   match t.desc with
   | Float _ | Int _ | Bool _ | Var _ | Lam _ -> true
+  (* TODO: [Qual] is eliminated by [Uniquify] before typechecking, make proper AST for [Uniquify]
+     once we have all of the module code figured out (along with other relevant module forms) *)
+  | Qual _ -> true
   | Vec (_, ts) -> List.for_all ts ~f:is_value
   | Tuple ts -> List.for_all ts ~f:is_value
   | Record fields -> List.for_all fields ~f:(fun (_, t) -> is_value t)
@@ -473,6 +476,8 @@ and gen_term (env : env) (t : Desugar.term) : term * constr list * substitution 
     if equal_ty ty TySampler
     then raise "sampler may only be used in #texture" ~loc ~d:[%message (v : string)];
     make (Var v) ty (subst_constraints sub scheme_constrs)
+  | Qual (m, x) ->
+    raise "uniquify should have removed qual" ~loc ~d:[%message (m : string) (x : string)]
   | Lam (v, ty_ann, body_stlc) ->
     let ty_v =
       match ty_ann with
@@ -940,7 +945,13 @@ let typecheck_impl (Program terms : Desugar.t) : t =
             let env =
               { env with aliases = Map.set env.aliases ~key:name ~data:(params, body) }
             in
-            env, acc))
+            env, acc)
+        (* [Uniquify] flattens modules to top-level [Define]s and drops
+           [Open] before typechecking; these arms assert that invariant. *)
+        | Module (name, _) ->
+          raise "uniquify should have removed" ~loc:top.loc ~d:[%message (name : string)]
+        | Open name ->
+          raise "uniquify should have removed" ~loc:top.loc ~d:[%message (name : string)])
   in
   Program (List.rev tops)
 ;;

@@ -52,6 +52,10 @@ type token =
   | TYPE
   | OF
   | WHERE
+  | MODULE
+  | STRUCT
+  | END
+  | OPEN
   | CONSTRUCTOR of string
   | NUMERIC of int
   | FLOAT_LIT of float
@@ -110,6 +114,10 @@ let string_of_token = function
   | TYPE -> "`type`"
   | OF -> "`of`"
   | WHERE -> "`where`"
+  | MODULE -> "`module`"
+  | STRUCT -> "`struct`"
+  | END -> "`end`"
+  | OPEN -> "`open`"
   | CONSTRUCTOR s -> Printf.sprintf "`%s`" s
   | NUMERIC n -> Int.to_string n
   | FLOAT_LIT f -> Printf.sprintf "%g" f
@@ -289,6 +297,10 @@ let read_lexeme (t : t) : token Or_error.t =
         | "type" -> Ok TYPE
         | "of" -> Ok OF
         | "where" -> Ok WHERE
+        | "module" -> Ok MODULE
+        | "struct" -> Ok STRUCT
+        | "end" -> Ok END
+        | "open" -> Ok OPEN
         | s when Map.mem vecs s -> Map.find_or_error vecs s
         | s when Map.mem mats s -> Map.find_or_error mats s
         | "_" -> Ok UNDERSCORE
@@ -358,5 +370,7 @@ let%expect_test "lexer" =
     y - x
     // bottom comment
     |};
-  [%expect {| (Ok ((ID x) ADD (NUMERIC 2) (ID x) ADD (NUMERIC 3) (ID y) SUB (ID x))) |}]
+  [%expect {| (Ok ((ID x) ADD (NUMERIC 2) (ID x) ADD (NUMERIC 3) (ID y) SUB (ID x))) |}];
+  test "module struct end open";
+  [%expect {| (Ok (MODULE STRUCT END OPEN)) |}]
 ;;

@@ -534,9 +534,20 @@ and term_paren_or_tuple_p =
       | _ -> return (Tuple ts)))
     st
 
+and term_qual_p =
+  fun st ->
+  (with_term_loc
+     (let%bind m = constructor_p in
+      let%bind _ = tok DOT in
+      let%bind x = ident_p in
+      return (Qual (m, x)))
+   <??> "qualified name")
+    st
+
 and term_head_p =
   fun st ->
-  (term_variant_p
+  (term_qual_p
+   <|> term_variant_p
    <|> term_atom_p
    <|> term_number_p
    <|> term_unary_neg_p
@@ -566,7 +577,8 @@ and term_postfix_p =
   in
   let term_arg_base_p =
     (* NOTE: intentionally excludes signed literals to avoid cases like [f -5] *)
-    term_atom_p
+    term_qual_p
+    <|> term_atom_p
     <|> term_unsigned_number_p
     <|> term_op_section_p
     <|> term_paren_or_tuple_p
@@ -900,10 +912,37 @@ let top_alias_p =
   <??> "a type alias"
 ;;
 
-let glml_p =
-  many1 (top_let_p <|> top_extern_p <|> top_record_p <|> top_variant_p <|> top_alias_p)
-  >>| fun tops -> Program tops
+let top_open_p =
+  with_top_loc
+    (tok OPEN *> commit (constructor_p >>| fun name -> Open name) <??> "an open")
 ;;
+
+let rec top_item_p st =
+  (top_let_p
+   <|> top_extern_p
+   <|> top_record_p
+   <|> top_variant_p
+   <|> top_alias_p
+   <|> top_module_p
+   <|> top_open_p)
+    st
+
+and top_module_p =
+  fun st ->
+  (with_top_loc
+     (tok MODULE
+      *> commit
+           (let%bind name = constructor_p in
+            let%bind _ = tok EQ in
+            let%bind _ = tok STRUCT in
+            let%bind body = many top_item_p in
+            let%bind _ = tok END in
+            return (Module (name, body)))
+      <??> "module definition"))
+    st
+;;
+
+let glml_p = many1 top_item_p >>| fun tops -> Program tops
 
 let%expect_test "glml parse tests" =
   let test = test sexp_of_t glml_p in
@@ -959,6 +998,58 @@ let%expect_test "type alias parsing" =
     |}]
 ;;
 
+let%expect_test "module parse tests" =
+  let test = test sexp_of_t glml_p in
+  test
+    {|
+    module Vec = struct
+      let len (p : vec2) : float = #sqrt (#dot p p)
+      let scale (p : vec2) (k : float) : vec2 = [p.0 * k, p.1 * k]
+    end
+
+    open Vec
+
+    let main (coord : vec2) = [len coord, Vec.len coord, 0.0, 1.0]
+    |};
+  [%expect
+    {|
+    (Program
+     ((Module Vec
+       (Define Nonrec len (: ((vec 2 float) -> float))
+        (lambda (p ((vec 2 float))) (app sqrt (app (app dot p) p))))
+       (Define Nonrec scale (: ((vec 2 float) -> (float -> (vec 2 float))))
+        (lambda (p ((vec 2 float)))
+         (lambda (k (float)) (vec2 (* (index p 0) k) (* (index p 1) k))))))
+      (Open Vec)
+      (Define Nonrec main
+       (lambda (coord ((vec 2 float)))
+        (vec4 (app len coord) (app Vec.len coord) 0. 1.)))))
+  |}];
+  test
+    {|
+    module Empty = struct end
+    let main (coord : vec2) = [0.0, 0.0, 0.0, 1.0]
+    |};
+  [%expect
+    {|
+    (Program
+     ((Module Empty)
+      (Define Nonrec main (lambda (coord ((vec 2 float))) (vec4 0. 0. 0. 1.)))))
+    |}]
+;;
+
+let%expect_test "qualified name parse" =
+  let test = test sexp_of_term term_p in
+  test "Color.rgb";
+  [%expect {| Color.rgb |}];
+  test "Color.shade c";
+  [%expect {| (app Color.shade c) |}];
+  test "f Vec.len coord";
+  [%expect {| (app (app f Vec.len) coord) |}];
+  test "p.0";
+  [%expect {| (index p 0) |}]
+;;
+
 let%expect_test "regression test, toplevel let parsing after record" =
   let test = test sexp_of_t glml_p in
   test
@@ -986,8 +1077,8 @@ let%expect_test "parse error messages" =
   test_top "foo";
   [%expect
     {|
-    [parser] at 1:1-1:4: expected one of: `let`, `#`, `type` but found `foo`
-      in: "a type alias at 1:1-1:4"
+    [parser] at 1:1-1:4: expected one of: `let`, `#`, `type`, `module`, `open` but found `foo`
+      in: "an open at 1:1-1:4"
       |
     1 | foo
       | ^^^

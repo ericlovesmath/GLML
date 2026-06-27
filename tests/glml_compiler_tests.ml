@@ -355,19 +355,19 @@ let%expect_test "nested structs" =
   let test_program =
     {|
     type point = { x: float, y: float }
-    type segment = { start: point, end: point }
+    type segment = { start: point, stop: point }
 
     let make_seg (u: float) =
       let s =
         if true then
-          { start = { x = 0.0, y = 0.0 }, end = { x = 1.0, y = 1.0 } }
+          { start = { x = 0.0, y = 0.0 }, stop = { x = 1.0, y = 1.0 } }
         else
-          { start = { x = 1.0, y = 1.0 }, end = { x = 0.0, y = 0.0 } }
+          { start = { x = 1.0, y = 1.0 }, stop = { x = 0.0, y = 0.0 } }
       in
       s
 
     let main (u: vec2) = let seg = make_seg 1.0 in
-      let c = seg.end.x in
+      let c = seg.stop.x in
       [c, c, c, 1.0]
     |}
   in

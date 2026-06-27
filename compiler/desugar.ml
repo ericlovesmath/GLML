@@ -14,6 +14,7 @@ type type_decl =
 
 type term_desc =
   | Var of string
+  | Qual of string * string
   | Float of float
   | Int of int
   | Bool of bool
@@ -41,6 +42,7 @@ and term =
 
 let rec sexp_of_term_desc = function
   | Var v -> Atom v
+  | Qual (m, x) -> Atom (m ^ "." ^ x)
   | Float f -> Atom (Float.to_string f)
   | Int i -> Atom (Int.to_string i)
   | Bool b -> Atom (Bool.to_string b)
@@ -92,13 +94,15 @@ type top_desc =
   | Define of recur * string * ty option * constr list * term
   | Extern of ty * string
   | TypeDef of string * string list * type_decl
+  | Module of string * top list
+  | Open of string
 
-type top =
+and top =
   { desc : top_desc
   ; loc : Lexer.loc
   }
 
-let sexp_of_top_desc = function
+let rec sexp_of_top_desc = function
   | Define (recur, v, ret_ty, constrs, term) ->
     let recur_sexp = sexp_of_recur recur in
     let parts = [ Atom "Define"; recur_sexp; Atom v ] in
@@ -118,9 +122,11 @@ let sexp_of_top_desc = function
   | TypeDef (name, params, decl) ->
     let ty = name ^ "[" ^ String.concat ~sep:", " params ^ "]" in
     List [ Atom "TypeDef"; Atom ty; sexp_of_type_decl decl ]
-;;
+  | Module (name, body) ->
+    List (Atom "Module" :: Atom name :: List.map body ~f:sexp_of_top)
+  | Open name -> List [ Atom "Open"; Atom name ]
 
-let sexp_of_top t = sexp_of_top_desc t.desc
+and sexp_of_top t = sexp_of_top_desc t.desc
 
 type t = Program of top list [@@deriving sexp_of]
 
@@ -136,6 +142,7 @@ let desugar_type_decl (td : Frontend.type_decl) : type_decl =
 let rec desugar_term_desc ~loc (td : Frontend.term_desc) : term_desc =
   match td with
   | Var v -> Var v
+  | Qual (m, x) -> Qual (m, x)
   | Float f -> Float f
   | Int n -> Int n
   | Bool b -> Bool b
@@ -207,14 +214,15 @@ and desugar_term (t : Frontend.term) : term =
   ({ desc = desugar_term_desc ~loc:t.loc t.desc; loc = t.loc } : term)
 ;;
 
-let desugar_top_desc (td : Frontend.top_desc) : top_desc =
+let rec desugar_top_desc (td : Frontend.top_desc) : top_desc =
   match td with
   | Define (r, v, ty_opt, where, t) -> Define (r, v, ty_opt, where, desugar_term t)
   | Extern (ty, v) -> Extern (ty, v)
   | TypeDef (name, params, decl) -> TypeDef (name, params, desugar_type_decl decl)
-;;
+  | Module (name, body) -> Module (name, List.map body ~f:desugar_top)
+  | Open name -> Open name
 
-let desugar_top (t : Frontend.top) : top = { desc = desugar_top_desc t.desc; loc = t.loc }
+and desugar_top (t : Frontend.top) : top = { desc = desugar_top_desc t.desc; loc = t.loc }
 
 let desugar (Program tops : Frontend.t) : t Compiler_error.t =
   try_with (fun () -> Program (List.map ~f:desugar_top tops))

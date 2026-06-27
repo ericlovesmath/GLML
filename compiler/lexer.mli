@@ -49,6 +49,10 @@ type token =
   | TYPE
   | OF
   | WHERE
+  | MODULE
+  | STRUCT
+  | END
+  | OPEN
   | CONSTRUCTOR of string
   | NUMERIC of int
   | FLOAT_LIT of float
