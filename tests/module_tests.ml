@@ -188,3 +188,98 @@ let%expect_test "module error tests" =
       |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |}]
 ;;
+
+let%expect_test "type member / qualified type" =
+  test
+    {|
+    module M = struct
+      type t = vec4
+      type u = t
+      let mk (x : float) : u = [x, x, x, 1.0]
+    end
+    let main (coord : vec2) : M.t = M.mk 1.0
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(1., 1., 1., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "module type alias" =
+  test
+    {|
+    type color = { r : float, g : float, b : float }
+    module M = struct
+      type c = color
+      let mk (x : float) : c = { r = x, g = x, b = x }
+    end
+    let main (coord : vec2) : vec4 =
+      let c : M.c = M.mk 0.5 in
+      [c.r, c.g, c.b, 1.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(0.5, 0.5, 0.5, 1.);
+    }
+    |}]
+;;
+
+let%expect_test "qualified type member name shadowing" =
+  test
+    ~dump:[ Uniquify ]
+    {|
+    type t = float
+    module M = struct
+      type t = vec4
+      let mk (x : float) : t = [x, x, x, 1.0]
+    end
+    let main (coord : vec2) : M.t =
+      let a : t = 0.5 in
+      M.mk a
+    |};
+  [%expect
+    {|
+    ===== uniquify =====
+    (Program
+     ((TypeDef t (AliasDecl float)) (TypeDef M_t (AliasDecl (vec 4 float)))
+      (Define Nonrec mk (: (float -> M_t)) (lambda (x (float)) (vec4 x x x 1.)))
+      (Define Nonrec main (: ((vec 2 float) -> M_t))
+       (lambda (coord ((vec 2 float))) (let a (: t) 0.5 (app mk a))))))
+
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(0.5, 0.5, 0.5, 1.);
+    }
+    |}]
+;;
+
+let%expect_test "unknown qualified type member" =
+  test
+    {|
+    module M = struct type t = vec4 end
+    let main (coord : vec2) : M.cinna = [0.0, 0.0, 0.0, 1.0]
+    |};
+  [%expect
+    {|
+    [uniquify] at 3:5-3:61: unknown module type
+      m: M
+      tn: cinna
+      |
+    3 |     let main (coord : vec2) : M.cinna = [0.0, 0.0, 0.0, 1.0]
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |}]
+;;

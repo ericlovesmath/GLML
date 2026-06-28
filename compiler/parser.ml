@@ -125,16 +125,22 @@ let ty_singles_p =
   <?> "type keyword/variable"
 ;;
 
-let rec ty_atom_p st =
-  ((let%bind name = ident_p in
-    (let%map args = between `Bracket (commas ty_p) in
-     TyApp (name, args))
-    <|> return (TyName name))
-   <|> ty_singles_p
-   <|> ty_vec_p
-   <|> ty_mat_p
-   <??> "type")
+let rec ty_qual_p st =
+  (let%bind m = constructor_p in
+   let%bind _ = tok DOT in
+   let%bind t = ident_p in
+   return (TyQual (m, t)))
     st
+
+and ty_named_p st =
+  (let%bind name = ident_p in
+   (let%map args = between `Bracket (commas ty_p) in
+    TyApp (name, args))
+   <|> return (TyName name))
+    st
+
+and ty_atom_p st =
+  (ty_qual_p <|> ty_named_p <|> ty_singles_p <|> ty_vec_p <|> ty_mat_p <??> "type") st
 
 and ty_paren_or_tuple_p st =
   (let%bind ts = between `Paren (commas ty_p) in
@@ -208,12 +214,23 @@ let%expect_test "ty parse tests" =
     (pair float int)
     (pair (box float) int)
     |}];
+  test "M.t";
+  test "Color.t -> vec3";
+  test "(M.t, N.u)";
+  test "box[M.t]";
+  [%expect
+    {|
+    M.t
+    (Color.t -> (vec 3 float))
+    (tuple M.t N.u)
+    (box M.t)
+    |}];
   test "";
   test "()";
   [%expect
     {|
-    [parser]: expected one of: identifier, type keyword/variable, `(`
-    [parser] at 1:2-1:3: expected one of: identifier, type keyword/variable, `(` but found `)`
+    [parser]: expected one of: constructor, identifier, type keyword/variable, `(`
+    [parser] at 1:2-1:3: expected one of: constructor, identifier, type keyword/variable, `(` but found `)`
       |
     1 | ()
       |  ^
@@ -818,7 +835,7 @@ let%expect_test "where clause parse tests" =
     ((Broadcast 'a 'b 'r))
     ((MulBroadcast 'a 'b 'r))
     ((Numeric 'c) (Broadcast 'a 'b 'r))
-    [parser] at 1:7-1:14: expected one of: `(`, identifier, type keyword/variable but found `Unknown`
+    [parser] at 1:7-1:14: expected one of: `(`, `.`, identifier, type keyword/variable but found `Unknown`
       |
     1 | where Unknown 'a
       |       ^^^^^^^
@@ -1122,7 +1139,8 @@ let%expect_test "parse error messages" =
       |            ^
     |}];
   test_ty "";
-  [%expect {| [parser]: expected one of: identifier, type keyword/variable, `(` |}];
+  [%expect
+    {| [parser]: expected one of: constructor, identifier, type keyword/variable, `(` |}];
   test_ty "float ->";
   [%expect
     {|

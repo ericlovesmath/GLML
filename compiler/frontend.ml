@@ -60,6 +60,7 @@ type ty =
   | TyVar of string
   | TyApp of string * ty list
   | TyTuple of ty list
+  | TyQual of string * string
   | TySampler
 [@@deriving equal]
 
@@ -73,6 +74,7 @@ let rec sexp_of_ty = function
   | TyVar v -> Atom ("'" ^ v)
   | TyApp (s, args) -> List (Atom s :: List.map args ~f:sexp_of_ty)
   | TyTuple ts -> List (Atom "tuple" :: List.map ts ~f:sexp_of_ty)
+  | TyQual (m, t) -> Atom (m ^ "." ^ t)
   | TySampler -> Atom "sampler"
 ;;
 

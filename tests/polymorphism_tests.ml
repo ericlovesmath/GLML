@@ -497,7 +497,7 @@ let%expect_test "where clause on non-toplevel let - unknown class" =
     |};
   [%expect
     {|
-    [parser] at 2:57-2:60: expected one of: `(`, identifier, type keyword/variable but found `Foo`
+    [parser] at 2:57-2:60: expected one of: `(`, `.`, identifier, type keyword/variable but found `Foo`
       in: "let expression at 2:31-2:34"
       in: "a top-level definition at 2:5-2:8"
       |

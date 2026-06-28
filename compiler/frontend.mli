@@ -24,6 +24,7 @@ type ty =
   | TyVar of string
   | TyApp of string * ty list
   | TyTuple of ty list
+  | TyQual of string * string
   | TySampler
 [@@deriving sexp_of, equal]
 

@@ -265,6 +265,8 @@ let rec resolve_stlc_ty ~(loc : Lexer.loc) (env : env) (t : Frontend.ty) : ty =
           raise "wrong number of type args" ~loc ~d:[%message (name : string)]
         | Ok sub -> subst_ty sub body)
      | None -> args |> List.map ~f:resolve |> resolve_variant_or_struct name)
+  | TyQual (m, tn) ->
+    raise "uniquify should have removed" ~loc ~d:[%message (m : string) (tn : string)]
   | TyArrow (l, r) -> TyArrow (resolve l, resolve r)
   | TyFloat -> TyFloat
   | TyInt -> TyInt
@@ -932,6 +934,7 @@ let typecheck_impl (Program terms : Desugar.t) : t =
           let rec occurs_in (ty : Frontend.ty) =
             match ty with
             | TyFloat | TyInt | TyBool | TyVec _ | TyVar _ | TySampler -> false
+            | TyQual _ -> false
             | TyName s -> String.equal s name
             | TyApp (s, args) -> String.equal s name || List.exists args ~f:occurs_in
             | TyArrow (l, r) -> occurs_in l || occurs_in r
