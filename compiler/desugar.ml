@@ -94,7 +94,8 @@ type top_desc =
   | Define of recur * string * ty option * constr list * term
   | Extern of ty * string
   | TypeDef of string * string list * type_decl
-  | Module of string * top list
+  | Module of string * Frontend.sig_ref option * top list
+  | ModuleType of string * Frontend.spec list
   | Open of string
 
 and top =
@@ -122,8 +123,15 @@ let rec sexp_of_top_desc = function
   | TypeDef (name, params, decl) ->
     let ty = name ^ "[" ^ String.concat ~sep:", " params ^ "]" in
     List [ Atom "TypeDef"; Atom ty; sexp_of_type_decl decl ]
-  | Module (name, body) ->
-    List (Atom "Module" :: Atom name :: List.map body ~f:sexp_of_top)
+  | Module (name, sig_opt, body) ->
+    let sig_sexp =
+      match sig_opt with
+      | None -> []
+      | Some s -> [ List [ Atom ":"; Frontend.sexp_of_sig_ref s ] ]
+    in
+    List ((Atom "Module" :: Atom name :: sig_sexp) @ List.map body ~f:sexp_of_top)
+  | ModuleType (name, specs) ->
+    List (Atom "ModuleType" :: Atom name :: List.map specs ~f:Frontend.sexp_of_spec)
   | Open name -> List [ Atom "Open"; Atom name ]
 
 and sexp_of_top t = sexp_of_top_desc t.desc
@@ -219,7 +227,8 @@ let rec desugar_top_desc (td : Frontend.top_desc) : top_desc =
   | Define (r, v, ty_opt, where, t) -> Define (r, v, ty_opt, where, desugar_term t)
   | Extern (ty, v) -> Extern (ty, v)
   | TypeDef (name, params, decl) -> TypeDef (name, params, desugar_type_decl decl)
-  | Module (name, body) -> Module (name, List.map body ~f:desugar_top)
+  | Module (name, sig_opt, body) -> Module (name, sig_opt, List.map body ~f:desugar_top)
+  | ModuleType (name, specs) -> ModuleType (name, specs)
   | Open name -> Open name
 
 and desugar_top (t : Frontend.top) : top = { desc = desugar_top_desc t.desc; loc = t.loc }

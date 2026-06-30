@@ -934,6 +934,42 @@ let top_open_p =
     (tok OPEN *> commit (constructor_p >>| fun name -> Open name) <??> "an open")
 ;;
 
+let spec_p =
+  let val_p =
+    tok VAL
+    *> commit
+         (let%bind name = ident_p in
+          let%bind _ = tok COLON in
+          let%bind ty = ty_p in
+          return (SpecVal (name, ty)))
+  in
+  let type_p =
+    tok TYPE
+    *> commit
+         (let%bind name = ident_p in
+          (let%bind ty = tok EQ *> ty_p in
+           return (SpecManifestType (name, ty)))
+          <|> return (SpecAbstractType name))
+  in
+  val_p <|> type_p <??> "signature spec"
+;;
+
+let sig_body_p =
+  tok SIG
+  *> commit
+       (let%bind specs = many spec_p in
+        let%bind _ = tok END in
+        return specs)
+  <??> "signature body"
+;;
+
+let sig_ref_p =
+  sig_body_p
+  >>| (fun specs -> SigInline specs)
+  <|> (constructor_p >>| fun name -> SigName name)
+  <??> "signature"
+;;
+
 let rec top_item_p st =
   (top_let_p
    <|> top_extern_p
@@ -949,12 +985,24 @@ and top_module_p =
   (with_top_loc
      (tok MODULE
       *> commit
-           (let%bind name = constructor_p in
-            let%bind _ = tok EQ in
-            let%bind _ = tok STRUCT in
-            let%bind body = many top_item_p in
-            let%bind _ = tok END in
-            return (Module (name, body)))
+           (let module_type_p =
+              tok TYPE
+              *> commit
+                   (let%bind name = constructor_p in
+                    let%bind _ = tok EQ in
+                    let%bind specs = sig_body_p in
+                    return (ModuleType (name, specs)))
+            in
+            let module_struct_p =
+              let%bind name = constructor_p in
+              let%bind sig_opt = optional (tok COLON *> sig_ref_p) in
+              let%bind _ = tok EQ in
+              let%bind _ = tok STRUCT in
+              let%bind body = many top_item_p in
+              let%bind _ = tok END in
+              return (Module (name, sig_opt, body))
+            in
+            module_type_p <|> module_struct_p)
       <??> "module definition"))
     st
 ;;
@@ -1051,6 +1099,40 @@ let%expect_test "module parse tests" =
     {|
     (Program
      ((Module Empty)
+      (Define Nonrec main (lambda (coord ((vec 2 float))) (vec4 0. 0. 0. 1.)))))
+    |}]
+;;
+
+let%expect_test "module signature parsing" =
+  let test = test sexp_of_t glml_p in
+  test
+    {|
+    module type COLOR = sig
+      type t = vec3
+      type u
+      val mk : float -> t
+    end
+
+    module Color : COLOR = struct
+      type t = vec3
+      let mk (x : float) : t = [x, x, x]
+    end
+
+    module Inline : sig val f : float -> float end = struct
+      let f (x : float) : float = x
+    end
+
+    let main (coord : vec2) = [0.0, 0.0, 0.0, 1.0]
+    |};
+  [%expect
+    {|
+    (Program
+     ((ModuleType COLOR (SpecManifestType t (vec 3 float)) (SpecAbstractType u)
+       (SpecVal mk (float -> t)))
+      (Module Color (: COLOR) (TypeDef t (AliasDecl (vec 3 float)))
+       (Define Nonrec mk (: (float -> t)) (lambda (x (float)) (vec3 x x x))))
+      (Module Inline (: (sig (SpecVal f (float -> float))))
+       (Define Nonrec f (: (float -> float)) (lambda (x (float)) x)))
       (Define Nonrec main (lambda (coord ((vec 2 float))) (vec4 0. 0. 0. 1.)))))
     |}]
 ;;

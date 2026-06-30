@@ -39,7 +39,8 @@ type top_desc =
   | Extern of ty * string
   (* TypeDef (var, params, type) *)
   | TypeDef of string * string list * type_decl
-  | Module of string * top list
+  | Module of string * Frontend.sig_ref option * top list
+  | ModuleType of string * Frontend.spec list
   | Open of string
 [@@deriving sexp_of]
 

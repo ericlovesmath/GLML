@@ -46,6 +46,17 @@ type type_decl =
   | AliasDecl of ty
 [@@deriving sexp_of]
 
+type spec =
+  | SpecVal of string * ty
+  | SpecManifestType of string * ty
+  | SpecAbstractType of string
+[@@deriving sexp_of]
+
+type sig_ref =
+  | SigName of string
+  | SigInline of spec list
+[@@deriving sexp_of]
+
 type recur =
   (* NOTE: [int] is for the maximum number of recs allowed *)
   | Rec of int
@@ -89,7 +100,8 @@ type top_desc =
   | Extern of ty * string
   (* TypeDef (var, params, type) *)
   | TypeDef of string * string list * type_decl
-  | Module of string * top list
+  | Module of string * sig_ref option * top list
+  | ModuleType of string * spec list
   | Open of string
 [@@deriving sexp_of]
 

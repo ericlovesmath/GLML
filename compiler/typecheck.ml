@@ -101,6 +101,21 @@ type t = Program of top list [@@deriving sexp_of]
 (** Represents polymorphic [forall 'vars. constrs => ty] *)
 type type_scheme = string list * constr list * ty [@@deriving sexp_of]
 
+(** A structs's elaborated principal signature *)
+type sig_item =
+  | Sig_type of string * ty
+  | Sig_val of string * string (* surface name, emitted [core] global *)
+[@@deriving sexp_of]
+
+type signature = sig_item list [@@deriving sexp_of]
+
+(** A struct's declared signature (abstract types rejected FOR NOW) *)
+type decl_item =
+  | Decl_val of string * ty
+  | Decl_manifest of string * ty
+
+type decl_sig = decl_item list
+
 (** Maps type variables to type schemes *)
 type context = type_scheme String.Map.t
 
@@ -110,7 +125,27 @@ type env =
   ; structs : (string list * (string * ty) list) String.Map.t
   ; variants : (string list * (string * ty list) list) String.Map.t
   ; ctx : context
+  ; modules : signature String.Map.t
+  ; sigs : decl_sig String.Map.t
   }
+
+let sig_find_val (sg : signature) x =
+  List.find_map sg ~f:(function
+    | Sig_val (n, core) when String.equal n x -> Some core
+    | _ -> None)
+;;
+
+let sig_find_type (sg : signature) t =
+  List.find_map sg ~f:(function
+    | Sig_type (n, repr) when String.equal n t -> Some repr
+    | _ -> None)
+;;
+
+let module_sig ~loc (env : env) m : signature =
+  match Map.find env.modules m with
+  | Some sg -> sg
+  | None -> raise "unreachable: unresolved module path" ~loc ~d:[%message (m : string)]
+;;
 
 let subst_context (sub : substitution) (ctx : context) : type_scheme String.Map.t =
   Map.map ctx ~f:(fun (vars, constrs, ty) ->
@@ -266,7 +301,13 @@ let rec resolve_stlc_ty ~(loc : Lexer.loc) (env : env) (t : Frontend.ty) : ty =
         | Ok sub -> subst_ty sub body)
      | None -> args |> List.map ~f:resolve |> resolve_variant_or_struct name)
   | TyQual (m, tn) ->
-    raise "uniquify should have removed" ~loc ~d:[%message (m : string) (tn : string)]
+    (match sig_find_type (module_sig ~loc env m) tn with
+     | Some repr -> repr
+     | None ->
+       raise
+         "unreachable: unresolved module type path"
+         ~loc
+         ~d:[%message (m : string) (tn : string)])
   | TyArrow (l, r) -> TyArrow (resolve l, resolve r)
   | TyFloat -> TyFloat
   | TyInt -> TyInt
@@ -394,6 +435,21 @@ let coerce_arg_to_ty loc (arg : term) (expected_ty : ty) : term * constr list =
   | _ -> coerce_term loc expected_ty arg, [ c (Coerce (arg.ty, expected_ty)) ]
 ;;
 
+(** Instantiate the scheme bound to top-level global [core].
+    Shared by the [Var] and [Qual] arms *)
+let instantiate_core ~loc (env : env) core ~name : ty * constr list =
+  let vs, scheme_constrs, ty_scheme =
+    match Map.find env.ctx core with
+    | Some s -> s
+    | None -> raise "var not found in type map" ~loc ~d:[%message (core : string)]
+  in
+  let sub = List.map vs ~f:(fun v -> v, fresh_tyvar ()) in
+  let ty = subst_ty sub ty_scheme in
+  if equal_ty ty TySampler
+  then raise "sampler may only be used in #texture" ~loc ~d:[%message (name : string)];
+  ty, subst_constraints sub scheme_constrs
+;;
+
 (** Typecheck a [let] binding, returns the enclosing scope needs to continue inference: *)
 let rec infer_binding
           (env : env)
@@ -468,18 +524,21 @@ and gen_term (env : env) (t : Desugar.term) : term * constr list * substitution 
   | Int i -> make (Int i) TyInt []
   | Bool b -> make (Bool b) TyBool []
   | Var v ->
-    let vs, scheme_constrs, ty_scheme =
-      match Map.find env.ctx v with
-      | Some s -> s
-      | None -> raise "var not found in type map" ~loc ~d:[%message (v : string)]
-    in
-    let sub = List.map vs ~f:(fun v -> v, fresh_tyvar ()) in
-    let ty = subst_ty sub ty_scheme in
-    if equal_ty ty TySampler
-    then raise "sampler may only be used in #texture" ~loc ~d:[%message (v : string)];
-    make (Var v) ty (subst_constraints sub scheme_constrs)
+    let ty, cs = instantiate_core ~loc env v ~name:v in
+    make (Var v) ty cs
   | Qual (m, x) ->
-    raise "uniquify should have removed qual" ~loc ~d:[%message (m : string) (x : string)]
+    let core =
+      match sig_find_val (module_sig ~loc env m) x with
+      | Some core -> core
+      | None ->
+        raise
+          "unreachable: unresolved module member path"
+          ~loc
+          ~d:[%message (m : string) (x : string)]
+    in
+    (* resolve exactly like [Var core] - the scheme lives in [ctx] *)
+    let ty, cs = instantiate_core ~loc env core ~name:x in
+    make (Var core) ty cs
   | Lam (v, ty_ann, body_stlc) ->
     let ty_v =
       match ty_ann with
@@ -777,7 +836,7 @@ and gen_variant (env : env) (loc : Lexer.loc) (ctor : string) (args : Desugar.te
   let expected_arg_tys =
     List.Assoc.find inst_ctors ~equal:String.equal ctor
     |> of_option
-         "(unreachable) ctor not in instantiated ctors"
+         "unreachable: ctor not in instantiated ctors"
          ~loc
          ~d:[%message (ctor : string)]
     |> ok_exn
@@ -858,6 +917,163 @@ let enforce_main_type _env bind ty loc v =
     | _ -> raise "main must have type vec2 -> vec4" ~loc ~d:[%message (ty : ty)])
 ;;
 
+(** [subsumes scheme tau], is a structure member's principal scheme at least as
+    general as the signature spec [tau]? Standard skolemize / instantiate / unify *)
+let subsumes ~loc ((vars_s, constrs_s, body_s) : type_scheme) (tau_spec : ty) : bool =
+  (* Skolemize the spec's quantifiers to fresh *)
+  let skolems =
+    ftv_of_ty tau_spec |> Set.to_list |> List.map ~f:(fun v -> v, fresh_tyvar ())
+  in
+  let skolem_names =
+    List.filter_map skolems ~f:(fun (_, t) ->
+      match t with
+      | TyVar s -> Some s
+      | _ -> None)
+  in
+  let tau' = subst_ty skolems tau_spec in
+  (* Instantiate the struct scheme with fresh flexible tyvars *)
+  let inst = List.map vars_s ~f:(fun v -> v, fresh_tyvar ()) in
+  let body' = subst_ty inst body_s in
+  let constrs' = subst_constraints inst constrs_s in
+  (* Unify bodies, discharge the struct's class/broadcast obligations *)
+  match
+    Compiler_error.try_with (fun () ->
+      Constraint_solver.solve ({ desc = Eq (body', tau'); loc } :: constrs'))
+  with
+  | Error _ -> false
+  | Ok (sub, deferred) ->
+    List.is_empty deferred
+    &&
+    (* Every skolem must remain a distinct type variable *)
+    let imgs = List.map skolem_names ~f:(fun s -> subst_ty sub (TyVar s)) in
+    List.for_all imgs ~f:(function
+      | TyVar _ -> true
+      | _ -> false)
+    && not (List.contains_dup imgs ~compare:compare_ty)
+;;
+
+(** Elaborate a declared signature for matching *)
+let elaborate_decl_sig ~loc (env : env) (specs : Frontend.spec list) : decl_sig =
+  let _, rev =
+    List.fold specs ~init:(env, []) ~f:(fun (env, acc) spec ->
+      match spec with
+      | SpecManifestType (t, ty) ->
+        let repr = resolve_stlc_ty ~loc env ty in
+        ( { env with aliases = Map.set env.aliases ~key:t ~data:([], repr) }
+        , Decl_manifest (t, repr) :: acc )
+      | SpecVal (x, ty) -> env, Decl_val (x, resolve_stlc_ty ~loc env ty) :: acc
+      | SpecAbstractType t ->
+        raise "abstract type specs not supported yet" ~loc ~d:[%message (t : string)])
+  in
+  List.rev rev
+;;
+
+(** Transparent signature matching *)
+let match_sig ~loc (env : env) mname (full : signature) (decl : decl_sig) : unit =
+  List.iter decl ~f:(function
+    | Decl_val (x, tau) ->
+      (match sig_find_val full x with
+       | None ->
+         raise
+           "module does not implement val"
+           ~loc
+           ~d:[%message (mname : string) (x : string)]
+       | Some core ->
+         let scheme =
+           Map.find env.ctx core
+           |> of_option "var not found in type map" ~loc ~d:[%message (core : string)]
+           |> ok_exn
+         in
+         if not (subsumes ~loc scheme tau)
+         then
+           raise
+             "signature mismatch: val has wrong type"
+             ~loc
+             ~d:[%message (mname : string) (x : string)])
+    | Decl_manifest (t, repr_expected) ->
+      (match sig_find_type full t with
+       | None ->
+         raise
+           "module does not implement type"
+           ~loc
+           ~d:[%message (mname : string) (t : string)]
+       | Some repr ->
+         if not (equal_ty repr repr_expected)
+         then
+           raise
+             "signature mismatch: manifest type"
+             ~loc
+             ~d:[%message (mname : string) (t : string)]))
+;;
+
+(** Elaborate a top-level [Define] *)
+let check_define (env : env) loc recur name return_ty constrs bind : top * env =
+  let bind, ty, env, scheme_constrs, remaining, _, scheme_vars =
+    infer_binding env loc bind recur name return_ty constrs
+  in
+  let ambiguous = Set.diff (ftv_of_ty ty) (String.Set.of_list scheme_vars) in
+  if not (List.is_empty remaining)
+  then
+    raise "unresolved top-level constraints" ~loc ~d:[%message (remaining : constr list)];
+  if not (Set.is_empty ambiguous)
+  then
+    raise
+      "ambiguous type, add a type annotation"
+      ~loc
+      ~d:[%message (name : string) (ty : ty) (ambiguous : String.Set.t)];
+  let bind, ty = enforce_main_type env bind ty loc name in
+  { desc = Define (recur, name, bind); ty; loc; scheme_constrs }, env
+;;
+
+(* Resolve an ascription's signature reference to a [decl_sig] for matching *)
+let elaborate_sigref ~loc (env : env) : Frontend.sig_ref -> decl_sig = function
+  | SigInline specs -> elaborate_decl_sig ~loc env specs
+  | SigName s ->
+    (match Map.find env.sigs s with
+     | Some d -> d
+     | None -> raise "unreachable: signature not found" ~loc ~d:[%message (s : string)])
+;;
+
+(** Elaborate a module to a single [signature] bound in [env.modules].
+
+    Sibling and self references resolve against the signature built so far *)
+let elaborate_module (env : env) loc mname sig_opt (members : Desugar.top list)
+  : env * top list
+  =
+  let add_item env item =
+    { env with modules = Map.add_multi env.modules ~key:mname ~data:item }
+  in
+  let env', rev_tops =
+    List.fold members ~init:(env, []) ~f:(fun (env, tops) (m : Desugar.top) ->
+      match m.desc with
+      | Define (recur, surface, return_ty, constrs, bind) ->
+        let core = Utils.fresh surface in
+        let env = add_item env (Sig_val (surface, core)) in
+        let top, env = check_define env m.loc recur core return_ty constrs bind in
+        env, top :: tops
+      | TypeDef (surface, params, AliasDecl ty) ->
+        let repr = resolve_stlc_ty ~loc:m.loc env ty in
+        let env =
+          add_item
+            { env with aliases = Map.set env.aliases ~key:surface ~data:(params, repr) }
+            (Sig_type (surface, repr))
+        in
+        env, tops
+      | _ -> raise "unreachable: invalid module member after uniquify" ~loc:m.loc)
+  in
+  let full = List.rev (Map.find_multi env'.modules mname) in
+  (* An ascription is checked against the structure here *)
+  Option.iter sig_opt ~f:(fun sigref ->
+    let decl_sig = elaborate_sigref ~loc env' sigref in
+    match_sig ~loc env' mname full decl_sig);
+  (* member schemes stay in [ctx], module-local type aliases should not leak *)
+  ( { env' with
+      aliases = env.aliases
+    ; modules = Map.set env'.modules ~key:mname ~data:full
+    }
+  , List.rev rev_tops )
+;;
+
 let typecheck_impl (Program terms : Desugar.t) : t =
   let _, tops =
     List.fold
@@ -867,33 +1083,15 @@ let typecheck_impl (Program terms : Desugar.t) : t =
           ; structs = String.Map.empty
           ; variants = String.Map.empty
           ; ctx = String.Map.empty
+          ; modules = String.Map.empty
+          ; sigs = String.Map.empty
           }
         , [] )
       ~f:(fun (env, acc) top ->
         match top.desc with
         | Define (recur, v, return_ty, constrs, bind) ->
-          let bind, ty, env, scheme_constrs, remaining, _, scheme_vars =
-            infer_binding env top.loc bind recur v return_ty constrs
-          in
-          let ambiguous = Set.diff (ftv_of_ty ty) (String.Set.of_list scheme_vars) in
-          if not (List.is_empty remaining)
-          then
-            raise
-              "unresolved top-level constraints"
-              ~loc:top.loc
-              ~d:[%message (remaining : constr list)]
-          else if not (Set.is_empty ambiguous)
-          then
-            raise
-              "ambiguous type, add a type annotation"
-              ~loc:top.loc
-              ~d:[%message (v : string) (ty : ty) (ambiguous : String.Set.t)]
-          else (
-            let bind, ty = enforce_main_type env bind ty top.loc v in
-            let top =
-              { desc = Define (recur, v, bind); ty; loc = top.loc; scheme_constrs }
-            in
-            env, top :: acc)
+          let top, env = check_define env top.loc recur v return_ty constrs bind in
+          env, top :: acc
         | Extern (ty, v) ->
           let ty = resolve_stlc_ty ~loc:top.loc env ty in
           let env = { env with ctx = Map.set env.ctx ~key:v ~data:([], [], ty) } in
@@ -949,10 +1147,12 @@ let typecheck_impl (Program terms : Desugar.t) : t =
               { env with aliases = Map.set env.aliases ~key:name ~data:(params, body) }
             in
             env, acc)
-        (* [Uniquify] flattens modules to top-level [Define]s and drops
-           [Open] before typechecking; these arms assert that invariant. *)
-        | Module (name, _) ->
-          raise "uniquify should have removed" ~loc:top.loc ~d:[%message (name : string)]
+        | Module (name, sig_opt, members) ->
+          let env, member_tops = elaborate_module env top.loc name sig_opt members in
+          env, List.rev_append member_tops acc
+        | ModuleType (name, specs) ->
+          let decl = elaborate_decl_sig ~loc:top.loc env specs in
+          { env with sigs = Map.set env.sigs ~key:name ~data:decl }, acc
         | Open name ->
           raise "uniquify should have removed" ~loc:top.loc ~d:[%message (name : string)])
   in

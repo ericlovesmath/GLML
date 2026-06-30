@@ -53,6 +53,8 @@ type token =
   | STRUCT
   | END
   | OPEN
+  | SIG
+  | VAL
   | CONSTRUCTOR of string
   | NUMERIC of int
   | FLOAT_LIT of float

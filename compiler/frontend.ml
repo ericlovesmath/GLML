@@ -104,6 +104,20 @@ type type_decl =
   | AliasDecl of ty
 [@@deriving sexp_of]
 
+(** [sig ... end] *)
+type spec =
+  | SpecVal of string * ty
+  | SpecManifestType of string * ty (* type t = ty *)
+  (* TODO: SpecAbstractType does nothing rn *)
+  | SpecAbstractType of string (* type t *)
+[@@deriving sexp_of]
+
+(** named [: S] or inline [: sig ... end] *)
+type sig_ref =
+  | SigName of string
+  | SigInline of spec list
+[@@deriving sexp_of]
+
 type recur =
   | Rec of int
   | Nonrec
@@ -199,13 +213,19 @@ type top_desc =
   | Define of recur * string * ty option * constr list * term
   | Extern of ty * string
   | TypeDef of string * string list * type_decl
-  | Module of string * top list
+  | Module of string * sig_ref option * top list
+  | ModuleType of string * spec list
   | Open of string
 
 and top =
   { desc : top_desc
   ; loc : Lexer.loc
   }
+
+let sexp_of_sig_ref = function
+  | SigName s -> Atom s
+  | SigInline specs -> List (Atom "sig" :: List.map specs ~f:sexp_of_spec)
+;;
 
 let rec sexp_of_top_desc = function
   | Define (recur, v, ret_ty_opt, constrs, term) ->
@@ -227,8 +247,15 @@ let rec sexp_of_top_desc = function
   | TypeDef (name, params, decl) ->
     let ty = name ^ "[" ^ String.concat ~sep:", " params ^ "]" in
     List [ Atom "TypeDef"; Atom ty; sexp_of_type_decl decl ]
-  | Module (name, body) ->
-    List (Atom "Module" :: Atom name :: List.map body ~f:sexp_of_top)
+  | Module (name, sig_opt, body) ->
+    let sig_sexp =
+      match sig_opt with
+      | None -> []
+      | Some s -> [ List [ Atom ":"; sexp_of_sig_ref s ] ]
+    in
+    List ((Atom "Module" :: Atom name :: sig_sexp) @ List.map body ~f:sexp_of_top)
+  | ModuleType (name, specs) ->
+    List (Atom "ModuleType" :: Atom name :: List.map specs ~f:sexp_of_spec)
   | Open name -> List [ Atom "Open"; Atom name ]
 
 and sexp_of_top t = sexp_of_top_desc t.desc
