@@ -1344,6 +1344,7 @@ let%expect_test "fragment derivative builtins" =
     }
     |}]
 ;;
+
 let%expect_test "records are nominal" =
   test
     {|
