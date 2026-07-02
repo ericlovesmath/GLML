@@ -108,7 +108,6 @@ type type_decl =
 type spec =
   | SpecVal of string * ty
   | SpecManifestType of string * ty (* type t = ty *)
-  (* TODO: SpecAbstractType does nothing rn *)
   | SpecAbstractType of string (* type t *)
 [@@deriving sexp_of]
 

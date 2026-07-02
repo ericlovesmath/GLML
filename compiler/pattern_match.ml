@@ -30,7 +30,7 @@ let signature_heads : ty -> head list option = function
   | TyVec (n, elem) -> [ HBracket (List.init n ~f:(Fn.const elem)) ] |> Some
   | TyRecord (_, fs) -> [ HRecord fs ] |> Some
   | TyTuple ts -> [ HTuple ts ] |> Some
-  | TyInt | TyFloat | TyArrow _ | TyVar _ | TySampler -> None
+  | TyInt | TyFloat | TyArrow _ | TyVar _ | TySampler | TyAbstract _ -> None
 ;;
 
 (** Head of a non-wild pattern at [col_ty]. Returns [None] for wild/var. *)
@@ -150,8 +150,13 @@ module Matrix = struct
 
   let is_wild : pat -> bool = function
     | PatWildcard | PatVar _ -> true
-    | PatCtor _ | PatLitBool _ | PatLitInt _ | PatLitFloat _ | PatBracket _
-    | PatRecord _ | PatTuple _ -> false
+    | PatCtor _
+    | PatLitBool _
+    | PatLitInt _
+    | PatLitFloat _
+    | PatBracket _
+    | PatRecord _
+    | PatTuple _ -> false
   ;;
 
   let classify (rows : 'a row list) : [ `Empty | `Leaf of 'a row | `Pivot of int ] =

@@ -8,6 +8,7 @@ module Passes : sig
     | Desugar
     | Uniquify
     | Typecheck
+    | Erase
     | Promote_ints
     | Monomorphize
     | Lower_tuples

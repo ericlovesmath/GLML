@@ -55,5 +55,15 @@ val subst_term : substitution -> term -> term
 (** Pre-order fold over every subterm of [t]. *)
 val fold_term : f:('a -> term -> 'a) -> 'a -> term -> 'a
 
+(** Map [f] over every [ty] embedded in a program. Used by [Erase]. *)
+val map_term_tys : f:(ty -> ty) -> term -> term
+
+(** Typed program together with the [reveal] map from abs type to repo *)
+type elaborated =
+  { program : t
+  ; reveal : ty Core.String.Map.t
+  }
+[@@deriving sexp_of]
+
 (** Typechecker for GLML *)
-val typecheck : Desugar.t -> t Compiler_error.t
+val typecheck : Desugar.t -> elaborated Compiler_error.t

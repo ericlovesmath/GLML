@@ -2,16 +2,7 @@ open Core
 open Typecheck
 open Type_system
 
-let rec has_tyvar = function
-  | TyVar _ -> true
-  | TyFloat | TyInt | TyBool | TySampler -> false
-  | TyVec (_, t) -> has_tyvar t
-  | TyArrow (a, b) -> has_tyvar a || has_tyvar b
-  | TyRecord (_, fields) -> List.exists fields ~f:(fun (_, t) -> has_tyvar t)
-  | TyVariant (_, ctors) ->
-    List.exists ctors ~f:(fun (_, ts) -> List.exists ts ~f:has_tyvar)
-  | TyTuple ts -> List.exists ts ~f:has_tyvar
-;;
+let has_tyvar ty = not (Set.is_empty (ftv_of_ty ty))
 
 let rec coercible (from_ty : ty) (to_ty : ty) : bool =
   if equal_ty from_ty to_ty
@@ -21,9 +12,11 @@ let rec coercible (from_ty : ty) (to_ty : ty) : bool =
     | TyInt, TyFloat -> true
     | TyArrow (p, r), TyArrow (p', r') -> coercible p' p && coercible r r'
     | TyVec (n, t), TyVec (n', t') when n = n' -> coercible t t'
-    | TyRecord (_, fs), TyRecord (_, fs') when List.length fs = List.length fs' ->
+    | TyRecord (n, fs), TyRecord (n', fs')
+      when String.equal n n' && List.length fs = List.length fs' ->
       List.for_all2_exn fs fs' ~f:(fun (_, a) (_, b) -> coercible a b)
-    | TyVariant (_, cs), TyVariant (_, cs') when List.length cs = List.length cs' ->
+    | TyVariant (n, cs), TyVariant (n', cs')
+      when String.equal n n' && List.length cs = List.length cs' ->
       List.for_all2_exn cs cs' ~f:(fun (_, ts) (_, ts') ->
         List.length ts = List.length ts' && List.for_all2_exn ts ts' ~f:coercible)
     | TyTuple ts, TyTuple ts' when List.length ts = List.length ts' ->

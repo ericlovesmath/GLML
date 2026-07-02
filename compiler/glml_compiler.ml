@@ -9,6 +9,7 @@ module Passes = struct
       | Desugar
       | Uniquify
       | Typecheck
+      | Erase
       | Promote_ints
       | Monomorphize
       | Lower_tuples
@@ -46,7 +47,9 @@ let compile
   let%bind t = Uniquify.uniquify t in
   trace Uniquify (Desugar.sexp_of_t t);
   let%bind t = Typecheck.typecheck t in
-  trace Typecheck (Typecheck.sexp_of_t t);
+  trace Typecheck (Typecheck.sexp_of_elaborated t);
+  let%bind t = Erase.erase t in
+  trace Erase (Typecheck.sexp_of_t t);
   let t = Promote_ints.materialize t in
   trace Promote_ints (Typecheck.sexp_of_t t);
   let%bind t = Monomorphize.monomorphize t in

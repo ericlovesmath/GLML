@@ -467,6 +467,51 @@ let%expect_test "signature mismatch errors" =
     |}]
 ;;
 
+let%expect_test "distinct spec type variables cannot be identified" =
+  (* ['a] and ['b] skolemize to distinct rigids, so a diagonal impl must not
+     match a spec promising two independent type variables. *)
+  test
+    {|
+    module type S = sig val f : 'a -> 'b end
+    module M : S = struct let f x = x end
+    let main (coord : vec2) : vec4 = [0.0, 0.0, 0.0, 1.0]
+    |};
+  [%expect
+    {|
+    [typecheck] at 3:5-3:42: signature mismatch: val has wrong type
+      mname: M
+      x: f
+      |
+    3 |     module M : S = struct let f x = x end
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |}]
+;;
+
+let%expect_test "inline signature cannot reference a module-internal type" =
+  (* The signature expression elaborates in the ambient scope: [t] is the
+     structure's internal alias, not declared in the sig, so the spec must not
+     silently resolve it (transparently) against the module's internals. *)
+  test
+    {|
+    module M : sig val f : t -> t end = struct
+      type t = vec3
+      let f (x : vec3) : vec3 = x
+    end
+    let main (coord : vec2) : vec4 = [0.0, 0.0, 0.0, 1.0]
+    |};
+  [%expect
+    {|
+    [typecheck] at 2:5-5:8: type not a variant or record
+      t: t
+      |
+    2 |     module M : sig val f : t -> t end = struct
+    3 |       type t = vec3
+    4 |       let f (x : vec3) : vec3 = x
+    5 |     end
+      |
+    |}]
+;;
+
 let%expect_test "manifest type equality success" =
   test
     {|
@@ -623,5 +668,370 @@ let%expect_test "unknown qualified type member" =
       |
     3 |     let main (coord : vec2) : M.cinna = [0.0, 0.0, 0.0, 1.0]
       |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |}]
+;;
+
+let%expect_test "abstract type" =
+  test
+    {|
+    module type COLOR = sig
+      type t
+      val rgb : float -> float -> float -> t
+      val shade : t -> vec3
+    end
+
+    module Color : COLOR = struct
+      type t = vec3
+      let rgb (r : float) (g : float) (b : float) : t = [r, g, b]
+      let shade (c : t) : vec3 = c
+    end
+
+    let main (coord : vec2) : vec4 =
+      let c = Color.rgb 0.25 0.5 0.75 in
+      let s = Color.shade c in
+      [s.0, s.1, s.2, 1.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(0.25, 0.5, 0.75, 1.);
+    }
+    |}]
+;;
+
+let%expect_test "abstract type opacity error" =
+  test
+    {|
+    module type COLOR = sig
+      type t
+      val rgb : float -> float -> float -> t
+    end
+    module Color : COLOR = struct
+      type t = vec3
+      let rgb (r : float) (g : float) (b : float) : t = [r, g, b]
+    end
+    let main (coord : vec2) : vec4 =
+      let c = Color.rgb 1.0 0.0 0.0 in
+      let x : vec3 = c in
+      [x.0, x.1, x.2, 1.0]
+    |};
+  [%expect
+    {|
+    [constraint solver] at 12:7-13:27: type mismatch
+      ty: #t_0
+      ty': (vec 3 float)
+       |
+    12 |       let x : vec3 = c in
+    13 |       [x.0, x.1, x.2, 1.0]
+       |
+    |}]
+;;
+
+let%expect_test "abstract and manifest types mixed in one signature" =
+  test
+    {|
+    module type S = sig
+      type t
+      type u = vec2
+      val make : u -> t
+      val get : t -> u
+    end
+    module M : S = struct
+      type t = vec2
+      type u = vec2
+      let make (p : u) : t = p
+      let get (c : t) : u = c
+    end
+    let main (coord : vec2) : vec4 =
+      let c = M.make coord in
+      let p = M.get c in
+      [p.0, p.1, 0.0, 1.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        float anf = coord[0];
+        float anf_0 = coord[1];
+        fragColor = vec4(anf, anf_0, 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "abstract types are generative" =
+  test
+    {|
+    module type BOX = sig
+      type t
+      val wrap : float -> t
+    end
+    module A : BOX = struct type t = float  let wrap (x : float) : t = x end
+    module B : BOX = struct type t = float  let wrap (x : float) : t = x end
+    let use (x : A.t) : float = 0.0
+    let main (coord : vec2) : vec4 = [use (B.wrap 1.0), 0.0, 0.0, 1.0]
+    |};
+  [%expect
+    {|
+    [constraint solver] at 9:39-9:55: type mismatch
+      ty: #t_1
+      ty': #t_0
+      |
+    9 |     let main (coord : vec2) : vec4 = [use (B.wrap 1.0), 0.0, 0.0, 1.0]
+      |                                       ^^^^^^^^^^^^^^^^
+    |}]
+;;
+
+let%expect_test "stamps present pre-erasure" =
+  test
+    ~dump:[ Typecheck; Erase ]
+    {|
+    module type COLOR = sig
+      type t
+      val rgb : float -> float -> float -> t
+      val shade : t -> vec3
+    end
+    module Color : COLOR = struct
+      type t = vec3
+      let rgb (r : float) (g : float) (b : float) : t = [r, g, b]
+      let shade (c : t) : vec3 = c
+    end
+    let main (coord : vec2) : vec4 =
+      let c = Color.rgb 0.25 0.5 0.75 in
+      let s = Color.shade c in
+      [s.0, s.1, s.2, 1.0]
+    |};
+  [%expect
+    {|
+    ===== typecheck =====
+    ((program
+      (Program
+       (((Define Nonrec rgb
+          ((coerce (float -> (float -> (float -> (vec 3 float))))
+            ((lambda r
+              ((lambda g
+                ((lambda b
+                  ((vec3 ((coerce float (r : float)) : float)
+                    ((coerce float (g : float)) : float)
+                    ((coerce float (b : float)) : float))
+                   : (vec 3 float)))
+                 : (float -> (vec 3 float))))
+               : (float -> (float -> (vec 3 float)))))
+             : (float -> (float -> (float -> (vec 3 float))))))
+           : (float -> (float -> (float -> (vec 3 float))))))
+         : (float -> (float -> (float -> (vec 3 float)))))
+        ((Define Nonrec shade
+          ((coerce ((vec 3 float) -> (vec 3 float))
+            ((lambda c (c : (vec 3 float))) : ((vec 3 float) -> (vec 3 float))))
+           : ((vec 3 float) -> (vec 3 float))))
+         : ((vec 3 float) -> (vec 3 float)))
+        ((Define Nonrec main
+          ((coerce ((vec 2 float) -> (vec 4 float))
+            ((coerce ((vec 2 float) -> (vec 4 float))
+              ((lambda coord
+                ((let c_0
+                  ((app
+                    ((app
+                      ((app (rgb : (float -> (float -> (float -> #t_0))))
+                        ((coerce float (0.25 : float)) : float))
+                       : (float -> (float -> #t_0)))
+                      ((coerce float (0.5 : float)) : float))
+                     : (float -> #t_0))
+                    ((coerce float (0.75 : float)) : float))
+                   : #t_0)
+                  ((let s
+                    ((app (shade : (#t_0 -> (vec 3 float)))
+                      ((coerce #t_0 (c_0 : #t_0)) : #t_0))
+                     : (vec 3 float))
+                    ((vec4
+                      ((coerce float ((index (s : (vec 3 float)) 0) : float)) :
+                       float)
+                      ((coerce float ((index (s : (vec 3 float)) 1) : float)) :
+                       float)
+                      ((coerce float ((index (s : (vec 3 float)) 2) : float)) :
+                       float)
+                      ((coerce float (1. : float)) : float))
+                     : (vec 4 float)))
+                   : (vec 4 float)))
+                 : (vec 4 float)))
+               : ((vec 2 float) -> (vec 4 float))))
+             : ((vec 2 float) -> (vec 4 float))))
+           : ((vec 2 float) -> (vec 4 float))))
+         : ((vec 2 float) -> (vec 4 float))))))
+     (reveal ((t_0 (vec 3 float)))))
+
+
+    ===== erase =====
+    (Program
+     (((Define Nonrec rgb
+        ((coerce (float -> (float -> (float -> (vec 3 float))))
+          ((lambda r
+            ((lambda g
+              ((lambda b
+                ((vec3 ((coerce float (r : float)) : float)
+                  ((coerce float (g : float)) : float)
+                  ((coerce float (b : float)) : float))
+                 : (vec 3 float)))
+               : (float -> (vec 3 float))))
+             : (float -> (float -> (vec 3 float)))))
+           : (float -> (float -> (float -> (vec 3 float))))))
+         : (float -> (float -> (float -> (vec 3 float))))))
+       : (float -> (float -> (float -> (vec 3 float)))))
+      ((Define Nonrec shade
+        ((coerce ((vec 3 float) -> (vec 3 float))
+          ((lambda c (c : (vec 3 float))) : ((vec 3 float) -> (vec 3 float))))
+         : ((vec 3 float) -> (vec 3 float))))
+       : ((vec 3 float) -> (vec 3 float)))
+      ((Define Nonrec main
+        ((coerce ((vec 2 float) -> (vec 4 float))
+          ((coerce ((vec 2 float) -> (vec 4 float))
+            ((lambda coord
+              ((let c_0
+                ((app
+                  ((app
+                    ((app (rgb : (float -> (float -> (float -> (vec 3 float)))))
+                      ((coerce float (0.25 : float)) : float))
+                     : (float -> (float -> (vec 3 float))))
+                    ((coerce float (0.5 : float)) : float))
+                   : (float -> (vec 3 float)))
+                  ((coerce float (0.75 : float)) : float))
+                 : (vec 3 float))
+                ((let s
+                  ((app (shade : ((vec 3 float) -> (vec 3 float)))
+                    ((coerce (vec 3 float) (c_0 : (vec 3 float))) :
+                     (vec 3 float)))
+                   : (vec 3 float))
+                  ((vec4
+                    ((coerce float ((index (s : (vec 3 float)) 0) : float)) :
+                     float)
+                    ((coerce float ((index (s : (vec 3 float)) 1) : float)) :
+                     float)
+                    ((coerce float ((index (s : (vec 3 float)) 2) : float)) :
+                     float)
+                    ((coerce float (1. : float)) : float))
+                   : (vec 4 float)))
+                 : (vec 4 float)))
+               : (vec 4 float)))
+             : ((vec 2 float) -> (vec 4 float))))
+           : ((vec 2 float) -> (vec 4 float))))
+         : ((vec 2 float) -> (vec 4 float))))
+       : ((vec 2 float) -> (vec 4 float)))))
+
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(0.25, 0.5, 0.75, 1.);
+    }
+    |}]
+;;
+
+let%expect_test "transitive erasure of stamp" =
+  test
+    {|
+    module type NUM = sig
+      type t
+      val of_float : float -> t
+      val to_float : t -> float
+    end
+    module A : NUM = struct
+      type t = float
+      let of_float (x : float) : t = x
+      let to_float (c : t) : float = c
+    end
+    module B : NUM = struct
+      type t = A.t
+      let of_float (x : float) : t = A.of_float x
+      let to_float (c : t) : float = A.to_float c
+    end
+    let main (coord : vec2) : vec4 =
+      let b = B.of_float 0.5 in
+      [B.to_float b, 0.0, 0.0, 1.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(0.5, 0., 0., 1.);
+    }
+    |}]
+;;
+
+let%expect_test "ascription restricts a member to its signature type" =
+  test
+    {|
+    module type S = sig val f : float -> float end
+    module M : S = struct let f x = x end
+    let main (coord : vec2) : vec4 = [M.f true, 0.0, 0.0, 1.0]
+    |};
+  [%expect
+    {|
+    [constraint solver] at 4:39-4:47: type mismatch
+      ty: bool
+      ty': float
+      |
+    4 |     let main (coord : vec2) : vec4 = [M.f true, 0.0, 0.0, 1.0]
+      |                                       ^^^^^^^^
+  |}];
+  test
+    {|
+    module type S = sig
+      type t
+      type u = t
+      val make : float -> t
+      val get : u -> float
+    end
+    module M : S = struct
+      type t = float
+      type u = float
+      let make (x : float) : t = x
+      let get (c : u) : float = c
+    end
+    let main (coord : vec2) : vec4 =
+      let c : M.u = M.make 0.5 in
+      [M.get c, 0.0, 0.0, 1.0]
+    |};
+  [%expect
+    {|
+    #version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    void main() {
+        vec2 coord = gl_FragCoord.xy;
+        fragColor = vec4(0.5, 0., 0., 1.);
+    }
+  |}];
+  test
+    {|
+    module type S = sig
+      type t
+      type u = t
+      val get : u -> float
+    end
+    module M : S = struct
+      type t = float
+      type u = float
+      let get (c : u) : float = c
+    end
+    let main (coord : vec2) : vec4 = [M.get 0.5, 0.0, 0.0, 1.0]
+    |};
+  [%expect
+    {|
+    [constraint solver] at 12:39-12:48: type mismatch
+      ty: float
+      ty': #t_0
+       |
+    12 |     let main (coord : vec2) : vec4 = [M.get 0.5, 0.0, 0.0, 1.0]
+       |                                       ^^^^^^^^^
     |}]
 ;;

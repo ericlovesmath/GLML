@@ -109,10 +109,11 @@ type sig_item =
 
 type signature = sig_item list [@@deriving sexp_of]
 
-(** A struct's declared signature (abstract types rejected FOR NOW) *)
+(** A declared signature, read as an existential package *)
 type decl_item =
   | Decl_val of string * ty
   | Decl_manifest of string * ty
+  | Decl_abstract of string * string (* surface name and bound stamp *)
 
 type decl_sig = decl_item list
 
@@ -127,6 +128,7 @@ type env =
   ; ctx : context
   ; modules : signature String.Map.t
   ; sigs : decl_sig String.Map.t
+  ; reveal : ty String.Map.t
   }
 
 let sig_find_val (sg : signature) x =
@@ -177,31 +179,33 @@ let rec fold_term ~(f : 'a -> term -> 'a) (acc : 'a) (t : term) : 'a =
   | Tuple ts -> List.fold ts ~init:acc ~f:fold
 ;;
 
-(** Apply substitution to term *)
-let rec subst_term (sub : substitution) (t : term) : term =
-  let subst = subst_term sub in
+(** Map [f] over every [ty] embedded in a term *)
+let rec map_term_tys ~(f : ty -> ty) (t : term) : term =
+  let map = map_term_tys ~f in
   let (desc : term_desc) =
     match t.desc with
     | Var _ | Float _ | Int _ | Bool _ -> t.desc
-    | Vec (n, ts) -> Vec (n, List.map ts ~f:subst)
-    | Lam (v, body) -> Lam (v, subst body)
-    | App (f, x) -> App (subst f, subst x)
-    | Let (recur, v, constrs, bind, body) ->
-      Let (recur, v, subst_constraints sub constrs, subst bind, subst body)
-    | If (c, t, f) -> If (subst c, subst t, subst f)
-    | Bop (op, l, r) -> Bop (op, subst l, subst r)
-    | Index (t, i) -> Index (subst t, i)
-    | Builtin (b, args) -> Builtin (b, List.map args ~f:subst)
-    | Record args -> Record (List.map args ~f:subst)
-    | Field (t, f) -> Field (subst t, f)
-    | Variant (ctor, args) -> Variant (ctor, List.map args ~f:subst)
-    | Match (scrutinee, cases) ->
-      Match (subst scrutinee, List.map cases ~f:(fun (pat, body) -> pat, subst body))
-    | Coerce (target, inner) -> Coerce (subst_ty sub target, subst inner)
-    | Tuple ts -> Tuple (List.map ts ~f:subst)
+    | Vec (n, ts) -> Vec (n, List.map ts ~f:map)
+    | Lam (v, body) -> Lam (v, map body)
+    | App (a, b) -> App (map a, map b)
+    | Let (r, v, cs, bind, body) ->
+      Let (r, v, List.map cs ~f:(map_constr_tys ~f), map bind, map body)
+    | If (c, tt, e) -> If (map c, map tt, map e)
+    | Bop (op, a, b) -> Bop (op, map a, map b)
+    | Index (a, i) -> Index (map a, i)
+    | Builtin (b, args) -> Builtin (b, List.map args ~f:map)
+    | Record ts -> Record (List.map ts ~f:map)
+    | Field (a, fld) -> Field (map a, fld)
+    | Variant (ctor, args) -> Variant (ctor, List.map args ~f:map)
+    | Match (s, cases) -> Match (map s, List.map cases ~f:(fun (p, b) -> p, map b))
+    | Coerce (target, inner) -> Coerce (f target, map inner)
+    | Tuple ts -> Tuple (List.map ts ~f:map)
   in
-  { t with desc; ty = subst_ty sub t.ty }
+  { t with desc; ty = f t.ty }
 ;;
+
+(** Apply substitution to term *)
+let subst_term (sub : substitution) (t : term) : term = map_term_tys ~f:(subst_ty sub) t
 
 let ftv_of_context (ctx : context) : String.Set.t =
   let ftv_of_scheme (vars, constrs, ty) =
@@ -918,38 +922,25 @@ let enforce_main_type _env bind ty loc v =
 ;;
 
 (** [subsumes scheme tau], is a structure member's principal scheme at least as
-    general as the signature spec [tau]? Standard skolemize / instantiate / unify *)
+    general as the signature spec [tau]? Standard skolemize / instantiate /
+    unify. The spec's quantifiers are skolemized to fresh rigid nominal
+    constants [TyAbstract], so escape prevention is structural *)
 let subsumes ~loc ((vars_s, constrs_s, body_s) : type_scheme) (tau_spec : ty) : bool =
-  (* Skolemize the spec's quantifiers to fresh *)
   let skolems =
-    ftv_of_ty tau_spec |> Set.to_list |> List.map ~f:(fun v -> v, fresh_tyvar ())
-  in
-  let skolem_names =
-    List.filter_map skolems ~f:(fun (_, t) ->
-      match t with
-      | TyVar s -> Some s
-      | _ -> None)
+    ftv_of_ty tau_spec
+    |> Set.to_list
+    |> List.map ~f:(fun v -> v, TyAbstract (Utils.fresh v))
   in
   let tau' = subst_ty skolems tau_spec in
-  (* Instantiate the struct scheme with fresh flexible tyvars *)
   let inst = List.map vars_s ~f:(fun v -> v, fresh_tyvar ()) in
   let body' = subst_ty inst body_s in
   let constrs' = subst_constraints inst constrs_s in
-  (* Unify bodies, discharge the struct's class/broadcast obligations *)
   match
     Compiler_error.try_with (fun () ->
       Constraint_solver.solve ({ desc = Eq (body', tau'); loc } :: constrs'))
   with
   | Error _ -> false
-  | Ok (sub, deferred) ->
-    List.is_empty deferred
-    &&
-    (* Every skolem must remain a distinct type variable *)
-    let imgs = List.map skolem_names ~f:(fun s -> subst_ty sub (TyVar s)) in
-    List.for_all imgs ~f:(function
-      | TyVar _ -> true
-      | _ -> false)
-    && not (List.contains_dup imgs ~compare:compare_ty)
+  | Ok (_, deferred) -> List.is_empty deferred
 ;;
 
 (** Elaborate a declared signature for matching *)
@@ -963,47 +954,100 @@ let elaborate_decl_sig ~loc (env : env) (specs : Frontend.spec list) : decl_sig 
         , Decl_manifest (t, repr) :: acc )
       | SpecVal (x, ty) -> env, Decl_val (x, resolve_stlc_ty ~loc env ty) :: acc
       | SpecAbstractType t ->
-        raise "abstract type specs not supported yet" ~loc ~d:[%message (t : string)])
+        let g = Utils.fresh t in
+        ( { env with aliases = Map.set env.aliases ~key:t ~data:([], TyAbstract g) }
+        , Decl_abstract (t, g) :: acc ))
   in
   List.rev rev
 ;;
 
-(** Transparent signature matching *)
-let match_sig ~loc (env : env) mname (full : signature) (decl : decl_sig) : unit =
-  List.iter decl ~f:(function
-    | Decl_val (x, tau) ->
-      (match sig_find_val full x with
-       | None ->
-         raise
-           "module does not implement val"
-           ~loc
-           ~d:[%message (mname : string) (x : string)]
-       | Some core ->
-         let scheme =
-           Map.find env.ctx core
-           |> of_option "var not found in type map" ~loc ~d:[%message (core : string)]
-           |> ok_exn
-         in
-         if not (subsumes ~loc scheme tau)
-         then
-           raise
-             "signature mismatch: val has wrong type"
-             ~loc
-             ~d:[%message (mname : string) (x : string)])
-    | Decl_manifest (t, repr_expected) ->
-      (match sig_find_type full t with
-       | None ->
-         raise
-           "module does not implement type"
-           ~loc
-           ~d:[%message (mname : string) (t : string)]
-       | Some repr ->
-         if not (equal_ty repr repr_expected)
-         then
-           raise
-             "signature mismatch: manifest type"
-             ~loc
-             ~d:[%message (mname : string) (t : string)]))
+(** Substitute abstract-type stamps *)
+let rec subst_abstract (sub : (string * ty) list) (ty : ty) : ty =
+  match ty with
+  | TyAbstract g -> List.Assoc.find ~equal:String.equal sub g |> Option.value ~default:ty
+  | ty -> map_ty_children (subst_abstract sub) ty
+;;
+
+(** Match a structure's transparent principal signature [full] against declared
+    signature [decl], and produce the sealed signature to bind for the module.
+    [decl] is an existential package [exists a-bar. S], split like so:
+
+    1. For each abstract [type t] look up the structure's actual representation
+       [R_t] and mint a fresh generative stamp [g]. This gives us the two
+       eliminating substitutions over the bound stamps [a], [rho = R_t / a],
+       and [pack = g / a].
+
+    2. Check each item against [full] under [rho], and emit its sealed form under
+       [pack]. This gives us a faithful ascription NOT a structural rewrite of
+       the inferred scheme, which many over-seal. *)
+let seal ~loc (env : env) mname (full : signature) (decl : decl_sig) : signature * env =
+  (* Realizing the existential *)
+  let pack, rho, reveal =
+    List.fold
+      decl
+      ~init:([], [], env.reveal)
+      ~f:(fun ((pack, rho, reveal) as acc) -> function
+      | Decl_abstract (t, a) ->
+        let r_t =
+          sig_find_type full t
+          |> of_option
+               "module does not implement type"
+               ~loc
+               ~d:[%message (mname : string) (t : string)]
+          |> ok_exn
+        in
+        let g = Utils.fresh t in
+        (a, TyAbstract g) :: pack, (a, r_t) :: rho, Map.set reveal ~key:g ~data:r_t
+      | Decl_val _ | Decl_manifest _ -> acc)
+  in
+  (* Match each item under [rho], emit its sealed form under [pack] *)
+  let ctx, rev_sigma =
+    List.fold decl ~init:(env.ctx, []) ~f:(fun (ctx, sigma) -> function
+      | Decl_abstract (t, a) ->
+        ctx, Sig_type (t, List.Assoc.find_exn ~equal:String.equal pack a) :: sigma
+      | Decl_manifest (t, repr) ->
+        let r_t =
+          sig_find_type full t
+          |> of_option
+               "module does not implement type"
+               ~loc
+               ~d:[%message (mname : string) (t : string)]
+          |> ok_exn
+        in
+        if not (equal_ty r_t (subst_abstract rho repr))
+        then
+          raise
+            "signature mismatch: manifest type"
+            ~loc
+            ~d:[%message (mname : string) (t : string)];
+        ctx, Sig_type (t, subst_abstract pack repr) :: sigma
+      | Decl_val (x, tau) ->
+        let core =
+          sig_find_val full x
+          |> of_option
+               "module does not implement val"
+               ~loc
+               ~d:[%message (mname : string) (x : string)]
+          |> ok_exn
+        in
+        let scheme =
+          Map.find env.ctx core
+          |> of_option "var not found in type map" ~loc ~d:[%message (core : string)]
+          |> ok_exn
+        in
+        if not (subsumes ~loc scheme (subst_abstract rho tau))
+        then
+          raise
+            "signature mismatch: val has wrong type"
+            ~loc
+            ~d:[%message (mname : string) (x : string)];
+        let tau_seal = subst_abstract pack tau in
+        let ctx =
+          Map.set ctx ~key:core ~data:(ftv_of_ty tau_seal |> Set.to_list, [], tau_seal)
+        in
+        ctx, Sig_val (x, core) :: sigma)
+  in
+  List.rev rev_sigma, { env with ctx; reveal }
 ;;
 
 (** Elaborate a top-level [Define] *)
@@ -1062,20 +1106,33 @@ let elaborate_module (env : env) loc mname sig_opt (members : Desugar.top list)
       | _ -> raise "unreachable: invalid module member after uniquify" ~loc:m.loc)
   in
   let full = List.rev (Map.find_multi env'.modules mname) in
-  (* An ascription is checked against the structure here *)
-  Option.iter sig_opt ~f:(fun sigref ->
-    let decl_sig = elaborate_sigref ~loc env' sigref in
-    match_sig ~loc env' mname full decl_sig);
+  (* An ascription is checked against the structure here. The signature
+     expression itself elaborates in the *ambient* scope - module-internal type
+     aliases are hidden from it, matching uniquify's [resolve_sigref] - so a
+     spec cannot silently reference a hidden internal type transparently. *)
+  let sigma, env' =
+    match sig_opt with
+    | None -> full, env'
+    | Some sigref ->
+      let decl = elaborate_sigref ~loc { env' with aliases = env.aliases } sigref in
+      seal ~loc env' mname full decl
+  in
   (* member schemes stay in [ctx], module-local type aliases should not leak *)
   ( { env' with
       aliases = env.aliases
-    ; modules = Map.set env'.modules ~key:mname ~data:full
+    ; modules = Map.set env'.modules ~key:mname ~data:sigma
     }
   , List.rev rev_tops )
 ;;
 
-let typecheck_impl (Program terms : Desugar.t) : t =
-  let _, tops =
+type elaborated =
+  { program : t
+  ; reveal : ty String.Map.t
+  }
+[@@deriving sexp_of]
+
+let typecheck_impl (Program terms : Desugar.t) : elaborated =
+  let final_env, tops =
     List.fold
       terms
       ~init:
@@ -1085,6 +1142,7 @@ let typecheck_impl (Program terms : Desugar.t) : t =
           ; ctx = String.Map.empty
           ; modules = String.Map.empty
           ; sigs = String.Map.empty
+          ; reveal = String.Map.empty
           }
         , [] )
       ~f:(fun (env, acc) top ->
@@ -1156,7 +1214,7 @@ let typecheck_impl (Program terms : Desugar.t) : t =
         | Open name ->
           raise "uniquify should have removed" ~loc:top.loc ~d:[%message (name : string)])
   in
-  Program (List.rev tops)
+  { program = Program (List.rev tops); reveal = final_env.reveal }
 ;;
 
 let typecheck t = try_with (fun () -> typecheck_impl t)

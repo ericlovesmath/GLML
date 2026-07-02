@@ -12,13 +12,7 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution =
   | (loc, TyVar v, ty) :: con | (loc, ty, TyVar v) :: con ->
     let rec occurs_in = function
       | TyVar v' -> String.equal v v'
-      | TyFloat | TyInt | TyBool | TySampler -> false
-      | TyVec (_, t) -> occurs_in t
-      | TyRecord (_, fields) -> List.exists fields ~f:(fun (_, t) -> occurs_in t)
-      | TyVariant (_, ctors) ->
-        List.exists ctors ~f:(fun (_, ts) -> List.exists ts ~f:occurs_in)
-      | TyArrow (ty, ty') -> occurs_in ty || occurs_in ty'
-      | TyTuple ts -> List.exists ts ~f:occurs_in
+      | ty -> fold_ty_children (fun acc t -> acc || occurs_in t) false ty
     in
     if equal_ty (TyVar v) ty
     then unify con
@@ -33,13 +27,13 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution =
   | (loc, TyArrow (f, x), TyArrow (f', x')) :: con ->
     unify ((loc, f, f') :: (loc, x, x') :: con)
   | (loc, TyVec (n, t), TyVec (n', t')) :: con when n = n' -> unify ((loc, t, t') :: con)
-  | (loc, TyRecord (_, fs), TyRecord (_, fs')) :: con
-    when List.length fs = List.length fs' ->
+  | (loc, TyRecord (n, fs), TyRecord (n', fs')) :: con
+    when String.equal n n' && List.length fs = List.length fs' ->
     unify (List.map2_exn fs fs' ~f:(fun (_, t) (_, t') -> loc, t, t') @ con)
   | (loc, TyTuple ts, TyTuple ts') :: con when List.length ts = List.length ts' ->
     unify (List.map2_exn ts ts' ~f:(Tuple3.create loc) @ con)
-  | (loc, TyVariant (_, cs), TyVariant (_, cs')) :: con
-    when List.length cs = List.length cs' ->
+  | (loc, TyVariant (n, cs), TyVariant (n', cs')) :: con
+    when String.equal n n' && List.length cs = List.length cs' ->
     let pairs =
       List.map2_exn cs cs' ~f:(fun (_, ts) (_, ts') ->
         List.map2_exn ts ts' ~f:(Tuple3.create loc))
@@ -55,14 +49,7 @@ let rec unify (con : (Lexer.loc * ty * ty) list) : substitution =
 (** int <: float subtyping to make canonical type *)
 let rec widen_numeric = function
   | TyInt -> TyFloat
-  | TyVec (n, t) -> TyVec (n, widen_numeric t)
-  | TyRecord (hint, fields) ->
-    TyRecord (hint, List.map fields ~f:(fun (n, t) -> n, widen_numeric t))
-  | TyVariant (hint, ctors) ->
-    TyVariant (hint, List.map ctors ~f:(fun (n, ts) -> n, List.map ts ~f:widen_numeric))
-  | TyArrow (a, b) -> TyArrow (widen_numeric a, widen_numeric b)
-  | TyTuple ts -> TyTuple (List.map ts ~f:widen_numeric)
-  | t -> t
+  | ty -> map_ty_children widen_numeric ty
 ;;
 
 let is_scalar = function
@@ -226,12 +213,14 @@ let resolve_constraints (constrs : constr list) : constr list * (Lexer.loc * ty 
           aux deferred eqs (mk (Coerce (p', p)) :: mk (Coerce (r, r')) :: rest)
         | TyVec (n, t), TyVec (n', t') when n = n' ->
           aux deferred eqs (mk (Coerce (t, t')) :: rest)
-        | TyRecord (_, fs), TyRecord (_, fs') when List.length fs = List.length fs' ->
+        | TyRecord (n, fs), TyRecord (n', fs')
+          when String.equal n n' && List.length fs = List.length fs' ->
           aux
             deferred
             eqs
             (List.map2_exn fs fs' ~f:(fun (_, a) (_, b) -> mk (Coerce (a, b))) @ rest)
-        | TyVariant (_, cs), TyVariant (_, cs') when List.length cs = List.length cs' ->
+        | TyVariant (n, cs), TyVariant (n', cs')
+          when String.equal n n' && List.length cs = List.length cs' ->
           let coerces =
             List.map2_exn cs cs' ~f:(fun (_, ts) (_, ts') ->
               List.map2_exn ts ts' ~f:(fun a b -> mk (Coerce (a, b))))
@@ -261,19 +250,21 @@ let rec join_ty (a : ty) (b : ty) : ty option =
     | TyInt, TyFloat | TyFloat, TyInt -> Some TyFloat
     | TyVec (n, t), TyVec (n', t') when n = n' ->
       Option.map (join_ty t t') ~f:(fun t -> TyVec (n, t))
-    | TyRecord (h1, fs), TyRecord (h2, fs') when List.length fs = List.length fs' ->
+    | TyRecord (h1, fs), TyRecord (h2, fs')
+      when String.equal h1 h2 && List.length fs = List.length fs' ->
       List.map2_exn fs fs' ~f:(fun (n, t) (_, t') ->
         Option.map (join_ty t t') ~f:(fun jt -> n, jt))
       |> Option.all
-      |> Option.map ~f:(fun fields -> TyRecord (merge_hint h1 h2, fields))
-    | TyVariant (h1, cs), TyVariant (h2, cs') when List.length cs = List.length cs' ->
+      |> Option.map ~f:(fun fields -> TyRecord (h1, fields))
+    | TyVariant (h1, cs), TyVariant (h2, cs')
+      when String.equal h1 h2 && List.length cs = List.length cs' ->
       List.map2_exn cs cs' ~f:(fun (n, ts) (_, ts') ->
         if List.length ts <> List.length ts'
         then None
         else
           List.map2_exn ts ts' ~f:join_ty |> Option.all |> Option.map ~f:(fun ts -> n, ts))
       |> Option.all
-      |> Option.map ~f:(fun ctors -> TyVariant (merge_hint h1 h2, ctors))
+      |> Option.map ~f:(fun ctors -> TyVariant (h1, ctors))
     | TyTuple ts, TyTuple ts' when List.length ts = List.length ts' ->
       List.map2_exn ts ts' ~f:join_ty
       |> Option.all

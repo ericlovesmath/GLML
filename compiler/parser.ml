@@ -974,8 +974,8 @@ let rec top_item_p st =
   (top_let_p
    <|> top_extern_p
    <|> top_record_p
-   <|> top_variant_p
    <|> top_alias_p
+   <|> top_variant_p
    <|> top_module_p
    <|> top_open_p)
     st

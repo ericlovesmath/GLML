@@ -7,14 +7,13 @@ type ty =
   | TyBool
   | TyVec of int * ty
   | TyArrow of ty * ty
-  | TyRecord of (string[@equal.ignore] [@compare.ignore]) * (string * ty) list
-  | TyVariant of (string[@equal.ignore] [@compare.ignore]) * (string * ty list) list
+  | TyRecord of string * (string * ty) list
+  | TyVariant of string * (string * ty list) list
   | TyVar of string
   | TyTuple of ty list
   | TySampler
+  | TyAbstract of string
 [@@deriving equal, compare]
-
-let merge_hint a b = if String.is_empty a then b else a
 
 let rec sexp_of_ty = function
   | TyFloat -> Atom "float"
@@ -35,6 +34,7 @@ let rec sexp_of_ty = function
   | TyVar v -> Atom ("'" ^ v)
   | TyTuple ts -> List (Atom "tuple" :: List.map ts ~f:sexp_of_ty)
   | TySampler -> Atom "sampler"
+  | TyAbstract g -> Atom ("#" ^ g)
 ;;
 
 type type_decl =
@@ -87,34 +87,51 @@ type substitution = (string * ty) list [@@deriving sexp_of]
 
 let fresh_tyvar () = TyVar (Utils.fresh "v")
 
+(** Apply [f] to each sub[ty] *)
+let map_ty_children (f : ty -> ty) : ty -> ty = function
+  | (TyFloat | TyInt | TyBool | TySampler | TyVar _ | TyAbstract _) as t -> t
+  | TyVec (n, t) -> TyVec (n, f t)
+  | TyArrow (a, b) -> TyArrow (f a, f b)
+  | TyRecord (hint, fields) -> TyRecord (hint, List.map fields ~f:(fun (n, t) -> n, f t))
+  | TyVariant (hint, ctors) ->
+    TyVariant (hint, List.map ctors ~f:(fun (n, ts) -> n, List.map ts ~f))
+  | TyTuple ts -> TyTuple (List.map ts ~f)
+;;
+
+(** Fold [f] over each immediate sub[ty] *)
+let fold_ty_children (f : 'a -> ty -> 'a) (acc : 'a) : ty -> 'a = function
+  | TyFloat | TyInt | TyBool | TySampler | TyVar _ | TyAbstract _ -> acc
+  | TyVec (_, t) -> f acc t
+  | TyArrow (a, b) -> f (f acc a) b
+  | TyRecord (_, fields) -> List.fold fields ~init:acc ~f:(fun acc (_, t) -> f acc t)
+  | TyVariant (_, ctors) ->
+    List.fold ctors ~init:acc ~f:(fun acc (_, ts) -> List.fold ts ~init:acc ~f)
+  | TyTuple ts -> List.fold ts ~init:acc ~f
+;;
+
 let rec subst_ty (sub : substitution) (ty : ty) : ty =
   match ty with
   | TyVar v -> List.Assoc.find ~equal:String.equal sub v |> Option.value ~default:ty
-  | TyFloat | TyInt | TyBool | TySampler -> ty
-  | TyVec (n, t) -> TyVec (n, subst_ty sub t)
-  | TyVariant (hint, ctors) ->
-    TyVariant (hint, List.map ctors ~f:(fun (n, ts) -> n, List.map ts ~f:(subst_ty sub)))
-  | TyRecord (hint, fields) ->
-    TyRecord (hint, List.map fields ~f:(fun (n, t) -> n, subst_ty sub t))
-  | TyArrow (f, x) -> TyArrow (subst_ty sub f, subst_ty sub x)
-  | TyTuple ts -> TyTuple (List.map ts ~f:(subst_ty sub))
+  | ty -> map_ty_children (subst_ty sub) ty
+;;
+
+(** Map [f] over each [ty] in a constraint *)
+let map_constr_tys ~(f : ty -> ty) (c : constr) : constr =
+  let desc =
+    match c.desc with
+    | Eq (l, r) -> Eq (f l, f r)
+    | HasClass (cls, ty) -> HasClass (cls, f ty)
+    | Broadcast (l, r, ret) -> Broadcast (f l, f r, f ret)
+    | MulBroadcast (l, r, ret) -> MulBroadcast (f l, f r, f ret)
+    | IndexAccess (t, i, ret) -> IndexAccess (f t, i, f ret)
+    | FieldAccess (t, fld, ret) -> FieldAccess (f t, fld, f ret)
+    | Coerce (from_ty, to_ty) -> Coerce (f from_ty, f to_ty)
+  in
+  { c with desc }
 ;;
 
 let subst_constraints (sub : substitution) (con : constr list) : constr list =
-  List.map con ~f:(fun c ->
-    let desc =
-      match c.desc with
-      | Eq (l, r) -> Eq (subst_ty sub l, subst_ty sub r)
-      | HasClass (cls, ty) -> HasClass (cls, subst_ty sub ty)
-      | Broadcast (l, r, ret) ->
-        Broadcast (subst_ty sub l, subst_ty sub r, subst_ty sub ret)
-      | MulBroadcast (l, r, ret) ->
-        MulBroadcast (subst_ty sub l, subst_ty sub r, subst_ty sub ret)
-      | IndexAccess (t, i, ret) -> IndexAccess (subst_ty sub t, i, subst_ty sub ret)
-      | FieldAccess (t, f, ret) -> FieldAccess (subst_ty sub t, f, subst_ty sub ret)
-      | Coerce (from_ty, to_ty) -> Coerce (subst_ty sub from_ty, subst_ty sub to_ty)
-    in
-    { c with desc })
+  List.map con ~f:(map_constr_tys ~f:(subst_ty sub))
 ;;
 
 let compose_sub (s : substitution) (s' : substitution) : substitution =
@@ -125,15 +142,7 @@ let compose_sub (s : substitution) (s' : substitution) : substitution =
 
 let rec ftv_of_ty = function
   | TyVar v -> String.Set.singleton v
-  | TyFloat | TyInt | TyBool | TySampler -> String.Set.empty
-  | TyVec (_, t) -> ftv_of_ty t
-  | TyRecord (_, fields) ->
-    String.Set.union_list (List.map fields ~f:(fun (_, t) -> ftv_of_ty t))
-  | TyVariant (_, ctors) ->
-    String.Set.union_list
-      (List.concat_map ctors ~f:(fun (_, ts) -> List.map ts ~f:ftv_of_ty))
-  | TyArrow (t1, t2) -> Set.union (ftv_of_ty t1) (ftv_of_ty t2)
-  | TyTuple ts -> String.Set.union_list (List.map ts ~f:ftv_of_ty)
+  | ty -> fold_ty_children (fun acc t -> Set.union acc (ftv_of_ty t)) String.Set.empty ty
 ;;
 
 let ftv_of_constraint (c : constr) : String.Set.t =

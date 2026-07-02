@@ -8,17 +8,13 @@ type ty =
   | TyBool
   | TyVec of int * ty
   | TyArrow of ty * ty
-  (** NOTE: First arg [hint] on records/variants is a non-semantic name suggestion
-      used by later passes (monomorphize) to produce nicer GLSL struct names.
-      Do NOT use this for any other purpose. *)
   | TyRecord of string * (string * ty) list
   | TyVariant of string * (string * ty list) list
   | TyVar of string
   | TyTuple of ty list
   | TySampler
+  | TyAbstract of string
 [@@deriving sexp_of, equal, compare]
-
-val merge_hint : string -> string -> string
 
 (** Top-level type declarations. The [string list] holds type parameter names
     (e.g. ["'a"; "'b"]) and comes first to mirror the surface syntax
@@ -83,7 +79,18 @@ type constr =
 type substitution = (string * ty) list [@@deriving sexp_of]
 
 val fresh_tyvar : unit -> ty
+
+(** Apply [f] to each sub[ty] *)
+val map_ty_children : (ty -> ty) -> ty -> ty
+
+(** Fold [f] over each sub[ty] *)
+val fold_ty_children : ('a -> ty -> 'a) -> 'a -> ty -> 'a
+
 val subst_ty : substitution -> ty -> ty
+
+(** Map [f] over each [ty] in a constraint *)
+val map_constr_tys : f:(ty -> ty) -> constr -> constr
+
 val subst_constraints : substitution -> constr list -> constr list
 val compose_sub : substitution -> substitution -> substitution
 val ftv_of_ty : ty -> String.Set.t

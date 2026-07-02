@@ -1344,3 +1344,22 @@ let%expect_test "fragment derivative builtins" =
     }
     |}]
 ;;
+let%expect_test "records are nominal" =
+  test
+    {|
+    type a = { x : float }
+    type b = { x : float }
+    let f (v : a) : float = v.x
+    let g (v : b) : a = v
+    let main (coord : vec2) : vec4 = [0.0, 0.0, 0.0, 1.0]
+    |};
+  [%expect
+    {|
+    [constraint solver] at 5:5-5:26: type mismatch
+      ty: (record b (x float))
+      ty': (record a (x float))
+      |
+    5 |     let g (v : b) : a = v
+      |     ^^^^^^^^^^^^^^^^^^^^^
+    |}]
+;;

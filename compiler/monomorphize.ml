@@ -153,17 +153,7 @@ let rec subst ~(poly : Type_system.ty) ~(concrete : Type_system.ty)
   | _ -> []
 ;;
 
-let rec is_concrete (ty : Type_system.ty) : bool =
-  match ty with
-  | TyVar _ -> false
-  | TyFloat | TyInt | TyBool | TySampler -> true
-  | TyVec (_, t) -> is_concrete t
-  | TyVariant (_, ctors) ->
-    List.for_all ctors ~f:(fun (_, ts) -> List.for_all ts ~f:is_concrete)
-  | TyRecord (_, fields) -> List.for_all fields ~f:(fun (_, t) -> is_concrete t)
-  | TyArrow (a, b) -> is_concrete a && is_concrete b
-  | TyTuple ts -> List.for_all ts ~f:is_concrete
-;;
+let is_concrete (ty : Type_system.ty) : bool = Set.is_empty (Type_system.ftv_of_ty ty)
 
 (* ===== Monomorphize-specific helpers ===== *)
 
@@ -446,6 +436,7 @@ and rewrite_refs (st : state) (t : Typecheck.term) : state * Typecheck.term =
 let rec ty_of (t : Type_system.ty) : ty =
   match t with
   | TyVar _ -> raise "unexpected TyVar after monomorphization"
+  | TyAbstract _ -> raise "unexpected TyAbstract after erasure"
   | TyFloat -> TyFloat
   | TyInt -> TyInt
   | TyBool -> TyBool
@@ -547,9 +538,15 @@ let assign_names ~(typedef_loc : Lexer.loc) (tops : Typecheck.top list)
   : Typecheck.top list
   =
   let open Type_system in
-  (* [equal_ty] already ignores the hint string at every level (see
-     [@equal.ignore] in [Type_system.ty]), so we don't have to canonicalize
-     hints to compare shapes - we just thread hints alongside as metadata. *)
+  (* [equal_ty] should be nominal, but GLSL structs dedup by layout, so we just
+     strip the names to dedup structurally *)
+  let rec strip ty =
+    match ty with
+    | TyRecord (_, fs) -> TyRecord ("", List.map fs ~f:(fun (n, t) -> n, strip t))
+    | TyVariant (_, cs) ->
+      TyVariant ("", List.map cs ~f:(fun (n, ts) -> n, List.map ts ~f:strip))
+    | ty -> map_ty_children strip ty
+  in
   let hint_of = function
     | (TyRecord (h, _) | TyVariant (h, _)) when not (String.is_empty h) -> Some h
     | _ -> None
@@ -560,10 +557,13 @@ let assign_names ~(typedef_loc : Lexer.loc) (tops : Typecheck.top list)
     | (k, eh) :: rest when equal_ty k ty -> (k, Option.first_some eh h) :: rest
     | entry :: rest -> entry :: upsert_shape rest ty h
   in
-  let record acc ty = if is_concrete ty then upsert_shape acc ty (hint_of ty) else acc in
+  let record acc ty =
+    if is_concrete ty then upsert_shape acc (strip ty) (hint_of ty) else acc
+  in
   let rec walk_ty acc ty =
     match ty with
     | TyFloat | TyInt | TyBool | TySampler | TyVar _ -> acc
+    | TyAbstract _ -> raise "unexpected TyAbstract after erasure"
     | TyVec (_, t) -> walk_ty acc t
     | TyArrow (a, b) -> walk_ty (walk_ty acc a) b
     | TyRecord (_, fields) ->
@@ -597,10 +597,11 @@ let assign_names ~(typedef_loc : Lexer.loc) (tops : Typecheck.top list)
     List.fold tops ~init:[] ~f:walk_top
     |> List.map ~f:(fun (ty, h) -> ty, Utils.fresh (prefix_for ty h))
   in
-  let lookup_ty ty = List.Assoc.find assignments ~equal:equal_ty ty in
+  let lookup_ty ty = List.Assoc.find assignments ~equal:equal_ty (strip ty) in
   let rec rty ty =
     match ty with
     | TyFloat | TyInt | TyBool | TySampler | TyVar _ -> ty
+    | TyAbstract _ -> raise "unexpected TyAbstract after erasure"
     | TyVec (n, t) -> TyVec (n, rty t)
     | TyArrow (a, b) -> TyArrow (rty a, rty b)
     | TyRecord (h, fields) ->
